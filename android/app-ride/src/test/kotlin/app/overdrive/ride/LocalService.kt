@@ -10,8 +10,8 @@ import java.util.concurrent.Executors
 
 /**
  * A stand-in for the ride intake of `server/` on the loopback address (ADR 0014 section 3), for the tests that run the real
- * container: bearer authentication, `PUT /v1/rides/{id}` and `PUT /v1/rides/{id}/fit`, answered as the real service does.
- * [down] makes every request answer 503.
+ * container: bearer authentication, `PUT /v1/rides/{id}` and `PUT /v1/rides/{id}/fit`, answered as the real service does, and
+ * `GET /v1/workouts` (ADR 0017), which answers [plan] with [planStatus]. [down] makes every request answer 503.
  */
 class LocalService(
     val token: String = "tok-3f9a7c1e5b2d4a6f8091a2b3c4d5e6f7",
@@ -20,12 +20,24 @@ class LocalService(
         val path: String,
         val authorization: String?,
         val body: ByteArray,
+        val method: String = "PUT",
+        val query: String? = null,
     )
 
     val received = CopyOnWriteArrayList<Received>()
 
     @Volatile
     var down = false
+
+    /** What `GET /v1/workouts` answers with (the planned workouts' JSON), and with which status. */
+    @Volatile
+    var plan: String = """{"error":{"code":"not_found","message":"No plan"}}"""
+
+    @Volatile
+    var planStatus = 404
+
+    /** The GETs of the plan, in order. They are kept apart from [received], which is the ride upload's. */
+    val planRequests = CopyOnWriteArrayList<Received>()
 
     private val records = ConcurrentHashMap<String, ByteArray>()
     private val fits = ConcurrentHashMap<String, ByteArray>()
@@ -49,8 +61,9 @@ class LocalService(
             val body = exchange.requestBody.readBytes()
             val auth = exchange.requestHeaders.getFirst("Authorization")
             val path = exchange.requestURI.path
-            received += Received(path, auth, body)
-            val (status, text) = answer(path, auth, body)
+            val request = Received(path, auth, body, exchange.requestMethod, exchange.requestURI.rawQuery)
+            if (request.method == "GET" && path == "/v1/workouts") planRequests += request else received += request
+            val (status, text) = answer(exchange.requestMethod, path, auth, body)
             val bytes = text.encodeToByteArray()
             exchange.responseHeaders.add("Content-Type", "application/json")
             if (status == 401) exchange.responseHeaders.add("WWW-Authenticate", "Bearer realm=\"overdrive\"")
@@ -60,12 +73,14 @@ class LocalService(
     }
 
     private fun answer(
+        method: String,
         path: String,
         auth: String?,
         body: ByteArray,
     ): Pair<Int, String> {
         if (down) return 503 to error("internal_error", "Down for the test")
         if (auth != "Bearer $token") return 401 to error("unauthorized", "Missing or invalid bearer token")
+        if (method == "GET" && path == "/v1/workouts") return planStatus to plan
         val match = ROUTE.matchEntire(path) ?: return 404 to error("not_found", "No such route")
         val id = match.groupValues[1]
         val store = if (match.groupValues[2].isEmpty()) records else fits

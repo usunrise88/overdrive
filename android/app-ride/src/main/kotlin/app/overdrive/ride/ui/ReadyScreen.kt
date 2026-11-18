@@ -28,6 +28,7 @@ import app.overdrive.data.rides.StoredRide
 import app.overdrive.ride.host.DevicesUi
 import app.overdrive.ride.host.RideChoice
 import app.overdrive.ride.overlay.OverlayAccess
+import app.overdrive.ride.plan.PlanUi
 import app.overdrive.ride.rides.RecoveryState
 import app.overdrive.ride.rides.ride
 import app.overdrive.ride.settings.AppSettings
@@ -67,6 +68,8 @@ class ReadyActions(
     val onRecoveryDiscard: (StoredRide) -> Unit = {},
     /** The "no trainer" line's **Pair a trainer**: opens the Devices screen (ADR 0010). */
     val onOpenDevices: () -> Unit = {},
+    /** The Planned section's refresh button: asks the service for the plan now (spec §5.7, ADR 0017). */
+    val onRefreshPlan: () -> Unit = {},
 )
 
 /**
@@ -81,6 +84,8 @@ class ReadyActions(
  * @param recovery an interrupted ride found on disk (ADR 0008): a notice at the top asks to save or discard it.
  * @param lastRide the ride saved last, with **Share** and **Save to folder** so its FIT file is reachable after the summary.
  * @param files share and save of a FIT file; the screen only calls them. [fileMessage] is what the last one said.
+ * @param plan the planned workouts from the service (spec §5.7): a **Planned** section above the list, drawn only when there is
+ * a plan to show ([PlanUi.visible]). Choosing one of its rows selects it like any workout; the ride's `workoutId` is its id.
  */
 @Composable
 fun ReadyScreen(
@@ -100,6 +105,7 @@ fun ReadyScreen(
     fileMessage: String? = null,
     forceDiscardConfirm: Boolean = false,
     bluetooth: BluetoothFix = BluetoothFix.None,
+    plan: PlanUi = PlanUi.Hidden,
 ) {
     var confirmDiscard by rememberSaveable { mutableStateOf(false) }
     Box(modifier.fillMaxSize().background(OverdriveColors.bg)) {
@@ -117,7 +123,7 @@ fun ReadyScreen(
                 topBar,
             )
             Row(Modifier.weight(1f).fillMaxWidth()) {
-                WorkoutList(choice, workouts, settings, actions, Modifier.width(360.dp).fillMaxHeight())
+                WorkoutList(choice, workouts, settings, plan, actions, Modifier.width(360.dp).fillMaxHeight())
                 VerticalRule()
                 Detail(
                     choice,
@@ -157,12 +163,19 @@ private fun WorkoutList(
     choice: RideChoice,
     workouts: List<Workout>,
     settings: AppSettings,
+    plan: PlanUi,
     actions: ReadyActions,
     modifier: Modifier,
 ) {
     Column(modifier.padding(horizontal = 16.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionLabel("Ride", Modifier.padding(start = 16.dp, bottom = 4.dp))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            PlannedSection(
+                plan,
+                choice,
+                onSelect = { actions.onSelect(RideChoice.Planned(it)) },
+                onRefresh = actions.onRefreshPlan,
+            )
+            SectionLabel("Ride", Modifier.padding(start = 16.dp, bottom = 12.dp))
             SelectableRow(
                 title = "Free ride",
                 subtitle = "Simulation on the flat · gears",

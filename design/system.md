@@ -232,6 +232,17 @@ chip, then right-aligned: device status icons (16 dp, see §7.7), overlay button
   **Share** (`share-2`) and **Save to folder** (`folder-open`); a line of label text 2 under the title says what the last
   share or save did. **Discard** opens the confirmation sheet of §6.3 ("Discard this ride?", **Discard** secondary left,
   **Keep it** primary right). The mock-up PNG predates these rows.
+- **Planned workouts (stage P2-2b, spec §5.7, ADR 0017).** Only when the tablet has a service address and token (and the service has
+  a plan source); otherwise nothing is drawn and nothing is said. At the top of the left column, above "Ride", scrolling with it:
+  a **Planned** label (label, text 3) with a 48 dp ghost refresh icon button (`refresh-cw`, "Refresh planned workouts", off while
+  it asks); one line of state under it (label, text 2: "Updated 07:30", "Updating…"; with a 16 dp `triangle-alert` and text 1 when
+  there is a problem: "Out of date · updated 17 Nov 21:15" over the reason in text 2 ("Service unreachable"), or "The service did
+  not accept the token. Check the token in Settings"); today's workouts as **value rows** (§7.5), or "Nothing planned today"
+  (body, text 2); then **This week** as a disclosure row with its count, collapsed, and opened the days under it ("Tomorrow",
+  "Sun 22 Nov": label, text 3) each with its value rows. A value row shows the name, one line of description, the length ("65 min")
+  and the intensity factor ("IF 0.76", caption, text 3) on the right; the chosen one is surface 2 with a check, like the Free ride
+  and local workout rows. A ridden workout says "✓ Done 18:04 · description" (a 16 dp `check` before the subtitle); one the player
+  cannot run is dimmed, takes no press or focus and says why ("Longer than 12 hours", with a `triangle-alert`).
 
 ### 6.2 Riding (`ride--riding.png`)
 
@@ -402,6 +413,15 @@ Two-line 64 dp, single-line 56 dp; padding 10 × 16; 16 dp gap. Title bodyStrong
 text 2. Trailing: value numXS (tabular, right-aligned) over caption text 3, or an icon/control.
 Rows in a card are separated by 1 dp `border`, full width. Selected row: surface2, radius 8,
 no dividers around it (selection lists use no dividers).
+
+**Value row** (`ValueRow`, stage P2-2b): the two-line list row with a value on the right, numXS tabular and right-aligned over a
+caption in text 3 ("65 min" over "IF 0.76"); a 16 dp icon may go before the subtitle (the check of "Done", the alert of a row that
+cannot be used); the selected row is surface 2 with a check after the value; a disabled row has a text-3 title, no press and no
+focus. **Disclosure row** (`DisclosureRow`): single-line, 56 dp, the title in bodyStrong, a detail in label text 2 ("3 workouts")
+and a 20 dp `chevron-right` (`chevron-down` when open); its state is also said to accessibility. **Focus ring**: a row that has
+focus (keyboard, d-pad; Compose gives focus to clickable things only after the first hardware key) draws a 2 dp text-1 ring
+inside its edge, the focus state of §7.1 for rows; these two rows are the first components to draw it, the others follow when
+they are next touched.
 
 ### 7.6 Notice
 

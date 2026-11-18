@@ -277,13 +277,7 @@ public class HttpSyncProvider(
             null
         }
 
-    private fun reasonFor(failure: TransportFailure): String =
-        when (failure) {
-            TransportFailure.Unreachable -> "Service unreachable"
-            TransportFailure.TimedOut -> "The service did not answer in time"
-            TransportFailure.SecureConnection -> "Secure connection failed"
-            TransportFailure.Other -> "Could not talk to the service"
-        }
+    private fun reasonFor(failure: TransportFailure): String = failure.plainReason()
 
     /** The server's message as one short line of text for a row in Settings. */
     private fun oneLine(message: String): String {

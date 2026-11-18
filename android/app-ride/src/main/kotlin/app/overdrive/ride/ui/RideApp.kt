@@ -37,6 +37,7 @@ import app.overdrive.ride.host.RideChoice
 import app.overdrive.ride.host.RideMapping
 import app.overdrive.ride.overlay.OverlayController
 import app.overdrive.ride.overlay.OverlayPolicy
+import app.overdrive.ride.plan.PlanUi
 import app.overdrive.ride.rides.SaveState
 import app.overdrive.ride.settings.OverlayStartMode
 import app.overdrive.ride.settings.SimulatedClick
@@ -54,6 +55,7 @@ import app.overdrive.uikit.tokens.OverdriveMotion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.LocalDate
 
 /** The screens of the app. A small state, no navigation library (ADR 0005). */
 enum class Screen {
@@ -96,6 +98,8 @@ fun RideApp(
     val rideFiles = rememberRideFiles(container.rides)
     val pairing by container.pairing.state.collectAsStateWithLifecycle()
     val learn by container.learning.ui.collectAsStateWithLifecycle()
+    val planState by container.plan.state.collectAsStateWithLifecycle()
+    val ridden by container.rides.ridden.collectAsStateWithLifecycle()
     val syncStatus by container.sync.status.collectAsStateWithLifecycle()
     val syncReport by container.sync.report.collectAsStateWithLifecycle()
     // One plain notice with one action for Bluetooth that cannot be used, re-read on every resume (ADR 0010).
@@ -214,6 +218,13 @@ fun RideApp(
         ) { target ->
             when (target) {
                 Page.Ready -> {
+                    // The Ready screen coming on screen asks for the plan (the repository holds it to once a minute), and the
+                    // list is made again from the clock whenever the plan or the rides change, never more often.
+                    LaunchedEffect(Unit) { container.planScreenOpened() }
+                    val planUi =
+                        remember(planState, ridden) {
+                            PlanUi.of(planState, ridden, LocalDate.now().toString(), System.currentTimeMillis())
+                        }
                     ReadyScreen(
                         choice = choice,
                         workouts = workouts,
@@ -235,7 +246,9 @@ fun RideApp(
                                 onRecoverySave = { container.rides.saveRecovered(it.id) },
                                 onRecoveryDiscard = { container.rides.discardRecovered(it.id) },
                                 onOpenDevices = { screen = Screen.Devices },
+                                onRefreshPlan = container::refreshPlan,
                             ),
+                        plan = planUi,
                         overlayAccess = access,
                         recovery = recovery,
                         lastRide = lastRide,

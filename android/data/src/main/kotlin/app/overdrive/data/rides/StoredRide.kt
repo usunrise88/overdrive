@@ -29,6 +29,11 @@ data class StoredRide(
     val status: StoredRideStatus,
     /** Size of the FIT file in bytes, or null while there is none. */
     val fitBytes: Long?,
+    /**
+     * The id of the workout the ride was made from (`ride.workoutId`), such as a planned workout's `icu-123` (spec §5.7), or
+     * null for a free ride and for a ride stored before the id was kept in the small file beside it.
+     */
+    val workoutId: String? = null,
 ) {
     val hasFit: Boolean get() = fitBytes != null
     val isInterrupted: Boolean get() = status == StoredRideStatus.Interrupted

@@ -81,7 +81,7 @@ object WorkoutDescriber {
     }
 
     /** The step kinds present, in a fixed order: "steady, ramp, intervals, free". */
-    private fun kinds(workout: Workout): String {
+    internal fun kinds(workout: Workout): String {
         val leaves = workout.steps.flatMap { if (it is RepeatStep) it.steps else listOf(it as LeafStep) }
         return buildList {
             if (leaves.any { it is SteadyStep }) add("steady")

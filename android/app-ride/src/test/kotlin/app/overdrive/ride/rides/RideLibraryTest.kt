@@ -280,6 +280,54 @@ class RideLibraryTest {
             assertTrue(seen.single() is RecoveryState.Saving)
         }
 
+    // ---- The workouts that were ridden (spec §5.7) -----------------------------------------------------------------
+
+    @Test
+    fun theRidesOnDiskThatHaveAWorkoutAreListedAsRiddenAtStartAndAFreeRideIsNot() =
+        runTest {
+            val store = RideStore(directory)
+            for ((id, workout) in listOf("a" to "icu-1001", "b" to null, "c" to "icu-1002")) {
+                val record = RideFixtures.record("ride-$id", RideFixtures.START, 90, workout)
+                store.finalize(record, "Ride $id", 0)
+            }
+            val library = library()
+            assertTrue("nothing before the scan", library.ridden.value.isEmpty())
+            library.start()
+            runCurrent()
+            assertEquals(setOf("icu-1001", "icu-1002"), library.ridden.value.map { it.workoutId }.toSet())
+            assertEquals(2, library.ridden.value.size)
+            assertEquals(RideFixtures.START, library.ridden.value.first { it.workoutId == "icu-1001" }.startEpochMillis)
+        }
+
+    @Test
+    fun aRideStoredFromAPlannedWorkoutIsRiddenAtOnceAndAFreeRideAddsNothing() =
+        runTest {
+            val library = library()
+            for ((id, workout) in listOf("ride-1" to "icu-77", "ride-2" to null)) {
+                val record = RideFixtures.record(id, RideFixtures.START + id.length, 120, workout)
+                val log = library.begin("Ride")
+                log.recorder.onRideStarted(record.ride.copy(endEpochMillis = null))
+                for (sample in record.samples) log.recorder.onSample(sample)
+                log.recorder.onRideFinished(record.ride.endEpochMillis!!)
+                runCurrent()
+                assertTrue(log.finish(record) is SaveState.Saved)
+            }
+            assertEquals(listOf(RiddenWorkout("icu-77", RideFixtures.START + "ride-1".length)), library.ridden.value)
+        }
+
+    @Test
+    fun aRecoveredRideThatWasMadeFromAPlannedWorkoutCountsOnceTheRiderKeepsIt() =
+        runTest {
+            RideFixtures.writeLog(RideStore(directory), "cut", RideFixtures.START, 600, false, workoutId = "icu-5")
+            val library = library()
+            library.start()
+            runCurrent()
+            assertTrue("an interrupted ride has not been kept yet", library.ridden.value.isEmpty())
+            library.saveRecovered("cut")
+            runCurrent()
+            assertEquals(listOf("icu-5"), library.ridden.value.map { it.workoutId })
+        }
+
     // ---- Storing at the end of a ride ------------------------------------------------------------------------------
 
     @Test

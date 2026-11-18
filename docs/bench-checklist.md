@@ -31,7 +31,7 @@ and write down what you see. Do not treat it as known.
 | 4 | Heart-rate strap | HR7 | 20 min |
 | 5 | Click v2 (AC 3) | Click, ideally a Zwift account to unlock it | 1.5 h |
 | 6 | Overlay over a real video app (AC 1, 7) | video apps, trainer, strap, Click | 2.5 h, with the 60-minute ride |
-| 7 | A whole ride, FIT export and import (AC 2, 3, 6) | trainer, strap, Click, intervals.icu | 1 h |
+| 7 | A whole ride, FIT export and import, upload, planned workouts (AC 2, 3, 6) | trainer, strap, Click, intervals.icu, the service | 1.5 h |
 | 8 | Crash recovery (AC 5) | trainer | 20 min |
 | 9 | Wrap-up and what to send back | | 15 min |
 
@@ -675,6 +675,30 @@ Everything a ride is, once, on all three devices, then the file it leaves.
   with **Send now**) when the network is back. Finish a new ride and watch it upload with the app in the background. Write
   down the time from the end of the ride to the server's log line, and anything the Settings line said that was not plain.
   Settles: ADR 0014 section 8 (what only the tablet can show).
+- [ ] **7.10 Planned workouts (stage P2-2b, ADR 0017).** Needs 7.9 done (address and token set) and the server reading your
+  intervals.icu calendar, with one workout planned for today and one or two later this week (the AI agent, or by hand in
+  intervals.icu; later stages bring the MCP tools). Open the app on the **Ready** screen. Expect, in this order:
+  - **The section.** Within a few seconds a **Planned** section is at the top of the left column, above **Ride**: today's
+    workouts (name, one line of description, the length in minutes and "IF 0.xx"), then **This week** with a count. A workout
+    planned for another day is not under today. With no address or token (clear them first, then put them back) there is no
+    section and no error text. Write down how long it took to appear after the app opened.
+  - **Offline.** Put the tablet in flight mode and force-stop and reopen the app (8.2): the same list is there, with "Out of
+    date · updated <time>" and "Service unreachable" under **Planned**. Turn flight mode off and press the refresh button: the
+    line says "Updating…" and then "Updated <time>". Leave and re-enter the Ready screen (Settings, back) twice within a
+    minute: nothing is asked the second time (watch the server's log).
+  - **Right word, wrong token.** Type a wrong token in Settings, Sync: the section says "The service did not accept the token.
+    Check the token in Settings" and keeps the list. Fix the token: the list updates without a restart.
+  - **Start it.** Tap a planned workout, press **Start**, pedal: the workout plays exactly as 7.1 (targets, intervals, the Click
+    and the on-screen buttons). **Finish** it. On the server (or in intervals.icu after the upload) the ride carries that
+    workout's id (`icu-<number>`): in the `rides` table as `workoutId` in the record, and intervals.icu pairs the activity
+    with the planned workout of the day (spec §5.5, which is the server's stage). Back on the Ready screen the workout reads
+    "Done <time>" with a check, and tapping it still selects it again.
+  - **Reach it without touching the screen.** With a Bluetooth keyboard or a USB keyboard on the tablet, Tab walks the
+    section top to bottom (refresh, today's rows, **This week**, then the local list); Enter chooses a row or opens **This
+    week**; a ring shows which one has focus. **The Click cannot do this** (its ten actions are for the ride, as for the rest of
+    the Ready screen): write down whether the tablet gives the Click any way to move focus, and whether Start has to be pressed
+    on the screen. Also write down a workout the app showed as disabled, if one ever appears, and its reason.
+  Settles: ADR 0017 ("what only the real tablet can settle"), spec §5.7.
 
 ---
 
@@ -870,6 +894,7 @@ the app in the background and with the screen off, a 60-minute ride, the laps an
 | 7.7 Strava (optional) | | | |
 | 7.8 Waiting to upload | | | |
 | 7.9 Upload to the service | | | |
+| 7.10 Planned workouts | | | |
 | 8.1 to 8.3 Crash recovery (AC 5) | | | |
 | 8.4 Swipe away | | | |
 | 8.5 The outbox survives it | | | |
@@ -936,5 +961,5 @@ as follows; every step keeps its text, and sessions 3 and 4 are unchanged.
 | 3.n trainer, 4.n strap | 3.n, 4.n |
 | 5.n Click | 5.n (5.11 and 5.12 are new) |
 | 6.n crash recovery (session 6) | 8.n (session 8) |
-| 7.n FIT export (session 7) | 7.(n+1); 7.1 is new, 7.8 is new |
+| 7.n FIT export (session 7) | 7.(n+1); 7.1 is new, 7.8, 7.9 and 7.10 are new |
 | 8.n wrap-up (session 8) | 9.n (session 9) |

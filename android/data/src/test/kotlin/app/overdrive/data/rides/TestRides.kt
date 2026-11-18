@@ -43,9 +43,10 @@ object TestRides {
         seconds: Int,
         id: String = "ride-1",
         start: Long = START,
+        workoutId: String? = null,
     ): RideRecord =
         RideRecordBuilder.recover(
-            header(id, start),
+            header(id, start, workoutId),
             samples(seconds),
             (1..seconds step 3).map(::rr),
             start + seconds * 1000L,
@@ -62,9 +63,10 @@ object TestRides {
         id: String = "ride-1",
         start: Long = START,
         title: String = "Test ride",
+        workoutId: String? = null,
     ): RideRecord {
         val writer = RideLogWriter(store, title)
-        val record = record(seconds, id, start)
+        val record = record(seconds, id, start, workoutId)
         writer.onRideStarted(record.ride.copy(endEpochMillis = null))
         val rr = record.rrIntervals.groupBy { it.timeOffsetSeconds }
         for (sample in record.samples) {

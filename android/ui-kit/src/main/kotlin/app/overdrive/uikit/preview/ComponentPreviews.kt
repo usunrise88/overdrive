@@ -32,6 +32,7 @@ import app.overdrive.uikit.DeviceRow
 import app.overdrive.uikit.DeviceStatus
 import app.overdrive.uikit.DeviceStatusCluster
 import app.overdrive.uikit.DeviceStatusIcon
+import app.overdrive.uikit.DisclosureRow
 import app.overdrive.uikit.Notice
 import app.overdrive.uikit.OdButton
 import app.overdrive.uikit.OdCard
@@ -50,6 +51,7 @@ import app.overdrive.uikit.SettingRow
 import app.overdrive.uikit.StatTile
 import app.overdrive.uikit.Stepper
 import app.overdrive.uikit.TileGroup
+import app.overdrive.uikit.ValueRow
 import app.overdrive.uikit.ZoneChip
 import app.overdrive.uikit.Zones
 import app.overdrive.uikit.chart.ProfileLook
@@ -298,6 +300,32 @@ fun ListSample() {
             SelectableRow("Sweet spot 3×10", "65 min · steady, ramp, intervals", true, {})
             SelectableRow("VO2 5×3", "56 min · intervals", false, {})
             Box(Modifier.height(8.dp))
+            ValueRow(
+                "Sweet spot 3×10",
+                "Three 10-minute efforts",
+                {},
+                value = "65 min",
+                caption = "IF 0.76",
+                selected = true,
+            )
+            ValueRow(
+                "Threshold 2×20",
+                "Done 18:04",
+                {},
+                value = "1:15",
+                caption = "IF 0.88",
+                subtitleIcon = OverdriveIcons.Check,
+            )
+            ValueRow(
+                "Long ride",
+                "Longer than 12 hours",
+                {},
+                value = "13:00:00",
+                enabled = false,
+                subtitleIcon = OverdriveIcons.TriangleAlert,
+            )
+            DisclosureRow("This week", "3 workouts", expanded = false, onToggle = {})
+            Box(Modifier.height(8.dp))
             SettingRow("FTP", description = "Sets power zones and workout targets", first = true) {
                 Stepper("250 W", {}, {})
             }
@@ -349,7 +377,7 @@ private fun ProfilePreview() = ProfileSample()
 @Composable
 private fun ZoneBarsPreview() = ZoneBarsSample()
 
-@Preview(widthDp = 360, heightDp = 400)
+@Preview(widthDp = 360, heightDp = 560)
 @Composable
 private fun ListPreview() = ListSample()
 
