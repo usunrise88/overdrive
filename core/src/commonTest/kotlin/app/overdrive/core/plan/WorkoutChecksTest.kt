@@ -99,6 +99,22 @@ class WorkoutChecksTest {
     }
 
     @Test
+    fun `the planned load is IF squared times hours times a hundred, and an hour at FTP is 100`() {
+        assertNear(100.0, workout(SteadyStep(duration = 3600, target = 1.0)).plannedLoad(), 0.01)
+        assertNear(56.25, workout(SteadyStep(duration = 3600, target = 0.75)).plannedLoad(), 0.01)
+        assertNear(25.0, workout(SteadyStep(duration = 1800, target = 0.7071067811865476)).plannedLoad(), 0.01)
+        // Free steps add no time and no stress.
+        val mixed = workout(SteadyStep(duration = 3600, target = 1.0), FreeStep(duration = 1800))
+        assertNear(100.0, mixed.plannedLoad(), 0.01)
+    }
+
+    @Test
+    fun `a workout with no power to normalise has no planned load`() {
+        assertNull(workout(FreeStep(duration = 3600)).plannedLoad())
+        assertNull(workout(SteadyStep(duration = 20, target = 1.0)).plannedLoad())
+    }
+
+    @Test
     fun `no hint when there is less than one window of prescribed power`() {
         assertNull(workout(FreeStep(duration = 3600)).intensityFactor())
         assertNull(workout(SteadyStep(duration = 29, target = 0.9)).intensityFactor())
