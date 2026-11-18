@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.overdrive.uikit.icons.OverdriveIcons
 import app.overdrive.uikit.tokens.OverdriveColors
@@ -150,7 +151,10 @@ fun DeviceStatusCluster(
  * text arc, one turn per second, linear. It loops only while it is on screen, which is while a search runs.
  */
 @Composable
-fun Spinner(modifier: Modifier = Modifier) {
+fun Spinner(
+    modifier: Modifier = Modifier,
+    diameter: Dp = 20.dp,
+) {
     val motion = LocalMotionEnabled.current
     val turn =
         if (motion) {
@@ -169,7 +173,7 @@ fun Spinner(modifier: Modifier = Modifier) {
         } else {
             0f
         }
-    Canvas(modifier.size(20.dp)) {
+    Canvas(modifier.size(diameter)) {
         val stroke = 2.dp.toPx()
         val inset = stroke / 2f
         val arcSize = Size(size.width - stroke, size.height - stroke)

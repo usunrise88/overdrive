@@ -788,6 +788,41 @@ Everything a ride is, once, on all three devices, then the file it leaves.
 
 ---
 
+## Session 10: the companion on the phone (stage P3-4a)
+
+Needs: the Xiaomi 14 Ultra, the `app-companion` APK from the release, and the service with a few rides uploaded from the tablet (the metrics and
+rides screens have nothing to draw without them). Companion-only: the ride app's sessions above are not affected. Everything here is what the JVM
+tests cannot settle (`docs/adr/0024-companion-app.md`).
+
+- [ ] **10.1 First run.** Open the app with no address stored: the connect step. Type the address **without** `https://`: Connect accepts it. A wrong
+  token says "The service did not accept this token (401)." under the token field and stays on the step; a wrong host says the DNS sentence under the
+  address with "(UnknownHostException · DNS)". A plain `http://192.168...` address is accepted and says "Not encrypted" in Settings. After Connect, Today
+  opens. Note the keyboard: it must not cover the Connect button (the page scrolls), and Show reveals the token.
+- [ ] **10.2 The numbers.** Today, Fitness, Power and Rides against what the tablet recorded: a ride's load, duration and average power in the list and in
+  its detail; the zone times add up to the moving time; the laps and the planned-workout line say what you rode; fitness, fatigue and form on Fitness agree with
+  `get_fitness` in the assistant.
+- [ ] **10.3 The charts' touch.** On Fitness: a tap selects a day on both line charts and the week below it; a hold (about a quarter of a second) and a slide
+  scrubs, a tick under the finger at every day; a vertical swipe that starts on a chart scrolls the page and never the chart; **Today** (and the page leaving)
+  returns to rest. Does the hold feel right, too slow or too fast? On the ride detail, the three plots share one crosshair. **Values** opens a table, newest first.
+- [ ] **10.4 TalkBack.** Each chart is one item that reads "Fitness and fatigue, 6 months, Wed 18 Nov, Fitness 54, Fatigue 43"; the custom actions **Previous point**
+  and **Next point** move it and the new point is read; the Today pill reads "Back to today"; the tabs read "Today, tab, 1 of 5".
+- [ ] **10.5 Offline.** Airplane mode, force-stop, open: every screen draws from its cache and the status line says "Offline · updated HH:MM" with "Pull down to try
+  again." Back online, pull down on each screen: "Updating…" in the header, the line goes. A ride opened once opens offline. Turn the service off (not the phone):
+  "The service did not answer. It may be restarting; try again in a minute." Give a wrong token in Settings: "The service did not accept the token. Check it in Settings." with a **Settings** button.
+- [ ] **10.6 The FTP suggestion.** With one open (the service needs three comparable efforts), **Keep** hides it at once and it stays gone after a restart; **Use** puts
+  the new FTP on Today and Power, and the tablet's Ready screen shows it after its next sync. Repeat both with the service unreachable: "Will be sent when the service can be
+  reached", and it goes when the service is back (Settings, **Sync now**, or open Today).
+- [ ] **10.7 Text and width.** System font scale 1.3x and the smallest display size (about 360 dp wide): nothing is cut, readouts wrap, tiles do not overlap, the bottom
+  navigation labels fit.
+- [ ] **10.8 Frames.** A year on Fitness and Power, a three-hour ride's detail: scrolling and scrubbing do not drop frames (Developer options, Profile GPU rendering, or
+  `adb shell dumpsys gfxinfo app.overdrive.companion framestats`); the pull down feels like a pull and not a bounce.
+- [ ] **10.9 Edges.** The bottom navigation sits above the gesture bar (80 dp with at least 16 dp under the icons), the status bar does not overlap a header, the app
+  stays in portrait, the system back goes pushed screen, then Today, then out.
+- [ ] **10.10 What to send back.** Screenshots of any screen that looks wrong, the numbers that disagreed (10.2), the hold's feel (10.3) and the frame figures (10.8). They show
+  your own training: send them privately.
+
+---
+
 ## Coverage: what settles what
 
 ### Acceptance criteria (`docs/phase1-acceptance.md`)

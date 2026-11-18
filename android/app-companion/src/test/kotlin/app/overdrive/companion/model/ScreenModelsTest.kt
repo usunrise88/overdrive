@@ -1,0 +1,575 @@
+package app.overdrive.companion.model
+
+import app.overdrive.companion.Samples
+import app.overdrive.companion.model.TestClock.fresh
+import app.overdrive.companion.wellness.RecoveryFactData
+import app.overdrive.companion.wellness.RecoveryLevel
+import app.overdrive.companion.wellness.RecoveryState
+import app.overdrive.core.metrics.MetricsResponse
+import app.overdrive.core.profile.ProfileState
+import app.overdrive.core.remote.FtpAnswers
+import app.overdrive.core.remote.MetricsRange
+import app.overdrive.core.remote.ProblemKind
+import app.overdrive.core.remote.ResourceState
+import app.overdrive.core.remote.RidesList
+import app.overdrive.core.remote.RidesView
+import app.overdrive.core.remote.ServiceProblem
+import app.overdrive.uikit.RecoveryLook
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/** The screens' words and numbers from the service's answers (design/companion.md §4, §5), without Compose. */
+class ScreenModelsTest {
+    private val words = TestClock.words
+    private val host = "overdrive.example.net"
+
+    private fun <T> ScreenUi<T>.content(): T = (body as Body.Content).value
+
+    // region states
+
+    @Test
+    fun `nothing cached and nothing asked is loading, a failure with nothing cached is the error block`() {
+        val loading = FitnessUi.of(ResourceState(loaded = true), MetricsRange.SIX_MONTHS, words, host)
+        assertEquals(Body.Loading("Loading your fitness…"), loading.body)
+        val problem =
+            ServiceProblem(ProblemKind.NAME_NOT_FOUND, "Cannot find the service address (DNS)", "UnknownHostException")
+        val failed =
+            FitnessUi.of(
+                ResourceState(loaded = true, problem = problem, asked = true),
+                MetricsRange.SIX_MONTHS,
+                words,
+                host,
+            )
+        val block = (failed.body as Body.Failed).problem
+        assertEquals("Could not reach your service", block.title)
+        assertEquals(
+            "The phone could not find overdrive.example.net. Check the address in Settings, or try again on another network.",
+            block.cause,
+        )
+        assertEquals("UnknownHostException · DNS", block.hint)
+        assertNull(failed.status)
+    }
+
+    @Test
+    fun `a stale answer keeps its content and adds the status line with its own time`() {
+        val metrics = Samples.metrics("2026-05-25")
+        val offline = ServiceProblem(ProblemKind.NO_NETWORK, "No network connection")
+        val ui = FitnessUi.of(fresh(metrics).copy(problem = offline), MetricsRange.SIX_MONTHS, words, host)
+        assertEquals("Offline · updated 07:40", ui.status?.title)
+        assertEquals("Updated 07:40", ui.subtitle)
+        assertTrue(ui.body is Body.Content)
+    }
+
+    @Test
+    fun `refreshing is said by the header and leaves the content`() {
+        val ui =
+            FitnessUi.of(
+                fresh(Samples.metrics("2026-05-25")).copy(refreshing = true),
+                MetricsRange.SIX_MONTHS,
+                words,
+                host,
+            )
+        assertTrue(ui.refreshing)
+        assertTrue(ui.body is Body.Content)
+    }
+
+    @Test
+    fun `no load yet is the empty state with the design's sentence`() {
+        val ui = FitnessUi.of(fresh(Samples.metrics("2026-05-25", noLoad = true)), MetricsRange.SIX_MONTHS, words, host)
+        assertEquals(
+            Body.Empty(
+                "No load yet",
+                "Fitness and fatigue start with your first ride on the tablet or your first activity on the watch.",
+            ),
+            ui.body,
+        )
+    }
+
+    // region fitness
+
+    @Test
+    fun `the fitness tiles are today with the change over four weeks and seven days, and the form word`() {
+        val metrics = Samples.metrics("2026-05-25")
+        val content = FitnessUi.of(fresh(metrics), MetricsRange.SIX_MONTHS, words, host).content()
+        val today = metrics.daily.last()
+        val fitness = content.tiles[0]
+        assertEquals("Fitness", fitness.label)
+        assertEquals(Math.round(today.ctl).toString(), fitness.value)
+        val ago28 = metrics.daily[metrics.daily.size - 29]
+        assertEquals(
+            "${words.change((Math.round(today.ctl) - Math.round(ago28.ctl)).toInt())} in 4 weeks",
+            fitness.caption,
+        )
+        val ago7 = metrics.daily[metrics.daily.size - 8]
+        assertEquals(
+            "${words.change((Math.round(today.atl) - Math.round(ago7.atl)).toInt())} in 7 days",
+            content.tiles[1].caption,
+        )
+        assertEquals("Form", content.tiles[2].label)
+        assertEquals(
+            app.overdrive.core.metrics.FormWord
+                .of(today.tsb)
+                .label,
+            content.tiles[2].caption,
+        )
+    }
+
+    @Test
+    fun `the readout follows the selected day and rests on today`() {
+        val metrics = Samples.metrics("2026-05-25")
+        val content = FitnessUi.of(fresh(metrics), MetricsRange.SIX_MONTHS, words, host).content()
+        val rest = content.fitness.readoutAt(null)
+        assertEquals("Wed 18 Nov", rest.x)
+        assertEquals(listOf("Fitness", "Fatigue"), rest.entries.map { it.name })
+        val past = content.fitness.readoutAt(content.fitness.spec.snapXs[10])
+        assertEquals(words.day(metrics.daily[10].date), past.x)
+        assertEquals(Math.round(metrics.daily[10].ctl).toString(), past.entries[0].value)
+        assertTrue(
+            content.form
+                .readoutAt(null)
+                .entries
+                .single()
+                .value
+                .contains(" · "),
+        )
+    }
+
+    @Test
+    fun `the charts draw one point per day, today last, at most 366`() {
+        for (range in MetricsRange.entries) {
+            val metrics = Samples.metrics(range.from(Samples.TODAY))
+            val content = FitnessUi.of(fresh(metrics), range, words, host).content()
+            assertEquals(metrics.daily.size, content.fitness.spec.snapXs.size)
+            assertTrue(content.fitness.spec.snapXs.size <= 366)
+            assertEquals(range.weeks, content.weekly.spec.values.size)
+            assertEquals(content.fitness.spec.xMax, content.fitness.spec.restX, 0.0)
+        }
+    }
+
+    @Test
+    fun `the form chart always shows its Training hard band, whatever the data`() {
+        val content = FitnessUi.of(fresh(Samples.metrics("2026-05-25")), MetricsRange.SIX_MONTHS, words, host).content()
+        val spec = content.form.spec
+        assertTrue(spec.yMin <= -30.0 && spec.yMax >= 10.0)
+        assertEquals("Training hard", spec.bands.single().label)
+        assertTrue(content.form.note!!.startsWith("Fitness minus fatigue. Below −10"))
+    }
+
+    @Test
+    fun `the weekly readout says so far for the current week`() {
+        val metrics = Samples.metrics("2026-05-25")
+        val weekly = FitnessUi.of(fresh(metrics), MetricsRange.SIX_MONTHS, words, host).content().weekly
+        val now = weekly.readoutAt(null)
+        assertEquals("Week of 16 Nov · so far", now.x)
+        assertEquals("Load", now.entries[0].name)
+        assertEquals("Rides", now.entries[1].name)
+        val older = weekly.readoutAt(weekly.spec.selectXs[3])
+        assertFalse(older.x.contains("so far"))
+        // A day selected on the line charts selects its week here, and a column selects the week's last day in the range.
+        assertEquals(weekly.spec.values.size - 1, weekly.spec.columnOf(weekly.spec.restX))
+        assertEquals(weekly.spec.restX, weekly.spec.selectXs.last(), 0.0)
+    }
+
+    @Test
+    fun `date ticks follow the range and keep three days from either end`() {
+        val six = DateAxis.ticks(MetricsRange.SIX_WEEKS, "2026-10-12", "2026-11-18", words)
+        assertEquals(listOf("26 Oct", "9 Nov"), six.map { it.label })
+        val months = DateAxis.ticks(MetricsRange.SIX_MONTHS, "2026-05-25", "2026-11-18", words)
+        assertEquals(listOf("Jun", "Jul", "Aug", "Sep", "Oct", "Nov"), months.map { it.label })
+        val year = DateAxis.ticks(MetricsRange.ONE_YEAR, "2025-11-24", "2026-11-18", words)
+        assertEquals(listOf("Jan", "Apr", "Jul", "Oct"), year.map { it.label })
+        // A month that starts within three days of the end has no label.
+        assertEquals(
+            listOf(
+                "Jun",
+                "Jul",
+                "Aug",
+                "Sep",
+                "Oct",
+            ),
+            DateAxis.ticks(MetricsRange.SIX_MONTHS, "2026-05-25", "2026-11-02", words).map {
+                it.label
+            },
+        )
+    }
+
+    @Test
+    fun `week ticks label every week for six weeks and the weeks that open a month otherwise`() {
+        val weeks = listOf("2026-10-12", "2026-10-19", "2026-10-26", "2026-11-02", "2026-11-09", "2026-11-16")
+        assertEquals(weeks.size, DateAxis.weekTicks(MetricsRange.SIX_WEEKS, weeks, words).size)
+        assertEquals(listOf("Nov"), DateAxis.weekTicks(MetricsRange.SIX_MONTHS, weeks, words).map { it.label })
+    }
+
+    // region power
+
+    private fun power(
+        metrics: MetricsResponse,
+        answers: FtpAnswers = FtpAnswers(),
+        profile: ProfileState = ProfileState(ready = true, profile = Samples.profile()),
+    ) = PowerUi.of(fresh(metrics), profile, answers, MetricsRange.SIX_MONTHS, words, host)
+
+    @Test
+    fun `the FTP card shows the suggestion with its basis, and Use and Keep answer it`() {
+        val card = power(Samples.metrics("2026-05-25")).content().ftp
+        assertEquals(250, card.current)
+        assertEquals("Set 2 Oct", card.setLine)
+        val suggestion = card.answer as FtpUi.Suggestion
+        assertEquals(256, suggestion.watts)
+        assertEquals("from 3 rides in 6 weeks", suggestion.basis)
+        assertEquals(7, suggestion.id)
+    }
+
+    @Test
+    fun `a suggestion the rider kept, or that the profile already has, is not offered again`() {
+        val metrics = Samples.metrics("2026-05-25")
+        assertNull(power(metrics, FtpAnswers(setOf(7))).content().ftp.answer)
+        val used = ProfileState(ready = true, profile = Samples.profile(ftp = 256))
+        assertNull(power(metrics, profile = used).content().ftp.answer)
+        assertEquals(256, power(metrics, profile = used).content().ftp.current)
+        assertEquals(FtpUi.Queued, power(metrics, FtpAnswers(setOf(7), waiting = 1)).content().ftp.answer)
+    }
+
+    @Test
+    fun `without a suggestion the card says set and estimated, without an FTP it says so`() {
+        val none = power(Samples.metrics("2026-05-25", suggestion = null)).content().ftp
+        assertNull(none.answer)
+        assertEquals(256, none.estimate)
+        val unset =
+            PowerUi.content(
+                Samples.metrics("2026-05-25", suggestion = null, ftp = null),
+                ProfileState(ready = true),
+                FtpAnswers(),
+                MetricsRange.SIX_MONTHS,
+                words,
+            )
+        assertNull(unset.ftp.current)
+    }
+
+    @Test
+    fun `the power curve has the 25 durations on a log axis, rests at 20 minutes and reads both curves`() {
+        val curve = power(Samples.metrics("2026-05-25")).content().curve!!
+        assertEquals(25, curve.spec.snapXs.size)
+        assertTrue(curve.spec.xLogarithmic)
+        assertEquals(1200.0, curve.spec.restX, 0.0)
+        val rest = curve.readoutAt(null)
+        assertEquals("20 min", rest.x)
+        assertEquals(listOf("6 months", "Best ever"), rest.entries.map { it.name })
+        assertTrue(rest.entries.all { it.value.endsWith(" W") })
+        // A duration longer than the longest range ride: the range line has no value there (the line ends).
+        val last = curve.readoutAt(7200.0)
+        assertEquals("—", last.entries[0].value)
+        assertEquals("FTP 250", curve.spec.refLines.single().label)
+    }
+
+    @Test
+    fun `best efforts list the five durations that exist, each with its ride`() {
+        val efforts = power(Samples.metrics("2026-05-25")).content().bestEfforts
+        assertEquals(listOf("5 s", "1 min", "5 min", "20 min", "1 h"), efforts.map { it.duration })
+        assertTrue(efforts.all { it.rideId == "ride-sweet" })
+    }
+
+    @Test
+    fun `the FTP history is a step line per day with the estimates as dots and reads the estimate before the day`() {
+        val history = power(Samples.metrics("2026-05-25")).content().ftpHistory
+        val line = history.spec.lines.single()
+        assertTrue(line.stepped)
+        assertEquals(history.spec.snapXs.size, line.xs.size)
+        assertEquals(250.0, line.ys.last(), 0.0)
+        assertEquals(238.0, line.ys.first(), 0.0)
+        val rest = history.readoutAt(null)
+        assertEquals(listOf("FTP", "Estimated"), rest.entries.map { it.name })
+        assertEquals("250 W", rest.entries[0].value)
+    }
+
+    @Test
+    fun `drift is dots with a rolling mean of the last five rides, and the empty case says why`() {
+        val drift = power(Samples.metrics("2026-05-25")).content().drift!!
+        assertEquals("Steady", drift.spec.bands.single().label)
+        assertEquals(0.0, drift.spec.yMin, 0.0)
+        assertTrue(drift.spec.yMax >= 10.0)
+        assertTrue(drift.note!!.contains("40 minutes"))
+        assertEquals(listOf(2.0, 3.0, 5.0), PowerUi.rollingMean(listOf(2.0, 4.0, 6.0), window = 2))
+        val three = PowerUi.rollingMean(listOf(5.0, 5.0, 8.0, 10.0), window = 3)
+        assertEquals(listOf(5.0, 5.0, 6.0), three.take(3))
+        assertEquals(7.6667, three[3], 1e-4)
+        assertNull(power(Samples.metrics("2026-05-25", withDrift = false)).content().drift)
+    }
+
+    @Test
+    fun `a chart with a single point still builds, with one thing to select`() {
+        val full = Samples.metrics("2026-05-25")
+        val one =
+            full.copy(
+                drift = full.drift.take(1),
+                powerCurve =
+                    app.overdrive.core.metrics.PowerCurves(
+                        full.powerCurve.range.take(1),
+                        full.powerCurve.allTime.take(1),
+                    ),
+            )
+        val content = power(one).content()
+        assertEquals(1, content.drift!!.spec.snapXs.size)
+        assertEquals(1, content.curve!!.spec.snapXs.size)
+        assertEquals("no listed duration was ridden long enough", 0, content.bestEfforts.size)
+        assertEquals(content.drift!!.spec.snapXs[0], content.drift!!.spec.restX, 0.0)
+        assertEquals("1 s", content.curve!!.readoutAt(null).x)
+    }
+
+    // region rides
+
+    @Test
+    fun `rides are grouped by month with the month's load, rows of two lines and a card position`() {
+        val view = RidesView(fresh(Samples.ridesPage()), RidesList(Samples.rideItems()))
+        val content = RidesUi.of(view, words, host).content()
+        val months = content.entries.filterIsInstance<RidesEntry.Month>()
+        assertEquals(listOf("November", "October"), months.map { it.month })
+        assertEquals("Load ${words.load(74.0 + 97.0 + 38.0 + 81.0 + 68.0 + 27.0 + 74.0)}", months[0].total)
+        val rows = content.entries.filterIsInstance<RidesEntry.Row>().map { it.row }
+        assertEquals("Sweet spot 3×10", rows[0].title)
+        assertEquals("Wed 18 · 1:05:12", rows[0].subtitle)
+        assertEquals("74", rows[0].load)
+        assertEquals("196 W", rows[0].caption)
+        assertEquals(CardPosition.First, rows[0].position)
+        assertEquals(CardPosition.Middle, rows[1].position)
+        assertEquals(CardPosition.Last, rows[6].position)
+        assertEquals(CardPosition.First, rows[7].position)
+    }
+
+    @Test
+    fun `a watch activity says Watch, shows heart rate in bpm, and is marked by words, not colour`() {
+        val view = RidesView(fresh(Samples.ridesPage()), RidesList(Samples.rideItems()))
+        val activity =
+            RidesUi
+                .of(view, words, host)
+                .content()
+                .entries
+                .filterIsInstance<RidesEntry.Row>()
+                .map {
+                    it.row
+                }.first { it.watch }
+        assertEquals("Beat Saber", activity.title)
+        assertEquals("Watch · Sun 15 · 42:10", activity.subtitle)
+        assertEquals("142 bpm", activity.caption)
+    }
+
+    @Test
+    fun `no rides is the empty state and a single ride in a month is a card of one`() {
+        val empty = RidesUi.of(RidesView(fresh(Samples.ridesPage(emptyList())), RidesList()), words, host)
+        assertEquals("No rides yet", (empty.body as Body.Empty).heading)
+        val one =
+            RidesView(fresh(Samples.ridesPage(Samples.rideItems().take(1))), RidesList(Samples.rideItems().take(1)))
+        assertEquals(
+            CardPosition.Only,
+            RidesUi
+                .of(one, words, host)
+                .content()
+                .entries
+                .filterIsInstance<RidesEntry.Row>()
+                .single()
+                .row.position,
+        )
+    }
+
+    // region ride detail
+
+    @Test
+    fun `the ride's tiles, planned workout, laps and zones come from the summary and the plan`() {
+        val ride = RideDetailUi.of(fresh(Samples.rideDetail()), words, host).content()
+        assertEquals("VO2 5×3", ride.name)
+        assertEquals("Thu 12 Nov · 18:02–18:58", ride.whenLine)
+        assertEquals(
+            listOf(
+                "Duration",
+                "Normalised",
+                "Load",
+                "Average",
+                "Intensity",
+                "Work",
+                "Avg heart",
+                "Max heart",
+                "Moving",
+            ),
+            ride.tiles.map {
+                it.label
+            },
+        )
+        assertEquals("56:00", ride.tiles[0].value)
+        assertEquals("211", ride.tiles[1].value)
+        assertEquals("0.85", ride.tiles[4].value)
+        assertEquals("635", ride.tiles[5].value)
+        assertEquals("VO2 5×3 · all 15 steps ridden", ride.plan?.title)
+        assertEquals("Efforts 287–291 W against 288 W", ride.plan?.efforts)
+        assertEquals(15, ride.laps!!.size)
+        assertEquals("ramp", ride.laps!![0].target)
+        assertEquals("of 288", ride.laps!![3].target)
+        assertEquals(7, ride.zones.size)
+    }
+
+    @Test
+    fun `a ride without a plan has no planned card and no lap table, a missing reading is the dash`() {
+        val ride =
+            RideDetailUi
+                .of(
+                    fresh(Samples.rideDetail(withPlan = false, withHeartRate = false)),
+                    words,
+                    host,
+                ).content()
+        assertNull(ride.plan)
+        assertNull(ride.laps)
+        assertEquals("—", ride.tiles[6].value ?: "—")
+        assertTrue(ride.chart!!.noHeartRate)
+        assertNull(ride.chart!!.spec.plan)
+    }
+
+    @Test
+    fun `the ride readout rests on the whole ride and names the step of a selected second`() {
+        val chart = RideDetailUi.of(fresh(Samples.rideDetail()), words, host).content().chart!!
+        val rest = chart.readoutAt(null)
+        assertEquals("Whole ride", rest.x)
+        assertEquals(listOf("Power avg", "Heart avg", "W′ lowest"), rest.entries.map { it.name })
+        assertEquals("7.2 kJ at 48:50", rest.entries[2].value)
+        val inEffort = chart.readoutAt(1100.0)
+        assertEquals("18:20", inEffort.x)
+        assertTrue(inEffort.entries.last().value, inEffort.entries.last().value.startsWith("VO2 1 of 5 · Z5"))
+        assertEquals(chart.spec.seconds.size, chart.table.rows.size)
+    }
+
+    @Test
+    fun `a ride with no samples has no chart and does not crash`() {
+        val bare = Samples.rideDetail().copy(series = emptyList(), laps = emptyList())
+        val ride = RideDetailUi.of(fresh(bare), words, host).content()
+        assertNull(ride.chart)
+        assertEquals(9, ride.tiles.size)
+    }
+
+    @Test
+    fun `an activity says what it knows and that it counts toward fatigue`() {
+        val activity = ActivityWords.of(Samples.rideItems()[2], words)
+        assertEquals("Beat Saber", activity.name)
+        assertEquals("Sun 15 Nov · from the watch", activity.whenLine)
+        assertEquals("38", activity.load.value)
+        assertEquals(
+            "Counts toward fatigue, form and recovery. Not used for the power curve, FTP or aerobic drift.",
+            activity.countsLine,
+        )
+    }
+
+    // region today
+
+    private fun today(
+        recovery: RecoveryState = RecoveryState.NotAvailableYet,
+        metrics: ResourceState<MetricsResponse> = fresh(Samples.metrics("2026-05-25")),
+        workouts: ResourceState<app.overdrive.core.plan.WorkoutsResponse> = fresh(Samples.workouts()),
+        rides: RidesView = RidesView(),
+        answers: FtpAnswers = FtpAnswers(),
+        justUsed: Int? = null,
+    ) = TodayUi.of(
+        recovery,
+        metrics,
+        workouts,
+        rides,
+        ProfileState(ready = true, profile = Samples.profile()),
+        answers,
+        justUsed,
+        Samples.TODAY,
+        words,
+        host,
+    )
+
+    @Test
+    fun `today's header is the date and when it was updated`() {
+        assertEquals("Wednesday 18 November · updated 07:40", today().subtitle)
+        val failing =
+            today(
+                metrics =
+                    ResourceState(
+                        loaded = true,
+                        problem = ServiceProblem(ProblemKind.NO_NETWORK, "x"),
+                        asked = true,
+                    ),
+                workouts =
+                    ResourceState(
+                        loaded = true,
+                        problem = ServiceProblem(ProblemKind.NO_NETWORK, "x"),
+                        asked = true,
+                    ),
+            )
+        assertEquals("Wednesday 18 November", failing.subtitle)
+        assertEquals("Could not reach your service", (failing.body as Body.Failed).problem.title)
+    }
+
+    @Test
+    fun `the planned card has the name, the duration, the load and the intensity, and a profile`() {
+        val planned = today().content().planned!!.single()
+        assertEquals("Sweet spot 3×10", planned.name)
+        assertTrue(planned.subtitle, Regex("""(\d+:)?\d\d:\d\d · load \d+ · IF 0\.\d\d""").matches(planned.subtitle))
+        assertNotNull(planned.profile)
+        assertNull(planned.done)
+    }
+
+    @Test
+    fun `the planned card says done, with the end time, when a ride of that name was ridden today`() {
+        val ridden = Samples.ride("ride-today", Samples.TODAY, "Sweet spot 3×10", 3900, 74.0, 196.0)
+        val rides = RidesView(fresh(Samples.ridesPage(listOf(ridden))), RidesList(listOf(ridden)))
+        val planned = today(rides = rides).content().planned!!.single()
+        assertEquals("Done 18:05", planned.done)
+        assertEquals("ride-today", planned.rideId)
+    }
+
+    @Test
+    fun `nothing planned today is an empty list, and no plan source is no card`() {
+        assertEquals(
+            emptyList<PlannedRowUi>(),
+            today(workouts = fresh(Samples.workouts(withToday = false))).content().planned,
+        )
+        assertNull(today(workouts = fresh(Samples.workouts(configured = false))).content().planned)
+    }
+
+    @Test
+    fun `the FTP suggestion is offered on today with its words, and Use then says what happened`() {
+        val ftp = today().content().ftp as FtpUi.Suggestion
+        assertEquals(256, ftp.watts)
+        assertEquals(6, ftp.windowWeeks)
+        assertEquals(FtpUi.Used(256, waiting = false), today(justUsed = 256).content().ftp)
+        assertNull(today(metrics = fresh(Samples.metrics("2026-05-25", suggestion = null))).content().ftp)
+    }
+
+    @Test
+    fun `without the watch the recovery card is the learning form, never a state`() {
+        val recovery = today().content().recovery
+        assertEquals(RecoveryLook.Learning, recovery.look)
+        assertEquals("Learning your usual range", recovery.heading)
+        assertEquals(
+            "Overdrive rates recovery after 14 nights with the watch. The watch is not connected yet.",
+            recovery.reason,
+        )
+        assertEquals(0f, recovery.progress)
+    }
+
+    @Test
+    fun `the recovery card's other states are ready for the watch data stage`() {
+        val facts = listOf(RecoveryFactData("resting-hr", "Resting heart rate", "59", "bpm", "above usual 50–56", true))
+        val caution =
+            TodayUi.recoveryUi(
+                RecoveryState.Rated(
+                    RecoveryLevel.Caution,
+                    "Resting heart rate is above your usual range for the second morning.",
+                    facts,
+                ),
+            )
+        assertEquals("Recovery · this morning", caution.label)
+        assertEquals(RecoveryLook.Caution, caution.look)
+        assertEquals(
+            "Recovery · yesterday",
+            TodayUi.recoveryUi(RecoveryState.Rated(RecoveryLevel.Ready, "x", facts, thisMorning = false)).label,
+        )
+        val learning = TodayUi.recoveryUi(RecoveryState.Learning(9, 14, facts))
+        assertEquals("Overdrive rates recovery after 14 nights with the watch. 9 nights so far.", learning.reason)
+        assertEquals(9f / 14f, learning.progress!!, 1e-6f)
+        assertEquals("No reading from last night", TodayUi.recoveryUi(RecoveryState.NoReading).heading)
+    }
+}
