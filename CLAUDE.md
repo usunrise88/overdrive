@@ -57,8 +57,9 @@ Layout rationale: `docs/adr/0001-repository-layout-and-toolchain.md`.
 
 - **The main session orchestrates**: it plans stages (`docs/roadmap.md`), writes briefs, reviews and
   merges results, cuts releases and answers the owner. It does not do bulk implementation itself.
-- **At most two subagents run at once**: one **Sonnet** for the main implementation work, one
-  **Haiku** for auxiliary work (mechanical, bounded, read-only or low-risk).
+- **At most three subagents run at once**, at most two of them **Sonnet** (main implementation
+  work, on separate areas of the code so their changes do not collide); the rest **Haiku** for
+  auxiliary work (mechanical, bounded, read-only or low-risk).
 - **Once at the start of each stage** the orchestrator may launch one **Opus** subagent to design
   the interfaces of that stage, giving it the design skills (`artifact-design`, `dataviz`) and the
   principles and references below. Its output (tokens, component specs, mock-ups) is what the Sonnet

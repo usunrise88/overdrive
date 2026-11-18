@@ -1,0 +1,14 @@
+# Caddy site for the Overdrive web service (spec §7.2). Copy to /etc/caddy/sites.d/ on the host, then:
+#   sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl reload caddy
+# The port is SERVER_PORT from .env (compose publishes the server on 127.0.0.1 only).
+overdrive.llmto.day {
+	import common
+	reverse_proxy 127.0.0.1:27180
+
+	log {
+		output file /var/log/caddy/overdrive.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+	}
+}
