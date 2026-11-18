@@ -21,6 +21,8 @@ describe("loadConfig", () => {
       INTERVALS_ATHLETE_ID: "0",
       INTERVALS_BASE_URL: "https://intervals.icu",
       PLAN_REFRESH_MINUTES: 15,
+      STRAVA_BACKFILL: false,
+      STRAVA_BASE_URL: "https://www.strava.com",
       TIMEZONE: "UTC",
     });
   });

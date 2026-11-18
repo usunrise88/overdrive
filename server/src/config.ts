@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { stravaConfigShape } from "./config-strava.ts";
 import { parsePassphraseHash } from "./oauth/passphrase.ts";
 import { isTimeZone } from "./time.ts";
 
@@ -208,6 +209,7 @@ const schema = z.object({
       .max(1440, "PLAN_REFRESH_MINUTES must be at most 1440 (a day)")
       .default(15),
   ),
+  ...stravaConfigShape, // Strava upload (ADR 0020): config-strava.ts
   // The rider's time zone: which day "today" is for the plan, and which day a ride belongs to.
   TIMEZONE: z.preprocess(
     blankIsUnset,

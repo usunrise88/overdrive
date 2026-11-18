@@ -36,9 +36,9 @@ const migration = (version: number, sql: string): Migration => ({
 });
 
 describe("the real migrations", () => {
-  it("create the ride, plan, profile, ride workout and OAuth tables", async () => {
+  it("create the ride, plan, profile, ride workout, OAuth and Strava tables", async () => {
     const applied = await migrate(db);
-    expect(applied).toEqual([1, 2, 3]);
+    expect(applied).toEqual([1, 2, 3, 4, 5]);
     expect(await tables()).toEqual([
       "oauth_clients",
       "oauth_codes",
@@ -50,6 +50,8 @@ describe("the real migrations", () => {
       "ride_workouts",
       "rides",
       "schema_migrations",
+      "strava_auth",
+      "strava_uploads",
     ]);
   });
 
@@ -107,14 +109,20 @@ describe("the real migrations", () => {
     expect(await migrate(db)).toEqual([]);
     expect(await migrate(db)).toEqual([]);
     const rows = await db.query<{ version: number }>("SELECT version FROM schema_migrations");
-    expect(rows.rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
+    expect(rows.rows).toEqual([
+      { version: 1 },
+      { version: 2 },
+      { version: 3 },
+      { version: 4 },
+      { version: 5 },
+    ]);
     const rides = await db.query("SELECT id FROM rides");
     expect(rides.rows).toHaveLength(1);
   });
 
   it("run together once each when two starts race", async () => {
     const results = await Promise.all([migrate(db), migrate(db)]);
-    expect(results.flat()).toEqual([1, 2, 3]);
+    expect(results.flat()).toEqual([1, 2, 3, 4, 5]);
   });
 
   it("give the profile one row and the OAuth tables their constraints (0003)", async () => {
