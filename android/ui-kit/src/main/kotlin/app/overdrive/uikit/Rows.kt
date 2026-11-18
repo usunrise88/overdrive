@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.overdrive.uikit.icons.OverdriveIcons
@@ -48,14 +49,20 @@ fun SelectableRow(
             .fillMaxWidth()
             .heightIn(min = OverdriveDimens.sizeListRowTwoLine)
             .background(fill, md)
-            .plainClickable(source, role = androidx.compose.ui.semantics.Role.RadioButton, onClick = onClick)
+            .plainClickable(source, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
             OdText(title, style = OdType.bodyStrong, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            OdText(subtitle, style = OdType.label, color = OverdriveColors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            OdText(
+                subtitle,
+                style = OdType.label,
+                color = OverdriveColors.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         if (selected) OdIcon(OverdriveIcons.Check)
     }
@@ -99,17 +106,34 @@ fun DeviceRow(
     Column(modifier.fillMaxWidth()) {
         if (divider) HorizontalRule()
         Row(
-            Modifier.fillMaxWidth().heightIn(min = OverdriveDimens.sizeDeviceRow).padding(horizontal = 20.dp, vertical = 14.dp),
+            Modifier
+                .fillMaxWidth()
+                .heightIn(
+                    min = OverdriveDimens.sizeDeviceRow,
+                ).padding(horizontal = 20.dp, vertical = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.size(40.dp).background(OverdriveColors.surface2, md), contentAlignment = Alignment.Center) {
-                OdIcon(icon, tint = if (status == DeviceStatus.NotPaired) OverdriveColors.textTertiary else OverdriveColors.textPrimary)
+                OdIcon(
+                    icon,
+                    tint =
+                        if (status ==
+                            DeviceStatus.NotPaired
+                        ) {
+                            OverdriveColors.textTertiary
+                        } else {
+                            OverdriveColors.textPrimary
+                        },
+                )
             }
             Column(Modifier.weight(1f)) {
                 OdText(title, style = OdType.bodyStrong, maxLines = 1)
                 if (status == DeviceStatus.Lost) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         OdIcon(OverdriveIcons.TriangleAlert, size = InlineIconSize)
                         OdText(subtitle, style = OdType.label, color = OverdriveColors.textPrimary, maxLines = 1)
                     }
@@ -118,15 +142,31 @@ fun DeviceRow(
                 }
             }
             when (status) {
-                DeviceStatus.NotPaired -> OdButton("Pair", onPair)
-                DeviceStatus.Searching -> Spinner()
-                DeviceStatus.Connected ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                DeviceStatus.NotPaired -> {
+                    OdButton("Pair", onPair)
+                }
+
+                DeviceStatus.Searching -> {
+                    Spinner()
+                }
+
+                DeviceStatus.Connected -> {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         OdIcon(OverdriveIcons.Check, size = InlineIconSize, tint = OverdriveColors.textSecondary)
                         OdText("Connected", style = OdType.label, color = OverdriveColors.textSecondary)
                     }
-                DeviceStatus.Lost -> OdButton("Retry now", onRetry)
-                DeviceStatus.Locked -> OdText("No presses", style = OdType.label)
+                }
+
+                DeviceStatus.Lost -> {
+                    OdButton("Retry now", onRetry)
+                }
+
+                DeviceStatus.Locked -> {
+                    OdText("No presses", style = OdType.label)
+                }
             }
         }
         if (notice != null) Box(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 16.dp)) { notice() }

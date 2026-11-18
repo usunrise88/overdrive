@@ -46,8 +46,20 @@ fun ZoneTimeBars(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OdText("Z$zone", Modifier.width(24.dp), style = OdType.labelNum, color = OverdriveColors.textSecondary, maxLines = 1)
-                OdText(Zones.name(zone), Modifier.width(112.dp), style = OdType.label, color = OverdriveColors.textSecondary, maxLines = 1)
+                OdText(
+                    "Z$zone",
+                    Modifier.width(24.dp),
+                    style = OdType.labelNum,
+                    color = OverdriveColors.textSecondary,
+                    maxLines = 1,
+                )
+                OdText(
+                    Zones.name(zone),
+                    Modifier.width(112.dp),
+                    style = OdType.label,
+                    color = OverdriveColors.textSecondary,
+                    maxLines = 1,
+                )
                 Canvas(Modifier.weight(1f).height(12.dp)) {
                     val width = max(size.width * seconds / longest, 1.dp.toPx())
                     val radius = CornerRadius(OverdriveDimens.radiusSm.toPx())
@@ -65,7 +77,14 @@ fun ZoneTimeBars(
                         }
                     drawPath(path, Zones.color(zone))
                 }
-                OdText(UiFormat.elapsed(seconds), Modifier.width(56.dp), style = OdType.labelNum, textAlign = TextAlign.End, maxLines = 1, softWrap = false)
+                OdText(
+                    UiFormat.elapsed(seconds),
+                    Modifier.width(56.dp),
+                    style = OdType.labelNum,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                    softWrap = false,
+                )
             }
         }
     }

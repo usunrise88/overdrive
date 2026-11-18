@@ -22,7 +22,9 @@ class WorkoutsTest {
 
     @Test
     fun bundledAssetsAreTheContractFixturesWhereTheyCopyOne() {
-        assertEquals(File(fixtures, "workouts/valid/sweet-spot-3x10.json").readText(), asset("sweet-spot-3x10.json"))
+        // The JSON asset is re-formatted by the repository's formatter, so compare what it means, not its bytes.
+        val fixture = File(fixtures, "workouts/valid/sweet-spot-3x10.json").readText()
+        assertEquals(WorkoutImport.fromJson(fixture), WorkoutImport.fromJson(asset("sweet-spot-3x10.json")))
         assertEquals(File(fixtures, "zwo/valid/all-elements.zwo").readText(), asset("all-elements.zwo"))
     }
 
@@ -36,7 +38,7 @@ class WorkoutsTest {
     @Test
     fun jsonAndZwoAreToldApartByTheirFirstCharacter() {
         assertTrue(WorkoutFiles.parse(asset("sweet-spot-3x10.json"), "a.json") is WorkoutFileResult.Loaded)
-        assertTrue(WorkoutFiles.parse("﻿  \n" + asset("all-elements.zwo"), "a.zwo") is WorkoutFileResult.Loaded)
+        assertTrue(WorkoutFiles.parse("  \n" + asset("all-elements.zwo"), "a.zwo") is WorkoutFileResult.Loaded)
     }
 
     @Test
@@ -48,7 +50,11 @@ class WorkoutsTest {
         val notJson = WorkoutFiles.parse("hello", "notes.txt") as WorkoutFileResult.Failed
         assertTrue(notJson.error.text.endsWith("Fix the file or pick another one."))
 
-        val badZwo = WorkoutFiles.parse(File(fixtures, "zwo/invalid/unknown-step.zwo").readText(), "x.zwo") as WorkoutFileResult.Failed
+        val badZwo =
+            WorkoutFiles.parse(
+                File(fixtures, "zwo/invalid/unknown-step.zwo").readText(),
+                "x.zwo",
+            ) as WorkoutFileResult.Failed
         assertTrue(badZwo.error.text.isNotBlank())
 
         val unnamed = WorkoutFiles.parse("{}", null) as WorkoutFileResult.Failed
@@ -100,7 +106,10 @@ class WorkoutsTest {
 
     @Test
     fun aWorkoutOfOnlyFreeStepsIsGearsMode() {
-        val workout = WorkoutImport.fromJson("""{"schema":1,"id":"f","name":"F","steps":[{"type":"free","duration":60}]}""")
+        val workout =
+            WorkoutImport.fromJson(
+                """{"schema":1,"id":"f","name":"F","steps":[{"type":"free","duration":60}]}""",
+            )
         val description = WorkoutDescriber.describe(workout, 200)
         assertEquals("Gears", description.mode)
         assertNull(description.hardestWatts)

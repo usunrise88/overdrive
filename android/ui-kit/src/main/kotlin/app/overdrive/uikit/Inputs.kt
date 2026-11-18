@@ -1,9 +1,10 @@
 package app.overdrive.uikit
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -24,11 +25,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,8 +40,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.role
@@ -62,7 +62,14 @@ private val md = RoundedCornerShape(OverdriveDimens.radiusMd)
 
 @Composable
 private fun motionSpecColor() =
-    if (LocalMotionEnabled.current) tween<Color>(OverdriveMotion.durationFast, easing = OverdriveMotion.easingStandard) else snap()
+    if (LocalMotionEnabled.current) {
+        tween<Color>(
+            OverdriveMotion.durationFast,
+            easing = OverdriveMotion.easingStandard,
+        )
+    } else {
+        snap()
+    }
 
 /**
  * A segmented control (design/system.md §7.8): surface 2 with a hairline and 2 dp inner padding, 40 dp segments
@@ -82,15 +89,28 @@ fun SegmentedControl(
     ) {
         options.forEachIndexed { index, label ->
             val selected = index == selectedIndex
-            val fill by animateColorAsState(if (selected) OverdriveColors.surface3 else Color.Transparent, motionSpecColor(), label = "segment")
+            val fill by animateColorAsState(
+                if (selected) OverdriveColors.surface3 else Color.Transparent,
+                motionSpecColor(),
+                label = "segment",
+            )
             val source = rememberInteractionSource()
             Box(
                 Modifier
                     .height(40.dp)
                     .clip(RoundedCornerShape(6.dp))
                     .background(fill)
-                    .then(if (selected) Modifier.border(OverdriveDimens.strokeHairline, OverdriveColors.borderStrong, RoundedCornerShape(6.dp)) else Modifier)
-                    .semantics { this.selected = selected }
+                    .then(
+                        if (selected) {
+                            Modifier.border(
+                                OverdriveDimens.strokeHairline,
+                                OverdriveColors.borderStrong,
+                                RoundedCornerShape(6.dp),
+                            )
+                        } else {
+                            Modifier
+                        },
+                    ).semantics { this.selected = selected }
                     .plainClickable(source, role = Role.RadioButton) { onSelect(index) }
                     .padding(horizontal = 16.dp),
                 contentAlignment = Alignment.Center,
@@ -134,7 +154,14 @@ fun Stepper(
             repeating = true,
             tint = if (canDecrement) OverdriveColors.textSecondary else OverdriveColors.textTertiary,
         )
-        OdText(valueText, Modifier.widthIn(min = 96.dp), style = OdType.numXS, textAlign = TextAlign.Center, maxLines = 1, softWrap = false)
+        OdText(
+            valueText,
+            Modifier.widthIn(min = 96.dp),
+            style = OdType.numXS,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            softWrap = false,
+        )
         OdIconButton(
             OverdriveIcons.Plus,
             onIncrement,
@@ -155,11 +182,26 @@ fun OdSwitch(
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
 ) {
-    val track by animateColorAsState(if (checked) OverdriveColors.textPrimary else OverdriveColors.surface3, motionSpecColor(), label = "track")
-    val thumbColour by animateColorAsState(if (checked) OverdriveColors.textOnPrimary else OverdriveColors.textTertiary, motionSpecColor(), label = "thumb")
+    val track by animateColorAsState(
+        if (checked) OverdriveColors.textPrimary else OverdriveColors.surface3,
+        motionSpecColor(),
+        label = "track",
+    )
+    val thumbColour by animateColorAsState(
+        if (checked) OverdriveColors.textOnPrimary else OverdriveColors.textTertiary,
+        motionSpecColor(),
+        label = "thumb",
+    )
     val offset by animateDpAsState(
         if (checked) 21.dp else 3.dp,
-        if (LocalMotionEnabled.current) tween(OverdriveMotion.durationFast, easing = OverdriveMotion.easingStandard) else snap(),
+        if (LocalMotionEnabled.current) {
+            tween(
+                OverdriveMotion.durationFast,
+                easing = OverdriveMotion.easingStandard,
+            )
+        } else {
+            snap()
+        },
         label = "offset",
     )
     val source = rememberInteractionSource()
@@ -167,8 +209,11 @@ fun OdSwitch(
         modifier
             .size(44.dp, 26.dp)
             .background(track, CircleShape)
-            .border(OverdriveDimens.strokeHairline, if (checked) OverdriveColors.textPrimary else OverdriveColors.borderStrong, CircleShape)
-            .semantics { if (contentDescription != null) this.contentDescription = contentDescription }
+            .border(
+                OverdriveDimens.strokeHairline,
+                if (checked) OverdriveColors.textPrimary else OverdriveColors.borderStrong,
+                CircleShape,
+            ).semantics { if (contentDescription != null) this.contentDescription = contentDescription }
             .plainClickable(source, role = Role.Switch) { onCheckedChange(!checked) },
     ) {
         // 1 dp border + 3 dp inset puts the thumb 4 dp from the edge, as in the mock-up (3 dp inside the border).
@@ -194,6 +239,7 @@ fun OdSlider(
     val widthPx = remember { mutableIntStateOf(0) }
     val thumbPx = with(LocalDensity.current) { SLIDER_THUMB.toPx() }
     val fraction = (value - range.first).toFloat() / (range.last - range.first)
+
     fun pick(x: Float) {
         val usable = (widthPx.intValue - thumbPx).coerceAtLeast(1f)
         val raw = ((x - thumbPx / 2f) / usable).coerceIn(0f, 1f)
@@ -206,7 +252,12 @@ fun OdSlider(
             .onSizeChanged { widthPx.intValue = it.width }
             .semantics {
                 this.contentDescription = contentDescription
-                progressBarRangeInfo = ProgressBarRangeInfo(value.toFloat(), range.first.toFloat()..range.last.toFloat(), (range.last - range.first) / step - 1)
+                progressBarRangeInfo =
+                    ProgressBarRangeInfo(
+                        value.toFloat(),
+                        range.first.toFloat()..range.last.toFloat(),
+                        (range.last - range.first) / step - 1,
+                    )
                 stateDescription = value.toString()
                 setProgress { target ->
                     latest((((target - range.first) / step).roundToInt() * step + range.first).coerceIn(range))
@@ -219,8 +270,18 @@ fun OdSlider(
         val centreY = size.height / 2f
         val thumbCentre = thumbPx / 2f + (size.width - thumbPx) * fraction
         val radius = CornerRadius(trackHeight / 2f)
-        drawRoundRect(OverdriveColors.surface3, Offset(0f, centreY - trackHeight / 2f), Size(size.width, trackHeight), radius)
-        drawRoundRect(OverdriveColors.textPrimary, Offset(0f, centreY - trackHeight / 2f), Size(thumbCentre, trackHeight), radius)
+        drawRoundRect(
+            OverdriveColors.surface3,
+            Offset(0f, centreY - trackHeight / 2f),
+            Size(size.width, trackHeight),
+            radius,
+        )
+        drawRoundRect(
+            OverdriveColors.textPrimary,
+            Offset(0f, centreY - trackHeight / 2f),
+            Size(thumbCentre, trackHeight),
+            radius,
+        )
         drawCircle(OverdriveColors.textPrimary, thumbPx / 2f, Offset(thumbCentre, centreY))
     }
 }
@@ -243,13 +304,21 @@ fun SettingRow(
     Column(modifier.fillMaxWidth()) {
         if (!first) HorizontalRule()
         Row(
-            Modifier.fillMaxWidth().heightIn(min = OverdriveDimens.sizeListRowTwoLine).padding(PaddingValues(horizontal = 20.dp, vertical = 10.dp)),
+            Modifier
+                .fillMaxWidth()
+                .heightIn(
+                    min = OverdriveDimens.sizeListRowTwoLine,
+                ).padding(PaddingValues(horizontal = 20.dp, vertical = 10.dp)),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(if (titleWidth != null) Modifier.width(titleWidth) else Modifier.weight(1f)) {
                 OdText(title, style = OdType.bodyStrong)
-                if (description != null) OdText(description, style = OdType.label, color = OverdriveColors.textSecondary)
+                if (description !=
+                    null
+                ) {
+                    OdText(description, style = OdType.label, color = OverdriveColors.textSecondary)
+                }
             }
             control()
         }

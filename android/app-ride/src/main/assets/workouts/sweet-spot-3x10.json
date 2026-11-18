@@ -4,12 +4,16 @@
   "name": "Sweet spot 3x10",
   "description": "Three 10-minute efforts with 5-minute recoveries.",
   "steps": [
-    { "type": "ramp", "duration": 600, "from": 0.45, "to": 0.70, "label": "Warm-up" },
-    { "type": "repeat", "count": 3, "steps": [
-      { "type": "steady", "duration": 600, "target": 0.88, "label": "Sweet spot" },
-      { "type": "steady", "duration": 300, "target": 0.50, "label": "Recover" }
-    ] },
+    { "type": "ramp", "duration": 600, "from": 0.45, "to": 0.7, "label": "Warm-up" },
+    {
+      "type": "repeat",
+      "count": 3,
+      "steps": [
+        { "type": "steady", "duration": 600, "target": 0.88, "label": "Sweet spot" },
+        { "type": "steady", "duration": 300, "target": 0.5, "label": "Recover" }
+      ]
+    },
     { "type": "free", "duration": 300, "label": "Free ride" },
-    { "type": "ramp", "duration": 300, "from": 0.55, "to": 0.40, "label": "Cool-down" }
+    { "type": "ramp", "duration": 300, "from": 0.55, "to": 0.4, "label": "Cool-down" }
   ]
 }

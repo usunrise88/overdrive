@@ -1,10 +1,12 @@
 package app.overdrive.ride.settings
 
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -26,7 +28,7 @@ class SettingsRepository(
     val settings: Flow<AppSettings> =
         store.data
             .catch { error ->
-                if (error is IOException) emit(androidx.datastore.preferences.core.emptyPreferences()) else throw error
+                if (error is IOException) emit(emptyPreferences()) else throw error
             }.map { it.toSettings() }
             .distinctUntilChanged()
 
@@ -78,7 +80,7 @@ class SettingsRepository(
         ).sanitized()
     }
 
-    private fun androidx.datastore.preferences.core.MutablePreferences.write(settings: AppSettings) {
+    private fun MutablePreferences.write(settings: AppSettings) {
         this[Keys.ftp] = settings.ftp
         this[Keys.gearCount] = settings.gearCount
         this[Keys.gradePerGear] = settings.gradePerGear

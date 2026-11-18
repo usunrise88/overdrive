@@ -61,7 +61,11 @@ fun OdTopBar(
 ) {
     Column(modifier.fillMaxWidth()) {
         Row(
-            Modifier.fillMaxWidth().height(OverdriveDimens.sizeTopBar - OverdriveDimens.strokeHairline).padding(horizontal = 24.dp),
+            Modifier
+                .fillMaxWidth()
+                .height(
+                    OverdriveDimens.sizeTopBar - OverdriveDimens.strokeHairline,
+                ).padding(horizontal = 24.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             content = content,
@@ -125,9 +129,17 @@ fun DeviceStatusCluster(
                     DeviceIconState.NotPaired -> OverdriveColors.textTertiary
                     DeviceIconState.Attention -> OverdriveColors.textPrimary
                 }
-            Row(Modifier.padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 OdIcon(item.icon, size = InlineIconSize, tint = colour)
-                if (item.state == DeviceIconState.Attention) OdIcon(OverdriveIcons.TriangleAlert, size = InlineIconSize, tint = colour)
+                if (item.state ==
+                    DeviceIconState.Attention
+                ) {
+                    OdIcon(OverdriveIcons.TriangleAlert, size = InlineIconSize, tint = colour)
+                }
             }
         }
     }
@@ -146,7 +158,11 @@ fun Spinner(modifier: Modifier = Modifier) {
             val angle by transition.animateFloat(
                 initialValue = 0f,
                 targetValue = 360f,
-                animationSpec = infiniteRepeatable(tween(OverdriveMotion.durationSpinner, easing = LinearEasing), RepeatMode.Restart),
+                animationSpec =
+                    infiniteRepeatable(
+                        tween(OverdriveMotion.durationSpinner, easing = LinearEasing),
+                        RepeatMode.Restart,
+                    ),
                 label = "angle",
             )
             angle
@@ -159,7 +175,15 @@ fun Spinner(modifier: Modifier = Modifier) {
         val arcSize = Size(size.width - stroke, size.height - stroke)
         drawArc(OverdriveColors.surface3, 0f, 360f, false, Offset(inset, inset), arcSize, style = Stroke(stroke))
         rotate(turn) {
-            drawArc(OverdriveColors.textSecondary, -90f, 90f, false, Offset(inset, inset), arcSize, style = Stroke(stroke, cap = StrokeCap.Butt))
+            drawArc(
+                OverdriveColors.textSecondary,
+                -90f,
+                90f,
+                false,
+                Offset(inset, inset),
+                arcSize,
+                style = Stroke(stroke, cap = StrokeCap.Butt),
+            )
         }
     }
 }
@@ -197,18 +221,50 @@ fun ConfirmSheet(
             Column(
                 Modifier
                     .animateEnterExit(
-                        enter = if (motion) slideInVertically(tween(OverdriveMotion.durationStandard, easing = OverdriveMotion.easingDecelerate)) { it } else EnterTransition.None,
-                        exit = if (motion) slideOutVertically(tween(OverdriveMotion.durationFast, easing = OverdriveMotion.easingAccelerate)) { it } else ExitTransition.None,
+                        enter =
+                            if (motion) {
+                                slideInVertically(
+                                    tween(OverdriveMotion.durationStandard, easing = OverdriveMotion.easingDecelerate),
+                                ) {
+                                    it
+                                }
+                            } else {
+                                EnterTransition.None
+                            },
+                        exit =
+                            if (motion) {
+                                slideOutVertically(
+                                    tween(OverdriveMotion.durationFast, easing = OverdriveMotion.easingAccelerate),
+                                ) {
+                                    it
+                                }
+                            } else {
+                                ExitTransition.None
+                            },
                     ).width(560.dp)
                     .clickable(interactionSource = noInteraction, indication = null) {}
-                    .surface(OverdriveColors.surface1, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp), OverdriveColors.border)
-                    .padding(24.dp),
+                    .surface(
+                        OverdriveColors.surface1,
+                        RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
+                        OverdriveColors.border,
+                    ).padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
                 OdText(title, style = OdType.title)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OdButton(confirmLabel, onConfirm, Modifier.weight(1f), height = OverdriveDimens.sizeButtonHeightRide)
-                    OdButton(dismissLabel, onDismiss, Modifier.weight(1f), ButtonVariant.Primary, height = OverdriveDimens.sizeButtonHeightRide)
+                    OdButton(
+                        confirmLabel,
+                        onConfirm,
+                        Modifier.weight(1f),
+                        height = OverdriveDimens.sizeButtonHeightRide,
+                    )
+                    OdButton(
+                        dismissLabel,
+                        onDismiss,
+                        Modifier.weight(1f),
+                        ButtonVariant.Primary,
+                        height = OverdriveDimens.sizeButtonHeightRide,
+                    )
                 }
             }
         }

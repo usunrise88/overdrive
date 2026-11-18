@@ -1,5 +1,6 @@
 package app.overdrive.uikit
 
+import androidx.compose.ui.graphics.Color
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -74,8 +75,8 @@ class UiFormatTest {
 
     @Test
     fun zoneColourPastBlendIsOpaqueSrgbMix() {
-        val surface = androidx.compose.ui.graphics.Color(0xFF000000)
-        val zone = androidx.compose.ui.graphics.Color(0xFF646464)
+        val surface = Color(0xFF000000)
+        val zone = Color(0xFF646464)
         val blended = Zones.blend(surface, zone, 0.5f)
         assertEquals(1f, blended.alpha, 0f)
         assertEquals(0.5f * 0x64 / 255f, blended.red, 1e-5f)

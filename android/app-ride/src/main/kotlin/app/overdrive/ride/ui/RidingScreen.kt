@@ -27,9 +27,9 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overdrive.core.ride.PauseReason
@@ -120,13 +120,24 @@ fun RidingScreen(
 @Composable
 private fun PausedBanner(snapshot: RideSnapshot) {
     Row(
-        Modifier.fillMaxWidth().height(48.dp).background(OverdriveColors.surface2, RoundedCornerShape(8.dp)).padding(horizontal = 16.dp),
+        Modifier
+            .fillMaxWidth()
+            .height(
+                48.dp,
+            ).background(OverdriveColors.surface2, RoundedCornerShape(8.dp))
+            .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         OdIcon(OverdriveIcons.Pause)
         OdText("Paused at ${UiFormat.elapsed(snapshot.elapsedSeconds)}", style = OdType.bodyStrong, maxLines = 1)
-        OdText(pausedAdvice(snapshot), style = OdType.body, color = OverdriveColors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        OdText(
+            pausedAdvice(snapshot),
+            style = OdType.body,
+            color = OverdriveColors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -153,11 +164,18 @@ private fun PowerCard(
     val snapshot = ui.snapshot
     val zone = snapshot.zone?.number
     val dim = if (paused) OverdriveColors.textTertiary else OverdriveColors.textPrimary
-    OdCard(modifier, padding = PaddingValues(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 24.dp), verticalArrangement = Arrangement.SpaceBetween) {
+    OdCard(
+        modifier,
+        padding = PaddingValues(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
         Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
             OdText("Power", Modifier.weight(1f), style = OdType.label, color = OverdriveColors.textTertiary)
             if (!paused && zone != null && snapshot.power != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     ZoneChip(zone)
                     OdText(
                         "${Zones.name(zone)} · ${UiFormat.percent(percentOfFtp(snapshot.power!!, snapshot.ftp))}",
@@ -209,7 +227,9 @@ private fun gearText(
     remember(gear, count) {
         buildAnnotatedString {
             append(gear?.toString() ?: UiFormat.EMPTY)
-            withStyle(SpanStyle(color = OverdriveColors.textSecondary, fontWeight = FontWeight.Normal)) { append(" / $count") }
+            withStyle(
+                SpanStyle(color = OverdriveColors.textSecondary, fontWeight = FontWeight.Normal),
+            ) { append(" / $count") }
         }
     }
 
@@ -257,25 +277,48 @@ private fun WorkoutCard(
     val snapshot = ui.snapshot
     val workout = snapshot.workout
     val profile = ui.profile
-    OdCard(modifier, padding = PaddingValues(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    OdCard(
+        modifier,
+        padding = PaddingValues(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         if (workout == null || profile == null) {
             // A free ride has no intervals: the card shows the gear, the thing the rider changes (design/system.md §6.2).
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 OdText("Gear", style = OdType.label, color = OverdriveColors.textTertiary)
                 OdText(gearText(snapshot.gear, snapshot.gearCount), style = OdType.numL, maxLines = 1, softWrap = false)
-                OdText("Gear ${snapshot.neutralGear} rides the flat.", style = OdType.label, color = OverdriveColors.textSecondary)
+                OdText(
+                    "Gear ${snapshot.neutralGear} rides the flat.",
+                    style = OdType.label,
+                    color = OverdriveColors.textSecondary,
+                )
             }
         } else {
             val next = workout.nextStep
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(32.dp), verticalAlignment = Alignment.Bottom) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(32.dp),
+                verticalAlignment = Alignment.Bottom,
+            ) {
                 Column(Modifier.weight(1f)) {
                     OdText("Interval", style = OdType.label, color = OverdriveColors.textTertiary)
-                    OdText(rememberTitleWithNote(workout.stepLabel, RideMapping.repeatText(snapshot)), style = OdType.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    OdText(
+                        rememberTitleWithNote(workout.stepLabel, RideMapping.repeatText(snapshot)),
+                        style = OdType.title,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     OdText("Next", style = OdType.label, color = OverdriveColors.textTertiary)
                     OdText(
-                        if (next == null) "Finish" else WorkoutDescriber.nextLine(next, snapshot.ftp, snapshot.intensityPercent),
+                        if (next ==
+                            null
+                        ) {
+                            "Finish"
+                        } else {
+                            WorkoutDescriber.nextLine(next, snapshot.ftp, snapshot.intensityPercent)
+                        },
                         style = OdType.bodyStrong,
                         color = OverdriveColors.textSecondary,
                         maxLines = 1,
@@ -283,7 +326,13 @@ private fun WorkoutCard(
                 }
                 Column(Modifier.width(156.dp), horizontalAlignment = Alignment.End) {
                     OdText("Left in interval", style = OdType.label, color = OverdriveColors.textTertiary)
-                    OdText(UiFormat.elapsed(workout.stepRemainingSeconds), style = OdType.numL, maxLines = 1, softWrap = false, textAlign = TextAlign.End)
+                    OdText(
+                        UiFormat.elapsed(workout.stepRemainingSeconds),
+                        style = OdType.numL,
+                        maxLines = 1,
+                        softWrap = false,
+                        textAlign = TextAlign.End,
+                    )
                 }
             }
             WorkoutProfile(
@@ -317,7 +366,14 @@ private fun ControlBar(
             if (paused) {
                 OdButton("Finish ride", onFinish, leadingIcon = OverdriveIcons.Flag, height = 64.dp)
                 Box(Modifier.weight(1f))
-                OdButton("Resume", actions::resume, variant = ButtonVariant.Primary, leadingIcon = OverdriveIcons.Play, height = 64.dp, minWidth = 200.dp)
+                OdButton(
+                    "Resume",
+                    actions::resume,
+                    variant = ButtonVariant.Primary,
+                    leadingIcon = OverdriveIcons.Play,
+                    height = 64.dp,
+                    minWidth = 200.dp,
+                )
             } else {
                 RideControls(snapshot, actions)
                 Box(Modifier.weight(1f))
@@ -339,12 +395,31 @@ private fun RideControls(
         if (snapshot.workout != null) {
             OdButton("Previous", actions::previousInterval, leadingIcon = OverdriveIcons.SkipBack, height = 64.dp)
         }
-        OdIconButton(OverdriveIcons.Minus, actions::levelDown, if (erg) "Intensity down" else "Gear down", variant = ButtonVariant.Secondary, size = 64.dp, repeating = true)
+        OdIconButton(
+            OverdriveIcons.Minus,
+            actions::levelDown,
+            if (erg) "Intensity down" else "Gear down",
+            variant = ButtonVariant.Secondary,
+            size = 64.dp,
+            repeating = true,
+        )
         Column(Modifier.width(112.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            OdText(if (erg) UiFormat.percent(snapshot.intensityPercent) else UiFormat.count(snapshot.gear), style = OdType.numS, maxLines = 1, softWrap = false)
+            OdText(
+                if (erg) UiFormat.percent(snapshot.intensityPercent) else UiFormat.count(snapshot.gear),
+                style = OdType.numS,
+                maxLines = 1,
+                softWrap = false,
+            )
             OdText(if (erg) "Intensity" else "Gear", style = OdType.caption, color = OverdriveColors.textTertiary)
         }
-        OdIconButton(OverdriveIcons.Plus, actions::levelUp, if (erg) "Intensity up" else "Gear up", variant = ButtonVariant.Secondary, size = 64.dp, repeating = true)
+        OdIconButton(
+            OverdriveIcons.Plus,
+            actions::levelUp,
+            if (erg) "Intensity up" else "Gear up",
+            variant = ButtonVariant.Secondary,
+            size = 64.dp,
+            repeating = true,
+        )
         if (snapshot.workout != null) {
             OdButton("Next", actions::nextInterval, trailingIcon = OverdriveIcons.SkipForward, height = 64.dp)
         }

@@ -16,6 +16,7 @@ object PreviewSamples {
         ProfileData(
             buildList {
                 var start = 0
+
                 fun add(
                     duration: Int,
                     from: Float?,
@@ -41,6 +42,7 @@ object PreviewSamples {
     val trace: List<TracePoint> =
         buildList {
             var seed = 3L
+
             fun noise(): Float {
                 seed = (seed * 1664525L + 1013904223L) % 4294967296L
                 return seed / 4294967296f - 0.5f

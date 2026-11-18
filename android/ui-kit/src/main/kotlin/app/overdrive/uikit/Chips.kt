@@ -69,7 +69,7 @@ fun ZoneChip(
     ) {
         OdText(
             if (zone == null) UiFormat.EMPTY else "Z$zone",
-            style = OdType.captionNum.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+            style = OdType.zoneTag,
             color = content,
             maxLines = 1,
             softWrap = false,

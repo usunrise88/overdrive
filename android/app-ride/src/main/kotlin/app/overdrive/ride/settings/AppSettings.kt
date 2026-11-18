@@ -81,7 +81,8 @@ class IntRule(
     val step: Int,
 ) {
     /** [value] limited to the range and snapped to the nearest step from [min]. */
-    fun normalize(value: Int): Int = (min + ((value.coerceIn(min, max) - min).toDouble() / step).roundToInt() * step).coerceAtMost(max)
+    fun normalize(value: Int): Int =
+        (min + ((value.coerceIn(min, max) - min).toDouble() / step).roundToInt() * step).coerceAtMost(max)
 
     /** One step up or down, kept inside the range. */
     fun stepped(
@@ -107,7 +108,12 @@ class DecimalRule(
     fun normalize(value: Double): Double {
         if (!value.isFinite()) return min
         val index = ((value.coerceIn(min, max) - min) / step).roundToInt()
-        return BigDecimal.valueOf(min + index * step).setScale(places, RoundingMode.HALF_UP).toDouble().coerceIn(min, max)
+        return BigDecimal
+            .valueOf(
+                min + index * step,
+            ).setScale(places, RoundingMode.HALF_UP)
+            .toDouble()
+            .coerceIn(min, max)
     }
 
     fun stepped(

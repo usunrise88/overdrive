@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -30,7 +31,16 @@ fun Modifier.surface(
     fill: Color,
     shape: Shape,
     edge: Color? = null,
-): Modifier = this.background(fill, shape).then(if (edge != null) Modifier.border(OverdriveDimens.strokeHairline, edge, shape) else Modifier)
+): Modifier =
+    this.background(fill, shape).then(
+        if (edge !=
+            null
+        ) {
+            Modifier.border(OverdriveDimens.strokeHairline, edge, shape)
+        } else {
+            Modifier
+        },
+    )
 
 /** A click without any indication: pressed feedback is drawn by the component itself (design/system.md §7.1). */
 fun Modifier.plainClickable(
@@ -38,7 +48,14 @@ fun Modifier.plainClickable(
     enabled: Boolean = true,
     role: Role = Role.Button,
     onClick: () -> Unit,
-): Modifier = this.clickable(interactionSource = interactionSource, indication = null, enabled = enabled, role = role, onClick = onClick)
+): Modifier =
+    this.clickable(
+        interactionSource = interactionSource,
+        indication = null,
+        enabled = enabled,
+        role = role,
+        onClick = onClick,
+    )
 
 /**
  * Fires [onClick] on press, then again every [intervalMillis] after [initialDelayMillis] while the pointer stays
@@ -55,7 +72,7 @@ fun Modifier.repeatingClickable(
     val latest by rememberUpdatedState(onClick)
     val scope = rememberCoroutineScope()
     return if (!enabled) {
-        this
+        this.semantics { disabled() }
     } else {
         this
             .semantics(mergeDescendants = true) {
@@ -81,7 +98,9 @@ fun Modifier.repeatingClickable(
                                 }
                             val released = tryAwaitRelease()
                             repeater.cancel()
-                            interactionSource.emit(if (released) PressInteraction.Release(press) else PressInteraction.Cancel(press))
+                            interactionSource.emit(
+                                if (released) PressInteraction.Release(press) else PressInteraction.Cancel(press),
+                            )
                         }
                     },
                 )

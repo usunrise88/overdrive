@@ -34,8 +34,13 @@ object WorkoutFiles {
         text: String,
         fileName: String? = null,
     ): WorkoutFileResult {
-        val body = text.removePrefix("﻿").trimStart()
-        if (body.isEmpty()) return failed(fileName, "The file is empty. Pick a workout file in the native JSON format or a Zwift .zwo file.")
+        val body = text.removePrefix("").trimStart()
+        if (body.isEmpty()) {
+            return failed(
+                fileName,
+                "The file is empty. Pick a workout file in the native JSON format or a Zwift .zwo file.",
+            )
+        }
         return try {
             val workout = if (body.startsWith("<")) WorkoutImport.fromZwo(body) else WorkoutImport.fromJson(body)
             WorkoutFileResult.Loaded(workout)
@@ -54,7 +59,12 @@ object WorkoutFiles {
         fileName: String?,
         text: String,
     ): WorkoutFileResult =
-        WorkoutFileResult.Failed(WorkoutFileError(if (fileName.isNullOrBlank()) "That file is not a workout" else "$fileName is not a workout", text))
+        WorkoutFileResult.Failed(
+            WorkoutFileError(
+                if (fileName.isNullOrBlank()) "That file is not a workout" else "$fileName is not a workout",
+                text,
+            ),
+        )
 
     /** The first line of [message], shortened, with a closing full stop. */
     private fun firstLine(message: String?): String {

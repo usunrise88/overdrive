@@ -15,6 +15,7 @@ import androidx.compose.ui.layout.LastBaseline
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,6 +52,9 @@ object OdType {
     val bodyStrongNum: TextStyle = bodyStrong.tabular()
     val labelNum: TextStyle = label.tabular()
     val captionNum: TextStyle = caption.tabular()
+
+    /** The zone tag of a chip: caption size, semi-bold, tabular. */
+    val zoneTag: TextStyle = captionNum.copy(fontWeight = FontWeight.SemiBold)
 
     /** The style of a unit that follows a value: label size, no tracking, `lineHeight = 1em` so it never grows the line. */
     val unit: TextStyle =
@@ -174,7 +178,14 @@ fun RowScope.ValueWithUnitContent(
         OdText(value, Modifier.alignByBaseline(), style, color, softWrap = false, overflow = TextOverflow.Visible)
         if (unit != null) {
             Spacer(Modifier.width(4.dp))
-            OdText(unit, Modifier.alignByBaseline(), unitStyle, unitColor, softWrap = false, overflow = TextOverflow.Visible)
+            OdText(
+                unit,
+                Modifier.alignByBaseline(),
+                unitStyle,
+                unitColor,
+                softWrap = false,
+                overflow = TextOverflow.Visible,
+            )
         }
     }
 }

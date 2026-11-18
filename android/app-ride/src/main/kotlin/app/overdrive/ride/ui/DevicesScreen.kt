@@ -57,7 +57,11 @@ fun DevicesScreen(
             horizontalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OdText("Paired devices connect on their own when the app starts.", style = OdType.label, color = OverdriveColors.textTertiary)
+                OdText(
+                    "Paired devices connect on their own when the app starts.",
+                    style = OdType.label,
+                    color = OverdriveColors.textTertiary,
+                )
                 OdCard(padding = PaddingValues(0.dp)) {
                     DeviceRow(
                         OverdriveIcons.Bike,
@@ -109,7 +113,9 @@ private fun ClickRow(
                     Notice(
                         icon = OverdriveIcons.Info,
                         title = "Click is locked",
-                        text = "It is connected but sends no button presses. Unlock it once in the Zwift app, then check again. You can ride without it; every action is on screen.",
+                        text =
+                            "It is connected but sends no button presses. Unlock it once in the Zwift app, " +
+                                "then check again. You can ride without it; every action is on screen.",
                         actionLabel = "Check again",
                         onAction = actions.onCheckClick,
                     )
@@ -175,7 +181,12 @@ private fun MapLine(
         } else {
             OdText(button, Modifier.width(112.dp), style = OdType.bodyStrong)
             OdText(press, Modifier.weight(1f), style = OdType.label)
-            OdText(hold, Modifier.weight(1f), style = OdType.label, color = if (holdDim) OverdriveColors.textSecondary else OverdriveColors.textPrimary)
+            OdText(
+                hold,
+                Modifier.weight(1f),
+                style = OdType.label,
+                color = if (holdDim) OverdriveColors.textSecondary else OverdriveColors.textPrimary,
+            )
         }
     }
 }

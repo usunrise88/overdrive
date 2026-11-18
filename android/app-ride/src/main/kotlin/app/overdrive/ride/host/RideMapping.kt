@@ -57,9 +57,23 @@ object RideMapping {
         val next = workout.nextStep
         return OverlayInterval(
             name = step.label,
-            repeatText = if (step.repeatIteration != null && repeats != null && repeats > 1) "${step.repeatIteration} of $repeats" else null,
+            repeatText =
+                if (step.repeatIteration != null && repeats != null &&
+                    repeats > 1
+                ) {
+                    "${step.repeatIteration} of $repeats"
+                } else {
+                    null
+                },
             remainingSeconds = workout.stepRemainingSeconds,
-            next = if (next == null) "Finish" else WorkoutDescriber.nextLine(next, snapshot.ftp, snapshot.intensityPercent),
+            next =
+                if (next ==
+                    null
+                ) {
+                    "Finish"
+                } else {
+                    WorkoutDescriber.nextLine(next, snapshot.ftp, snapshot.intensityPercent)
+                },
             profile = chart,
             nowSeconds = workout.workoutElapsedSeconds,
         )
@@ -72,7 +86,4 @@ object RideMapping {
         val iteration = step.repeatIteration ?: return null
         return if (count > 1) "$iteration of $count" else null
     }
-
-    /** Intensity as percent, or the gear for simulation steps: what the readout between − and + shows. */
-    fun isErg(snapshot: RideSnapshot): Boolean = snapshot.mode == TrainerMode.ERG
 }

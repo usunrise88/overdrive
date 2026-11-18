@@ -19,8 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.overdrive.uikit.HorizontalRule
@@ -125,8 +125,18 @@ private fun MainRow(state: OverlayUiState) {
         }
         Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
             PowerValue(state.power, state.zone, state.paused)
-            SlotValue(UiFormat.count(state.heartRate), state.heartRate == null, state.paused, OverdriveDimens.overlaySlotHeartRate)
-            SlotValue(UiFormat.count(state.cadence), state.cadence == null, state.paused, OverdriveDimens.overlaySlotCadence)
+            SlotValue(
+                UiFormat.count(state.heartRate),
+                state.heartRate == null,
+                state.paused,
+                OverdriveDimens.overlaySlotHeartRate,
+            )
+            SlotValue(
+                UiFormat.count(state.cadence),
+                state.cadence == null,
+                state.paused,
+                OverdriveDimens.overlaySlotCadence,
+            )
             TimeValue(state.elapsedSeconds)
             ControlValue(state.control, state.paused)
         }
@@ -138,7 +148,15 @@ private fun Label(
     text: String,
     slot: Dp,
 ) {
-    OdText(text, Modifier.requiredWidth(slot), style = OdType.caption, color = OverdriveColors.textTertiary, maxLines = 1, softWrap = false, overflow = TextOverflow.Visible)
+    OdText(
+        text,
+        Modifier.requiredWidth(slot),
+        style = OdType.caption,
+        color = OverdriveColors.textTertiary,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Visible,
+    )
 }
 
 @Composable
@@ -146,7 +164,13 @@ private fun PowerLabel(zoneTag: Int?) {
     Row(Modifier.requiredWidth(OverdriveDimens.overlaySlotPower), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         OdText("Power", style = OdType.caption, color = OverdriveColors.textTertiary, maxLines = 1, softWrap = false)
         if (zoneTag != null) {
-            OdText("Z$zoneTag", style = OdType.captionNum, color = OverdriveColors.textSecondary, maxLines = 1, softWrap = false)
+            OdText(
+                "Z$zoneTag",
+                style = OdType.captionNum,
+                color = OverdriveColors.textSecondary,
+                maxLines = 1,
+                softWrap = false,
+            )
         }
     }
 }
@@ -166,12 +190,36 @@ private fun TimeLabel(paused: Boolean) {
 
 @Composable
 private fun ControlLabel(control: OverlayControl) {
-    Row(Modifier.requiredWidth(OverdriveDimens.overlaySlotGearOrTarget), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(
+        Modifier.requiredWidth(OverdriveDimens.overlaySlotGearOrTarget),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
         when (control) {
-            is OverlayControl.Gear -> OdText("Gear", style = OdType.caption, color = OverdriveColors.textTertiary, maxLines = 1, softWrap = false)
+            is OverlayControl.Gear -> {
+                OdText(
+                    "Gear",
+                    style = OdType.caption,
+                    color = OverdriveColors.textTertiary,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
+
             is OverlayControl.Target -> {
-                OdText("Target", style = OdType.caption, color = OverdriveColors.textTertiary, maxLines = 1, softWrap = false)
-                OdText(UiFormat.percent(control.intensityPercent), style = OdType.captionNum, color = OverdriveColors.textSecondary, maxLines = 1, softWrap = false)
+                OdText(
+                    "Target",
+                    style = OdType.caption,
+                    color = OverdriveColors.textTertiary,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+                OdText(
+                    UiFormat.percent(control.intensityPercent),
+                    style = OdType.captionNum,
+                    color = OverdriveColors.textSecondary,
+                    maxLines = 1,
+                    softWrap = false,
+                )
             }
         }
     }
@@ -263,8 +311,20 @@ private fun SpeedRow(
             Label("Distance", distanceSlot)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-            ValueWithUnit(UiFormat.speed(speedKmh), "km/h", OdType.numS, Modifier.requiredWidth(OverdriveDimens.overlaySlotPower), color = colour)
-            ValueWithUnit(UiFormat.distanceKm(distanceMeters), "km", OdType.numS, Modifier.requiredWidth(distanceSlot), color = colour)
+            ValueWithUnit(
+                UiFormat.speed(speedKmh),
+                "km/h",
+                OdType.numS,
+                Modifier.requiredWidth(OverdriveDimens.overlaySlotPower),
+                color = colour,
+            )
+            ValueWithUnit(
+                UiFormat.distanceKm(distanceMeters),
+                "km",
+                OdType.numS,
+                Modifier.requiredWidth(distanceSlot),
+                color = colour,
+            )
         }
     }
 }
@@ -279,7 +339,13 @@ private fun IntervalSection(interval: OverlayInterval) {
         Row {
             OdText("Next", style = OdType.label, color = OverdriveColors.textTertiary, maxLines = 1)
             Spacer(Modifier.width(6.dp))
-            OdText(interval.next, style = OdType.labelNum, color = OverdriveColors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            OdText(
+                interval.next,
+                style = OdType.labelNum,
+                color = OverdriveColors.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         WorkoutProfile(
             data = interval.profile,
@@ -301,14 +367,35 @@ private fun IntervalHead(
             buildAnnotatedString {
                 withStyle(SpanStyle(fontWeight = FontWeight.Medium)) { append(name) }
                 if (repeatText != null) {
-                    withStyle(SpanStyle(fontWeight = FontWeight.Normal, color = OverdriveColors.textSecondary)) { append(" $repeatText") }
+                    withStyle(
+                        SpanStyle(fontWeight = FontWeight.Normal, color = OverdriveColors.textSecondary),
+                    ) { append(" $repeatText") }
                 }
             }
         }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-        OdText(title, Modifier.weight(1f).alignByBaseline(), style = OdType.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        OdText(UiFormat.elapsed(remainingSeconds), Modifier.alignByBaseline(), style = OdType.numS, maxLines = 1, softWrap = false)
+        OdText(
+            title,
+            Modifier.weight(1f).alignByBaseline(),
+            style = OdType.body,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        OdText(
+            UiFormat.elapsed(remainingSeconds),
+            Modifier.alignByBaseline(),
+            style = OdType.numS,
+            maxLines = 1,
+            softWrap = false,
+        )
         Spacer(Modifier.width(4.dp))
-        OdText("left", Modifier.alignByBaseline(), style = OdType.unit, color = OverdriveColors.textSecondary, maxLines = 1, softWrap = false)
+        OdText(
+            "left",
+            Modifier.alignByBaseline(),
+            style = OdType.unit,
+            color = OverdriveColors.textSecondary,
+            maxLines = 1,
+            softWrap = false,
+        )
     }
 }

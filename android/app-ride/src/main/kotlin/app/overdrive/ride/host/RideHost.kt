@@ -28,9 +28,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -277,16 +277,41 @@ object DeviceRows {
         DevicesUi(
             trainer =
                 when (trainer) {
-                    ConnectionState.CONNECTED -> DeviceRowUi(DeviceStatus.Connected, "$trainerName · ERG and simulation")
-                    ConnectionState.CONNECTING -> DeviceRowUi(DeviceStatus.Searching, "Connecting to $trainerName…")
-                    ConnectionState.DISCONNECTED -> DeviceRowUi(DeviceStatus.Lost, "Connection lost · retrying")
+                    ConnectionState.CONNECTED -> {
+                        DeviceRowUi(
+                            DeviceStatus.Connected,
+                            "$trainerName · ERG and simulation",
+                        )
+                    }
+
+                    ConnectionState.CONNECTING -> {
+                        DeviceRowUi(DeviceStatus.Searching, "Connecting to $trainerName…")
+                    }
+
+                    ConnectionState.DISCONNECTED -> {
+                        DeviceRowUi(DeviceStatus.Lost, "Connection lost · retrying")
+                    }
                 },
             heartRate =
                 when {
-                    strapName == null || strap == null -> DeviceRowUi(DeviceStatus.NotPaired, "Not paired")
-                    strap == ConnectionState.CONNECTED -> DeviceRowUi(DeviceStatus.Connected, strapName)
-                    strap == ConnectionState.CONNECTING -> DeviceRowUi(DeviceStatus.Searching, "Searching for heart-rate straps…")
-                    else -> DeviceRowUi(DeviceStatus.Lost, "Connection lost · retrying")
+                    strapName == null || strap == null -> {
+                        DeviceRowUi(DeviceStatus.NotPaired, "Not paired")
+                    }
+
+                    strap == ConnectionState.CONNECTED -> {
+                        DeviceRowUi(DeviceStatus.Connected, strapName)
+                    }
+
+                    strap == ConnectionState.CONNECTING -> {
+                        DeviceRowUi(
+                            DeviceStatus.Searching,
+                            "Searching for heart-rate straps…",
+                        )
+                    }
+
+                    else -> {
+                        DeviceRowUi(DeviceStatus.Lost, "Connection lost · retrying")
+                    }
                 },
             click =
                 when (click) {

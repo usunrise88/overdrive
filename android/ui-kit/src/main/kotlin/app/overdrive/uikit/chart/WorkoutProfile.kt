@@ -158,6 +158,7 @@ private class ProfileGeometry(
     ): List<Piece> {
         val total = data.totalSeconds.toFloat()
         if (total <= 0f) return emptyList()
+
         fun y(fraction: Float) = plotHeightPx - min(fraction, Y_MAX) / Y_MAX * plotHeightPx
         val out = ArrayList<Piece>()
         for (step in data.steps) {
@@ -258,11 +259,27 @@ fun WorkoutProfile(
         }
         for (piece in geometry.pieces) {
             when {
-                nowX == null || piece.xMin >= nowX -> drawPath(piece.path, piece.colour)
-                piece.xMax <= nowX -> drawPath(piece.path, piece.pastColour)
+                nowX == null || piece.xMin >= nowX -> {
+                    drawPath(piece.path, piece.colour)
+                }
+
+                piece.xMax <= nowX -> {
+                    drawPath(piece.path, piece.pastColour)
+                }
+
                 else -> {
-                    clipRect(left = 0f, top = 0f, right = nowX, bottom = plotHeight) { drawPath(piece.path, piece.pastColour) }
-                    clipRect(left = nowX, top = 0f, right = widthPx, bottom = plotHeight) { drawPath(piece.path, piece.colour) }
+                    clipRect(
+                        left = 0f,
+                        top = 0f,
+                        right = nowX,
+                        bottom = plotHeight,
+                    ) { drawPath(piece.path, piece.pastColour) }
+                    clipRect(
+                        left = nowX,
+                        top = 0f,
+                        right = widthPx,
+                        bottom = plotHeight,
+                    ) { drawPath(piece.path, piece.colour) }
                 }
             }
         }
@@ -271,7 +288,14 @@ fun WorkoutProfile(
             val label = geometry.ftpLabel
             if (label != null) {
                 val ftpY = plotHeight - 1f / Y_MAX * plotHeight
-                drawText(label, OverdriveColors.textTertiary, Offset(widthPx - label.size.width - 2.dp.toPx(), ftpY - 4.dp.toPx() - label.firstBaseline))
+                drawText(
+                    label,
+                    OverdriveColors.textTertiary,
+                    Offset(
+                        widthPx - label.size.width - 2.dp.toPx(),
+                        ftpY - 4.dp.toPx() - label.firstBaseline,
+                    ),
+                )
             }
         }
         if (nowX != null) {
@@ -287,7 +311,14 @@ fun WorkoutProfile(
                         x > widthPx - 20.dp.toPx() -> x - layout.size.width
                         else -> x - layout.size.width / 2f
                     }
-                drawText(layout, OverdriveColors.textTertiary, Offset(left, size.height - 4.dp.toPx() - layout.firstBaseline))
+                drawText(
+                    layout,
+                    OverdriveColors.textTertiary,
+                    Offset(
+                        left,
+                        size.height - 4.dp.toPx() - layout.firstBaseline,
+                    ),
+                )
             }
         }
     }
@@ -305,7 +336,11 @@ private fun DrawScope.drawTrace(
         val y = plotHeight - min(point.fraction, Y_MAX) / Y_MAX * plotHeight
         if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
     }
-    drawPath(path, OverdriveColors.textPrimary, style = Stroke(OverdriveDimens.strokeChartLineSecondary.toPx(), join = StrokeJoin.Round))
+    drawPath(
+        path,
+        OverdriveColors.textPrimary,
+        style = Stroke(OverdriveDimens.strokeChartLineSecondary.toPx(), join = StrokeJoin.Round),
+    )
 }
 
 /** Caption style, tabular, for axis ticks and the FTP label. */

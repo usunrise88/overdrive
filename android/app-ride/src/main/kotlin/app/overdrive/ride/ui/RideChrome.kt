@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -67,7 +68,11 @@ fun RideTopBar(
     modifier: Modifier = Modifier,
 ) {
     OdTopBar(modifier) {
-        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             OdText(title, Modifier.weight(1f, fill = false), style = OdType.heading, maxLines = 1)
             when (chip) {
                 is TopBarChip.Calm -> OdChip(chip.text, dot = true)
@@ -116,12 +121,14 @@ fun SectionLabel(
 fun rememberTitleWithNote(
     title: String,
     note: String?,
-): androidx.compose.ui.text.AnnotatedString =
+): AnnotatedString =
     remember(title, note) {
         buildAnnotatedString {
             append(title)
             if (note != null) {
-                withStyle(SpanStyle(fontWeight = FontWeight.Normal, color = OverdriveColors.textSecondary)) { append(" $note") }
+                withStyle(
+                    SpanStyle(fontWeight = FontWeight.Normal, color = OverdriveColors.textSecondary),
+                ) { append(" $note") }
             }
         }
     }

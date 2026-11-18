@@ -112,9 +112,17 @@ object WorkoutDescriber {
     ): StepRow {
         val name = (leaf.label ?: repeatLabel ?: defaultName(leaf)) + if (repeats > 1) " ×$repeats" else ""
         return when (leaf) {
-            is SteadyStep ->
-                StepRow(name, leaf.duration, "${percent(leaf.target)}%", "${watts(leaf.target, ftp)} W", Zones.ofFraction(leaf.target))
-            is RampStep ->
+            is SteadyStep -> {
+                StepRow(
+                    name,
+                    leaf.duration,
+                    "${percent(leaf.target)}%",
+                    "${watts(leaf.target, ftp)} W",
+                    Zones.ofFraction(leaf.target),
+                )
+            }
+
+            is RampStep -> {
                 StepRow(
                     name,
                     leaf.duration,
@@ -122,7 +130,11 @@ object WorkoutDescriber {
                     "${UiFormat.range(watts(leaf.from, ftp), watts(leaf.to, ftp))} W",
                     Zones.ofFraction((leaf.from + leaf.to) / 2.0),
                 )
-            is FreeStep -> StepRow(name, leaf.duration, "Gears", "", null)
+            }
+
+            is FreeStep -> {
+                StepRow(name, leaf.duration, "Gears", "", null)
+            }
         }
     }
 
@@ -138,7 +150,14 @@ object WorkoutDescriber {
     /** The geometry of the profile chart: one instance per workout, so the chart caches its paths. */
     fun profileOf(steps: List<FlatStep>): ProfileData =
         ProfileData(
-            steps.map { ProfileStep(it.startSeconds, it.durationSeconds, it.targetFrom?.toFloat(), it.targetTo?.toFloat()) },
+            steps.map {
+                ProfileStep(
+                    it.startSeconds,
+                    it.durationSeconds,
+                    it.targetFrom?.toFloat(),
+                    it.targetTo?.toFloat(),
+                )
+            },
         )
 
     /**

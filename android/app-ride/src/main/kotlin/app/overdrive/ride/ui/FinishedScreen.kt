@@ -52,7 +52,13 @@ object FinishedFormat {
         val clock = DateTimeFormatter.ofPattern("HH:mm", locale)
         val day = DateTimeFormatter.ofPattern("EEEE d MMMM", locale).format(start)
         val end = endEpochMillis?.let { Instant.ofEpochMilli(it).atZone(zone) }
-        return if (end == null) "$day · ${clock.format(start)}" else "$day · ${clock.format(start)}–${clock.format(end)}"
+        return if (end ==
+            null
+        ) {
+            "$day · ${clock.format(start)}"
+        } else {
+            "$day · ${clock.format(start)}–${clock.format(end)}"
+        }
     }
 }
 
@@ -77,7 +83,10 @@ fun FinishedScreen(
                 OdButton("Done", onDone, variant = ButtonVariant.Primary, height = 64.dp, minWidth = 160.dp)
             }
         } else {
-            Row(Modifier.weight(1f).fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            Row(
+                Modifier.weight(1f).fillMaxWidth().padding(24.dp),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+            ) {
                 Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     Column {
                         OdText(ride.title, style = OdType.title, maxLines = 1)
@@ -89,11 +98,20 @@ fun FinishedScreen(
                     }
                     SummaryTiles(ride)
                     OdCard(padding = PaddingValues(horizontal = 20.dp, vertical = 16.dp)) {
-                        OdText("Time in power zones", Modifier.padding(bottom = 8.dp), style = OdType.label, color = OverdriveColors.textTertiary)
+                        OdText(
+                            "Time in power zones",
+                            Modifier.padding(bottom = 8.dp),
+                            style = OdType.label,
+                            color = OverdriveColors.textTertiary,
+                        )
                         ZoneTimeBars(ride.zoneSeconds)
                     }
                     Box(Modifier.weight(1f))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         OdText(
                             "This ride is not saved yet. Saving and FIT export arrive in a later build.",
                             Modifier.weight(1f),
@@ -114,7 +132,15 @@ private fun SummaryTiles(ride: FinishedRide) {
     val s = ride.summary
     val padding = PaddingValues(horizontal = 20.dp, vertical = 16.dp)
     val tile: @Composable (String, String?, String?) -> Unit = { label, value, unit ->
-        StatTile(label, value, unit, Modifier.fillMaxWidth(), valueStyle = OdType.numS, padding = padding, spaceBetween = false)
+        StatTile(
+            label,
+            value,
+            unit,
+            Modifier.fillMaxWidth(),
+            valueStyle = OdType.numS,
+            padding = padding,
+            spaceBetween = false,
+        )
     }
     TileGroup(
         columns = 4,
@@ -174,8 +200,29 @@ private fun LapLine(
     ) {
         OdText(number, Modifier.width(28.dp), style = labelStyle, color = OverdriveColors.textTertiary, maxLines = 1)
         OdText(name, Modifier.weight(1f), style = OdType.label, maxLines = 1)
-        OdText(time, Modifier.width(64.dp), style = labelStyle, color = if (header) OverdriveColors.textTertiary else OverdriveColors.textSecondary, textAlign = TextAlign.End, maxLines = 1)
-        OdText(watts, Modifier.width(64.dp), style = labelStyle, color = if (header) OverdriveColors.textTertiary else OverdriveColors.textPrimary, textAlign = TextAlign.End, maxLines = 1)
-        OdText(heartRate, Modifier.width(56.dp), style = labelStyle, color = if (header) OverdriveColors.textTertiary else OverdriveColors.textSecondary, textAlign = TextAlign.End, maxLines = 1)
+        OdText(
+            time,
+            Modifier.width(64.dp),
+            style = labelStyle,
+            color = if (header) OverdriveColors.textTertiary else OverdriveColors.textSecondary,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+        )
+        OdText(
+            watts,
+            Modifier.width(64.dp),
+            style = labelStyle,
+            color = if (header) OverdriveColors.textTertiary else OverdriveColors.textPrimary,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+        )
+        OdText(
+            heartRate,
+            Modifier.width(56.dp),
+            style = labelStyle,
+            color = if (header) OverdriveColors.textTertiary else OverdriveColors.textSecondary,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+        )
     }
 }

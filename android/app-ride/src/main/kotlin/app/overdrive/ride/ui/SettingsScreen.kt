@@ -99,7 +99,10 @@ private fun OverlayGroup(
     actions: SettingsActions,
 ) {
     Group("Overlay") {
-        OverlayPreview(settings.overlayOpacityPercent / PERCENT, Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 16.dp))
+        OverlayPreview(
+            settings.overlayOpacityPercent / PERCENT,
+            Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 16.dp),
+        )
         SettingRow("Mode", description = "Tap the overlay to switch") {
             SegmentedControl(
                 options = listOf("Compact", "Detailed"),
@@ -116,13 +119,29 @@ private fun OverlayGroup(
                 modifier = Modifier.weight(1f),
                 contentDescription = "Overlay opacity",
             )
-            OdText("${settings.overlayOpacityPercent}%", Modifier.width(48.dp), style = OdType.numXS, textAlign = TextAlign.End, maxLines = 1)
+            OdText(
+                "${settings.overlayOpacityPercent}%",
+                Modifier.width(48.dp),
+                style = OdType.numXS,
+                textAlign = TextAlign.End,
+                maxLines = 1,
+            )
         }
         SettingRow("Blur the video behind", description = "Easier to read over busy video. Uses more battery.") {
-            OdSwitch(settings.overlayBlur, { value -> actions.onChange { it.copy(overlayBlur = value) } }, contentDescription = "Blur the video behind")
+            OdSwitch(settings.overlayBlur, { value ->
+                actions.onChange {
+                    it.copy(overlayBlur = value)
+                }
+            }, contentDescription = "Blur the video behind")
         }
         SettingRow("Position", description = "Drag the overlay; it snaps to the nearest edge") {
-            OdButton("Reset", actions.onResetOverlayPosition, variant = ButtonVariant.Ghost, enabled = settings.overlayX != null || settings.overlayY != null)
+            OdButton(
+                "Reset",
+                actions.onResetOverlayPosition,
+                variant = ButtonVariant.Ghost,
+                enabled =
+                    settings.overlayX != null || settings.overlayY != null,
+            )
         }
     }
 }
@@ -161,8 +180,20 @@ private fun RiderGroup(
         SettingRow("Gears", description = "Gear ${settings.neutralGear} rides the flat") {
             Stepper(
                 settings.gearCount.toString(),
-                onDecrement = { actions.onChange { it.copy(gearCount = SettingsRules.gears.stepped(it.gearCount, -1)) } },
-                onIncrement = { actions.onChange { it.copy(gearCount = SettingsRules.gears.stepped(it.gearCount, +1)) } },
+                onDecrement = {
+                    actions.onChange {
+                        it.copy(
+                            gearCount = SettingsRules.gears.stepped(it.gearCount, -1),
+                        )
+                    }
+                },
+                onIncrement = {
+                    actions.onChange {
+                        it.copy(
+                            gearCount = SettingsRules.gears.stepped(it.gearCount, +1),
+                        )
+                    }
+                },
                 canDecrement = SettingsRules.gears.canStep(settings.gearCount, -1),
                 canIncrement = SettingsRules.gears.canStep(settings.gearCount, +1),
                 label = "gears",
@@ -171,8 +202,20 @@ private fun RiderGroup(
         SettingRow("Step per gear", description = "Grade added by each gear; total stays within 15%") {
             Stepper(
                 "${UiFormat.decimal(settings.gradePerGear, 1)}%",
-                onDecrement = { actions.onChange { it.copy(gradePerGear = SettingsRules.gradePerGear.stepped(it.gradePerGear, -1)) } },
-                onIncrement = { actions.onChange { it.copy(gradePerGear = SettingsRules.gradePerGear.stepped(it.gradePerGear, +1)) } },
+                onDecrement = {
+                    actions.onChange {
+                        it.copy(
+                            gradePerGear = SettingsRules.gradePerGear.stepped(it.gradePerGear, -1),
+                        )
+                    }
+                },
+                onIncrement = {
+                    actions.onChange {
+                        it.copy(
+                            gradePerGear = SettingsRules.gradePerGear.stepped(it.gradePerGear, +1),
+                        )
+                    }
+                },
                 canDecrement = SettingsRules.gradePerGear.canStep(settings.gradePerGear, -1),
                 canIncrement = SettingsRules.gradePerGear.canStep(settings.gradePerGear, +1),
                 label = "step per gear",
@@ -235,8 +278,15 @@ private fun DeveloperGroup(
                 onSelect = { index -> actions.onChange { it.copy(demoSpeed = DemoSpeed.entries[index]) } },
             )
         }
-        SettingRow("Scripted dropouts", description = "Heart rate, cadence, power and the trainer drop out during the ride") {
-            OdSwitch(settings.scriptedDropouts, { value -> actions.onChange { it.copy(scriptedDropouts = value) } }, contentDescription = "Scripted dropouts")
+        SettingRow(
+            "Scripted dropouts",
+            description = "Heart rate, cadence, power and the trainer drop out during the ride",
+        ) {
+            OdSwitch(settings.scriptedDropouts, { value ->
+                actions.onChange {
+                    it.copy(scriptedDropouts = value)
+                }
+            }, contentDescription = "Scripted dropouts")
         }
         SettingRow("Simulated Click", description = "What the Devices screen shows for the Click") {
             SegmentedControl(

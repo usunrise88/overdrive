@@ -17,12 +17,19 @@ object WorkoutFileReader {
                 resolver.openInputStream(uri)?.use { input ->
                     val buffer = input.readNBytes(WorkoutFiles.MAX_BYTES + 1)
                     if (buffer.size > WorkoutFiles.MAX_BYTES) null else buffer
-                } ?: return WorkoutFiles.unreadable(name, "The file is larger than a workout file can be. Pick a workout file in the native JSON format or a Zwift .zwo file.")
+                }
+                    ?: return WorkoutFiles.unreadable(
+                        name,
+                        "The file is larger than a workout file can be. Pick a workout file in the native JSON format or a Zwift .zwo file.",
+                    )
             WorkoutFiles.parse(bytes.toString(Charsets.UTF_8), name)
         } catch (e: IOException) {
             WorkoutFiles.unreadable(name, "The file could not be read. Check that it is still there and pick it again.")
         } catch (e: SecurityException) {
-            WorkoutFiles.unreadable(name, "The app is not allowed to read that file. Pick it again from the file picker.")
+            WorkoutFiles.unreadable(
+                name,
+                "The app is not allowed to read that file. Pick it again from the file picker.",
+            )
         }
     }
 

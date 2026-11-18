@@ -1,6 +1,8 @@
 package app.overdrive.ride.settings
 
+import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -21,8 +23,11 @@ class SettingsTest {
     @get:Rule
     val folder = TemporaryFolder()
 
-    private fun TestScope.repository(name: String = "settings"): Pair<SettingsRepository, androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>> {
-        val store = PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "$name.preferences_pb") }
+    private fun TestScope.repository(name: String = "settings"): Pair<SettingsRepository, DataStore<Preferences>> {
+        val store =
+            PreferenceDataStoreFactory.create(
+                scope = backgroundScope,
+            ) { File(folder.root, "$name.preferences_pb") }
         return SettingsRepository(store) to store
     }
 
@@ -100,7 +105,15 @@ class SettingsTest {
     @Test
     fun rideInputsIgnoreOverlayAndClickSettings() {
         val base = AppSettings()
-        assertEquals(base.rideInputs(), base.copy(overlayOpacityPercent = 90, overlayBlur = true, simulatedClick = SimulatedClick.Locked).rideInputs())
+        assertEquals(
+            base.rideInputs(),
+            base
+                .copy(
+                    overlayOpacityPercent = 90,
+                    overlayBlur = true,
+                    simulatedClick = SimulatedClick.Locked,
+                ).rideInputs(),
+        )
         assertFalse(base.rideInputs() == base.copy(ftp = 260).rideInputs())
         assertFalse(base.rideInputs() == base.copy(demoSpeed = DemoSpeed.Fast).rideInputs())
     }

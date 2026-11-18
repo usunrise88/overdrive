@@ -33,7 +33,15 @@ fun OdIcon(
         modifier
             .size(size)
             .paint(painter, colorFilter = ColorFilter.tint(colour))
-            .then(if (contentDescription != null) Modifier.semantics { this.contentDescription = contentDescription } else Modifier),
+            .then(
+                if (contentDescription !=
+                    null
+                ) {
+                    Modifier.semantics { this.contentDescription = contentDescription }
+                } else {
+                    Modifier
+                },
+            ),
     )
 }
 

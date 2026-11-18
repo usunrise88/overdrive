@@ -51,14 +51,41 @@ private fun buttonColours(
     enabled: Boolean,
 ): ButtonColours =
     when {
-        !enabled -> ButtonColours(OverdriveColors.surface1, Color.Transparent, OverdriveColors.textTertiary)
-        pressed -> ButtonColours(OverdriveColors.surface3, OverdriveColors.borderStrong, OverdriveColors.textPrimary)
-        else ->
+        !enabled -> {
+            ButtonColours(OverdriveColors.surface1, Color.Transparent, OverdriveColors.textTertiary)
+        }
+
+        pressed -> {
+            ButtonColours(OverdriveColors.surface3, OverdriveColors.borderStrong, OverdriveColors.textPrimary)
+        }
+
+        else -> {
             when (variant) {
-                ButtonVariant.Primary -> ButtonColours(OverdriveColors.textPrimary, Color.Transparent, OverdriveColors.textOnPrimary)
-                ButtonVariant.Secondary -> ButtonColours(OverdriveColors.surface2, OverdriveColors.border, OverdriveColors.textPrimary)
-                ButtonVariant.Ghost -> ButtonColours(Color.Transparent, Color.Transparent, OverdriveColors.textSecondary)
+                ButtonVariant.Primary -> {
+                    ButtonColours(
+                        OverdriveColors.textPrimary,
+                        Color.Transparent,
+                        OverdriveColors.textOnPrimary,
+                    )
+                }
+
+                ButtonVariant.Secondary -> {
+                    ButtonColours(
+                        OverdriveColors.surface2,
+                        OverdriveColors.border,
+                        OverdriveColors.textPrimary,
+                    )
+                }
+
+                ButtonVariant.Ghost -> {
+                    ButtonColours(
+                        Color.Transparent,
+                        Color.Transparent,
+                        OverdriveColors.textSecondary,
+                    )
+                }
             }
+        }
     }
 
 @Composable
@@ -117,7 +144,11 @@ fun OdButton(
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (leadingIcon != null) OdIcon(leadingIcon, tint = colours.content)
-            if (text != null) OdText(text, style = OdType.bodyStrong, color = colours.content, maxLines = 1, softWrap = false)
+            if (text !=
+                null
+            ) {
+                OdText(text, style = OdType.bodyStrong, color = colours.content, maxLines = 1, softWrap = false)
+            }
             if (trailingIcon != null) OdIcon(trailingIcon, tint = colours.content)
         }
     }

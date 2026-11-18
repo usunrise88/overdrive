@@ -41,8 +41,8 @@ import app.overdrive.uikit.OdIconButton
 import app.overdrive.uikit.OdSlider
 import app.overdrive.uikit.OdSwitch
 import app.overdrive.uikit.OdText
-import app.overdrive.uikit.OdType
 import app.overdrive.uikit.OdTopBar
+import app.overdrive.uikit.OdType
 import app.overdrive.uikit.OverdriveTheme
 import app.overdrive.uikit.SegmentedControl
 import app.overdrive.uikit.SelectableRow
@@ -71,10 +71,35 @@ private fun SheetTitle(text: String) {
 fun DeviceRowStates(modifier: Modifier = Modifier) {
     OdCard(modifier.width(640.dp), padding = PaddingValues(0.dp)) {
         DeviceRow(OverdriveIcons.Heart, "Heart rate", "Not paired", DeviceStatus.NotPaired)
-        DeviceRow(OverdriveIcons.Heart, "Heart rate", "Searching for heart-rate straps…", DeviceStatus.Searching, divider = true)
-        DeviceRow(OverdriveIcons.Heart, "Heart rate", "Coospo HR7 · battery 80%", DeviceStatus.Connected, divider = true)
-        DeviceRow(OverdriveIcons.Bike, "Trainer", "Connection lost · retrying in 8 s", DeviceStatus.Lost, divider = true)
-        DeviceRow(OverdriveIcons.Gamepad2, "Click", "Zwift Click v2 · connected", DeviceStatus.Locked, divider = true, notice = { ClickLockedNotice() })
+        DeviceRow(
+            OverdriveIcons.Heart,
+            "Heart rate",
+            "Searching for heart-rate straps…",
+            DeviceStatus.Searching,
+            divider = true,
+        )
+        DeviceRow(
+            OverdriveIcons.Heart,
+            "Heart rate",
+            "Coospo HR7 · battery 80%",
+            DeviceStatus.Connected,
+            divider = true,
+        )
+        DeviceRow(
+            OverdriveIcons.Bike,
+            "Trainer",
+            "Connection lost · retrying in 8 s",
+            DeviceStatus.Lost,
+            divider = true,
+        )
+        DeviceRow(
+            OverdriveIcons.Gamepad2,
+            "Click",
+            "Zwift Click v2 · connected",
+            DeviceStatus.Locked,
+            divider = true,
+            notice = { ClickLockedNotice() },
+        )
     }
 }
 
@@ -84,7 +109,9 @@ fun ClickLockedNotice(onCheckAgain: () -> Unit = {}) {
     Notice(
         icon = OverdriveIcons.Info,
         title = "Click is locked",
-        text = "It is connected but sends no button presses. Unlock it once in the Zwift app, then check again. You can ride without it; every action is on screen.",
+        text =
+            "It is connected but sends no button presses. Unlock it once in the Zwift app, " +
+                "then check again. You can ride without it; every action is on screen.",
         actionLabel = "Check again",
         onAction = onCheckAgain,
     )
@@ -100,13 +127,18 @@ fun ComponentSheet() {
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             Column {
-                SheetTitle("Device row: not paired · searching · connected · connection lost · Click connected but locked")
+                SheetTitle(
+                    "Device row: not paired · searching · connected · connection lost · Click connected but locked",
+                )
                 DeviceRowStates()
             }
             Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
                 Column(Modifier.weight(1f)) {
                     SheetTitle("Buttons: primary · secondary · ghost · pressed · disabled · ride size (64 dp)")
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
                         OdButton("Start", {}, variant = ButtonVariant.Primary)
                         OdButton("Pair", {})
                         OdButton("Cancel", {}, variant = ButtonVariant.Ghost)
@@ -118,7 +150,10 @@ fun ComponentSheet() {
                 }
                 Column(Modifier.weight(1f)) {
                     SheetTitle("Chips · zone chips · state chips")
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
                         OdChip("Riding", dot = true)
                         OdChip("Paused", icon = OverdriveIcons.Pause, on = true)
                         OdChip("ERG")
@@ -130,13 +165,44 @@ fun ComponentSheet() {
             Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
                 Column(Modifier.weight(1f)) {
                     SheetTitle("Stat tiles: value · no signal · zone-coloured power")
+                    val pad = PaddingValues(horizontal = 20.dp, vertical = 16.dp)
                     TileGroup(
                         columns = 3,
                         tiles =
                             listOf(
-                                { StatTile("Heart rate", "148", "bpm", valueStyle = OdType.numS, spaceBetween = false, padding = PaddingValues(horizontal = 20.dp, vertical = 16.dp)) },
-                                { StatTile("Heart rate", null, null, valueStyle = OdType.numS, labelEnd = "No signal", spaceBetween = false, padding = PaddingValues(horizontal = 20.dp, vertical = 16.dp)) },
-                                { StatTile("Power", "251", "W", valueStyle = OdType.numS, valueColor = Zones.color(4), labelEnd = "Z4", spaceBetween = false, padding = PaddingValues(horizontal = 20.dp, vertical = 16.dp)) },
+                                {
+                                    StatTile(
+                                        "Heart rate",
+                                        "148",
+                                        "bpm",
+                                        valueStyle = OdType.numS,
+                                        spaceBetween = false,
+                                        padding = pad,
+                                    )
+                                },
+                                {
+                                    StatTile(
+                                        "Heart rate",
+                                        null,
+                                        null,
+                                        valueStyle = OdType.numS,
+                                        labelEnd = "No signal",
+                                        spaceBetween = false,
+                                        padding = pad,
+                                    )
+                                },
+                                {
+                                    StatTile(
+                                        "Power",
+                                        "251",
+                                        "W",
+                                        valueStyle = OdType.numS,
+                                        valueColor = Zones.color(4),
+                                        labelEnd = "Z4",
+                                        spaceBetween = false,
+                                        padding = pad,
+                                    )
+                                },
                             ),
                     )
                 }
@@ -176,7 +242,11 @@ fun IconSheet() {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             for ((name, icon) in OverdriveIcons.all) {
-                Column(Modifier.width(112.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(
+                    Modifier.width(112.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     OdIcon(icon, size = 24.dp)
                     OdText(name, style = OdType.caption, color = OverdriveColors.textTertiary, maxLines = 1)
                 }
@@ -185,7 +255,7 @@ fun IconSheet() {
     }
 }
 
-/** The workout profile as on the ride screen: FTP line, minute ticks, elapsed steps blended, power trace, now marker. */
+/** The workout profile as on the ride screen: FTP line, minute ticks, blended elapsed steps, power trace, now marker. */
 @Composable
 fun ProfileSample() {
     OverdriveTheme {
@@ -220,7 +290,9 @@ fun ListSample() {
             SelectableRow("Sweet spot 3×10", "65 min · steady, ramp, intervals", true, {})
             SelectableRow("VO2 5×3", "56 min · intervals", false, {})
             Box(Modifier.height(8.dp))
-            SettingRow("FTP", description = "Sets power zones and workout targets", first = true) { Stepper("250 W", {}, {}) }
+            SettingRow("FTP", description = "Sets power zones and workout targets", first = true) {
+                Stepper("250 W", {}, {})
+            }
         }
     }
 }

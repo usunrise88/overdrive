@@ -23,8 +23,26 @@ class RideMappingTest {
     private val steps =
         listOf(
             FlatStep("Warm-up", 600, 0.45, 0.70, TrainerMode.ERG, startSeconds = 0),
-            FlatStep("Sweet spot", 600, 0.88, 0.88, TrainerMode.ERG, startSeconds = 600, repeatIteration = 1, repeatCount = 3),
-            FlatStep("Recover", 300, 0.50, 0.50, TrainerMode.ERG, startSeconds = 1200, repeatIteration = 1, repeatCount = 3),
+            FlatStep(
+                "Sweet spot",
+                600,
+                0.88,
+                0.88,
+                TrainerMode.ERG,
+                startSeconds = 600,
+                repeatIteration = 1,
+                repeatCount = 3,
+            ),
+            FlatStep(
+                "Recover",
+                300,
+                0.50,
+                0.50,
+                TrainerMode.ERG,
+                startSeconds = 1200,
+                repeatIteration = 1,
+                repeatCount = 3,
+            ),
             FlatStep("Free ride", 300, null, null, TrainerMode.SIMULATION, startSeconds = 1500),
         )
     private val profile = WorkoutDescriber.profileOf(steps)
@@ -112,7 +130,13 @@ class RideMappingTest {
 
     @Test
     fun theLastStepsNextIsFinishAndAFreeStepIsNamedByItsLabel() {
-        val last = ergSnapshot().copy(workout = progress(3), mode = TrainerMode.SIMULATION, targetPower = null, gear = 12)
+        val last =
+            ergSnapshot().copy(
+                workout = progress(3),
+                mode = TrainerMode.SIMULATION,
+                targetPower = null,
+                gear = 12,
+            )
         assertEquals("Finish", checkNotNull(RideMapping.overlayState(last, profile).interval).next)
         val beforeFree = ergSnapshot().copy(workout = progress(2))
         assertEquals("Free ride · 5:00", checkNotNull(RideMapping.overlayState(beforeFree, profile).interval).next)
@@ -132,12 +156,26 @@ class RideMappingTest {
 
     @Test
     fun deviceRowsFollowTheLinkStates() {
-        val ok = DeviceRows.of("Simulated trainer", ConnectionState.CONNECTED, "Simulated strap", ConnectionState.CONNECTED, SimulatedClick.Connected)
+        val ok =
+            DeviceRows.of(
+                "Simulated trainer",
+                ConnectionState.CONNECTED,
+                "Simulated strap",
+                ConnectionState.CONNECTED,
+                SimulatedClick.Connected,
+            )
         assertEquals(DeviceStatus.Connected, ok.trainer.status)
         assertEquals(DeviceStatus.Connected, ok.heartRate.status)
         assertEquals(DeviceStatus.Connected, ok.click.status)
 
-        val trouble = DeviceRows.of("T", ConnectionState.DISCONNECTED, "S", ConnectionState.CONNECTING, SimulatedClick.Locked)
+        val trouble =
+            DeviceRows.of(
+                "T",
+                ConnectionState.DISCONNECTED,
+                "S",
+                ConnectionState.CONNECTING,
+                SimulatedClick.Locked,
+            )
         assertEquals(DeviceStatus.Lost, trouble.trainer.status)
         assertEquals(DeviceStatus.Searching, trouble.heartRate.status)
         assertEquals(DeviceStatus.Locked, trouble.click.status)

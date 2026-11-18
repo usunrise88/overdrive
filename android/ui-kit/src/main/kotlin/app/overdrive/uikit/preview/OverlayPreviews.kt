@@ -40,10 +40,18 @@ fun VideoBackdrop(
 ) {
     Canvas(modifier) {
         when (kind) {
-            Backdrop.Dark ->
+            Backdrop.Dark -> {
                 drawRect(Brush.verticalGradient(listOf(Color(0xFF05070A), Color(0xFF0D1116), Color(0xFF151A12))))
-            Backdrop.Bright ->
-                drawRect(Brush.verticalGradient(listOf(Color(0xFFF4F8FC), Color(0xFFE6EEF6), Color(0xFFFDFDFB), Color(0xFFE9ECE4))))
+            }
+
+            Backdrop.Bright -> {
+                drawRect(
+                    Brush.verticalGradient(
+                        listOf(Color(0xFFF4F8FC), Color(0xFFE6EEF6), Color(0xFFFDFDFB), Color(0xFFE9ECE4)),
+                    ),
+                )
+            }
+
             Backdrop.Busy -> {
                 drawRect(Color(0xFF888888))
                 val stripe = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Butt)

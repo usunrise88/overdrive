@@ -32,7 +32,13 @@ class RideHostTest {
     private fun TestScope.host(
         settings: MutableStateFlow<AppSettings> = MutableStateFlow(AppSettings(ftp = 250)),
         choice: RideChoice = RideChoice.Planned(short),
-    ) = RideHost(SimulatedRideSessionFactory(), settings, choice, StandardTestDispatcher(testScheduler), debounceMillis = 100)
+    ) = RideHost(
+        SimulatedRideSessionFactory(),
+        settings,
+        choice,
+        StandardTestDispatcher(testScheduler),
+        debounceMillis = 100,
+    )
 
     @Test
     fun preparesAReadyRideAtStart() =
@@ -189,7 +195,11 @@ class RideHostTest {
             runCurrent()
             // The host's own dispatcher drives everything; commands from here only enqueue.
             host.actions.start()
-            assertEquals("a command takes effect on the ride's coroutine, not before", RideState.READY, host.snapshots.value.state)
+            assertEquals(
+                "a command takes effect on the ride's coroutine, not before",
+                RideState.READY,
+                host.snapshots.value.state,
+            )
             runCurrent()
             assertEquals(RideState.RIDING, host.snapshots.value.state)
             host.close()

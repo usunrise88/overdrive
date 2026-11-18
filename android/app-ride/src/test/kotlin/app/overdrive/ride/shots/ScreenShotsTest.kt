@@ -2,12 +2,16 @@ package app.overdrive.ride.shots
 
 import app.overdrive.core.ride.PauseReason
 import app.overdrive.core.ride.RideState
+import app.overdrive.ride.host.FinishedRide
 import app.overdrive.ride.host.NoMedia
 import app.overdrive.ride.host.RideActions
 import app.overdrive.ride.host.RideChoice
+import app.overdrive.ride.host.RideHost
+import app.overdrive.ride.host.SimulatedRideSessionFactory
 import app.overdrive.ride.settings.AppSettings
 import app.overdrive.ride.ui.DevicesActions
 import app.overdrive.ride.ui.DevicesScreen
+import app.overdrive.ride.ui.FinishedScreen
 import app.overdrive.ride.ui.ReadyActions
 import app.overdrive.ride.ui.ReadyScreen
 import app.overdrive.ride.ui.RidingScreen
@@ -16,6 +20,11 @@ import app.overdrive.ride.ui.SettingsScreen
 import app.overdrive.ride.ui.TopBarActions
 import app.overdrive.ride.workouts.WorkoutFileError
 import app.overdrive.uikit.OverdriveTheme
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.robolectric.annotation.Config
 
@@ -54,7 +63,11 @@ class ScreenShotsTest : ShotTest() {
                     settings = settings,
                     devices = TestData.devicesOk,
                     startEnabled = false,
-                    openError = WorkoutFileError("notes.txt is not a workout", "Not a valid workout file: Unexpected JSON token. Fix the file or pick another one."),
+                    openError =
+                        WorkoutFileError(
+                            "notes.txt is not a workout",
+                            "Not a valid workout file: Unexpected JSON token. Fix the file or pick another one.",
+                        ),
                     topBar = topBar,
                     actions = ReadyActions({}, {}, {}, {}),
                 )
@@ -66,7 +79,13 @@ class ScreenShotsTest : ShotTest() {
         shot("ride--riding") {
             val snapshot = TestData.riding()
             OverdriveTheme {
-                RidingScreen(TestData.ui(snapshot, RideChoice.Planned(TestData.sweetSpot)), TestData.devicesOk, topBar, actions(snapshot), NoMedia)
+                RidingScreen(
+                    TestData.ui(snapshot, RideChoice.Planned(TestData.sweetSpot)),
+                    TestData.devicesOk,
+                    topBar,
+                    actions(snapshot),
+                    NoMedia,
+                )
             }
         }
 
@@ -75,7 +94,13 @@ class ScreenShotsTest : ShotTest() {
         shot("ride--paused") {
             val snapshot = TestData.riding(RideState.PAUSED, PauseReason.MANUAL)
             OverdriveTheme {
-                RidingScreen(TestData.ui(snapshot, RideChoice.Planned(TestData.sweetSpot)), TestData.devicesOk, topBar, actions(snapshot), NoMedia)
+                RidingScreen(
+                    TestData.ui(snapshot, RideChoice.Planned(TestData.sweetSpot)),
+                    TestData.devicesOk,
+                    topBar,
+                    actions(snapshot),
+                    NoMedia,
+                )
             }
         }
 
@@ -100,9 +125,44 @@ class ScreenShotsTest : ShotTest() {
         shot("ride--free") {
             val snapshot = TestData.freeRide()
             OverdriveTheme {
-                RidingScreen(TestData.ui(snapshot, RideChoice.Free, profile = false), TestData.devicesOk, topBar, actions(snapshot), NoMedia)
+                RidingScreen(
+                    TestData.ui(snapshot, RideChoice.Free, profile = false),
+                    TestData.devicesOk,
+                    topBar,
+                    actions(snapshot),
+                    NoMedia,
+                )
             }
         }
+
+    /** A whole simulated Sweet spot 3x10 ridden by the real engine in virtual time, then summarised by the host. */
+    private fun finishedRide(): FinishedRide {
+        var result: FinishedRide? = null
+        runTest {
+            val host =
+                RideHost(
+                    SimulatedRideSessionFactory(),
+                    flowOf(AppSettings(ftp = 250)),
+                    RideChoice.Planned(TestData.sweetSpot),
+                    StandardTestDispatcher(testScheduler),
+                )
+            runCurrent()
+            host.actions.start()
+            advanceTimeBy(3_905_000)
+            runCurrent()
+            result = host.ui.value.finished
+            host.close()
+        }
+        return checkNotNull(result)
+    }
+
+    @Test
+    fun finished() {
+        val ride = finishedRide()
+        shot("ride--finished") {
+            OverdriveTheme { FinishedScreen(ride, TestData.devicesOk, topBar, onDone = {}) }
+        }
+    }
 
     @Test
     fun devices() =

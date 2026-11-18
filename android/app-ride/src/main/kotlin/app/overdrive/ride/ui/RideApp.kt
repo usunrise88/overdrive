@@ -95,13 +95,21 @@ fun RideApp(
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) {
                 scope.launch {
-                    when (val result = withContext(Dispatchers.IO) { WorkoutFileReader.read(context.contentResolver, uri) }) {
+                    when (
+                        val result =
+                            withContext(
+                                Dispatchers.IO,
+                            ) { WorkoutFileReader.read(context.contentResolver, uri) }
+                    ) {
                         is WorkoutFileResult.Loaded -> {
                             openError = null
                             container.library.add(result.workout)
                             host.select(RideChoice.Planned(result.workout))
                         }
-                        is WorkoutFileResult.Failed -> openError = result.error
+
+                        is WorkoutFileResult.Failed -> {
+                            openError = result.error
+                        }
                     }
                 }
             }
@@ -116,14 +124,21 @@ fun RideApp(
         )
     val page =
         when (screen) {
-            Screen.Devices -> Page.Devices
-            Screen.Settings -> Page.Settings
-            Screen.Ride ->
+            Screen.Devices -> {
+                Page.Devices
+            }
+
+            Screen.Settings -> {
+                Page.Settings
+            }
+
+            Screen.Ride -> {
                 when (state) {
                     RideState.IDLE, RideState.READY -> Page.Ready
                     RideState.RIDING, RideState.PAUSED -> Page.Riding
                     RideState.FINISHED -> Page.Finished
                 }
+            }
         }
     val motion = LocalMotionEnabled.current
 
@@ -144,7 +159,7 @@ fun RideApp(
             label = "screen",
         ) { target ->
             when (target) {
-                Page.Ready ->
+                Page.Ready -> {
                     ReadyScreen(
                         choice = choice,
                         workouts = workouts,
@@ -155,15 +170,26 @@ fun RideApp(
                         topBar = topBar,
                         actions =
                             ReadyActions(
-                                onSelect = { openError = null; host.select(it) },
+                                onSelect = {
+                                    openError = null
+                                    host.select(it)
+                                },
                                 onStart = host.actions::start,
                                 onOpenFile = { picker.launch(arrayOf("*/*")) },
                                 onDismissError = { openError = null },
                             ),
                     )
-                Page.Riding -> RidingScreen(ui, devices, topBar, host.actions, container.media)
-                Page.Finished -> FinishedScreen(ui.finished, devices, topBar, onDone = host::reset)
-                Page.Devices ->
+                }
+
+                Page.Riding -> {
+                    RidingScreen(ui, devices, topBar, host.actions, container.media)
+                }
+
+                Page.Finished -> {
+                    FinishedScreen(ui.finished, devices, topBar, onDone = host::reset)
+                }
+
+                Page.Devices -> {
                     DevicesScreen(
                         devices = devices,
                         actions =
@@ -171,11 +197,25 @@ fun RideApp(
                                 onBack = { screen = Screen.Ride },
                                 onRetryTrainer = host::retryTrainer,
                                 onRetryHeartRate = host::retryHeartRate,
-                                onPairClick = { container.updateSettings { it.copy(simulatedClick = SimulatedClick.Connected) } },
-                                onCheckClick = { container.updateSettings { it.copy(simulatedClick = SimulatedClick.Connected) } },
+                                onPairClick = {
+                                    container.updateSettings {
+                                        it.copy(
+                                            simulatedClick = SimulatedClick.Connected,
+                                        )
+                                    }
+                                },
+                                onCheckClick = {
+                                    container.updateSettings {
+                                        it.copy(
+                                            simulatedClick = SimulatedClick.Connected,
+                                        )
+                                    }
+                                },
                             ),
                     )
-                Page.Settings ->
+                }
+
+                Page.Settings -> {
                     SettingsScreen(
                         settings = settings,
                         actions =
@@ -185,12 +225,17 @@ fun RideApp(
                                 onResetOverlayPosition = container::resetOverlayPosition,
                             ),
                     )
+                }
             }
         }
         if (overlayShown && screen == Screen.Ride) {
             OverlayPreview(
                 state = RideMapping.overlayState(ui.snapshot, ui.profile),
-                settings = OverlaySettings(settings.overlayOpacityPercent / 100f, if (overlayDetailed) OverlayMode.Detailed else OverlayMode.Compact),
+                settings =
+                    OverlaySettings(
+                        settings.overlayOpacityPercent / 100f,
+                        if (overlayDetailed) OverlayMode.Detailed else OverlayMode.Compact,
+                    ),
                 onToggleMode = { overlayDetailed = !overlayDetailed },
                 modifier = Modifier.align(Alignment.TopEnd).padding(top = 80.dp, end = 16.dp),
             )

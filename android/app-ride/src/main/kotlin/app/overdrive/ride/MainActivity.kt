@@ -33,7 +33,10 @@ class MainActivity : ComponentActivity() {
         val motion = Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
         setContent {
             OverdriveTheme(motionEnabled = motion) {
-                RideApp(container, Modifier.fillMaxSize().background(OverdriveColors.bg).windowInsetsPadding(WindowInsets.safeDrawing))
+                RideApp(
+                    container,
+                    Modifier.fillMaxSize().background(OverdriveColors.bg).windowInsetsPadding(WindowInsets.safeDrawing),
+                )
             }
         }
     }

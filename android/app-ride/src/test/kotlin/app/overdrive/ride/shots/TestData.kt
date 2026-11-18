@@ -1,7 +1,7 @@
 package app.overdrive.ride.shots
 
-import androidx.test.core.app.ApplicationProvider
 import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import app.overdrive.core.ride.FlatStep
 import app.overdrive.core.ride.PauseReason
 import app.overdrive.core.ride.PowerZone

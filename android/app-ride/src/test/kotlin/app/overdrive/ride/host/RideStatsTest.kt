@@ -86,7 +86,8 @@ class RideStatsTest {
     fun traceGetsAPointPerCompletedTenSecondBucketOnly() {
         val stats = RideStatsAccumulator(ftp = 200)
         var result = RideStats()
-        for (second in 0..9) result = stats.accept(snapshot(second + 1, 100)) // workout seconds 1..10 are buckets 0 and 1
+        // Workout seconds 1..10 fall into buckets 0 and 1.
+        for (second in 0..9) result = stats.accept(snapshot(second + 1, 100))
         // Bucket 0 (seconds 1..9) completed when second 10 started bucket 1.
         assertEquals(1, result.trace.size)
         assertEquals(5, result.trace[0].seconds)
@@ -102,7 +103,11 @@ class RideStatsTest {
         val stats = RideStatsAccumulator(ftp = 200)
         stats.accept(snapshot(1, 100))
         // The rider skips ahead: the workout position jumps while the ride clock moves by one.
-        val skipped = snapshot(2, 200).let { it.copy(workout = it.workout!!.copy(workoutElapsedSeconds = 105, stepIndex = 1)) }
+        val skipped =
+            snapshot(
+                2,
+                200,
+            ).let { it.copy(workout = it.workout!!.copy(workoutElapsedSeconds = 105, stepIndex = 1)) }
         val result = stats.accept(skipped)
         assertEquals(listOf(5), result.trace.map { it.seconds })
     }

@@ -87,7 +87,10 @@ class SimulatedRideSessionFactory : RideSessionFactory {
                 scope = request.scope,
                 ftp = settings.ftp,
                 seed = request.rideNumber.toLong(),
-                scenario = SimulationScenario(dropouts = if (settings.scriptedDropouts) SCRIPTED_DROPOUTS else emptyList()),
+                scenario =
+                    SimulationScenario(
+                        dropouts = if (settings.scriptedDropouts) SCRIPTED_DROPOUTS else emptyList(),
+                    ),
                 events = if (settings.scriptedDropouts) SCRIPTED_EVENTS else emptyList(),
                 gears = gears,
                 tickInterval = tick,

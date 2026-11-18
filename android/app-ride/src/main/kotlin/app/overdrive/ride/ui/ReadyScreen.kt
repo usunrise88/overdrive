@@ -151,7 +151,11 @@ private fun Detail(
                 enabled = startEnabled,
             )
             if (!startEnabled) {
-                OdText("Waiting for the trainer to connect.", style = OdType.body, color = OverdriveColors.textSecondary)
+                OdText(
+                    "Waiting for the trainer to connect.",
+                    style = OdType.body,
+                    color = OverdriveColors.textSecondary,
+                )
             }
         }
     }
@@ -203,7 +207,12 @@ private fun WorkoutDetail(
         Column {
             OdText(description.title, style = OdType.title, maxLines = 1)
             if (description.description != null) {
-                OdText(description.description, style = OdType.body, color = OverdriveColors.textSecondary, maxLines = 2)
+                OdText(
+                    description.description,
+                    style = OdType.body,
+                    color = OverdriveColors.textSecondary,
+                    maxLines = 2,
+                )
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(40.dp)) {
@@ -239,8 +248,22 @@ private fun StepTableRow(row: StepRow) {
     ) {
         Box(Modifier.width(36.dp)) { ZoneChip(row.zone) }
         OdText(row.name, Modifier.weight(1f), style = OdType.bodyStrong, maxLines = 1)
-        OdText(UiFormat.elapsed(row.durationSeconds), Modifier.width(80.dp), style = OdType.labelNum, color = OverdriveColors.textSecondary, textAlign = TextAlign.End, maxLines = 1)
-        OdText(row.percentText, Modifier.width(96.dp), style = OdType.labelNum, color = OverdriveColors.textSecondary, textAlign = TextAlign.End, maxLines = 1)
+        OdText(
+            UiFormat.elapsed(row.durationSeconds),
+            Modifier.width(80.dp),
+            style = OdType.labelNum,
+            color = OverdriveColors.textSecondary,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+        )
+        OdText(
+            row.percentText,
+            Modifier.width(96.dp),
+            style = OdType.labelNum,
+            color = OverdriveColors.textSecondary,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+        )
         OdText(row.wattsText, Modifier.width(112.dp), style = OdType.labelNum, textAlign = TextAlign.End, maxLines = 1)
     }
 }

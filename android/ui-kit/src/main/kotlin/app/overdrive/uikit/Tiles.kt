@@ -85,9 +85,17 @@ fun StatTile(
         modifier.padding(padding),
         verticalArrangement = if (spaceBetween) Arrangement.SpaceBetween else Arrangement.spacedBy(4.dp),
     ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             OdText(label, style = OdType.label, color = OverdriveColors.textTertiary, maxLines = 1)
-            if (labelEnd != null) OdText(labelEnd, style = OdType.label, color = OverdriveColors.textSecondary, maxLines = 1)
+            if (labelEnd !=
+                null
+            ) {
+                OdText(labelEnd, style = OdType.label, color = OverdriveColors.textSecondary, maxLines = 1)
+            }
         }
         ValueWithUnit(value, unit, valueStyle, color = valueColor)
     }
@@ -111,7 +119,14 @@ fun TileGroup(
         rows.forEachIndexed { rowIndex, row ->
             if (rowIndex > 0) HorizontalRule()
             Row(
-                if (fillHeight) Modifier.weight(1f).fillMaxWidth() else Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                if (fillHeight) {
+                    Modifier
+                        .weight(
+                            1f,
+                        ).fillMaxWidth()
+                } else {
+                    Modifier.fillMaxWidth().height(IntrinsicSize.Min)
+                },
             ) {
                 for (column in 0 until columns) {
                     if (column > 0) VerticalRule()

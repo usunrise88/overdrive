@@ -1,7 +1,7 @@
 package app.overdrive.ride.shots
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.height
@@ -16,22 +16,11 @@ import org.junit.Test
 
 /** The overlay's measured size must be the numbers of design/system.md §5.1 (84, 282, 159 dp by 464 dp). */
 class OverlayGeometryTest : ShotTest() {
-    private fun size(content: @androidx.compose.runtime.Composable () -> Unit): Pair<Dp, Dp> {
+    private fun size(content: @Composable () -> Unit): Pair<Dp, Dp> {
         rule.setContent { OverdriveTheme(content = content) }
         rule.waitForIdle()
         val bounds = rule.onRoot().getUnclippedBoundsInRoot()
         return bounds.width to bounds.height
-    }
-
-    @Test
-    fun debugBounds() {
-        rule.setContent { OverdriveTheme { OverlayCompact(PreviewSamples.overlayErg, OverlaySettings()) } }
-        rule.waitForIdle()
-        for (text in listOf("Power", "223", "Heart", "148", "Time", "32:17")) {
-            val b = rule.onNodeWithText(text).getUnclippedBoundsInRoot()
-            println("GEOM $text top=${b.top} bottom=${b.bottom} h=${b.height} left=${b.left} w=${b.width}")
-        }
-        println("GEOM root ${rule.onRoot().getUnclippedBoundsInRoot()}")
     }
 
     @Test

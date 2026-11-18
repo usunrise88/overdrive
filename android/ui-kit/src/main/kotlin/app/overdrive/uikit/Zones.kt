@@ -14,10 +14,24 @@ object Zones {
     private val UPPER_BOUNDS = doubleArrayOf(55.0, 75.0, 90.0, 105.0, 120.0, 150.0)
 
     /** Zone colour for [zone] (1 to 7). Anything else is the neutral secondary text colour. */
-    fun color(zone: Int?): Color = if (zone != null && zone in 1..ZONE_COUNT) OverdriveColors.zones[zone - 1] else OverdriveColors.textSecondary
+    fun color(zone: Int?): Color =
+        if (zone != null &&
+            zone in 1..ZONE_COUNT
+        ) {
+            OverdriveColors.zones[zone - 1]
+        } else {
+            OverdriveColors.textSecondary
+        }
 
     /** Zone name for [zone] (1 to 7), or an empty string. */
-    fun name(zone: Int?): String = if (zone != null && zone in 1..ZONE_COUNT) OverdriveColors.zoneNames[zone - 1] else ""
+    fun name(zone: Int?): String =
+        if (zone != null &&
+            zone in 1..ZONE_COUNT
+        ) {
+            OverdriveColors.zoneNames[zone - 1]
+        } else {
+            ""
+        }
 
     /**
      * The zone of a workout target given as a fraction of FTP (1.0 is FTP), by Coggan's upper bounds read as
@@ -46,5 +60,4 @@ object Zones {
             blue = surface.blue + (colour.blue - surface.blue) * amount,
             alpha = 1f,
         )
-
 }

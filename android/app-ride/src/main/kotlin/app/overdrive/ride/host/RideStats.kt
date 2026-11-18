@@ -82,7 +82,16 @@ class RideStatsAccumulator(
     private fun publishedTrace(): List<TracePoint> =
         buckets
             .filterKeys { it != currentBucket }
-            .map { (id, bucket) -> TracePoint(id * BUCKET_SECONDS + BUCKET_SECONDS / 2, (bucket.sum.toDouble() / bucket.count / ftp).toFloat()) }
+            .map { (id, bucket) ->
+                TracePoint(
+                    id * BUCKET_SECONDS + BUCKET_SECONDS / 2,
+                    (
+                        bucket.sum.toDouble() /
+                            bucket.count /
+                            ftp
+                    ).toFloat(),
+                )
+            }
 
     private companion object {
         const val BUCKET_SECONDS = 10

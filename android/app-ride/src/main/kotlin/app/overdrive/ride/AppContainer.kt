@@ -39,7 +39,12 @@ class AppContainer(
         )
 
     /** The current settings. Defaults until the first read from disk completes, a few milliseconds after start. */
-    val settings: StateFlow<AppSettings> = settingsRepository.settings.stateIn(scope, SharingStarted.Eagerly, AppSettings())
+    val settings: StateFlow<AppSettings> =
+        settingsRepository.settings.stateIn(
+            scope,
+            SharingStarted.Eagerly,
+            AppSettings(),
+        )
 
     val library: WorkoutLibrary = WorkoutLibrary.fromAssets(appContext.assets)
 
