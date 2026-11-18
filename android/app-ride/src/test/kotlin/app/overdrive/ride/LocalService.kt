@@ -1,5 +1,7 @@
 package app.overdrive.ride
 
+import app.overdrive.core.profile.Profile
+import app.overdrive.core.profile.ProfileApiJson
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import java.net.InetAddress
@@ -11,7 +13,8 @@ import java.util.concurrent.Executors
 /**
  * A stand-in for the ride intake of `server/` on the loopback address (ADR 0014 section 3), for the tests that run the real
  * container: bearer authentication, `PUT /v1/rides/{id}` and `PUT /v1/rides/{id}/fit`, answered as the real service does, and
- * `GET /v1/workouts` (ADR 0017), which answers [plan] with [planStatus]. [down] makes every request answer 503.
+ * `GET /v1/workouts` (ADR 0017), which answers [plan] with [planStatus], and `GET`/`PATCH /v1/profile` (ADR 0021), which hold
+ * [profile]. [down] makes every request answer 503.
  */
 class LocalService(
     val token: String = "tok-3f9a7c1e5b2d4a6f8091a2b3c4d5e6f7",
@@ -39,6 +42,17 @@ class LocalService(
     /** The GETs of the plan, in order. They are kept apart from [received], which is the ride upload's. */
     val planRequests = CopyOnWriteArrayList<Received>()
 
+    /**
+     * The rider's profile as the service holds it (ADR 0021): `GET /v1/profile` answers it, `PATCH /v1/profile` applies a patch to
+     * it **as the real service does** (read strictly, applied, validated as the profile it makes) and answers the result. Null is
+     * a service without the route: 404. A test changes it, as an AI client's `update_profile` would.
+     */
+    @Volatile
+    var profile: Profile? = null
+
+    /** The GETs and PATCHes of the profile, in order, apart from [received] and [planRequests]. */
+    val profileRequests = CopyOnWriteArrayList<Received>()
+
     private val records = ConcurrentHashMap<String, ByteArray>()
     private val fits = ConcurrentHashMap<String, ByteArray>()
     private val executor = Executors.newCachedThreadPool()
@@ -62,7 +76,11 @@ class LocalService(
             val auth = exchange.requestHeaders.getFirst("Authorization")
             val path = exchange.requestURI.path
             val request = Received(path, auth, body, exchange.requestMethod, exchange.requestURI.rawQuery)
-            if (request.method == "GET" && path == "/v1/workouts") planRequests += request else received += request
+            when {
+                request.method == "GET" && path == "/v1/workouts" -> planRequests += request
+                path == "/v1/profile" -> profileRequests += request
+                else -> received += request
+            }
             val (status, text) = answer(exchange.requestMethod, path, auth, body)
             val bytes = text.encodeToByteArray()
             exchange.responseHeaders.add("Content-Type", "application/json")
@@ -81,6 +99,7 @@ class LocalService(
         if (down) return 503 to error("internal_error", "Down for the test")
         if (auth != "Bearer $token") return 401 to error("unauthorized", "Missing or invalid bearer token")
         if (method == "GET" && path == "/v1/workouts") return planStatus to plan
+        if (path == "/v1/profile") return profileAnswer(method, body)
         val match = ROUTE.matchEntire(path) ?: return 404 to error("not_found", "No such route")
         val id = match.groupValues[1]
         val store = if (match.groupValues[2].isEmpty()) records else fits
@@ -91,6 +110,32 @@ class LocalService(
         } else {
             409 to
                 error("ride_conflict", "Other")
+        }
+    }
+
+    private fun profileAnswer(
+        method: String,
+        body: ByteArray,
+    ): Pair<Int, String> {
+        val held = profile ?: return 404 to error("not_found", "No profile")
+        return when (method) {
+            "GET" -> {
+                200 to ProfileApiJson.encodeProfile(held)
+            }
+
+            "PATCH" -> {
+                try {
+                    val patched = ProfileApiJson.decodePatch(body.decodeToString()).applyTo(held)
+                    profile = patched.copy(updatedAt = "2026-11-18T10:00:00Z")
+                    200 to ProfileApiJson.encodeProfile(checkNotNull(profile))
+                } catch (e: IllegalArgumentException) {
+                    422 to error("invalid_profile", "Not a valid change")
+                }
+            }
+
+            else -> {
+                405 to error("not_found", "No such route")
+            }
         }
     }
 

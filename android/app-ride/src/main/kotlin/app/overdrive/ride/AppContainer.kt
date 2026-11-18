@@ -16,13 +16,17 @@ import app.overdrive.core.control.ActionRouter
 import app.overdrive.core.control.GestureTiming
 import app.overdrive.core.plan.PlanRefresh
 import app.overdrive.core.plan.PlanRepository
+import app.overdrive.core.profile.ProfileRefresh
+import app.overdrive.core.profile.ProfileRepository
 import app.overdrive.core.sync.HttpGetTransport
+import app.overdrive.core.sync.HttpPatchTransport
 import app.overdrive.core.sync.HttpSyncProvider
 import app.overdrive.core.sync.HttpTransport
 import app.overdrive.core.sync.OutboxEntry
 import app.overdrive.core.sync.SyncConfig
 import app.overdrive.core.sync.SyncCoordinator
 import app.overdrive.data.plan.FilePlanCache
+import app.overdrive.data.profile.FileProfileCache
 import app.overdrive.data.rides.RideStore
 import app.overdrive.data.sync.FileOutbox
 import app.overdrive.data.sync.LastUploadFile
@@ -50,6 +54,8 @@ import app.overdrive.ride.overlay.OverlayModel
 import app.overdrive.ride.rides.RideLibrary
 import app.overdrive.ride.settings.AppSettings
 import app.overdrive.ride.settings.SettingsRepository
+import app.overdrive.ride.settings.riderPatch
+import app.overdrive.ride.settings.withProfile
 import app.overdrive.ride.ui.AndroidBluetoothController
 import app.overdrive.ride.ui.BluetoothController
 import app.overdrive.ride.workouts.WorkoutLibrary
@@ -58,11 +64,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -87,6 +96,11 @@ import java.util.concurrent.atomic.AtomicLong
  * @param syncTransport the network under the upload (`HttpURLConnection`); a test points it at a local server.
  * @param planTransport the network under the planned workouts' `GET` (ADR 0017): the same `HttpURLConnection` class.
  * @param planFile the planned workouts' cache (`filesDir/plan/workouts`); a test passes a temporary one.
+ * @param profileTransport the network under the rider's profile `GET` (ADR 0021): the same `HttpURLConnection` class.
+ * @param profilePatchTransport the network under the profile's `PATCH`. The same class again; a test on a JDK, whose
+ * `HttpURLConnection` refuses that verb, passes one with a way round it.
+ * @param profileFile the profile's cache (`filesDir/profile/profile`): the service's last answer and the unsent edit; a test
+ * passes a temporary one.
  * @param today the tablet's local date, `YYYY-MM-DD`, for the range asked of the service; a test fixes it.
  * @param syncSettleMillis how long the service address and token must stay as typed before the upload is tried again with
  * them, so that typing a token does not send one request per letter.
@@ -106,6 +120,9 @@ class AppContainer(
     syncTransport: HttpTransport = UrlConnectionTransport(),
     planTransport: HttpGetTransport = UrlConnectionTransport(),
     planFile: File = File(context.applicationContext.filesDir, "plan/workouts"),
+    profileTransport: HttpGetTransport = UrlConnectionTransport(),
+    profilePatchTransport: HttpPatchTransport = UrlConnectionTransport(),
+    profileFile: File = File(context.applicationContext.filesDir, "profile/profile"),
     today: () -> String = { LocalDate.now().toString() },
     syncSettleMillis: Long = SYNC_SETTLE_MILLIS,
     mediaFactory: (Context) -> MediaController = { AudioManagerMediaController(it) },
@@ -162,7 +179,7 @@ class AppContainer(
         SyncCoordinator(scope, outbox, { syncProvider }, lastSuccessMillis = lastUploadAtStart).also { it.start() }
 
     /** The service address and token as the settings file has them: null until the file has been read, so nothing is asked before. */
-    private val planConfig = MutableStateFlow<SyncConfig?>(null)
+    private val serviceConfig = MutableStateFlow<SyncConfig?>(null)
 
     /**
      * The planned workouts (spec §5.7, ADR 0017): fetched from the same service, with the same address and token, at start,
@@ -171,12 +188,51 @@ class AppContainer(
      */
     val plan: PlanRepository =
         PlanRepository(
-            config = { planConfig.value ?: SyncConfig("", "") },
+            config = { serviceConfig.value ?: SyncConfig("", "") },
             transport = planTransport,
             cache = FilePlanCache(planFile),
             today = today,
             wallMillis = System::currentTimeMillis,
             elapsedMillis = { System.nanoTime() / NANOS_PER_MILLI },
+        )
+
+    /**
+     * The rider's profile (spec §8.3, ADR 0021): read from the same service at start, when the Ready screen opens (at most once a
+     * minute), after a settled change of the address or token and when the rider asks (the same gesture as the plan's); the
+     * rider's edits of FTP and physics are sent to it. The last good answer and the one unsent edit are kept on disk, so the
+     * profile works offline and after a restart. With no address or token, or while the service was never reached and nothing is
+     * cached, there is no profile in force and the tablet's own settings apply as they always did.
+     */
+    val profile: ProfileRepository =
+        ProfileRepository(
+            config = { serviceConfig.value ?: SyncConfig("", "") },
+            reader = profileTransport,
+            writer = profilePatchTransport,
+            cache = FileProfileCache(profileFile),
+            elapsedMillis = { System.nanoTime() / NANOS_PER_MILLI },
+        )
+
+    /**
+     * The tablet's settings with the profile in force on top (ADR 0021, [withProfile]): FTP and the physics of the ride. A cold
+     * flow that **waits until the profile is known** (the cache read and the settings looked at), so the ride built first uses the
+     * right FTP and not the tablet's own for a moment. The ride, the Ready screen and the Settings rows read this; the stored
+     * [settings] stay what the rider set on the tablet and are never overwritten by the service's.
+     */
+    private val effectiveSource: Flow<AppSettings> =
+        combine(
+            settingsRepository.settings,
+            profile.state
+                .filter { it.ready }
+                .map { it.profile }
+                .distinctUntilChanged(),
+        ) { own, inForce -> own.withProfile(inForce) }.distinctUntilChanged()
+
+    /** The latest of [effectiveSource]; the defaults until the settings have been read from disk, a few milliseconds after start. */
+    val effectiveSettings: StateFlow<AppSettings> =
+        effectiveSource.stateIn(
+            scope,
+            SharingStarted.Eagerly,
+            AppSettings(),
         )
 
     /**
@@ -310,7 +366,7 @@ class AppContainer(
                     bluetooth = BleRideSessionFactory(pairedDevices, bleRows.ui),
                     simulated = SimulatedRideSessionFactory(),
                 ),
-            settings = settingsRepository.settings,
+            settings = effectiveSource,
             initialChoice = library.workouts.value.firstOrNull()?.let { RideChoice.Planned(it) } ?: RideChoice.Free,
             persistence = rides,
             rideTriggers = pairedDevices.changes,
@@ -384,10 +440,14 @@ class AppContainer(
                     sync.kick(retryRefused = true)
                 }
         }
-        // The planned workouts follow the settings file itself (not the copy in [settings], which starts as the defaults and
-        // may be a step behind the file): the first value read from disk starts them, every later one is a change.
+        // The planned workouts and the profile follow the settings file itself (not the copy in [settings], which starts as the
+        // defaults and may be a step behind the file): the first value read from disk starts them, every later one is a change.
+        // The profile is told at once, in the same step, so that what is in force is known before anything is built from it.
         scope.launch {
-            settingsRepository.settings.collect { planConfig.value = SyncConfig(it.syncUrl, it.syncToken.value) }
+            settingsRepository.settings.collect {
+                serviceConfig.value = SyncConfig(it.syncUrl, it.syncToken.value)
+                profile.settingsChanged()
+            }
         }
         // The cache first, so the list is there with no network, then a request as soon as the settings have been read. After
         // that, a changed address or token hides or shows the section at once and asks again once it has settled, like the
@@ -395,7 +455,7 @@ class AppContainer(
         scope.launch {
             plan.load()
             var first = true
-            planConfig.filterNotNull().collectLatest {
+            serviceConfig.filterNotNull().collectLatest {
                 plan.settingsChanged()
                 if (first) {
                     first = false
@@ -403,6 +463,22 @@ class AppContainer(
                 } else {
                     delay(syncSettleMillis)
                     plan.refresh(PlanRefresh.SETTINGS_CHANGED)
+                }
+            }
+        }
+        // The profile the same way, on a coroutine of its own: a slow plan never holds up the FTP. Its cache is read first (the
+        // ride waits for it, see [effectiveSettings]), then the PATCH of an edit that was never sent and the GET go out.
+        scope.launch {
+            profile.load()
+            var first = true
+            serviceConfig.filterNotNull().collectLatest {
+                profile.settingsChanged()
+                if (first) {
+                    first = false
+                    profile.refresh(ProfileRefresh.START)
+                } else {
+                    delay(syncSettleMillis)
+                    profile.refresh(ProfileRefresh.SETTINGS_CHANGED)
                 }
             }
         }
@@ -438,19 +514,48 @@ class AppContainer(
     /** What the overlay service reads: this container's ride, settings and visibility (ADR 0006). */
     val overlayModel: OverlayModel = ContainerOverlayModel(this)
 
-    /** The Ready screen came on screen: asks the service for the plan if it has not been asked in the last minute. */
+    /**
+     * The Ready screen came on screen: asks the service for the plan and the profile, each if it has not been asked in the last
+     * minute (and sends an edit of the profile that never got through).
+     */
     fun planScreenOpened() {
         scope.launch { plan.refresh(PlanRefresh.SCREEN_OPENED) }
+        scope.launch { profile.refresh(ProfileRefresh.SCREEN_OPENED) }
     }
 
-    /** The Planned section's refresh button: asks the service now, however recently it was asked. */
+    /** The Planned section's refresh button: asks the service now for the plan and the profile (one gesture, both), however recently. */
     fun refreshPlan() {
         scope.launch { plan.refresh(PlanRefresh.REQUESTED) }
+        scope.launch { profile.refresh(ProfileRefresh.REQUESTED) }
     }
 
     /** Changes the settings from the UI; validation happens in the repository. */
     fun updateSettings(change: (AppSettings) -> AppSettings) {
         scope.launch { settingsRepository.update(change) }
+    }
+
+    /**
+     * The Settings screen changes FTP, mass, CdA or Crr (ADR 0021). [change] is given the settings **as the screen shows them**
+     * (the profile on top, [effectiveSettings]) and returns them changed, so a step goes from the number the rider sees.
+     *
+     * - **With a profile in force** the values that differ are put on top of the profile at once and sent to the service
+     *   (`PATCH /v1/profile`); if that cannot be done now the change stays, marked "Not sent yet", and is sent later. The tablet's
+     *   own stored values are left alone.
+     * - **With none** (no service set up, or never reached and nothing cached) it is an ordinary change of the tablet's settings,
+     *   exactly as before there was a profile.
+     */
+    fun changeRider(change: (AppSettings) -> AppSettings) {
+        val inForce = profile.state.value.profile
+        if (inForce != null) {
+            val shown = settings.value.withProfile(inForce)
+            val patch = riderPatch(shown, change(shown))
+            if (patch.isEmpty) return
+            if (profile.edit(patch)) {
+                scope.launch { profile.refresh(ProfileRefresh.EDITED) }
+                return
+            }
+        }
+        updateSettings(change)
     }
 
     fun resetOverlayPosition() {

@@ -38,6 +38,7 @@ import app.overdrive.ride.host.RideMapping
 import app.overdrive.ride.overlay.OverlayController
 import app.overdrive.ride.overlay.OverlayPolicy
 import app.overdrive.ride.plan.PlanUi
+import app.overdrive.ride.profile.ProfileUi
 import app.overdrive.ride.rides.SaveState
 import app.overdrive.ride.settings.OverlayStartMode
 import app.overdrive.ride.settings.SimulatedClick
@@ -91,6 +92,10 @@ fun RideApp(
     val ui by host.ui.collectAsStateWithLifecycle()
     val devices by host.devices.collectAsStateWithLifecycle()
     val settings by container.settings.collectAsStateWithLifecycle()
+    // What the rider rides with: the tablet's settings with the profile from the service on top (ADR 0021). The Ready screen
+    // and the Settings rows show this; `settings` stays what is stored on the tablet.
+    val rider by container.effectiveSettings.collectAsStateWithLifecycle()
+    val profileState by container.profile.state.collectAsStateWithLifecycle()
     val workouts by container.library.workouts.collectAsStateWithLifecycle()
     val choice by host.choice.collectAsStateWithLifecycle()
     val recovery by container.rides.recovery.collectAsStateWithLifecycle()
@@ -228,7 +233,7 @@ fun RideApp(
                     ReadyScreen(
                         choice = choice,
                         workouts = workouts,
-                        settings = settings,
+                        settings = rider,
                         devices = devices,
                         startEnabled = state == RideState.READY,
                         openError = openError,
@@ -334,12 +339,14 @@ fun RideApp(
 
                 Page.Settings -> {
                     val bleLogs = rememberBleLogFiles(container.bleLogs)
+                    val profileUi = remember(profileState) { ProfileUi.of(profileState) }
                     SettingsScreen(
-                        settings = settings,
+                        settings = rider,
                         actions =
                             SettingsActions(
                                 onBack = { screen = Screen.Ride },
                                 onChange = container::updateSettings,
+                                onRiderChange = container::changeRider,
                                 onResetOverlayPosition = container::resetOverlayPosition,
                                 onOpenOverlaySettings = overlay::openOverlaySettings,
                                 onOpenNotificationSettings = overlay::openNotificationSettings,
@@ -348,6 +355,7 @@ fun RideApp(
                         overlayAccess = access,
                         bleLogs = bleLogs,
                         sync = SyncUi.of(syncStatus, syncReport, System.currentTimeMillis()),
+                        profile = profileUi,
                     )
                 }
             }

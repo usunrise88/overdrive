@@ -75,7 +75,14 @@ fun AppSettings.toGearSettings(): GearSettings =
 fun AppSettings.toRideSettings(): RideSettings =
     RideSettings(
         ftp = ftp,
-        physics = PhysicsSettings(systemMassKg = massKg, cdA = cdA, crr = crr),
+        physics =
+            PhysicsSettings(
+                systemMassKg = massKg,
+                cdA = cdA,
+                crr = crr,
+                airDensity = airDensity,
+                drivetrainEfficiency = drivetrainEfficiency,
+            ),
         gears = toGearSettings(),
     )
 

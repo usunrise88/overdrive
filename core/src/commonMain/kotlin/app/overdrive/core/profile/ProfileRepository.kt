@@ -48,8 +48,9 @@ public sealed interface ProfileProblem {
 /**
  * What the app reads of the rider's profile.
  *
- * @property ready the cache has been read (or found to be none): until then nothing is known and a ride built now would use the
- * tablet's own values, so whoever builds one waits for this.
+ * @property ready what is in force is known: the cache has been read (or found to be none) **and** the settings have been looked at
+ * ([ProfileRepository.settingsChanged] at least once). Until then a ride built now might use the tablet's own values where a
+ * profile is about to apply, so whoever builds one waits for this.
  * @property profile the profile **in force**: the service's last answer (fresh, or from the cache after a restart) with the
  * tablet's unsent edit on top; null when there is none for the address in Settings (nothing set up, or the service was never
  * reached), in which case the tablet's own values apply exactly as they did before there was a profile.
@@ -104,7 +105,8 @@ public class ProfileRepository(
         val known: CachedProfile? = null,
         val problem: ProfileProblem? = null,
         val refreshing: Boolean = false,
-        val ready: Boolean = false,
+        val loaded: Boolean = false,
+        val settingsSeen: Boolean = false,
         /** Counts the changes of [known], so what is on disk can be told from what is in memory. */
         val version: Int = 0,
     )
@@ -131,7 +133,7 @@ public class ProfileRepository(
 
     /**
      * Reads the cache from disk. Call once at start, before the first [refresh]; a missing or damaged cache is no cache. Either
-     * way [ProfileState.ready] is true afterwards.
+     * way the cache half of [ProfileState.ready] is true afterwards.
      */
     public suspend fun load() {
         val cached =
@@ -142,17 +144,18 @@ public class ProfileRepository(
             } catch (e: Exception) {
                 null
             }
-        inner.update { it.copy(known = it.known ?: cached, ready = true) }
+        inner.update { it.copy(known = it.known ?: cached, loaded = true) }
         publish()
     }
 
     /**
      * The address or token in Settings were read or changed: re-reads them for [state] (a profile of another address is no longer
      * in force) and forgets the last problem when it was about other settings than these. The refresh that follows asks again.
+     * The first call is the settings half of [ProfileState.ready]: the container makes it as soon as the settings file is read.
      */
     public fun settingsChanged() {
         val aboutThese = config() == lastAsked.value
-        inner.update { if (aboutThese) it else it.copy(problem = null) }
+        inner.update { if (aboutThese) it.copy(settingsSeen = true) else it.copy(problem = null, settingsSeen = true) }
         publish()
     }
 
@@ -460,7 +463,7 @@ public class ProfileRepository(
         val known = now.known?.takeIf { isInForce(it, settings) }
         mutableState.value =
             ProfileState(
-                ready = now.ready,
+                ready = now.loaded && now.settingsSeen,
                 profile = known?.effective(),
                 pending = known?.pending,
                 problem = if (settings.isConfigured) now.problem else null,

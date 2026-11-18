@@ -82,6 +82,7 @@ class ProfileRepositoryTest {
                 config = unset
                 val repository = repository()
                 repository.load()
+                repository.settingsChanged()
                 for (why in ProfileRefresh.entries) repository.refresh(why)
                 assertEquals(ProfileState(ready = true), repository.state.value, "$unset")
                 assertFalse(repository.edit(ftp(180)), "no profile in force: the change is the tablet's own")
@@ -100,6 +101,8 @@ class ProfileRepositoryTest {
             val repository = repository(cache)
             assertFalse(repository.state.value.ready)
             repository.load()
+            assertFalse(repository.state.value.ready, "the cache is read, the settings are not yet")
+            repository.settingsChanged()
             assertTrue(repository.state.value.ready)
             assertNull(repository.profile, "nothing yet: the tablet's own values apply")
             repository.refresh(ProfileRefresh.START)
@@ -194,6 +197,7 @@ class ProfileRepositoryTest {
                 val cache = MemoryProfileCache(text)
                 val repository = repository(cache)
                 repository.load()
+                repository.settingsChanged()
                 assertTrue(repository.state.value.ready, text.take(20))
                 assertNull(repository.profile, text.take(20))
                 repository.refresh(ProfileRefresh.START)
@@ -214,6 +218,7 @@ class ProfileRepositoryTest {
                 }
             val repository = repository(broken)
             repository.load()
+            repository.settingsChanged()
             assertTrue(repository.state.value.ready)
             assertNull(repository.profile)
             repository.refresh(ProfileRefresh.START)
