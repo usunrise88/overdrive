@@ -1,5 +1,6 @@
 package app.overdrive.core.ble.recording
 
+import app.overdrive.core.ble.ClickUuids
 import app.overdrive.core.ble.GattUuid
 import app.overdrive.core.ble.IdentityUuids
 
@@ -13,7 +14,11 @@ import app.overdrive.core.ble.IdentityUuids
  *   and letters) is dropped, as is a run of three or more two-digit hex groups (a hardware address); the result is cut to
  *   24 characters;
  * - the **values of identifying characteristics** (serial number, system id, device name, firmware and hardware revision,
- *   manufacturer and model number strings) are never written: the line keeps its place and status, the data is `*`.
+ *   manufacturer and model number strings) are never written: the line keeps its place and status, the data is `*`;
+ * - the **public key a Zwift Click may append to its handshake reply** (docs/protocols/click-v2.md §3.1, §9 item 3) is
+ *   cut: a reply that starts with `RideOn` keeps its first eight bytes (`RideOn` and the two version bytes) and the rest
+ *   becomes zeros of the same length, because a key that is the same on every connection would name the unit. The length
+ *   survives, which is what the bench question asks, and the adapter ignores the tail either way.
  */
 public object BleRecordingPolicy {
     private const val MAX_MODEL_LENGTH = 24
@@ -22,11 +27,34 @@ public object BleRecordingPolicy {
     private const val ADDRESS_GROUPS = 3
     private const val SEPARATORS = " ._-:"
 
+    /** `RideOn` in ASCII: the Click's handshake word (docs/protocols/click-v2.md §3.1). */
+    private val RIDE_ON = byteArrayOf(0x52, 0x69, 0x64, 0x65, 0x4F, 0x6E)
+
+    /** `RideOn` and the two version bytes. */
+    private const val HANDSHAKE_KEEP = 8
+
     /** Characteristics whose values are replaced by `*`. */
     public val redactedCharacteristics: Set<GattUuid> = IdentityUuids.ALL
 
     /** Whether the value of [characteristic] must not be recorded. */
     public fun isRedacted(characteristic: GattUuid): Boolean = characteristic in redactedCharacteristics
+
+    /**
+     * The bytes of [characteristic] as they may be written: unchanged, except that the tail of a Click handshake reply is
+     * zeroed (see above). Applies to the Click's own characteristics only; a null characteristic is a state line and has no
+     * value.
+     */
+    public fun scrub(
+        characteristic: GattUuid?,
+        bytes: ByteArray,
+    ): ByteArray {
+        val clickValue = characteristic == ClickUuids.SYNC_TX || characteristic == ClickUuids.ASYNC
+        if (!clickValue || bytes.size <= HANDSHAKE_KEEP || !startsWithRideOn(bytes)) return bytes
+        return bytes.copyOf(HANDSHAKE_KEEP) + ByteArray(bytes.size - HANDSHAKE_KEEP)
+    }
+
+    private fun startsWithRideOn(bytes: ByteArray): Boolean =
+        bytes.size >= RIDE_ON.size && RIDE_ON.indices.all { bytes[it] == RIDE_ON[it] }
 
     /**
      * The advertised model name made safe to write, or null if nothing is left. `Coospo HR7-123456` becomes
