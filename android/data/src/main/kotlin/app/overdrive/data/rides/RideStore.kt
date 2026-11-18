@@ -96,7 +96,12 @@ class RideStore(
             active.add(id)
             try {
                 // The title is a convenience: a ride without it is still a ride.
-                runCatching { writeAtomically(metaFile(id), Meta(title, header.startEpochMillis, null).toBytes()) }
+                runCatching {
+                    writeAtomically(
+                        metaFile(id),
+                        Meta(title, header.startEpochMillis, null, header.workoutId).toBytes(),
+                    )
+                }
                 openSink(logFile(id))
             } catch (e: Exception) {
                 active.remove(id)
@@ -123,7 +128,13 @@ class RideStore(
         val files =
             try {
                 Stored(
-                    meta = Meta(title, record.ride.startEpochMillis, record.samples.size).toBytes(),
+                    meta =
+                        Meta(
+                            title,
+                            record.ride.startEpochMillis,
+                            record.samples.size,
+                            record.ride.workoutId,
+                        ).toBytes(),
                     json = RideRecordJson.encode(record).encodeToByteArray(),
                     fit = FitWriter(FitOptions(utcOffsetSeconds = utcOffsetSeconds)).write(record),
                 )
@@ -189,6 +200,7 @@ class RideStore(
                 durationSeconds = facts.durationSeconds ?: 0,
                 status = StoredRideStatus.Saved,
                 fitBytes = fit.length(),
+                workoutId = facts.workoutId,
             )
         }
         val log = logFile(id).takeIf { it.isFile }
@@ -207,6 +219,7 @@ class RideStore(
                 durationSeconds = recovered.samples.size,
                 status = status,
                 fitBytes = fit?.length(),
+                workoutId = recovered.header.workoutId,
             )
         }
         if (hasRecord) {
@@ -220,6 +233,7 @@ class RideStore(
                 durationSeconds = facts.durationSeconds ?: 0,
                 status = if (id in active) StoredRideStatus.Recording else StoredRideStatus.Unsaved,
                 fitBytes = null,
+                workoutId = facts.workoutId,
             )
         }
         return null
@@ -281,7 +295,12 @@ class RideStore(
 
     private fun metaOfRecord(id: String): Meta {
         val record = RideRecordJson.decode(recordFile(id).readText())
-        return Meta(titleFallback(record.ride.workoutId), record.ride.startEpochMillis, record.samples.size)
+        return Meta(
+            titleFallback(record.ride.workoutId),
+            record.ride.startEpochMillis,
+            record.samples.size,
+            record.ride.workoutId,
+        )
     }
 
     private fun titleFallback(workoutId: String?): String = if (workoutId == null) "Free ride" else "Workout"
@@ -296,6 +315,7 @@ class RideStore(
                 title = properties.getProperty("title")?.takeIf { it.isNotBlank() } ?: return null,
                 startEpochMillis = properties.getProperty("startEpochMillis")?.toLongOrNull() ?: return null,
                 durationSeconds = properties.getProperty("durationSeconds")?.toIntOrNull(),
+                workoutId = properties.getProperty("workoutId")?.takeIf { it.isNotEmpty() },
             )
         } catch (e: Exception) {
             null
@@ -312,12 +332,15 @@ class RideStore(
         val title: String,
         val startEpochMillis: Long,
         val durationSeconds: Int?,
+        /** The workout the ride was made from; absent in a file written before it was kept (then it reads as none). */
+        val workoutId: String?,
     ) {
         fun toBytes(): ByteArray {
             val properties = Properties()
             properties.setProperty("title", title)
             properties.setProperty("startEpochMillis", startEpochMillis.toString())
             durationSeconds?.let { properties.setProperty("durationSeconds", it.toString()) }
+            workoutId?.let { properties.setProperty("workoutId", it) }
             val out = ByteArrayOutputStream()
             OutputStreamWriter(out, Charsets.UTF_8).use { properties.store(it, null) }
             // `Properties.store` starts with a comment line holding the date; the file is the same whenever it is written.

@@ -103,6 +103,61 @@ class RideStoreTest {
         assertFalse(store.fitFile("ride-1").exists())
     }
 
+    // ---- The workout a ride was made from (spec §5.7) ------------------------------------------------------------
+
+    @Test
+    fun aPlannedWorkoutsIdIsKeptFromTheFirstSecondToTheStoredRide() {
+        TestRides.writeRide(store, 90, finished = false, workoutId = "icu-1001")
+        val recording = store.list().single()
+        assertEquals("icu-1001", recording.workoutId)
+
+        val record = TestRides.record(90, workoutId = "icu-1001")
+        val saved = store.finalize(record, "Sweet spot", 0).ok()
+        assertEquals("icu-1001", saved.workoutId)
+        assertEquals(StoredRideStatus.Saved, saved.status)
+        assertEquals(listOf(saved), store.list())
+        assertEquals("icu-1001", RideRecordJson.decode(store.recordFile("ride-1").readText()).ride.workoutId)
+    }
+
+    @Test
+    fun anInterruptedAndARecoveredRideKeepItsWorkoutId() {
+        TestRides.writeRide(store, 90, finished = false, workoutId = "icu-7")
+        val interrupted = RideStore(directory).scan().single()
+        assertEquals(StoredRideStatus.Interrupted, interrupted.status)
+        assertEquals("icu-7", interrupted.workoutId)
+        val saved = RideStore(directory).finalizeStored("ride-1", { 0 }).ok()
+        assertEquals("icu-7", saved.workoutId)
+        assertEquals("icu-7", RideStore(directory).list().single().workoutId)
+    }
+
+    @Test
+    fun aFreeRideHasNoWorkoutIdAndNoLineForItInItsMetaFile() {
+        val record = TestRides.writeRide(store, 61, finished = true)
+        val saved = store.finalize(record, "Free ride", 0).ok()
+        assertNull(saved.workoutId)
+        assertFalse("workoutId" in File(directory, "ride-1.meta").readText())
+    }
+
+    @Test
+    fun aRideStoredBeforeTheIdWasKeptHasNoWorkoutIdAndStillLists() {
+        val record = TestRides.record(90, workoutId = "icu-1001")
+        store.finalize(record, "Sweet spot", 0).ok()
+        val meta = File(directory, "ride-1.meta")
+        meta.writeText(meta.readLines().filterNot { it.startsWith("workoutId") }.joinToString("\n"))
+        val listed = RideStore(directory).list().single()
+        assertNull(listed.workoutId)
+        assertEquals(StoredRideStatus.Saved, listed.status)
+        assertEquals("Sweet spot", listed.title)
+    }
+
+    @Test
+    fun aWorkoutIdWithAnyCharacterSurvivesTheMetaFile() {
+        val odd = "my workout=1:2#3\\4 \u00e9"
+        val record = TestRides.record(60, workoutId = odd)
+        store.finalize(record, "Odd", 0).ok()
+        assertEquals(odd, RideStore(directory).list().single().workoutId)
+    }
+
     // ---- Atomic finalize -------------------------------------------------------------------------------------------
 
     @Test

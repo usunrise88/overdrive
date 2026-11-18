@@ -2,6 +2,8 @@ package app.overdrive.data.sync
 
 import app.overdrive.core.sync.ChunkSink
 import app.overdrive.core.sync.HttpAnswer
+import app.overdrive.core.sync.HttpGetRequest
+import app.overdrive.core.sync.HttpGetTransport
 import app.overdrive.core.sync.HttpRequest
 import app.overdrive.core.sync.HttpTransport
 import app.overdrive.core.sync.TransportException
@@ -13,6 +15,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.job
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
@@ -30,6 +33,9 @@ import javax.net.ssl.SSLException
  * timeouts on connecting and on waiting for the answer. Redirects are not followed. The blocking socket work runs on
  * [dispatcher], never on the main thread.
  *
+ * It is also the [HttpGetTransport] of the planned workouts (ADR 0017): one `GET` with the same stack, the same timeouts, the
+ * same bearer header and the same rules (no redirects, nothing logged), whose answer is read up to the request's `maxBytes`.
+ *
  * **It logs nothing and keeps neither the token nor the body anywhere but the request being sent.** What went wrong without an
  * answer is a [TransportException] whose message names only the kind of failure.
  *
@@ -40,7 +46,38 @@ class UrlConnectionTransport(
     private val connectTimeoutMillis: Int = CONNECT_TIMEOUT_MILLIS,
     private val readTimeoutMillis: Int = READ_TIMEOUT_MILLIS,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
-) : HttpTransport {
+) : HttpTransport,
+    HttpGetTransport {
+    override suspend fun get(request: HttpGetRequest): HttpAnswer =
+        withContext(dispatcher) {
+            val connection =
+                try {
+                    URL(request.url).openConnection() as HttpURLConnection
+                } catch (e: IOException) {
+                    throw TransportException(TransportFailure.Other, e)
+                } catch (e: ClassCastException) {
+                    throw TransportException(TransportFailure.Other, e)
+                }
+            try {
+                connection.requestMethod = "GET"
+                connection.connectTimeout = connectTimeoutMillis
+                connection.readTimeout = readTimeoutMillis
+                connection.instanceFollowRedirects = false
+                connection.useCaches = false
+                connection.doInput = true
+                connection.setRequestProperty("Authorization", "Bearer ${request.bearerToken}")
+                connection.setRequestProperty("Accept", "application/json")
+                val status = connection.responseCode
+                val stream = if (status >= HTTP_BAD_REQUEST) connection.errorStream else connection.inputStream
+                HttpAnswer(status, stream?.use { readAtMost(it, request.maxBytes) }.orEmpty())
+            } catch (e: IOException) {
+                currentCoroutineContext().ensureActive()
+                throw TransportException(failureOf(e), e)
+            } finally {
+                connection.disconnect()
+            }
+        }
+
     override suspend fun put(request: HttpRequest): HttpAnswer =
         withContext(dispatcher) {
             val job = currentCoroutineContext().job
@@ -95,6 +132,25 @@ class UrlConnectionTransport(
         return String(buffer, 0, filled, Charsets.UTF_8)
     }
 
+    /**
+     * All of [stream], which must not be longer than [maxBytes]: an answer that is longer is not read on and fails the request
+     * (`Other`), so a server that never stops costs one failed refresh and not the tablet's memory.
+     */
+    private fun readAtMost(
+        stream: InputStream,
+        maxBytes: Int,
+    ): String {
+        val out = ByteArrayOutputStream()
+        val buffer = ByteArray(READ_CHUNK_BYTES)
+        while (true) {
+            val read = stream.read(buffer)
+            if (read < 0) break
+            if (out.size() + read > maxBytes) throw TransportException(TransportFailure.Other)
+            out.write(buffer, 0, read)
+        }
+        return out.toString(Charsets.UTF_8.name())
+    }
+
     private fun failureOf(e: IOException): TransportFailure =
         when (e) {
             is SocketTimeoutException -> TransportFailure.TimedOut
@@ -107,6 +163,7 @@ class UrlConnectionTransport(
         const val CONNECT_TIMEOUT_MILLIS = 10_000
         const val READ_TIMEOUT_MILLIS = 30_000
         private const val MAX_ANSWER_BYTES = 4_096
+        private const val READ_CHUNK_BYTES = 8_192
         private const val HTTP_BAD_REQUEST = 400
     }
 }
