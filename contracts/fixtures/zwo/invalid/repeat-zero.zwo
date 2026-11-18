@@ -1,0 +1,6 @@
+<workout_file>
+  <name>Zero repeats</name>
+  <workout>
+    <IntervalsT Repeat="0" OnDuration="30" OnPower="1.2" OffDuration="30" OffPower="0.5"/>
+  </workout>
+</workout_file>

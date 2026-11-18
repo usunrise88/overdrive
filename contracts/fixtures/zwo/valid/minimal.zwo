@@ -1,0 +1,6 @@
+<workout_file>
+  <name>Free</name>
+  <workout>
+    <FreeRide Duration="3600"/>
+  </workout>
+</workout_file>

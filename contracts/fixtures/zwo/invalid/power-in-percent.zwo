@@ -1,0 +1,6 @@
+<workout_file>
+  <name>Power in percent</name>
+  <workout>
+    <SteadyState Duration="60" Power="88"/>
+  </workout>
+</workout_file>

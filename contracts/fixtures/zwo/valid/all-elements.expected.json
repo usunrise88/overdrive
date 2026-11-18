@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "id": "zwo-all-elements",
+  "name": "All <elements>",
+  "description": "Steady, ramps, intervals & a free ride.",
+  "steps": [
+    { "type": "ramp", "duration": 300, "from": 0.40, "to": 0.65, "cadence": 85, "label": "Warm-up" },
+    { "type": "steady", "duration": 180, "target": 0.75, "cadence": 90 },
+    { "type": "ramp", "duration": 240, "from": 0.65, "to": 1.05 },
+    { "type": "repeat", "count": 4, "steps": [
+      { "type": "steady", "duration": 30, "target": 1.20, "cadence": 100, "label": "On" },
+      { "type": "steady", "duration": 90, "target": 0.50, "cadence": 80, "label": "Off" }
+    ] },
+    { "type": "free", "duration": 120 },
+    { "type": "free", "duration": 20, "label": "Max effort" },
+    { "type": "steady", "duration": 60, "target": 0.60 },
+    { "type": "ramp", "duration": 300, "from": 0.70, "to": 0.35, "label": "Cool-down" }
+  ]
+}
