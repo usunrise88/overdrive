@@ -70,7 +70,10 @@ Pushing the tag starts two workflow runs: `ci.yml` and `release.yml`. Both run o
    the run is a tag push (or a manual run with `dry_run` turned off). It runs
    `gh release create <tag> dist/* --title "Overdrive <version>"`, with `--notes-file
    docs/releases/<tag>.md` when that file exists and `--generate-notes` otherwise, and adds
-   `--prerelease` when the tag contains a hyphen.
+   `--prerelease` when the tag contains a hyphen. If the release already exists (it was made in the
+   GitHub web UI, which creates the tag too; see section 11), it attaches the files with
+   `gh release upload --clobber` and sets the title, the notes file and the pre-release flag with
+   `gh release edit` instead.
 
 Release assets, for a tag `v<version>`:
 
@@ -82,8 +85,11 @@ Release assets, for a tag `v<version>`:
 
 Notes:
 
-- `gh release create` fails when a release for the tag already exists. A failed run is not
-  overwritten by a second run on the same tag.
+- A release made by hand in the web UI before the run is completed by the run (files, notes, flag),
+  so either route ends the same. The run still reads `docs/releases/<tag>.md` from **the tagged
+  commit**, and the workflow file of that commit is the one that runs: a tag on a commit from before
+  this behaviour was added still has the old step, which fails on an existing release (the signed files
+  are then in the run's `overdrive-<tag>` artifact, to attach by hand).
 - Release notes: hand-written notes live in `docs/releases/<tag>.md`, for example
   `docs/releases/v0.1.0-alpha.1.md`, written from `docs/releases/TEMPLATE.md`. The workflow uses that
   file as the release body when it exists and generates notes otherwise.
@@ -184,40 +190,33 @@ outbox).
 
 ## 11. Tags the agent could not push
 
-The cloud sandbox where the orchestrating agent works may refuse to push tags: the egress policy answers
-`HTTP 403` on `git push origin <tag>` while pushes to the development branch work. That is a policy denial, not
-a fault, so the agent does not retry it and does not change `release.yml` to publish from branch pushes
-(that would let any push to the branch publish signed APKs). When it happens, the release is prepared (green CI on
-the commit, notes in `docs/releases/<tag>.md`, a local annotated tag) and the owner pushes the tag from a machine
-that may. Pushing the tag is all it takes: `release.yml` builds, signs, verifies and publishes.
+The cloud sandbox where the orchestrating agent works refuses to push tags: the egress policy answers
+`HTTP 403` on `git push origin <tag>` while pushes to the development branch work. That is a policy denial,
+not a fault, so the agent does not retry it and does not change `release.yml` to publish from branch pushes
+(that would let any push to the branch publish signed APKs). When it happens, the release is prepared (green
+CI on the commit, notes in `docs/releases/<tag>.md`) and the owner makes the release from the GitHub web UI, no
+terminal needed. The tag is what starts `release.yml`, which then builds, signs, verifies and attaches the
+files.
 
-Do **not** create the release in the GitHub web UI: the workflow creates it with `gh release create`, which fails
-when a release for the tag already exists.
+**From the GitHub web UI** (the route used for `v0.1.0`):
 
-Pending tags (commit, and the CI run that proved it green):
+1. Open `https://github.com/usunrise88/overdrive/releases/new`.
+2. **Choose a tag**: type the tag (`v0.1.0`) and pick **Create new tag: v0.1.0 on publish**.
+3. **Target**: the development branch, whose head is the commit CI proved green (the agent names it, and
+   does not push to the branch afterwards). Do not choose another commit.
+4. **Title**: `Overdrive 0.1.0`. **Description**: leave it empty; the run fills it from `docs/releases/<tag>.md`.
+5. Leave **Set as a pre-release** off for `v0.1.0` (on for an alpha), then **Publish release**.
+6. Open the **Actions** tab: the **Release** run starts by itself. Wait for it to finish (about 6 to 10 minutes). The release page
+   then has the two APKs, `SHA256SUMS` and the notes. If the run fails, its log says why; nothing is lost, and
+   the files are in the run's artifact.
+
+Do **not** put anything in the description by hand if the run should write it, and do not delete a release to
+retry: use **Re-run all jobs** on the failed run instead (the tag stays).
+
+Alphas `v0.1.0-alpha.1` to `-alpha.3` were prepared (notes, green CI, local tags) but are **not published**: a
+tag on their old commits would run the old publishing step, they were never installed anywhere, and `v0.1.0`
+contains everything they did. Their notes stay in `docs/releases/` as the record of each stage.
 
 | Tag | Commit | CI run | Status |
 |---|---|---|---|
-| `v0.1.0-alpha.1` | `3cfa3ca0d42db8498fb0bb7f0f03995764bb7a1f` | 44229751415 (success) | not pushed: 403 from the sandbox, 2026-11-18 |
-| `v0.1.0-alpha.2` | `c393eeeafea57cf71cda672d03428ffd20b1b2dc` | 44238927474 (success) | not pushed: 403 from the sandbox, 2026-11-18 |
-| `v0.1.0-alpha.3` | `4b13573e01da50f8f8297f2e7f8c00d2786669c0` | 44255429021 (success) | not pushed: the sandbox refused tag pushes twice (403); not tried again |
-| `v0.1.0` | `c3b1f28a7e9fd001a15190dfebc7978359edd35a` | 44271684049 (success) | not pushed: not tried again after the 403s above |
-
-```bash
-git fetch origin claude/sleepy-gates-zqbtwq
-git tag -a v0.1.0-alpha.1 -m "Overdrive 0.1.0-alpha.1" 3cfa3ca0d42db8498fb0bb7f0f03995764bb7a1f
-git push origin v0.1.0-alpha.1
-git tag -a v0.1.0-alpha.2 -m "Overdrive 0.1.0-alpha.2" c393eeeafea57cf71cda672d03428ffd20b1b2dc
-git push origin v0.1.0-alpha.2
-git tag -a v0.1.0-alpha.3 -m "Overdrive 0.1.0-alpha.3" 4b13573e01da50f8f8297f2e7f8c00d2786669c0
-git push origin v0.1.0-alpha.3
-git tag -a v0.1.0 -m "Overdrive 0.1.0" c3b1f28a7e9fd001a15190dfebc7978359edd35a
-git push origin v0.1.0
-```
-
-Push the tags in order, one at a time, and let each `release.yml` run finish first: the workflow's `concurrency`
-group serialises them, and the version code is the run number, so the order of the pushes is the order of the
-version codes.
-
-Tags can be placed on older commits, so later stages' tags are added to the table as they are prepared and the
-owner can push them in order. Remove a row when its tag is on GitHub.
+| `v0.1.0` | see `docs/releases/` and the agent's message | CI green on that commit | to be made by the owner in the web UI |

@@ -1,7 +1,8 @@
 name: Release
 
 # Push a tag like v0.1.0 (or v0.2.0-alpha.1 for a pre-release) to build signed APKs and publish a
-# GitHub Release. Anything else is a dry run: everything except publishing, which also verifies the
+# GitHub Release. Making the release in the GitHub web UI works too: it creates the tag, and this run
+# then attaches the APKs and the notes to that release. Anything else is a dry run: everything except publishing, which also verifies the
 # signing secrets. Dry runs happen when this file changes on any branch, or manually.
 on:
   push:
@@ -107,9 +108,19 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          flags=""
-          case "$VERSION" in *-*) flags="--prerelease" ;; esac
+          case "$VERSION" in *-*) prerelease=true ;; *) prerelease=false ;; esac
+          args=(--title "Overdrive ${VERSION#v}")
           # Hand-written notes live in docs/releases/<tag>.md (see docs/releasing.md); otherwise generate them.
           notes="docs/releases/${VERSION}.md"
-          if [ -f "$notes" ]; then notes_flag="--notes-file $notes"; else notes_flag="--generate-notes"; fi
-          gh release create "$VERSION" dist/* --title "Overdrive ${VERSION#v}" $notes_flag $flags
+          if gh release view "$VERSION" > /dev/null 2>&1; then
+            # The release was made in the GitHub web UI (which also created the tag): attach the files and
+            # set the title, notes and pre-release flag the same way a tag push would have.
+            echo "Release $VERSION already exists: attaching the files to it."
+            gh release upload "$VERSION" dist/* --clobber
+            if [ -f "$notes" ]; then args+=(--notes-file "$notes"); fi
+            gh release edit "$VERSION" "${args[@]}" --prerelease="$prerelease"
+          else
+            if [ -f "$notes" ]; then args+=(--notes-file "$notes"); else args+=(--generate-notes); fi
+            if [ "$prerelease" = true ]; then args+=(--prerelease); fi
+            gh release create "$VERSION" dist/* "${args[@]}"
+          fi
