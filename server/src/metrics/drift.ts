@@ -50,7 +50,8 @@ export type DriftResult = DriftMeasured | DriftSkipped;
 
 const roundTo = (value: number, digits: number): number => {
   const factor = 10 ** digits;
-  return Math.round(value * factor) / factor;
+  // + 0: a drift of -0.0 is 0.
+  return Math.round(value * factor) / factor + 0;
 };
 
 const sum = (values: readonly number[]): number => values.reduce((a, b) => a + b, 0);

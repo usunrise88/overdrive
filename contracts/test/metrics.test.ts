@@ -68,7 +68,6 @@ describe("what a schema cannot say is named in the error", () => {
     ["a-week-is-missing", /touches 1 weeks/],
     ["week-load-is-not-the-sum", /is not rideLoad plus otherLoad/],
     ["curve-durations-not-ascending", /does not follow/],
-    ["curve-power-rises-with-the-duration", /is above the 60 s power/],
     ["curve-date-outside-the-range", /is outside the range/],
     ["curve-better-than-all-time", /no allTime effort of 60 s at least as good/],
     ["ftp-set-at-without-an-ftp", /must be null exactly when/],
@@ -85,7 +84,6 @@ describe("what a schema cannot say is named in the error", () => {
 
   it.each([
     ["moving-longer-than-the-ride", /is more than \/durationSec/],
-    ["curve-power-rises-with-the-duration", /is above the 300 s power/],
     ["drift-available-without-numbers", /must all be present/],
     ["drift-available-with-a-reason", /must all be present and reason null/],
     ["drift-unavailable-with-numbers", /reason must be set and the numbers null/],

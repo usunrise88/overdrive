@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./tool.ts";
+import { registerFitnessTools } from "./tools/fitness.ts";
 import { registerPlanTools } from "./tools/plan.ts";
 import { registerProfileTools } from "./tools/profile.ts";
 import { registerRideTools } from "./tools/rides.ts";
@@ -13,7 +14,8 @@ const INSTRUCTIONS =
   "the rider's FTP (0.88 means 88%) and its duration is in whole seconds. Dates are the rider's local days, written YYYY-MM-DD. " +
   "Every number in a result is computed by the server from recorded data: quote it, do not recalculate it. Start with get_profile " +
   "(FTP, zones, weekly availability, goals). The write tools create_workout, update_workout, delete_workout and update_profile change " +
-  "the rider's real calendar and profile: use them only when asked. Results are compact by default; ask for detail only when needed.";
+  "the rider's real calendar and profile: use them only when asked. get_fitness gives load, fitness, fatigue, form, the power curve and the FTP; " +
+  "an FTP it suggests is only a suggestion, never change the FTP without the rider's say-so. Results are compact by default; ask for detail only when needed.";
 
 /**
  * A server with the Phase 2 tools (spec §8.4): planned workouts (list, create, update, delete),
@@ -28,5 +30,6 @@ export function createMcpServer(ctx: ToolContext): McpServer {
   registerProfileTools(server, ctx);
   registerPlanTools(server, ctx);
   registerRideTools(server, ctx);
+  registerFitnessTools(server, ctx);
   return server;
 }

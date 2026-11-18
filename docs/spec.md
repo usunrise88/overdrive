@@ -561,6 +561,24 @@ Wellness input sits behind one `WellnessSource` interface so the wearable can ch
 - **Power curve** and **W′ balance** for interval analysis. W′ balance follows Skiba et al. (2012), peer-reviewed.
 - **Not used:** acute-to-chronic workload ratio. Impellizzeri et al. (2020) describe conceptual flaws in it.
 
+**Settled in stage P3-1** (ADR 0022, `server/src/metrics/`; the numbers are computed by code, tested against hand-worked examples):
+
+- *Load:* the day is the rider's local day (`TIMEZONE`); daily load is the sum of the rides' TSS (the ride's own FTP) plus, once stage P3-2
+  registers its source, the heart-rate load of other activities (`LoadEntry` kind `other`: fatigue and form only, never the power curve,
+  eFTP or drift).
+- *Fitness, fatigue, form:* `avg = avg_yesterday + (load - avg_yesterday) * (1 - exp(-1/τ))`, τ = 42 and 7 days, form = fitness − fatigue on
+  the same day; seeded at 0 on the first day with any load and walked day by day, rest days included. No acute:chronic ratio anywhere.
+- *Power curve:* 25 durations from 1 s to 2 h; a pause or a missing reading counts as 0 W inside a window (conservative); kept per ride;
+  best of the range and best of all time.
+- *eFTP, a suggestion only:* the larger of 0.95 × the best 20-minute power and 1.00 × the best 60-minute power over the last 42 days, each
+  needing at least two rides within 90% of the best; made a suggestion only when it differs from the FTP by 3% or more (and from a pending
+  or dismissed one by 3 W); `pending → accepted | dismissed | superseded`, accepted by `PATCH /v1/profile` with its value. The profile never
+  changes by itself.
+- *Aerobic drift:* a steady stretch (the whole ride or a lap) of at least 40 minutes, 95% of it with power and heart rate, variability index
+  at most 1.05: (EF first half − EF second half) / EF first half, EF = normalised power over average heart rate. Otherwise skipped with the reason.
+- *W′ balance:* Skiba et al. (2012), integral model, 1 Hz; CP = the profile's FTP (else the ride's), W′ = the profile's `wPrimeKj` (new field,
+  1 to 100 kJ) else 20 kJ.
+
 ### 6.4 Recovery without HRV
 
 - For each daily metric, keep a personal baseline: rolling mean and spread over the last 28 to 60 days.
@@ -745,9 +763,10 @@ path: everything is under `/v1`.
 | `PUT /v1/rides/{rideId}` | Ride app | Upload the ride record (§8.2), the JSON body. **Settled** |
 | `PUT /v1/rides/{rideId}/fit` | Ride app | Upload the FIT file generated from that record (`application/vnd.ant.fit`). **Settled** |
 | `GET /v1/workouts?from&to` | Ride app | Planned workouts in native format. **Settled** (stage P2-2a, below) |
-| `GET /v1/rides`, `GET /v1/rides/{id}` | Companion | History and detail |
+| `GET /v1/rides`, `GET /v1/rides/{id}`, `GET /v1/rides/{id}/metrics` | Companion | History, detail, and what was computed from one ride. **Settled** (stage P3-1, below) |
 | `POST /v1/wellness` | Companion | Batch of Health Connect records |
-| `GET /v1/metrics?from&to` | Companion | Load, form, recovery state, baselines |
+| `GET /v1/metrics?from&to` | Companion | Load, form, power curve, FTP, drift. **Settled** (stage P3-1, below); recovery state and baselines come with the wellness stage |
+| `POST /v1/ftp-suggestion/dismiss` | Companion | Hide an FTP suggestion. **Settled** (stage P3-1) |
 | `GET /v1/insights?from&to` | Companion | Written notes |
 | `GET /v1/profile`, `PATCH /v1/profile` | Both | FTP, zones, physics settings. **Settled** (stage P2-3, below) |
 
@@ -800,6 +819,25 @@ path: everything is under `/v1`.
   `422 invalid_profile` (a new code of the closed list); a body that is not JSON is `400 invalid_json`. A change emits the
   `profile-changed` event inside the service.
 
+**Settled in stage P3-1 (training metrics; ADR 0022, `contracts/schema/metrics-response.schema.json`, `ride-metrics-response.schema.json`,
+`rides-response.schema.json`, `ride-detail-response.schema.json`, `ftp-suggestion-dismiss-*.schema.json`, Kotlin `MetricsApiJson`):**
+
+- `GET /v1/metrics?from=YYYY-MM-DD&to=YYYY-MM-DD` answers `{ from, to, generatedAt, stale, firstLoadDate, daily, weekly, powerCurve, ftp, drift }`:
+  `daily` one `{ date, load, loadCycling, loadOther, ctl, atl, tsb }` per local day; `weekly` one `{ weekStart, load, rideLoad, otherLoad, rides,
+  activities }` per ISO week; `powerCurve` `{ range, allTime }`, each `[{ durationSec, power, date, rideId }]` at the 25 durations of the design;
+  `ftp` `{ current, setAt, suggestion, latestEstimate, history, estimates }` (the suggestion `{ id, watts, basedOnRides, windowDays, createdAt,
+  confidence, basis }` or null; history with the value in force at `from`); `drift` `[{ date, rideId, name, driftPercent, efFirst, efSecond }]`.
+  At most **366 days** (`400 invalid_range` otherwise, as for the plan's range); `stale` is true when a source of load failed.
+- `GET /v1/rides?before&limit` pages by cursor, newest first: `{ generatedAt, stale, before, limit, hasMore, nextBefore, items }` with items
+  `{ id, kind: "ride" | "activity", name, start, date, durationSeconds, load, loadApproximate, sport, averagePower, averageHeartRate }`
+  (activities come from the wellness stage, spec §6.7; the schema is fixed now). `GET /v1/rides/{id}[?series=true]` is the ride screen's data:
+  summary, laps with the plan's `targetPower`, `secondsInZones[7]`, `plan` (the workout as stored, `stepsRidden`, `stepsPlanned`, `effortRange`,
+  `effortTarget`), `ftp`, `cp`, `wPrime`, `wPrimeLowest` and, with `series=true`, `[{ t, power, heartRate, wBal }]` at 10 s.
+  `GET /v1/rides/{id}/metrics[?wbal=true[&series=true][&cp=][&wPrimeKj=]]` is the power curve, load, drift and W′ balance of one ride.
+- `POST /v1/ftp-suggestion/dismiss` takes `{ "suggestionId" }`; accepting a suggestion is `PATCH /v1/profile {ftp}`. A malformed query
+  parameter is `400 invalid_query` (a new code of the closed list).
+- The profile has a new key, `wPrimeKj` (§8.3 profile): W′ in kilojoules, 1 to 100, null for the default of 20.
+
 ### 8.4 MCP tools
 
 | Tool | Kind | Purpose |
@@ -834,6 +872,12 @@ Read tools return compact summaries by default and full series only on request, 
 - `get_profile` and `update_profile` are the profile of §8.3, with the zones in watts worked out.
 - Results are compact JSON; failures are tool errors in plain words (`plan source not configured: …`). Without an intervals.icu key
   the plan tools say so and the others work.
+
+**Settled in stage P3-1 (ADR 0022):** `get_fitness` gives load, fitness, fatigue and form (today and the change over 7 and 28 days, the weekly
+loads, optionally every day), the best efforts at 5 s, 1, 5, 20 and 60 minutes in the range and ever, the aerobic drift of steady rides and the
+FTP with its **suggestion and basis**; the eFTP is described, and returned, as only a suggestion that is not to be written to the profile
+unasked. Without dates it covers the last 42 days; `series: true` adds the daily series, the whole 25-duration curve and the weekly estimates.
+`get_ride` gains `powerCurve`, `aerobicDrift` and `wPrimeBalance`; `update_profile` and `get_profile` carry `wPrimeKj`.
 
 ## 9. Risks and open checks
 

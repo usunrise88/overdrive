@@ -58,10 +58,10 @@ export function createProfileStore(db: Db, bus: EventBus, now: () => Date): Prof
     );
     const row = result.rows[0];
     if (row === undefined) return defaultProfile();
-    // A row written before W′ existed has no such key: it reads as "not set".
+    // A row written before W′ existed has no such key (the type says it does): it reads as "not set".
     const profile = {
-      wPrimeKj: null,
       ...row.data,
+      wPrimeKj: row.data.wPrimeKj ?? null,
       updatedAt: new Date(row.updated_at).toISOString(),
     };
     // What is stored was valid when it was written; a row someone edited by hand is not served as if it were.

@@ -11,6 +11,8 @@ CREATE TABLE ride_metrics (
   version integer NOT NULL,
   record_sha256 text NOT NULL,
   start_epoch_millis bigint NOT NULL,
+  -- The workout the ride was played from (ride.workoutId), kept here so that listing rides never reads a record.
+  workout_id text,
   duration_seconds integer NOT NULL,
   moving_seconds integer NOT NULL,
   -- The FTP the ride was recorded with.
@@ -30,9 +32,10 @@ CREATE TABLE ride_metrics (
 CREATE INDEX ride_metrics_start ON ride_metrics (start_epoch_millis);
 
 -- FTP suggestions: an FTP the service estimates from recent best efforts. Only suggestions: the profile
--- changes when the rider accepts one (stage P3-5), never by itself. At most one is pending at a time: a
--- materially different new one marks the old one 'superseded', and one that no longer applies (the FTP
--- moved, the efforts aged out) ends the same way.
+-- changes when the rider accepts one (PATCH /v1/profile with its value marks it accepted), never by itself.
+-- At most one is pending at a time: a materially different new one marks the old one 'superseded', and one
+-- that no longer applies (the FTP moved, the efforts aged out) ends the same way. 'dismissed' is the rider
+-- saying no (POST /v1/ftp-suggestion/dismiss): nothing like it is suggested again until the estimate moves.
 CREATE TABLE ftp_suggestions (
   id serial PRIMARY KEY,
   created_at timestamptz NOT NULL,
@@ -40,6 +43,9 @@ CREATE TABLE ftp_suggestions (
   -- {"durationSec": 1200, "power": 275.8, "rideId": "…", "date": "2026-11-12"}
   basis jsonb NOT NULL,
   confidence text NOT NULL CHECK (confidence IN ('low', 'medium', 'high')),
+  -- How many rides had an effort close to the basis one, and how many days back the efforts were looked at.
+  based_on_rides integer NOT NULL,
+  window_days integer NOT NULL,
   -- The profile's FTP when it was made, and the difference in percent; null when the profile had none.
   current_ftp integer,
   difference_percent double precision,

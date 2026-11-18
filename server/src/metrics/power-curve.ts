@@ -1,4 +1,8 @@
-import { POWER_CURVE_DURATIONS, type PowerCurveDuration, type RideSample } from "@overdrive/contracts";
+import {
+  POWER_CURVE_DURATIONS,
+  type PowerCurveDuration,
+  type RideSample,
+} from "@overdrive/contracts";
 
 /**
  * The mean-maximal power curve (spec §6.3): for each duration, the best average power over any
@@ -12,7 +16,9 @@ import { POWER_CURVE_DURATIONS, type PowerCurveDuration, type RideSample } from 
  * The alternative, joining the pieces on both sides of a gap, would count a rest as work done.
  *
  * A ride shorter than a duration has no value for it, and a ride with no power reading at all has
- * no curve (not a row of zeros).
+ * no curve (not a row of zeros). The curve is the raw best of each duration: it is not forced to fall
+ * with the duration (a window of 10 s can average more than the best 8 s when its two extra seconds are
+ * hard ones), though on a real ride it nearly always does.
  */
 
 export interface RidePowerPoint {

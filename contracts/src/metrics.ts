@@ -247,9 +247,7 @@ function load(name: string): object {
 ajv.addSchema(load("ride-record.schema.json"), "ride-record.schema.json");
 ajv.addSchema(load("workout.schema.json"), "workout.schema.json");
 ajv.addSchema(load("metrics-response.schema.json"), "metrics-response.schema.json");
-const checkMetrics = ajv.getSchema<MetricsResponse>("metrics-response.schema.json") as ReturnType<
-  typeof ajv.compile<MetricsResponse>
->;
+const checkMetrics = ajv.compile<MetricsResponse>(load("metrics-response.schema.json"));
 const checkRideMetrics = ajv.compile<RideMetricsResponse>(
   load("ride-metrics-response.schema.json"),
 );
@@ -310,12 +308,6 @@ function curveErrors(
       if (point.durationSec <= previous.durationSec) {
         errors.push(
           `${here}/durationSec ${point.durationSec} does not follow ${previous.durationSec}`,
-        );
-        return;
-      }
-      if (point.power > previous.power) {
-        errors.push(
-          `${here}/power ${point.power} is above the ${previous.durationSec} s power ${previous.power}`,
         );
         return;
       }
@@ -478,12 +470,6 @@ export function rideMetricsResponseConsistencyErrors(response: RideMetricsRespon
     if (point.durationSec <= before.durationSec) {
       errors.push(
         `/powerCurve/${index}/durationSec ${point.durationSec} does not follow ${before.durationSec}`,
-      );
-      break;
-    }
-    if (point.power > before.power) {
-      errors.push(
-        `/powerCurve/${index}/power ${point.power} is above the ${before.durationSec} s power`,
       );
       break;
     }

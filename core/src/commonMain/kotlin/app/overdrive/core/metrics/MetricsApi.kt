@@ -177,8 +177,8 @@ public data class DriftPoint(
 }
 
 /**
- * The best efforts: ascending durations with a power that does not rise, among the rides of the range ([range]) and
- * among all rides up to the end of it ([allTime]).
+ * The best efforts at ascending durations, among the rides of the range ([range]) and among all rides up to the end of
+ * it ([allTime]).
  */
 @Serializable
 public data class PowerCurves(
@@ -189,9 +189,6 @@ public data class PowerCurves(
         for (curve in listOf(range, allTime)) {
             for (i in 1 until curve.size) {
                 require(curve[i].durationSec > curve[i - 1].durationSec) { "Curve durations must ascend" }
-                require(curve[i].power <= curve[i - 1].power) {
-                    "The ${curve[i].durationSec} s power is above the ${curve[i - 1].durationSec} s power"
-                }
             }
         }
         for (point in range) {
@@ -434,9 +431,6 @@ public data class RideMetricsResponse(
         require(load == null || load >= 0.0) { "Load is not negative" }
         for (i in 1 until powerCurve.size) {
             require(powerCurve[i].durationSec > powerCurve[i - 1].durationSec) { "Curve durations must ascend" }
-            require(powerCurve[i].power <= powerCurve[i - 1].power) {
-                "The curve's power must not rise with the duration"
-            }
         }
         if (drift.available) require(checkNotNull(drift.endSec) <= durationSec) { "The drift ends after the ride" }
         if (wPrimeBalance != null) {

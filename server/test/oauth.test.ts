@@ -991,6 +991,7 @@ describe("a real MCP client, the SDK's, from nothing to a tool call", () => {
     expect(tools.tools.map((t) => t.name).sort()).toEqual([
       "create_workout",
       "delete_workout",
+      "get_fitness",
       "get_profile",
       "get_ride",
       "list_planned_workouts",
