@@ -10,7 +10,7 @@ mock-ups for the ride app (tablet), its overlay and the companion (phone). Nothi
 |---|---|
 | `system.md` | **The spec for implementers.** Rules, every component with sizes and states, overlay geometry and behaviour, charts, motion, copy, Compose notes |
 | `tokens.json` | Source of truth for colour, type, spacing, radii, strokes, sizes, overlay metrics, chart and motion values |
-| `tools/build-tokens.mjs` | Writes `mockups/tokens.css` from `tokens.json` (a Kotlin output is to be added with `ui-kit`) |
+| `tools/build-tokens.mjs` | Writes `mockups/tokens.css`, `android/ui-kit` `OverdriveTokens.kt` and the Geist font resources from `tokens.json`; `--check` fails when any is stale |
 | `tools/check-contrast.mjs` | Checks the contrast rules (zones ≥ 7:1 on the overlay over white video, text tiers on every surface) and prints the colour-vision distances; exits 1 on failure |
 | `tools/render-mockups.mjs` | Serves `design/` locally and screenshots every frame of every mock-up with Playwright |
 | `fonts/` | Geist 400, 500, 600 (TTF, ~380 KB) and its licence, SIL OFL 1.1. From npm `geist` 1.9.2 |

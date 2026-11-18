@@ -103,7 +103,15 @@ ${fontFaces}
 
 const repoRoot = join(designDir, "..");
 const uikitMain = join(repoRoot, "android", "ui-kit", "src", "main");
-const kotlinFile = join(uikitMain, "kotlin", "app", "overdrive", "uikit", "tokens", "OverdriveTokens.kt");
+const kotlinFile = join(
+  uikitMain,
+  "kotlin",
+  "app",
+  "overdrive",
+  "uikit",
+  "tokens",
+  "OverdriveTokens.kt",
+);
 const fontDir = join(uikitMain, "res", "font");
 const licenceFile = join(uikitMain, "assets", "licenses", "geist-OFL.txt");
 const licenceSource = join(designDir, "fonts", "OFL.txt");
@@ -111,9 +119,34 @@ const licenceSource = join(designDir, "fonts", "OFL.txt");
 const HEX = /^#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;
 // Kotlin keywords that could appear as a token name.
 const RESERVED = new Set([
-  "as", "class", "do", "else", "false", "fun", "if", "in", "interface", "is", "null", "object",
-  "package", "return", "super", "this", "throw", "true", "try", "typealias", "val", "var", "when",
-  "while", "for", "break", "continue", "typeof",
+  "as",
+  "class",
+  "do",
+  "else",
+  "false",
+  "fun",
+  "if",
+  "in",
+  "interface",
+  "is",
+  "null",
+  "object",
+  "package",
+  "return",
+  "super",
+  "this",
+  "throw",
+  "true",
+  "try",
+  "typealias",
+  "val",
+  "var",
+  "when",
+  "while",
+  "for",
+  "break",
+  "continue",
+  "typeof",
 ]);
 // Maps a font weight to its Android resource name and Compose FontWeight constant.
 const FONT_BY_WEIGHT = {
@@ -136,7 +169,10 @@ const at = (path) => {
 };
 // camelCase identifier from JSON key parts, e.g. ("overlay", "padding") -> "overlayPadding".
 const ident = (...parts) => {
-  const words = parts.join(" ").split(/[^A-Za-z0-9]+/).filter(Boolean);
+  const words = parts
+    .join(" ")
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean);
   const name = words
     .map((w, i) => (i === 0 ? w[0].toLowerCase() : w[0].toUpperCase()) + w.slice(1))
     .join("");
@@ -240,7 +276,11 @@ put(
     }),
   ),
 );
-put("colors", "zonePastAlpha", single("zonePastAlpha", "Float", flt(at("color.zone.rules.pastAlpha"))));
+put(
+  "colors",
+  "zonePastAlpha",
+  single("zonePastAlpha", "Float", flt(at("color.zone.rules.pastAlpha"))),
+);
 
 // Dimensions: space, radius, stroke, size as Dp; overlay and chart metrics by their JSON path.
 for (const group of ["space", "radius", "stroke", "size"]) {
