@@ -9,9 +9,12 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.getAndUpdate
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.random.Random
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
@@ -21,7 +24,10 @@ public sealed interface SyncStatus {
     /** Not started, or stopped. */
     public data object Stopped : SyncStatus
 
-    /** Nothing waits to be uploaded. */
+    /**
+     * Nothing is left to try. [pending] is the outbox's size: 0 when everything was sent, more when the rest were refused
+     * (see [SyncReport.refused]).
+     */
     public data class Idle(
         val pending: Int,
     ) : SyncStatus
@@ -38,8 +44,16 @@ public sealed interface SyncStatus {
         val reason: String?,
     ) : SyncStatus
 
-    /** The provider has nowhere to upload (Phase 1's [NoopSyncProvider]): [pending] rides are kept for later. */
+    /** The provider has nowhere to upload (no address or token, or Phase 1's [NoopSyncProvider]): [pending] rides are kept. */
     public data class NotConfigured(
+        val pending: Int,
+    ) : SyncStatus
+
+    /**
+     * The service did not accept the token ([SyncResult.TokenRejected]): [pending] rides are kept and nothing is tried again
+     * until the address or the token changes, or the rider asks ([SyncCoordinator.kick] with `retryRefused`).
+     */
+    public data class TokenRejected(
         val pending: Int,
     ) : SyncStatus
 
@@ -49,6 +63,22 @@ public sealed interface SyncStatus {
     ) : SyncStatus
 }
 
+/** A ride the destination refused for good ([SyncResult.Refused]): its id, and the destination's reason in plain words. */
+public data class RefusedRide(
+    val rideId: String,
+    val message: String,
+)
+
+/**
+ * What the sync remembers besides what it is doing, for the Settings line: when an upload last succeeded and which rides the
+ * destination refused. A refused ride is still in the outbox; it leaves this list when it is uploaded after all.
+ */
+public data class SyncReport(
+    /** Wall-clock milliseconds of the last acknowledged upload, or null if none is known. */
+    val lastSuccessMillis: Long? = null,
+    val refused: List<RefusedRide> = emptyList(),
+)
+
 /**
  * Drains the [Outbox] through a [SyncProvider], oldest ride first (spec §4.9), and **never blocks or fails a ride**: everything
  * runs on a coroutine of its own, an outbox or provider that throws is a status and a later retry, and the only thing the ride
@@ -57,11 +87,18 @@ public sealed interface SyncStatus {
  * - An upload the provider [SyncResult.Acknowledged] leaves the outbox. [SyncResult.RetryLater] (or a throw) keeps the ride and
  *   backs off the way the Bluetooth links do ([BackoffPolicy], here [DEFAULT_POLICY]: 5 s, doubling, 15 minutes at most, with
  *   jitter), and the first success starts the schedule over. [SyncResult.NotConfigured] stops without backing off, because
- *   nothing will change by itself: **the no-op provider acknowledges nothing, so every ride stays queued for Phase 2.**
+ *   nothing will change by itself: **the no-op provider acknowledges nothing, so every ride stays queued.**
+ *   [SyncResult.TokenRejected] stops the same way: the credentials are wrong, so nothing is tried until they change.
+ * - [SyncResult.Refused] is a ride the destination will not take as it is: it **stays in the outbox but is skipped** (for this
+ *   process, and shown in [report]), so it neither loops nor holds up the rides behind it. A new process, a changed setting or
+ *   [kick] with `retryRefused` tries it once more.
  * - [kick] tries now, for a changed setting or the app starting; it cuts a backoff wait short and starts the schedule over.
  * - The provider is asked for at every round, so a settings change that swaps it needs no new coordinator.
  *
- * There is no network code here and no payload: what an upload is, is Phase 2's.
+ * There is no network code here and no payload: what an upload is, is the provider's ([HttpSyncProvider]).
+ *
+ * @param clock wall-clock time, for [SyncReport.lastSuccessMillis].
+ * @param lastSuccessMillis the last success remembered from an earlier run (the app keeps it), or null.
  */
 public class SyncCoordinator(
     private val scope: CoroutineScope,
@@ -70,14 +107,26 @@ public class SyncCoordinator(
     policy: BackoffPolicy = DEFAULT_POLICY,
     timeSource: TimeSource = TimeSource.Monotonic,
     random: Random = Random.Default,
+    private val clock: Clock = Clock.System,
+    lastSuccessMillis: Long? = null,
 ) {
     private val backoff = ReconnectBackoff(policy, timeSource, random)
     private val wake = Channel<Unit>(Channel.CONFLATED)
     private val mutableStatus = MutableStateFlow<SyncStatus>(SyncStatus.Stopped)
+    private val mutableReport = MutableStateFlow(SyncReport(lastSuccessMillis))
     private var job: Job? = null
+
+    /** Rides the provider refused, oldest first. Touched only by the drain coroutine. */
+    private val refused = LinkedHashMap<String, String>()
+
+    /** Set by [kick] with `retryRefused`; the drain forgets the refusals the next time it looks. */
+    private val forgetRefusals = MutableStateFlow(false)
 
     /** What the sync is doing. */
     public val status: StateFlow<SyncStatus> = mutableStatus.asStateFlow()
+
+    /** What the sync remembers: the last success and the refused rides. */
+    public val report: StateFlow<SyncReport> = mutableReport.asStateFlow()
 
     /** Starts draining, once now and then whenever kicked. Idempotent. */
     public fun start() {
@@ -99,8 +148,13 @@ public class SyncCoordinator(
         mutableStatus.value = SyncStatus.Stopped
     }
 
-    /** Try to upload now. Fire and forget; harmless when nothing is queued. */
-    public fun kick() {
+    /**
+     * Try to upload now. Fire and forget; harmless when nothing is queued. With [retryRefused] the rides the provider refused
+     * are tried once more as well, and a wait that was under way ends: for a changed setting and the rider's **Send now**. A
+     * plain kick (a ride finished, the app started) leaves the refused rides skipped.
+     */
+    public fun kick(retryRefused: Boolean = false) {
+        if (retryRefused) forgetRefusals.value = true
         wake.trySend(Unit)
     }
 
@@ -124,6 +178,10 @@ public class SyncCoordinator(
 
     private suspend fun drain() {
         while (true) {
+            if (forgetRefusals.getAndUpdate { false } && refused.isNotEmpty()) {
+                refused.clear()
+                publishRefused()
+            }
             val pending =
                 try {
                     outbox.pending()
@@ -133,15 +191,24 @@ public class SyncCoordinator(
                     mutableStatus.value = SyncStatus.OutboxUnavailable(e::class.simpleName)
                     return
                 }
+            // A refusal is about a ride that is still queued; one that left the outbox is no longer news.
+            val queued = pending.mapTo(HashSet()) { it.rideId }
+            if (refused.keys.retainAll(queued)) publishRefused()
             if (pending.isEmpty()) {
                 backoff.reset()
                 mutableStatus.value = SyncStatus.Idle(0)
                 return
             }
+            val todo = pending.filter { it.rideId !in refused }
+            if (todo.isEmpty()) {
+                mutableStatus.value = SyncStatus.Idle(pending.size)
+                return
+            }
             val target = provider()
-            var retry: SyncResult.RetryLater? = null
-            for ((index, entry) in pending.withIndex()) {
-                mutableStatus.value = SyncStatus.Syncing(pending.size - index)
+            var done = 0
+            for (entry in todo) {
+                val outstanding = pending.size - done
+                mutableStatus.value = SyncStatus.Syncing(outstanding)
                 when (val result = upload(target, entry)) {
                     SyncResult.Acknowledged -> {
                         try {
@@ -152,27 +219,45 @@ public class SyncCoordinator(
                             mutableStatus.value = SyncStatus.OutboxUnavailable(e::class.simpleName)
                             return
                         }
+                        done++
                         backoff.reset()
+                        refused.remove(entry.rideId)
+                        mutableReport.update {
+                            it.copy(lastSuccessMillis = clock.now().toEpochMilliseconds(), refused = refusedRides())
+                        }
                     }
 
                     SyncResult.NotConfigured -> {
-                        mutableStatus.value = SyncStatus.NotConfigured(pending.size - index)
+                        mutableStatus.value = SyncStatus.NotConfigured(outstanding)
                         return
                     }
 
-                    is SyncResult.RetryLater -> {
-                        retry = result
+                    SyncResult.TokenRejected -> {
+                        mutableStatus.value = SyncStatus.TokenRejected(outstanding)
+                        return
                     }
-                }
-                if (retry != null) {
-                    val remaining = pending.size - index
-                    val wait = backoff.onAttemptFailed()
-                    mutableStatus.value = SyncStatus.WaitingToRetry(remaining, wait.inWholeMilliseconds, retry.reason)
-                    waitForKick(wait.inWholeMilliseconds)
-                    break
+
+                    is SyncResult.Refused -> {
+                        refused[entry.rideId] = result.message
+                        publishRefused()
+                    }
+
+                    is SyncResult.RetryLater -> {
+                        val wait = backoff.onAttemptFailed()
+                        mutableStatus.value =
+                            SyncStatus.WaitingToRetry(outstanding, wait.inWholeMilliseconds, result.reason)
+                        waitForKick(wait.inWholeMilliseconds)
+                        break
+                    }
                 }
             }
         }
+    }
+
+    private fun refusedRides(): List<RefusedRide> = refused.map { (id, message) -> RefusedRide(id, message) }
+
+    private fun publishRefused() {
+        mutableReport.update { it.copy(refused = refusedRides()) }
     }
 
     private suspend fun upload(
@@ -187,9 +272,16 @@ public class SyncCoordinator(
             SyncResult.RetryLater(e::class.simpleName)
         }
 
-    /** Waits [millis], or less if kicked, in which case the schedule starts over. */
+    /**
+     * Waits [millis], or less if kicked, in which case the schedule starts over. A rider's kick (`retryRefused`) that came while
+     * the upload was under way is not lost: it ends the wait at once.
+     */
     private suspend fun waitForKick(millis: Long) {
         wake.tryReceive()
+        if (forgetRefusals.value) {
+            backoff.reset()
+            return
+        }
         val kicked = withTimeoutOrNull(millis) { wake.receive() }
         if (kicked != null) backoff.reset()
     }
