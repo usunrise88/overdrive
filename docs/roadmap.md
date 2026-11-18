@@ -95,3 +95,28 @@ Owner's open design questions, answered with the designer's defaults until the o
 verdict; charts open on 6 months (fitness, power) and 4 weeks (wellness); form words Fresh/Neutral/Training hard/Very fatigued at
 +5/−10/−30; a dismissed FTP suggestion stays hidden until the estimate moves by 3 W; the phone sends no notifications of its own
 (Telegram only).
+
+## Spec additions of 2026-11-18 (spec §11 and §12)
+
+The owner added thirteen features to the spec; each names the phase it belongs to. Decision (owner, 2026-11-18): they are built
+**before** any macOS application (which is not in the spec yet; nothing about it is planned until these are done). Those that belong
+to Phase 3 join the Phase 3 stages above and ship in `v0.3.0`; those that belong to Phases 1 and 2 follow as their own phase,
+`v0.4.0`, with the same rule: a release candidate first, then the release.
+
+| Addition (spec) | Spec phase | Where it is built |
+|---|---|---|
+| Repeat-session comparison (§11.7) | 3 | P3-7 (detection and comparison on the server) and P3-4 (page in the companion; the overlay line is in `v0.4.0`) |
+| Outdoor rides from the bike computer (§11.8) | 3, needed from March 2027 | P3-7 (FIT import, heart-rate load, duplicate guard) and P3-4 (share target in the companion), Telegram receives a FIT in P3-3 |
+| Post-ride analysis that hands a topic to the coach (§12.3) | 3 | P3-3 |
+| Body weight from Health Connect (§12.5) | 3 | P3-2 (records, 7-day average, `get_wellness`) and P3-4 (trend on the Wellness screen); system mass in the tablet's physics in `v0.4.0` |
+| ERG stall guard (§11.1) | 1 | `v0.4.0`, stage A1 (tablet) |
+| Heart-rate hold, step type `hr` (§11.2) | 1 | `v0.4.0`, stage A1 (workout contract, player, MCP) |
+| Overlay expands around step changes (§11.3) | 1 | `v0.4.0`, stage A1 (tablet) |
+| Routes with elevation (§11.4) | 2 | `v0.4.0`, stage A2 (service routing engine, MCP tools, trainer simulation, FIT positions) |
+| Easier variant of a planned workout (§11.5) | 2 | `v0.4.0`, stage A2 |
+| Coach notebook (§11.6) and methodology section (§12.4) | 2 | `v0.4.0`, stage A2 (MCP tools, versioning, companion read-only view) |
+| Agent replans after a missed session (§12.2) | 2 | `v0.4.0`, stage A2 (plan events, MCP tools, Telegram note) |
+| Live coach: spoken cues in real time (§12.1) | 2 | `v0.4.0`, stage A3 (streaming from the tablet, trigger rules, LLM, TTS) |
+
+Open questions before `v0.4.0` (the owner's, not yet asked): which road-routing engine (BRouter or GraphHopper, spec §11.4), which TTS
+service for the live coach, and whether the live coach is wanted before the macOS application.
