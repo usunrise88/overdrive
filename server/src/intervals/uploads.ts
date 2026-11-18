@@ -198,6 +198,7 @@ export function createUploadWorker(options: UploadWorkerOptions): UploadWorker {
     }
 
     const startMs = Number(ride.start);
+    let sent: { result: "uploaded" | "duplicate"; activityId: string | null; paired: boolean };
     try {
       const pairedEventId = await pairedEventFor(ride, startMs);
       const outcome = await client.uploadActivity({
@@ -218,18 +219,11 @@ export function createUploadWorker(options: UploadWorkerOptions): UploadWorker {
           })
           .catch(() => null);
       }
-      await finish(ride.id, attempts, { state: "done", externalId: activityId });
-      log.info(
-        {
-          rideId: ride.id,
-          attempts,
-          result: outcome.status,
-          activityId,
-          paired: outcome.status === "uploaded" && pairedEventId !== null,
-        },
-        "ride sent to intervals.icu",
-      );
-      return "done";
+      sent = {
+        result: outcome.status,
+        activityId,
+        paired: outcome.status === "uploaded" && pairedEventId !== null,
+      };
     } catch (error) {
       const known = error instanceof IntervalsError ? error : null;
       const reason = known?.message ?? "the upload failed unexpectedly";
@@ -259,13 +253,36 @@ export function createUploadWorker(options: UploadWorkerOptions): UploadWorker {
       );
       return "retry";
     }
+
+    // Recorded outside the try: if the database fails here the upload is not mistaken for a failed
+    // one. The row's lease runs out and the ride is tried again, which intervals.icu answers as a
+    // duplicate.
+    await finish(ride.id, attempts, { state: "done", externalId: sent.activityId });
+    log.info(
+      {
+        rideId: ride.id,
+        attempts,
+        result: sent.result,
+        activityId: sent.activityId,
+        paired: sent.paired,
+      },
+      "ride sent to intervals.icu",
+    );
+    return "done";
   }
 
   async function runOnce(): Promise<UploadSummary> {
     const summary: UploadSummary = { claimed: 0, done: 0, retry: 0, failed: 0 };
     for (const row of await claim()) {
       summary.claimed++;
-      summary[await attempt(row)]++;
+      try {
+        summary[await attempt(row)]++;
+      } catch (error) {
+        // The database failed while recording an outcome: the row's lease runs out and it is tried
+        // again (a ride intervals.icu already has is then a duplicate, which is success).
+        log.error({ err: error, rideId: row.ride_id }, "could not record the outcome of an upload");
+        summary.retry++;
+      }
     }
     return summary;
   }

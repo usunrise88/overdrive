@@ -3,7 +3,12 @@ import type { RideRecord } from "@overdrive/contracts";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "../src/db.ts";
 import type { RideStoredEvent } from "../src/events.ts";
-import { INTERVALS_DESTINATION, retryDelayMs } from "../src/intervals/uploads.ts";
+import { createIntervalsClient } from "../src/intervals/client.ts";
+import {
+  createUploadWorker,
+  INTERVALS_DESTINATION,
+  retryDelayMs,
+} from "../src/intervals/uploads.ts";
 import {
   asRide,
   expectError,
@@ -14,7 +19,12 @@ import {
   startApp,
 } from "./helpers/app.ts";
 import { clearPlan, clearRides, openMigratedTestDb } from "./helpers/db.ts";
-import { FAKE_API_KEY, type FakeIntervals, startFakeIntervals } from "./helpers/fake-intervals.ts";
+import {
+  FAKE_API_KEY,
+  FAKE_ATHLETE_ID,
+  type FakeIntervals,
+  startFakeIntervals,
+} from "./helpers/fake-intervals.ts";
 import { buildFit } from "./helpers/fit.ts";
 import { type Harness, plannedEvent, startHarness, steady } from "./helpers/harness.ts";
 
@@ -377,6 +387,44 @@ describe("the worker", () => {
       await restarted.services.uploads?.idle();
       expect(await destination("ride-1")).toMatchObject({ state: "done", external_id: "i1000001" });
       await restarted.app.close();
+    });
+
+    it("a database failure while recording the outcome leaves the ride to be tried again, as a duplicate", async () => {
+      await store("ride-1", 1);
+      let failures = 1;
+      const flaky: Db = {
+        ...db,
+        query: (sql, params) => {
+          if (sql.includes("SET state = $3") && failures-- > 0) {
+            return Promise.reject(new Error("the database went away"));
+          }
+          return db.query(sql, params);
+        },
+      };
+      const flakyWorker = createUploadWorker({
+        db: flaky,
+        client: createIntervalsClient({
+          baseUrl: fake.url,
+          athleteId: FAKE_ATHLETE_ID,
+          apiKey: FAKE_API_KEY,
+        }),
+        bus: h.services.bus,
+        timezone: "Europe/Paris",
+        now: h.clock.now,
+        log: h.logging.log,
+      });
+
+      expect(await flakyWorker.runOnce()).toEqual({ claimed: 1, done: 0, retry: 1, failed: 0 });
+      expect(fake.activities).toHaveLength(1); // it was uploaded, we just could not write it down
+      expect(await destination("ride-1")).toMatchObject({
+        state: "pending",
+        next: nextAfter(10 * MINUTE),
+      });
+
+      h.clock.advance(10 * MINUTE);
+      expect(await flakyWorker.runOnce()).toMatchObject({ done: 1 });
+      expect(fake.activities).toHaveLength(1); // not twice: intervals.icu had it
+      expect(await destination("ride-1")).toMatchObject({ state: "done" });
     });
 
     it("the waits are 1, 2, 4 … minutes up to six hours", () => {
