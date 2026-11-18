@@ -129,8 +129,8 @@ Sentence case everywhere. No all-caps labels.
 ## 5. Overlay
 
 A `TYPE_APPLICATION_OVERLAY` window owned by the ride foreground service, flags
-`FLAG_NOT_FOCUSABLE | FLAG_LAYOUT_NO_LIMITS`, `WRAP_CONTENT` size, gravity top-start with x/y
-from saved state. It never takes focus.
+`FLAG_NOT_FOCUSABLE | FLAG_NOT_TOUCH_MODAL | FLAG_LAYOUT_IN_SCREEN`, `WRAP_CONTENT` size, gravity
+top-start with x/y from saved state. It never takes focus (ADR 0006).
 
 ### 5.1 Frame
 

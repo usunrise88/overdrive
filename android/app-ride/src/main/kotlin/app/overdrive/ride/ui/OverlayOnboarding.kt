@@ -2,8 +2,15 @@ package app.overdrive.ride.ui
 
 import android.os.Build
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.LifecycleStartEffect
 import app.overdrive.ride.overlay.OverlayAccess
+import app.overdrive.ride.overlay.OverlayController
 import app.overdrive.uikit.Notice
 import app.overdrive.uikit.icons.OverdriveIcons
 
@@ -50,4 +57,35 @@ fun OverlayPermissionNotice(
         actionLabel = "Allow",
         onAction = onAllow,
     )
+}
+
+/**
+ * What the overlay may do right now, read again every time the screen resumes: the permission screens return no result,
+ * so coming back from one is the only moment the app learns that the rider allowed something.
+ */
+@Composable
+fun rememberOverlayAccess(overlay: OverlayController): OverlayAccess {
+    var access by remember(overlay) { mutableStateOf(overlay.access()) }
+    LifecycleResumeEffect(overlay) {
+        access = overlay.access()
+        onPauseOrDispose { }
+    }
+    return access
+}
+
+/**
+ * Starts the overlay service from this visible screen whenever a ride is [live], and again each time the screen is
+ * started during one (the service may have been stopped by the system meanwhile). Starting from a visible screen is
+ * what keeps Android's limits on starting foreground services from the background out of the way. Idempotent, and it
+ * does nothing without the permission (see [OverlayController.ensureRunning]).
+ */
+@Composable
+fun EnsureOverlayService(
+    live: Boolean,
+    overlay: OverlayController,
+) {
+    LifecycleStartEffect(live, overlay) {
+        if (live) overlay.ensureRunning()
+        onStopOrDispose { }
+    }
 }

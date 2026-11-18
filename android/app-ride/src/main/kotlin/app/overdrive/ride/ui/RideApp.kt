@@ -28,8 +28,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.LifecycleResumeEffect
-import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overdrive.core.ride.RideState
 import app.overdrive.ride.AppContainer
@@ -96,18 +94,8 @@ fun RideApp(
     KeepScreenOn(live)
     BackHandler(enabled = screen != Screen.Ride) { screen = Screen.Ride }
 
-    // The overlay's permissions are granted on system screens that return no result: read them again on every resume.
-    var access by remember { mutableStateOf(overlay.access()) }
-    LifecycleResumeEffect(overlay) {
-        access = overlay.access()
-        onPauseOrDispose { }
-    }
-    // The service starts from this visible screen once a ride is live (so Android's background-start limits do not
-    // apply). It is idempotent and does nothing without the permission.
-    LifecycleStartEffect(live, overlay) {
-        if (live) overlay.ensureRunning()
-        onStopOrDispose { }
-    }
+    val access = rememberOverlayAccess(overlay)
+    EnsureOverlayService(live, overlay)
     // Android 13 and later ask for notifications at runtime. The answer does not matter to the overlay, so the system
     // screen for the overlay permission opens either way, right after the question.
     val notifications =

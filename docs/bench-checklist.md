@@ -13,6 +13,7 @@ Tags used in the steps:
 - **FT n**: item n of `docs/protocols/ftms-hr.md` §9.
 - **FIT n**: item n of `docs/protocols/fit.md` §8.
 - **OV n**: item n of `docs/android/overlay-notes.md` §9.
+- **ADR 6**: the "Unverified on hardware" table of `docs/adr/0006-overlay-service.md`.
 - **ADR4**: the "to check on the bench" notes in `docs/adr/0004-ride-engine.md`.
 
 Anything marked **(unverified)** is a command or outcome the sources do not confirm. Run it, observe,
@@ -87,14 +88,19 @@ the session number and the log file name. Do not change the expected result to m
 - [ ] **1.3 Restricted settings.** On Android 13 and later, sideloaded apps may need "Allow restricted
   settings" before some permissions can be granted. Open the app's info page and look for that option.
   Expect: unknown (unverified whether it blocks the overlay). Write down whether it appears, and where.
-  Settles: OV 9.1, OV 1 (restricted settings).
-- [ ] **1.4 Overlay permission.** Settings → the app's special access → display over other apps.
-  Expect: the toggle is not greyed out, and you can turn it on. Write down where the toggle sits.
-  Optional check: `adb shell appops get app.overdrive.ride SYSTEM_ALERT_WINDOW` (unverified: `appops get`
-  is not in the research notes; `appops set` is). Settles: OV 9.1.
-- [ ] **1.5 Notification permission.** Allow notifications when the app asks. Expect: the ride's
-  foreground-service notification appears when a ride starts. If it is not allowed, record it: the
-  service may still run, but the notification is what keeps the service visible to the user.
+  Settles: OV 9.1, OV 1 (restricted settings), ADR 6 (unverified table).
+- [ ] **1.4 Overlay permission.** Open the app. The Ready screen shows a row "Show numbers over other apps" with
+  **Allow**. Tap it: on Android 13 and later the system first asks about notifications (answer as you like, see
+  1.5), then the "Display over other apps" screen opens. Switch the app on and come back.
+  Expect: the toggle is not greyed out (see 1.3), and the row is gone when you are back, without restarting the
+  app. Write down where the toggle sits. Also check **Settings → Overlay**: "Display over other apps" shows
+  "Allowed" and the button says **Manage**. Optional check: `adb shell appops get app.overdrive.ride
+  SYSTEM_ALERT_WINDOW` (unverified: `appops get` is not in the research notes; `appops set` is). Settles: OV 9.1.
+- [ ] **1.5 Notification permission.** Allow notifications when the system asks (step 1.4). Expect: the ride's
+  foreground-service notification ("Ride in progress") appears when a ride starts. If you declined, Settings →
+  Overlay → "Ride notification" has an **Allow** button that opens the app's notification settings. Record what you
+  chose: the service and the overlay should work either way (the notification is hidden from the shade but the
+  service shows in the Task Manager, which is documented but not yet seen on this ROM).
 - [ ] **1.6 Battery optimisation.** Open the app's battery setting and set it to unrestricted (the
   option names differ by ROM). Expect: the setting is saved. Optional check:
   `adb shell dumpsys deviceidle whitelist` (unverified; the research notes list it as unverified).
@@ -104,10 +110,12 @@ the session number and the log file name. Do not change the expected result to m
 
 ## Session 2: overlay over a real video app
 
-Use the build you are testing. The overlay checks do not need the trainer. The ride screen must be
-visible when the ride starts, because Android 15+ only lets a service start from the background while an
-overlay is visible (overlay-notes §0, gotcha 2). Start the ride from the ride screen, then switch to the
-video app.
+Use the build you are testing. The overlay checks do not need the trainer: the build rides a simulated one.
+The service starts from the ride screen when a ride is live (ADR 0006), so start the ride from the ride screen,
+then switch to the video app. The overlay is **not** drawn while Overdrive itself is on screen, and appears
+about 0.3 s after you leave it. The overlay button in the top bar is only an in-app preview and has nothing to
+do with the window. Demo speed (Settings, developer group) runs a ride 10 or 60 times faster if you want to see
+a workout's steps without waiting.
 
 - [ ] **2.1 Overlay over video.** Start a ride, then open a video app full screen. Expect: the overlay
   stays visible on top. Settles: AC 1 (part), OV 9.2 (for protected video, see the next step).
@@ -116,10 +124,11 @@ video app.
 - [ ] **2.3 Legibility.** Look at compact and detailed mode over dark and bright scenes at arm's length
   and at the bike's viewing distance. Expect: power, heart rate, cadence and time are readable at a
   glance. Write down any value you cannot read. Settles: spec §4.6 (readable over video), spec §7.4.
-- [ ] **2.4 Tap and long press.** Tap the overlay: it toggles compact and detailed. Long-press it: the
-  full app opens. Expect: both work from the overlay. If long-press does nothing, or the full app does not
-  come to the front, record it. Settles: spec §4.6; OV 9.5 (background start from the overlay's touch
-  handler).
+- [ ] **2.4 Tap and long press.** Tap the overlay: it toggles compact and detailed once, without animation,
+  and the mode is still the same after you reopen the app (Settings → Overlay → Mode). Long-press it for half a
+  second without moving: the full app comes to the front (no haptic, the app appearing is the feedback). Expect:
+  both work from the overlay while a video app is in front. If the long press does nothing, record it and try the
+  notification tap (2.12). Settles: spec §4.6; OV 9.5 (background start from the overlay's touch handler).
 - [ ] **2.5 Drag smoothness (AC 7).** Run these three commands around a 10-second drag of the overlay.
   The app must be a release or non-debuggable build, or the numbers are not valid (overlay-notes §5.4).
   ```
@@ -138,10 +147,13 @@ video app.
   adb pull /data/local/tmp/ipc-trace.txt ~/bench/
   ```
   Expect: no binder call per move from the drag handler (OV 9.3). Settles: AC 7, OV 9.3.
-- [ ] **2.7 Snapping and position memory.** Drag the overlay to a corner and let go: it should snap to the
-  edge. Then press Home, reopen the app, and check the position and mode. Expect: the same position and
-  mode. Also rotate the tablet, and check where the overlay lands. Then try split screen with the video
-  app. Write down where it ends up each time. Settles: spec §4.6; OV 9.11 (rotation and split screen).
+- [ ] **2.7 Snapping and position memory.** Drag the overlay by its middle: it follows the finger 1:1 and
+  never leaves the screen. Let go in the left half: it slides (about 0.2 s) to the left edge with a 16 dp
+  margin; in the right half, to the right edge. Drag it to the bottom, tap it to go detailed: it must grow
+  upward and stay on screen, and tap again to come back down. Press Home, reopen the app and leave again: the
+  overlay comes back at the same place in the same mode. **Settings → Overlay → Position → Reset** puts it back
+  top right. Write down any jump at the moment of a bottom-edge resize (ADR 0006 expects at most one frame).
+  Settles: spec §4.6; OV 9.11.
 - [ ] **2.8 Hour-long survival, screen on (AC 1).** Start a 60-minute free ride with the video app full
   screen and the screen on. Keep the ride log running. Expect: the overlay stays visible for the whole
   hour, and the ride finishes. Note any gap, and the time of the gap. This is the owner check for AC 1
@@ -176,6 +188,40 @@ video app.
   (unverified: the research notes list this command as unverified, and it may print a lot of text.
   Keep the output and compare the two snapshots.) Write down the percentage of battery used. Settles:
   spec §7.3 (battery is a requirement), OV 8.3.
+- [ ] **2.12 Open the app from another app (long press and notification).** With the video app in front, long-press
+  the overlay (as 2.4), then go back to the video app and pull down the shade and tap **Ride in progress**.
+  Expect: the long press brings Overdrive to the front. Android's rules for starting an activity from the
+  background list "has a visible window" and "holds `SYSTEM_ALERT_WINDOW`" as exemptions, but a blocked start gives
+  no error, only the log line `Background activity launch blocked!` (`adb logcat | grep -i "launch blocked"`), and
+  nothing says what ZUI adds on top. The notification tap is the documented fallback: expect it to work either
+  way. Record both results, and the Android and ROM version. Settles: spec §4.6, OV 9.5, ADR 6 (unverified table).
+- [ ] **2.13 Lifecycle of the window.** Start a ride on the ride screen, then check each of these in turn:
+  (a) with Overdrive in front there is no window; (b) press Home or open the video app: the window appears within
+  about half a second; (c) come back to Overdrive: it disappears at once; (d) rotate the tablet while in Overdrive:
+  the overlay must **not** flash; (e) pause the ride in Overdrive, then leave for the video app: the overlay shows
+  the paused look; (f) let a workout end (Demo speed 60× is fine) while the video app is in front: the window goes,
+  the app comes to the front with the summary and the notification says "Ride finished"; if the app did not come to
+  the front, tap the notification; (g) press **Done**: the notification goes. Record (a) to (g). Settles: AC 1
+  (part), ADR 0006 lifecycle.
+- [ ] **2.14 Blur.** Switch **Settings → Overlay → Blur the video behind** on and play a busy, bright video. Expect:
+  the video behind the overlay is blurred, the backing stays as opaque as the opacity setting says, text is
+  readable. The row is hidden if the tablet does not allow blurring; write that down if so (it is also hidden while
+  battery saver is on). Look at the rounded corners: the blur covers the window's rectangle, so some blurred video
+  may show behind them. Check the drag still feels smooth with blur on (repeat 2.5 once). Switch it off again.
+- [ ] **2.15 Bounds, rotation, cutouts and split screen.** Rotate the tablet (all four orientations the video app
+  allows): the overlay stays fully on screen, on the side it was on, with the 16 dp margin. If the tablet has a
+  camera cutout, check the overlay does not cover it in any orientation (the window does not subtract cutouts).
+  Put the video app in split screen with Overdrive: the overlay is hidden while Overdrive is visible in the other
+  half (ADR 0006 counts split screen as "on screen"); write down whether you would want it shown instead. Settles:
+  OV 9.11, ADR 6 (unverified table).
+- [ ] **2.16 The video app keeps working under the overlay.** With the overlay on screen: type in the video app's
+  search box (the keyboard must not lose focus to the overlay), use its Back button and the system Back gesture, scrub
+  and tap controls close to the overlay's edges and under where a corner of it would be. Expect: everything outside
+  the overlay's rectangle works as without it, and tapping the overlay itself does not reach the video. Settles:
+  spec §4.6 (never takes input focus).
+- [ ] **2.17 Without the notification.** Deny notifications (App info → Notifications off), start a ride, leave for the
+  video app. Expect: the overlay still shows and the ride goes on; the notification is not in the shade but the app
+  is listed under active apps in the Task Manager. Then allow notifications again. Settles: ADR 0006 notification.
 
 ---
 
@@ -378,13 +424,13 @@ the firmware version from the Companion app and the Zwift app version before eac
 
 | AC | Owner check | Settled by |
 |---|---|---|
-| 1. 60-minute free ride, video full screen, overlay visible | 60 min over a real video app | 2.1, 2.8, 2.9, 2.10, 1.6 |
+| 1. 60-minute free ride, video full screen, overlay visible | 60 min over a real video app | 2.1, 2.8, 2.9, 2.10, 2.13, 1.6 |
 | 2. ERG holds target through steady, ramp and interval steps | Same workout on the D500 | 3.3, 3.3b, 3.5, 3.10 |
 | 3. All ten Click actions work from the right controller in the background | Each action with the video app in front | 5.5, 5.6, 5.7 |
 | 4. Trainer power pulled mid-ride pauses; resumes with no data lost | Unplug the trainer | 3.11, 3.12 |
 | 5. Force-stop mid-ride, relaunch recovers the ride | Force-stop, relaunch | 6.1, 6.2, 6.3 |
 | 6. FIT opens in intervals.icu with power, HR, cadence and laps | Import into intervals.icu | 7.1 to 7.4 |
-| 7. Overlay drag drops no frames at the tablet's refresh rate | `dumpsys gfxinfo` while dragging | 2.5, 2.6 |
+| 7. Overlay drag drops no frames at the tablet's refresh rate | `dumpsys gfxinfo` while dragging | 2.5, 2.6, 2.14 |
 
 ### Spec §9 open checks (`docs/spec.md`)
 
@@ -398,7 +444,7 @@ the firmware version from the Companion app and the Zwift app version before eac
 | HRV from the watch | none | Watch probe, not on the bench. |
 | Strava map for virtual rides | 7.6 | Optional. |
 | Gear feel | 3.6 | Tune by feel; record the chosen gear count and step. |
-| ZUI background limits | 2.9, 2.10, 2.11, 1.3, 1.6 | |
+| ZUI background limits | 2.9, 2.10, 2.11, 2.12, 2.17, 1.3, 1.6 | |
 | Literature citations | none | Desk task. |
 
 ---
@@ -427,6 +473,12 @@ Fill this in on the bench. A criterion counts as confirmed only after its owner 
 | 2.9 Screen off, unplugged | | | |
 | 2.10 Restricted bucket | | | |
 | 2.11 Battery use | | | |
+| 2.12 Open the app from another app | | | |
+| 2.13 Lifecycle of the window | | | |
+| 2.14 Blur | | | |
+| 2.15 Bounds, rotation, split screen | | | |
+| 2.16 Video app keeps working | | | |
+| 2.17 Without the notification | | | |
 | 3.1 Pairing | | | |
 | 3.2 Feature bits | | | |
 | 3.3 ERG holds target (AC 2) | | | |

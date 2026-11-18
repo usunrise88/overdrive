@@ -8,7 +8,7 @@ One Gradle build for everything that runs on Android. The shared `core` is a sep
 | `ble` | Bluetooth transport behind an interface | §7.1 |
 | `data` | Local database, outbox, sync client | §4.9, §7.1 |
 | `ui-kit` | Design system: theme on the generated tokens, components, charts, the overlay composables, Lucide icons | §7.4 |
-| `app-ride` | Tablet app: ride, devices and settings screens over a simulated ride; overlay service comes in M1-B | §4 |
+| `app-ride` | Tablet app: ride, devices and settings screens over a simulated ride; the overlay service and window | §4 |
 | `app-companion` | Phone app: statistics, Health Connect reader | §6.1 |
 
 Dependency direction: apps → `ui-kit`, `data`, `ble` → `core`.
@@ -43,6 +43,17 @@ Google Play Services, anywhere.
 - **Previews.** `ui-kit/.../preview/` has `@Preview`s for every component and state, and the overlay in each mode.
 - **Developer settings** (end of the Settings screen): demo speed (10× and 60×), scripted sensor dropouts and
   the simulated Click state.
+
+## The overlay (ADR 0006)
+
+`app-ride/.../overlay/` holds the overlay: `OverlayService` (a `specialUse` foreground service started from the visible
+ride screen) owns a `TYPE_APPLICATION_OVERLAY` window (`OverlayWindowController`) around the ui-kit overlay composable.
+The window shows while a ride is live and the app is not on screen, drags and snaps to the nearer edge, and saves its
+position and mode in the settings. The rules are plain Kotlin with their own tests: `OverlayPlacement` (snap and clamp),
+`OverlayGestureDetector` (tap, long press, drag), `OverlayPolicy` and `ServiceStopRule` (lifecycle), `overlayStates`
+(distinct, at most one update a second). `OverlayController` is what the activity sees; the permission rows are on the
+Ready screen and in Settings. It needs "Display over other apps" (the rider grants it in system settings); without it the
+ride is unchanged.
 
 ## Screenshots
 

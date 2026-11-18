@@ -117,6 +117,9 @@ stable parameters (checked once, the report configuration is not kept). The fram
 
 ## What M1-B needs to know
 
+(Written before M1-B. The stage is built and its decisions, including where they refine this list, are in
+[ADR 0006](0006-overlay-service.md).)
+
 - **Same instances.** The overlay service gets the container from the `Application` (`OverdriveApp.container`),
   collects `host.snapshots` (a `StateFlow` of the engine's snapshots) and `host.ui` for the workout profile, and
   renders `RideMapping.overlayState(snapshot, profile)` through `OverlayCompact` or `OverlayDetailed` in a

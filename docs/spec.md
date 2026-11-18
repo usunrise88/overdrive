@@ -152,6 +152,14 @@ Phase 1 delivers a complete offline ride: connect the devices, ride free or play
 - The window never takes input focus, so the video app keeps working underneath.
 - Redraws only when a value changes, at most once a second. No continuous animation.
 - Readable over video: solid or blurred backing, tabular numerals, power-zone colour as the only accent.
+- **As built (stage M1-B, `docs/adr/0006-overlay-service.md`).** The service starts from the ride screen once a ride is
+  live and the window is shown while a ride is live and Overdrive itself is not on screen; it stops after the summary
+  has been seen or dismissed. A drag starts after 8 dp, follows the finger 1:1 by moving the window (the content never
+  recomposes) and on release snaps to the nearer side edge with a 16 dp margin (a 180 ms slide of x only); the position
+  is saved when the drag ends. A tap toggles the mode, a long press (500 ms) brings the app to the front. What the rider
+  just did (gear, target, intensity, pause) shows at once, everything else at most once a second. The first time, a row
+  on the Ready screen asks for "Display over other apps" (and notifications on Android 13 and later); without the
+  permission the ride is unchanged and the top bar's overlay button previews the overlay inside the app.
 
 ### 4.7 Handlebar controls
 
@@ -547,6 +555,10 @@ live spec document.
   `intervals-mcp-server` is GPL-3.0. BikeControl is GPL-3.0 up to tag `gpl3` and under a
   Non-Commercial licence after it, so nothing from later versions may be copied. See
   `docs/references-licences.md`.
+- **§4.6, overlay service type.** Phase 1 declares the foreground service as `specialUse` (the simulated ride has no
+  Bluetooth); M3 adds `connectedDevice` and `BLUETOOTH_CONNECT` with the BLE adapters. Opening the app from the overlay's long
+  press depends on Android's background-activity-start exemptions for a visible window and `SYSTEM_ALERT_WINDOW`;
+  that it works on the tablet is unverified, and the notification's tap is the fallback. See ADR 0006.
 - **§4.8, FIT export.** Garmin's FIT SDK is under a proprietary agreement that does not allow
   redistributing it inside an APK under a source-disclosure licence. The FIT writer is therefore our own
   implementation of the published format; the SDK is used only as a test-time decoder.
