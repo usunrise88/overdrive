@@ -1,5 +1,6 @@
 import type { Config } from "./config.ts";
 import { DEFAULT_INTERVALS_BASE_URL } from "./config.ts";
+import { type StravaConfig, stravaSettings } from "./config-strava.ts";
 import type { Db } from "./db.ts";
 import { createEventBus, type EventBus } from "./events.ts";
 import { createIntervalsClient, type IntervalsClient } from "./intervals/client.ts";
@@ -14,6 +15,7 @@ import { createPlanStore, type PlanStore } from "./plan/store.ts";
 import { createProfileStore, type ProfileStore } from "./profile/store.ts";
 import { createRideStore, type RideStore } from "./ride-store.ts";
 import { createRideWorkoutResolver, type RideWorkoutResolver } from "./ride-workout.ts";
+import { createStrava, STRAVA_DESTINATION, type StravaUploads } from "./strava/index.ts";
 import type { Timers } from "./timers.ts";
 
 /** The part of the configuration the integrations read; all optional, with the defaults of `config.ts`. */
@@ -26,7 +28,8 @@ export type ServicesConfig = Partial<
     | "PLAN_REFRESH_MINUTES"
     | "TIMEZONE"
   >
->;
+> &
+  StravaConfig;
 
 /**
  * What the other modules (MCP tools, Telegram, Google Calendar, Strava) are given: the event bus,
@@ -48,6 +51,8 @@ export interface Services {
   refresher: PlanRefresher | null;
   /** null when the integration is off: rides are queued, nothing is sent. */
   uploads: UploadWorker | null;
+  /** The Strava upload (ADR 0020); null when the three STRAVA_* credentials are not all set (the feature is off). */
+  strava: StravaUploads | null;
   /** The destinations a stored ride is queued for (`ride_destinations.destination`). */
   destinations: readonly string[];
   /** The rider's time zone (IANA). */
@@ -124,6 +129,28 @@ export function createServices(options: ServicesOptions): Services {
     if (header?.workoutId != null) await rideWorkouts.resolve(header);
   });
 
+  let strava: StravaUploads | null = null;
+  const stravaMode = stravaSettings(config);
+  if ("on" in stravaMode) {
+    strava = createStrava({
+      settings: stravaMode.on,
+      db,
+      bus,
+      rides,
+      rideWorkouts,
+      timezone,
+      log,
+      ...(now === undefined ? {} : { now }),
+      ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+      ...(options.sleep === undefined ? {} : { sleep: options.sleep }),
+      ...(options.timers === undefined ? {} : { timers: options.timers }),
+    });
+  } else if (stravaMode.partial) {
+    log.warn({}, `Strava upload is off: ${stravaMode.off}`);
+  } else {
+    log.info({}, "Strava upload is off (STRAVA_* is not set)");
+  }
+
   return {
     bus,
     plan,
@@ -133,15 +160,19 @@ export function createServices(options: ServicesOptions): Services {
     intervals,
     refresher,
     uploads,
-    // Queued either way, so a key added later also sends the rides that came before it.
-    destinations: [INTERVALS_DESTINATION],
+    strava,
+    // Queued either way, so a key added later also sends the rides that came before it. Strava is queued
+    // only while it is on: turning it on later must not post the history (STRAVA_BACKFILL says otherwise).
+    destinations:
+      strava === null ? [INTERVALS_DESTINATION] : [INTERVALS_DESTINATION, STRAVA_DESTINATION],
     timezone,
     start() {
       void uploads?.start();
+      void strava?.start();
       refresher?.start(config.PLAN_REFRESH_MINUTES ?? 15);
     },
     async stop() {
-      await Promise.all([uploads?.stop(), refresher?.stop()]);
+      await Promise.all([uploads?.stop(), strava?.stop(), refresher?.stop()]);
     },
   };
 }
