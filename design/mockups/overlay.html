@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Overlay mock-ups</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="components.css">
+</head>
+<body data-ready="false">
+
+<!-- One overlay is on screen at a time; each frame shows compact (left) and detailed (right) side by side. -->
+<div class="frame tablet bd-dark letterbox" id="dark">
+  <div data-ov="erg" style="left:16px;top:56px"></div>
+  <div data-ov="erg-detailed" style="right:16px;top:56px"></div>
+  <span class="frame-tag">Dark video · compact and detailed shown together for comparison</span>
+</div>
+
+<div class="frame tablet bd-bright letterbox" id="bright">
+  <div data-ov="erg" style="left:16px;top:56px"></div>
+  <div data-ov="erg-detailed" style="right:16px;top:56px"></div>
+  <span class="frame-tag">Bright video</span>
+</div>
+
+<div class="frame tablet bd-busy letterbox" id="busy">
+  <div data-ov="erg" style="left:16px;bottom:56px"></div>
+  <div data-ov="erg-detailed" style="right:16px;bottom:56px"></div>
+  <span class="frame-tag" style="top:12px;bottom:auto">Busy video</span>
+</div>
+
+<div class="frame tablet" id="zones" style="display:grid;grid-template-columns:1fr 1fr">
+  <div class="bd-bright" style="position:relative" data-sweep="left"></div>
+  <div class="bd-dark" style="position:relative" data-sweep="right"></div>
+  <span class="frame-tag">Zone sweep Z1–Z7 at FTP 250 W, over bright and dark video</span>
+</div>
+
+<div class="frame tablet bd-busy" id="states">
+  <div data-ov="free" style="left:16px;top:16px"></div>
+  <div data-ov="paused" style="left:16px;top:122px"></div>
+  <div data-ov="nosignal" style="left:16px;top:228px"></div>
+  <div data-ov="erg-up" style="left:16px;top:334px"></div>
+  <div data-ov="free-detailed" style="right:16px;top:16px"></div>
+  <div data-ov="paused-detailed" style="right:16px;top:240px"></div>
+  <span class="frame-tag" style="background:#000">Left: free ride (gear) · paused · heart-rate strap lost · ERG at 105%. Right: detailed free ride · detailed paused</span>
+</div>
+
+<script type="module">
+import { SWEET_SPOT } from "./charts.js";
+import { mountOverlay } from "./overlay.js";
+
+const base = {
+  power: 223, zone: 3, hr: 148, cad: 91, time: "32:17", target: 220, intensity: 100,
+  speed: "34.6", dist: "18.42", now: 1937,
+  interval: { name: "Sweet spot", of: "2 of 3", left: "2:43", next: "Recover · 5:00 · 125 W" },
+};
+const states = {
+  erg: base,
+  "erg-detailed": { ...base, detailed: true },
+  free: { ...base, power: 182, zone: 3, target: undefined, gear: 12, time: "1:04:09", cad: 87, hr: 139 },
+  paused: { ...base, paused: true, time: "32:17" },
+  nosignal: { ...base, hr: null, power: 214 },
+  "erg-up": { ...base, power: 233, zone: 4, target: 231, intensity: 105 },
+  "free-detailed": { ...base, detailed: true, power: 182, target: undefined, gear: 12, time: "1:04:09", interval: null, speed: "31.9", dist: "35.07" },
+  "paused-detailed": { ...base, detailed: true, paused: true },
+};
+for (const node of document.querySelectorAll("[data-ov]")) {
+  mountOverlay(node, states[node.dataset.ov], SWEET_SPOT);
+}
+const sweep = [
+  [118, 1], [171, 2], [212, 3], [251, 4], [286, 5], [341, 6], [523, 7],
+];
+for (const col of document.querySelectorAll("[data-sweep]")) {
+  sweep.forEach(([power, zone], i) => {
+    const node = document.createElement("div");
+    node.style.left = col.dataset.sweep === "left" ? "88px" : "88px";
+    node.style.top = `${24 + i * 104}px`;
+    col.appendChild(node);
+    mountOverlay(node, { ...base, power, zone, target: Math.round(250 * [0.5, 0.7, 0.85, 1, 1.15, 1.35, 2][i]) }, null);
+  });
+}
+document.body.dataset.ready = "true";
+</script>
+</body>
+</html>

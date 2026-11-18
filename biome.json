@@ -7,7 +7,15 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!**/fixtures", "!pnpm-lock.yaml", "!**/*.md"]
+    "includes": [
+      "**",
+      "!**/fixtures",
+      "!pnpm-lock.yaml",
+      "!**/*.md",
+      "!design/icons",
+      "!design/mockups/tokens.css",
+      "!design/mockups/*.html"
+    ]
   },
   "formatter": {
     "enabled": true,

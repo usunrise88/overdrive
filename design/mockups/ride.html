@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ride app mock-ups</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="components.css">
+<style>
+  .ride {
+    display: flex;
+    flex-direction: column;
+  }
+  .ride-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px 24px 0;
+    min-height: 0;
+  }
+  .ride-top {
+    display: grid;
+    grid-template-columns: 424px 1fr;
+    gap: 16px;
+    height: 312px;
+  }
+  .power {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 20px 24px 24px;
+  }
+  .power .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .power .target {
+    display: flex;
+    gap: 24px;
+  }
+  .ride-tiles {
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: 1fr 1fr;
+  }
+  .ride-tiles .tile {
+    justify-content: space-between;
+    padding: 20px 24px 24px;
+  }
+  .workout {
+    padding: 16px 24px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .workout .head {
+    display: flex;
+    align-items: flex-end;
+    gap: 32px;
+  }
+  .controls {
+    margin-top: auto;
+    height: 96px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 24px;
+    border-top: var(--stroke-hairline) solid var(--color-border);
+  }
+  .controls .group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .controls .sep {
+    width: 1px;
+    height: 40px;
+    background: var(--color-border);
+    margin: 0 8px;
+  }
+  .intensity {
+    min-width: 112px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .paused .dimmable {
+    color: var(--color-text-tertiary) !important;
+  }
+  .banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 48px;
+    padding: 0 16px;
+    border-radius: var(--radius-md);
+    background: var(--color-surface2);
+  }
+</style>
+</head>
+<body data-ready="false">
+
+<div class="frame tablet ride" id="ready"></div>
+<div class="frame tablet ride" id="riding"></div>
+<div class="frame tablet ride paused" id="paused"></div>
+<div class="frame tablet ride" id="finished"></div>
+
+<script type="module">
+import { SWEET_SPOT, VO2, flatten, profile, tracePower } from "./charts.js";
+import { deviceCluster, ic } from "./ui.js";
+
+const FTP = 250;
+const NOW = 1937;
+const devicesOk = deviceCluster([
+  { icon: "bike", state: "ok" },
+  { icon: "heart", state: "ok" },
+  { icon: "gamepad-2", state: "ok" },
+]);
+const topbar = (title, chip, right = "") => `
+  <div class="topbar">
+    <div class="grow" style="display:flex;align-items:center;gap:12px">
+      <span class="t-heading">${title}</span>${chip}
+    </div>
+    ${right}
+    ${devicesOk}
+    <span class="iconbtn">${ic("picture-in-picture-2")}</span>
+    <span class="iconbtn">${ic("settings")}</span>
+  </div>`;
+
+// ---------- Riding / paused ----------
+const riding = (paused) => {
+  const chip = paused
+    ? `<span class="chip on">${ic("pause", "i-16")}Paused</span>`
+    : `<span class="chip"><span class="dot"></span>Riding</span>`;
+  const powerCls = paused ? "c3" : "zc z3";
+  const banner = paused
+    ? `<div class="banner"><span class="c1">${ic("pause")}</span><span class="t-strong">Paused at 32:17</span><span class="c2">Pedal or press Resume to continue. Target power ramps back in over 3 s.</span></div>`
+    : "";
+  const controls = paused
+    ? `<div class="controls">
+        <span class="btn btn-secondary btn-ride">${ic("flag")}Finish ride</span>
+        <div style="flex:1"></div>
+        <span class="btn btn-primary btn-ride" style="min-width:200px">${ic("play")}Resume</span>
+      </div>`
+    : `<div class="controls">
+        <div class="group">
+          <span class="btn btn-secondary btn-ride">${ic("skip-back")}Previous</span>
+          <span class="btn btn-secondary btn-ride">${ic("minus")}</span>
+          <div class="intensity"><span class="t-num-s num">100%</span><span class="t-caption c3">Intensity</span></div>
+          <span class="btn btn-secondary btn-ride">${ic("plus")}</span>
+          <span class="btn btn-secondary btn-ride">Next${ic("skip-forward")}</span>
+        </div>
+        <div style="flex:1"></div>
+        <div style="display:flex;flex-direction:column;align-items:center">
+          <div class="group" style="gap:0">
+            <span class="btn btn-ghost" style="height:56px;padding:0 18px">${ic("play")}</span>
+            <span class="btn btn-ghost" style="height:56px;padding:0 18px">${ic("volume-1")}</span>
+            <span class="btn btn-ghost" style="height:56px;padding:0 18px">${ic("volume-2")}</span>
+          </div>
+          <span class="t-caption c3">Media</span>
+        </div>
+        <div class="sep"></div>
+        <span class="btn btn-secondary btn-ride">${ic("pause")}Pause</span>
+      </div>`;
+  return `${topbar("Sweet spot 3×10", chip)}
+  <div class="ride-body">
+    ${banner}
+    <div class="ride-top">
+      <div class="card power">
+        <div class="head">
+          <span class="t-label c3">Power</span>
+          ${paused ? "" : `<span class="t-label c2" style="display:flex;gap:8px;align-items:center"><span class="zchip z3">Z3</span>Tempo · 89%</span>`}
+        </div>
+        <div class="num t-hero ${powerCls}">223<span class="unit" style="font-size:22px">W</span></div>
+        <div class="target">
+          <div><div class="t-label c3">Target</div><div class="num t-num-s dimmable">220<span class="unit">W</span></div></div>
+          <div><div class="t-label c3">Intensity</div><div class="num t-num-s dimmable">100%</div></div>
+          <div><div class="t-label c3">Lap average</div><div class="num t-num-s dimmable">218<span class="unit">W</span></div></div>
+        </div>
+      </div>
+      <div class="tiles ride-tiles">
+        <div class="tile"><div class="lbl">Heart rate</div><div class="num t-num-l dimmable">148<span class="unit">bpm</span></div></div>
+        <div class="tile"><div class="lbl">Cadence</div><div class="num t-num-l dimmable">91<span class="unit">rpm</span></div></div>
+        <div class="tile"><div class="lbl">Time</div><div class="num t-num-l">32:17</div></div>
+        <div class="tile"><div class="lbl">Speed</div><div class="num t-num-l dimmable">34.6<span class="unit">km/h</span></div></div>
+        <div class="tile"><div class="lbl">Distance</div><div class="num t-num-l dimmable">18.42<span class="unit">km</span></div></div>
+        <div class="tile"><div class="lbl">Average power</div><div class="num t-num-l dimmable">204<span class="unit">W</span></div></div>
+      </div>
+    </div>
+    <div class="card workout">
+      <div class="head">
+        <div style="flex:1">
+          <div class="t-label c3">Interval</div>
+          <div class="t-title">Sweet spot <span class="c2" style="font-weight:400">2 of 3</span></div>
+        </div>
+        <div style="text-align:right">
+          <div class="t-label c3">Next</div>
+          <div class="t-strong c2">Recover · 5:00 · 125 W</div>
+        </div>
+        <div style="text-align:right;width:156px">
+          <div class="t-label c3">Left in interval</div>
+          <div class="num t-num-l">2:43</div>
+        </div>
+      </div>
+      <svg data-profile="ride"></svg>
+    </div>
+    ${controls}
+  </div>`;
+};
+
+document.getElementById("riding").innerHTML = riding(false);
+document.getElementById("paused").innerHTML = riding(true);
+
+// ---------- Ready ----------
+const minutes = (w) => {
+  const s = flatten(w.steps);
+  return Math.round((s.at(-1).start + s.at(-1).duration) / 60);
+};
+const workoutRow = (name, meta, selected) => `
+  <div class="row" style="border:0;border-radius:var(--radius-md);${selected ? "background:var(--color-surface2)" : ""}">
+    <div class="main"><span class="t-strong">${name}</span><span class="t-label c2">${meta}</span></div>
+    ${selected ? `<span class="c1">${ic("check")}</span>` : ""}
+  </div>`;
+document.getElementById("ready").innerHTML = `${topbar("Overdrive", `<span class="chip"><span class="dot"></span>Ready</span>`)}
+  <div style="flex:1;display:grid;grid-template-columns:360px 1fr;min-height:0">
+    <div style="border-right:1px solid var(--color-border);padding:20px 16px;display:flex;flex-direction:column;gap:8px">
+      <div class="section-label" style="padding:0 16px 4px">Ride</div>
+      <div class="list">
+        ${workoutRow("Free ride", "Simulation on the flat · gears")}
+        ${workoutRow("Sweet spot 3×10", `${minutes(SWEET_SPOT)} min · steady, ramp, intervals`, true)}
+        ${workoutRow("VO2 5×3", `${minutes(VO2)} min · intervals`)}
+        ${workoutRow("Endurance 90", "90 min · steady")}
+      </div>
+      <div style="margin-top:auto;padding:0 16px"><span class="btn btn-ghost" style="padding:0">${ic("folder-open")}Open workout file</span></div>
+    </div>
+    <div style="padding:32px 40px 32px;display:flex;flex-direction:column;gap:24px">
+      <div>
+        <div class="t-title">Sweet spot 3×10</div>
+        <div class="t-body c2">Three 10-minute efforts with 5-minute recoveries.</div>
+      </div>
+      <div style="display:flex;gap:40px">
+        <div><div class="t-label c3">Duration</div><div class="num t-num-s">1:05:00</div></div>
+        <div><div class="t-label c3">FTP</div><div class="num t-num-s">250<span class="unit">W</span></div></div>
+        <div><div class="t-label c3">Hardest step</div><div class="num t-num-s">220<span class="unit">W · Z3</span></div></div>
+        <div><div class="t-label c3">Mode</div><div class="t-num-s">ERG</div></div>
+      </div>
+      <svg data-profile="preview"></svg>
+      <div class="list">
+        ${[
+          ["Warm-up", "10:00", "45–70%", "113–175 W", "2"],
+          ["Sweet spot ×3", "10:00", "88%", "220 W", "3"],
+          ["Recover ×3", "5:00", "50%", "125 W", "1"],
+          ["Free ride", "5:00", "Gears", "", ""],
+          ["Cool-down", "5:00", "55–40%", "138–100 W", "1"],
+        ]
+          .map(
+            ([n, d, pct, w, z]) => `<div style="display:grid;grid-template-columns:36px 1fr 80px 96px 112px;gap:16px;height:40px;align-items:center;border-top:1px solid var(--color-border)">
+          ${z ? `<span class="zchip z${z}">Z${z}</span>` : `<span class="zchip" style="--z:var(--color-surface3);color:var(--color-text-secondary)">—</span>`}
+          <span class="t-strong">${n}</span><span class="t-label num c2" style="text-align:right">${d}</span>
+          <span class="t-label num c2" style="text-align:right">${pct}</span><span class="t-label num" style="text-align:right">${w}</span></div>`,
+          )
+          .join("")}
+      </div>
+      <div style="margin-top:auto;display:flex;align-items:center;gap:24px">
+        <span class="btn btn-primary btn-ride" style="min-width:240px">${ic("play")}Start</span>
+        <span class="t-body c2">Or start pedalling. The ride begins on the first pedal stroke.</span>
+      </div>
+    </div>
+  </div>`;
+
+// ---------- Finished ----------
+const zoneRows = [
+  [1, "Recovery", "13:32", 13.5],
+  [2, "Endurance", "9:05", 9.1],
+  [3, "Tempo", "31:40", 31.7],
+  [4, "Threshold", "6:10", 6.2],
+  [5, "VO2 max", "2:05", 2.1],
+  [6, "Anaerobic", "1:10", 1.2],
+  [7, "Neuromuscular", "0:30", 0.5],
+];
+const maxMin = 31.7;
+const zoneBars = zoneRows
+  .map(
+    ([z, name, t, m]) => `
+  <div style="display:grid;grid-template-columns:24px 112px 1fr 56px;align-items:center;gap:12px;height:28px">
+    <span class="t-label c2 num">Z${z}</span>
+    <span class="t-label c2">${name}</span>
+    <span style="height:12px"><span style="display:block;height:12px;width:${Math.max(0.5, (m / maxMin) * 100)}%;background:var(--zone-${z});border-radius:0 var(--radius-sm) var(--radius-sm) 0"></span></span>
+    <span class="t-label num c1" style="text-align:right">${t}</span>
+  </div>`,
+  )
+  .join("");
+const laps = [
+  ["Warm-up", "10:00", 144, 118],
+  ["Sweet spot", "10:00", 221, 149],
+  ["Recover", "5:00", 127, 131],
+  ["Sweet spot", "10:00", 220, 154],
+  ["Recover", "5:00", 126, 134],
+  ["Sweet spot", "10:00", 222, 158],
+  ["Recover", "5:00", 125, 137],
+  ["Free ride", "5:00", 176, 140],
+  ["Cool-down", "5:00", 118, 126],
+];
+const lapRows = laps
+  .map(
+    ([n, d, p, h], i) => `
+  <div style="display:grid;grid-template-columns:28px 1fr 64px 64px 56px;gap:12px;height:36px;align-items:center;border-top:1px solid var(--color-border)">
+    <span class="t-label c3 num">${i + 1}</span><span class="t-label">${n}</span>
+    <span class="t-label num c2" style="text-align:right">${d}</span>
+    <span class="t-label num" style="text-align:right">${p}</span>
+    <span class="t-label num c2" style="text-align:right">${h}</span>
+  </div>`,
+  )
+  .join("");
+const sumTile = (label, value, unit = "") =>
+  `<div class="tile"><div class="lbl">${label}</div><div class="num t-num-s">${value}${unit ? `<span class="unit">${unit}</span>` : ""}</div></div>`;
+document.getElementById("finished").innerHTML = `${topbar("Ride saved", "")}
+  <div style="flex:1;display:grid;grid-template-columns:1fr 440px;gap:24px;padding:24px;min-height:0">
+    <div style="display:flex;flex-direction:column;gap:20px;min-width:0">
+      <div>
+        <div class="t-title">Sweet spot 3×10</div>
+        <div class="t-body c2">Wednesday 18 November · 18:04–19:09</div>
+      </div>
+      <div class="tiles" style="grid-template-columns:repeat(4,1fr)">
+        ${sumTile("Duration", "1:05:00")}${sumTile("Moving time", "1:04:12")}${sumTile("Average power", "196", "W")}${sumTile("Normalised power", "214", "W")}
+        ${sumTile("Average heart rate", "141", "bpm")}${sumTile("Max heart rate", "166", "bpm")}${sumTile("Work", "755", "kJ")}${sumTile("Load", "73")}
+      </div>
+      <div class="card" style="padding:16px 20px">
+        <div class="t-label c3" style="margin-bottom:8px">Time in power zones</div>
+        ${zoneBars}
+      </div>
+      <div style="margin-top:auto;display:flex;gap:12px;align-items:center">
+        <span class="btn btn-secondary btn-ride">${ic("share-2")}Share FIT file</span>
+        <span class="t-label c2" style="flex:1">Saved on this tablet. It uploads once sync is set up.</span>
+        <span class="btn btn-primary btn-ride" style="min-width:160px">Done</span>
+      </div>
+    </div>
+    <div class="card" style="padding:16px 20px;align-self:start">
+      <div style="display:grid;grid-template-columns:28px 1fr 64px 64px 56px;gap:12px;height:24px;align-items:center">
+        <span class="t-caption c3">Lap</span><span></span>
+        <span class="t-caption c3" style="text-align:right">Time</span>
+        <span class="t-caption c3" style="text-align:right">Watts</span>
+        <span class="t-caption c3" style="text-align:right">HR</span>
+      </div>
+      ${lapRows}
+    </div>
+  </div>`;
+
+// ---------- Charts ----------
+const trace = tracePower(SWEET_SPOT, FTP, NOW, 10);
+for (const svg of document.querySelectorAll('[data-profile="ride"]')) {
+  const w = svg.parentElement.clientWidth - 48;
+  profile(svg, SWEET_SPOT, { width: w, height: 156, now: NOW, ftpLine: true, ticks: 10, power: trace, ftp: FTP, gap: 2 });
+}
+const pv = document.querySelector('[data-profile="preview"]');
+profile(pv, SWEET_SPOT, { width: pv.parentElement.clientWidth - 80, height: 168, ftpLine: true, ticks: 10, gap: 2 });
+document.body.dataset.ready = "true";
+</script>
+</body>
+</html>
