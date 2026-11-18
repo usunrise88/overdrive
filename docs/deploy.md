@@ -437,6 +437,11 @@ the three values.
   database keeps the password it was made with. Put the old value back in `.env`, or change the password inside the
   database to match (`docker compose exec db psql -U overdrive -d overdrive`, then `ALTER USER overdrive PASSWORD '…';`).
 - The tablet says the token is rejected: check section 5, then the token in the tablet's Settings, Sync.
+- The tablet says it cannot reach the service ("Service unreachable" in v0.2.0; from v0.2.1 the line names the cause, for example
+  "Cannot find the service address (DNS)") while the tablet's browser opens `https://overdrive.llmto.day/healthz`: the tablet's own
+  name resolution is the usual cause (the browser has its own secure DNS, apps use the system's). Settings, More connections,
+  **Private DNS**, hostname `dns.google` fixed it on the owner's tablet (2026-11-18). Nothing reaches the server's log in this case;
+  `docker compose logs server` shows no `/v1` request from the tablet.
 - The log says `MCP server is off: … is not set`: `PUBLIC_BASE_URL` and `OWNER_PASSPHRASE_HASH` must both be in `.env`, and the
   server restarted with `docker compose up -d server` (not `restart`).
 - `Invalid configuration:` naming `OWNER_PASSPHRASE_HASH`: the value is not a hash from `hash-passphrase` (a plain passphrase, a
