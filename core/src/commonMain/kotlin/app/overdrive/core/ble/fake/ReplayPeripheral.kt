@@ -18,10 +18,11 @@ import kotlin.time.Duration.Companion.nanoseconds
  * A peripheral that plays back a recorded or synthetic [BleSession] (spec §7.5, docs/protocols/ftms-hr.md §7.1), from
  * the device's side of the link.
  *
- * **Connections.** The session is cut at its `S connected` lines into one *segment* per connection; the *n*-th connect
- * to this peripheral plays the *n*-th segment, and a connect after the last segment gets an idle peripheral. A segment
- * ends at the next `S disconnected` (the peripheral drops the link then, with the recorded status) or `S closed` (the
- * link stays up until the central closes it).
+ * **Connections.** The session is cut into *attempts* at its `S connecting` lines. An attempt that reaches `S connected`
+ * is a *segment*; one that goes straight to `S disconnected` is a failed connect, replayed as a connect that fails with
+ * the recorded status. The *n*-th connect to this peripheral plays the *n*-th attempt, and a connect after the last one
+ * gets an idle peripheral. A segment ends at the next `S disconnected` (the peripheral drops the link then, with the
+ * recorded status) or `S closed` (the link stays up until the central closes it).
  *
  * **What is played.** Notifications and indications (`N`, `I`) are pushed at their recorded time **since the connection
  * came up**, when the central subscribed to that characteristic. A read (`R`) returns the next recorded value for its
@@ -42,6 +43,12 @@ public class ReplayPeripheral(
         val bytes: ByteArray,
     )
 
+    /** One connection attempt of the recording: it failed with [failedStatus], or it connected and played [segment]. */
+    private class Attempt(
+        val failedStatus: Int?,
+        val segment: Segment?,
+    )
+
     private class Segment(
         val pushes: List<Pushed>,
         val reads: Map<GattUuid, List<ByteArray>>,
@@ -51,18 +58,28 @@ public class ReplayPeripheral(
         val dropStatus: Int,
     )
 
-    private val segments: List<Segment> = segmentsOf(session)
-    private var connects = 0
+    private val attempts: List<Attempt> = attemptsOf(session)
+    private var attemptIndex = 0
+    private var current: Segment? = null
     private val readQueues = mutableMapOf<GattUuid, ArrayDeque<ByteArray>>()
     private val writeQueues = mutableMapOf<GattUuid, ArrayDeque<Int>>()
 
     override val characteristics: List<GattCharacteristicInfo> = characteristicsOf(session)
 
-    /** How many segments (connections) the session holds. */
-    public val segmentCount: Int get() = segments.size
+    /** How many connections that came up the session holds. */
+    public val segmentCount: Int get() = attempts.count { it.segment != null }
+
+    /** How many connection attempts the session holds, the failed ones included. */
+    public val attemptCount: Int get() = attempts.size
+
+    override fun onConnectAttempt(): Int? {
+        val attempt = attempts.getOrNull(attemptIndex++)
+        current = attempt?.segment
+        return attempt?.failedStatus
+    }
 
     override fun onConnected(connection: FakeConnection) {
-        val segment = segments.getOrNull(connects++) ?: return
+        val segment = current ?: return
         readQueues.clear()
         writeQueues.clear()
         segment.reads.forEach { (key, values) -> readQueues[key] = ArrayDeque(values) }
@@ -160,35 +177,59 @@ public class ReplayPeripheral(
             return service to properties
         }
 
-        fun segmentsOf(session: BleSession): List<Segment> {
-            val segments = mutableListOf<Segment>()
+        fun attemptsOf(session: BleSession): List<Attempt> {
+            val attempts = mutableListOf<Attempt>()
             var builder: SegmentBuilder? = null
+            var connecting = false
             for (event in session.events.sortedBy { it.timeNanos }) {
-                if (event.direction == BleDirection.STATE) {
-                    when {
-                        event.data == BleStates.CONNECTED -> {
-                            builder?.let { segments += it.build(null, 0) }
-                            builder = SegmentBuilder(event.timeNanos)
-                        }
-
-                        event.data == BleStates.DISCONNECTED && builder != null -> {
-                            val open = builder
-                            segments +=
-                                open.build(event.timeNanos - open.startNanos, event.status ?: DEFAULT_DROP_STATUS)
-                            builder = null
-                        }
-
-                        event.data == BleStates.CLOSED && builder != null -> {
-                            segments += builder.build(null, 0)
-                            builder = null
-                        }
-                    }
-                } else {
+                if (event.direction != BleDirection.STATE) {
                     builder?.add(event)
+                    continue
+                }
+                when (event.data) {
+                    BleStates.CONNECTING -> {
+                        builder?.let { attempts += Attempt(null, it.build(null, 0)) }
+                        builder = null
+                        connecting = true
+                    }
+
+                    BleStates.CONNECTED -> {
+                        builder?.let { attempts += Attempt(null, it.build(null, 0)) }
+                        builder = SegmentBuilder(event.timeNanos)
+                        connecting = false
+                    }
+
+                    BleStates.DISCONNECTED -> {
+                        val open = builder
+                        if (open != null) {
+                            attempts +=
+                                Attempt(
+                                    null,
+                                    open.build(
+                                        event.timeNanos - open.startNanos,
+                                        event.status ?: DEFAULT_DROP_STATUS,
+                                    ),
+                                )
+                            builder = null
+                        } else if (connecting) {
+                            attempts += Attempt(event.status ?: GattStatus.GATT_ERROR, null)
+                        }
+                        connecting = false
+                    }
+
+                    BleStates.CLOSED -> {
+                        builder?.let { attempts += Attempt(null, it.build(null, 0)) }
+                        builder = null
+                        connecting = false
+                    }
+
+                    else -> {
+                        Unit
+                    }
                 }
             }
-            builder?.let { segments += it.build(null, 0) }
-            return segments
+            builder?.let { attempts += Attempt(null, it.build(null, 0)) }
+            return attempts
         }
     }
 

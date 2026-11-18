@@ -8,9 +8,10 @@ import app.overdrive.core.ble.IdentityUuids
  * recordings of the owner's body stay out of it). The recorder holds a [DeviceId][app.overdrive.core.ble.DeviceId] for
  * nobody: lines carry timings, characteristics and bytes, nothing that names a unit. On top of that:
  *
- * - the **model name** in the header is the advertised model only: separators split it into words, and a word that looks
- *   like a serial number (four or more digits, or five or more hex digits mixing digits and letters) is dropped, as is
- *   everything but letters, digits, space, dot, hyphen and underscore, and the result is cut to 24 characters;
+ * - the **model name** in the header is the advertised model only: it keeps ASCII letters and digits, separators split it
+ *   into words, and a word that looks like a serial number (four or more digits, or five or more hex digits mixing digits
+ *   and letters) is dropped, as is a run of three or more two-digit hex groups (a hardware address); the result is cut to
+ *   24 characters;
  * - the **values of identifying characteristics** (serial number, system id, device name, firmware and hardware revision,
  *   manufacturer and model number strings) are never written: the line keeps its place and status, the data is `*`.
  */
@@ -18,6 +19,8 @@ public object BleRecordingPolicy {
     private const val MAX_MODEL_LENGTH = 24
     private const val SERIAL_DIGITS = 4
     private const val SERIAL_HEX_LENGTH = 5
+    private const val ADDRESS_GROUPS = 3
+    private const val SEPARATORS = " ._-:"
 
     /** Characteristics whose values are replaced by `*`. */
     public val redactedCharacteristics: Set<GattUuid> = IdentityUuids.ALL
@@ -31,14 +34,37 @@ public object BleRecordingPolicy {
      */
     public fun sanitizeModel(advertised: String?): String? {
         if (advertised == null) return null
-        val cleaned = advertised.filter { it.isLetterOrDigit() || it in " ._-:" }
-        val words =
-            cleaned
-                .split(' ', '-', '_', ':', '.')
-                .filter { it.isNotEmpty() && !looksLikeSerial(it) }
-        // Keep the original separators out of it: the model is a label, words joined by spaces are enough.
+        val cleaned = advertised.filter { isAscii(it) || it in SEPARATORS }
+        val tokens = cleaned.split(' ', '-', '_', ':', '.').filter { it.isNotEmpty() }
+        val words = withoutAddresses(tokens).filter { !looksLikeSerial(it) }
+        // The model is a label: words joined by single spaces are enough, the original separators are not kept.
         val model = words.joinToString(" ").take(MAX_MODEL_LENGTH).trim()
         return model.ifEmpty { null }
+    }
+
+    private fun isAscii(char: Char): Boolean = char in 'a'..'z' || char in 'A'..'Z' || char in '0'..'9'
+
+    private fun isHexPair(token: String): Boolean =
+        token.length == 2 && token.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
+
+    /** Drops every run of three or more two-digit hex groups, which is how a hardware address looks once split. */
+    private fun withoutAddresses(tokens: List<String>): List<String> {
+        val kept = ArrayList<String>(tokens.size)
+        var i = 0
+        while (i < tokens.size) {
+            var end = i
+            while (end < tokens.size && isHexPair(tokens[end])) end++
+            if (end - i >= ADDRESS_GROUPS) {
+                i = end
+            } else if (end > i) {
+                kept += tokens.subList(i, end)
+                i = end
+            } else {
+                kept += tokens[i]
+                i++
+            }
+        }
+        return kept
     }
 
     private fun looksLikeSerial(word: String): Boolean {

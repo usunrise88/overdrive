@@ -80,6 +80,9 @@ public abstract class FakePeripheral(
 
     internal var world: FakeBle? = null
 
+    /** A connect attempt reached the peripheral: return a GATT status to make it fail, or null to accept it. */
+    public open fun onConnectAttempt(): Int? = null
+
     /** The link is up: start the peripheral's behaviour on [connection]. */
     public open fun onConnected(connection: FakeConnection) {}
 

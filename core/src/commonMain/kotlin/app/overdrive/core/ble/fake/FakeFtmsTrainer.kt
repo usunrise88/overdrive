@@ -133,6 +133,15 @@ public class FakeFtmsTrainer(
     /** The power of the last notification. */
     public val powerWatts: Int get() = currentPower.toInt()
 
+    /**
+     * Another party takes control away (docs/protocols/ftms-hr.md §5): the trainer forgets control and says so with
+     * Fitness Machine Status `0xFF`, if the central subscribed.
+     */
+    public fun revokeControl() {
+        hasControl = false
+        connection?.let { status(it, byteArrayOf(STATUS_CONTROL_PERMISSION_LOST.toByte())) }
+    }
+
     override val characteristics: List<GattCharacteristicInfo> =
         listOf(
             GattCharacteristicInfo(FtmsUuids.SERVICE, FtmsUuids.FEATURE, setOf(GattProperty.READ)),
@@ -157,6 +166,14 @@ public class FakeFtmsTrainer(
                 sendBikeData(connection)
             }
         }
+    }
+
+    override fun onDisconnected() {
+        // Control, the target and the simulation end with the link.
+        hasControl = false
+        started = false
+        targetPowerWatts = null
+        simulation = null
     }
 
     override fun onRead(characteristic: GattUuid): ByteArray? =
@@ -358,5 +375,6 @@ public class FakeFtmsTrainer(
         const val STATUS_STARTED = 0x04
         const val STATUS_TARGET_POWER = 0x08
         const val STATUS_SIMULATION = 0x12
+        const val STATUS_CONTROL_PERMISSION_LOST = 0xFF
     }
 }

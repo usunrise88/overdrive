@@ -74,6 +74,7 @@ public class FakeGattTransport internal constructor(
             delay(after)
             return failConnect(GattStatus.GATT_ERROR)
         }
+        peripheral.onConnectAttempt()?.let { return failConnect(it) }
         peripheral.faults.takeConnect()?.let { return failConnect(it) }
         if (peripheral.connection != null) return failConnect(GattStatus.GATT_ERROR)
         if (isClosed) return GattResult.Failed(GattFailure(GattFailureKind.CLOSED))
