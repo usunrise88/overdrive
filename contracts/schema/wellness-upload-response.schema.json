@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive wellness upload response",
+  "description": "The answer to POST /v1/wellness (spec §8.3, ADR 0023): counts only, never a value. accepted records were stored (new, or replaced by a newer lastModified); duplicates were already stored (the same content, or an older or equal lastModified) and changed nothing; rejected were well formed but not stored (the id is already used by another kind of record, or the record ends more than a day in the future). accepted + duplicates + rejected is the number of records sent. byType has one entry for each kind of record in the batch, with the same three counts, and the entries add up to the totals. generatedAt is when the service answered (UTC). Rules a schema cannot state, checked by every implementation: the byType counts add up to the totals.",
+  "type": "object",
+  "required": ["accepted", "duplicates", "rejected", "byType", "generatedAt"],
+  "additionalProperties": false,
+  "properties": {
+    "accepted": { "type": "integer", "minimum": 0, "maximum": 2000 },
+    "duplicates": { "type": "integer", "minimum": 0, "maximum": 2000 },
+    "rejected": { "type": "integer", "minimum": 0, "maximum": 2000 },
+    "byType": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "restingHeartRate": { "$ref": "#/$defs/counts" },
+        "heartRateSamples": { "$ref": "#/$defs/counts" },
+        "sleepSession": { "$ref": "#/$defs/counts" },
+        "respiratoryRate": { "$ref": "#/$defs/counts" },
+        "oxygenSaturation": { "$ref": "#/$defs/counts" },
+        "steps": { "$ref": "#/$defs/counts" },
+        "exerciseSession": { "$ref": "#/$defs/counts" },
+        "heartRateVariabilityRmssd": { "$ref": "#/$defs/counts" }
+      }
+    },
+    "generatedAt": {
+      "description": "When the service answered (UTC, ISO-8601 with a Z).",
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    }
+  },
+  "$defs": {
+    "counts": {
+      "type": "object",
+      "required": ["accepted", "duplicates", "rejected"],
+      "additionalProperties": false,
+      "properties": {
+        "accepted": { "type": "integer", "minimum": 0, "maximum": 2000 },
+        "duplicates": { "type": "integer", "minimum": 0, "maximum": 2000 },
+        "rejected": { "type": "integer", "minimum": 0, "maximum": 2000 }
+      }
+    }
+  }
+}

@@ -38,12 +38,14 @@ public data class ProfilePatch(
     val weeklyAvailability: Map<Weekday, Int?> = emptyMap(),
     val goals: List<String>? = null,
     val physics: PhysicsPatch = PhysicsPatch(),
+    val maxHeartRate: Change<Int?> = Change.Keep,
+    val thresholdHeartRate: Change<Int?> = Change.Keep,
 ) {
     /** Whether the patch changes nothing. */
     public val isEmpty: Boolean
         get() =
             ftp == Change.Keep && zones == Change.Keep && weeklyAvailability.isEmpty() && goals == null &&
-                physics == PhysicsPatch()
+                physics == PhysicsPatch() && maxHeartRate == Change.Keep && thresholdHeartRate == Change.Keep
 
     /**
      * The one patch that does what this one does and then [later] does: where both name a field, [later] wins (the last write
@@ -64,6 +66,9 @@ public data class ProfilePatch(
                     airDensity = later.physics.airDensity ?: physics.airDensity,
                     drivetrainEfficiency = later.physics.drivetrainEfficiency ?: physics.drivetrainEfficiency,
                 ),
+            maxHeartRate = if (later.maxHeartRate == Change.Keep) maxHeartRate else later.maxHeartRate,
+            thresholdHeartRate =
+                if (later.thresholdHeartRate == Change.Keep) thresholdHeartRate else later.thresholdHeartRate,
         )
 
     /**
@@ -96,6 +101,16 @@ public data class ProfilePatch(
                     airDensity = physics.airDensity ?: before.airDensity,
                     drivetrainEfficiency = physics.drivetrainEfficiency ?: before.drivetrainEfficiency,
                 ),
+            maxHeartRate =
+                when (maxHeartRate) {
+                    Change.Keep -> profile.maxHeartRate
+                    is Change.Set -> maxHeartRate.value
+                },
+            thresholdHeartRate =
+                when (thresholdHeartRate) {
+                    Change.Keep -> profile.thresholdHeartRate
+                    is Change.Set -> thresholdHeartRate.value
+                },
         )
     }
 }
@@ -107,7 +122,8 @@ public data class ProfilePatch(
 public object ProfileApiJson {
     private val json = Json { encodeDefaults = true }
 
-    private val patchKeys = setOf("ftp", "zones", "weeklyAvailability", "goals", "physics")
+    private val patchKeys =
+        setOf("ftp", "zones", "weeklyAvailability", "goals", "physics", "maxHeartRate", "thresholdHeartRate")
     private val physicsKeys = setOf("systemMassKg", "cdA", "crr", "airDensity", "drivetrainEfficiency")
 
     /** @throws IllegalArgumentException if [text] is not a profile of the schema. */
@@ -116,6 +132,14 @@ public object ProfileApiJson {
         require(root is JsonObject) { "A profile is a JSON object" }
         // kotlinx reads "250" as the number 250; the schema does not.
         root["ftp"]?.let { requireNumber(it, "ftp") }
+        for (key in listOf(
+            "maxHeartRate",
+            "thresholdHeartRate",
+            "estimatedMaxHeartRate",
+            "estimatedThresholdHeartRate",
+        )) {
+            root[key]?.let { requireNumber(it, key) }
+        }
         (root["zones"] as? JsonObject)?.let { requireBoundsAreNumbers(it) }
         (root["weeklyAvailability"] as? JsonObject)?.forEach { (day, value) -> requireNumber(value, day) }
         (root["physics"] as? JsonObject)?.forEach { (key, value) -> requireNumber(value, key) }
@@ -150,6 +174,10 @@ public object ProfileApiJson {
             body["weeklyAvailability"] = JsonObject(days)
         }
         patch.goals?.let { goals -> body["goals"] = JsonArray(goals.map(::JsonPrimitive)) }
+        (patch.maxHeartRate as? Change.Set)?.let { body["maxHeartRate"] = it.value?.let(::JsonPrimitive) ?: JsonNull }
+        (patch.thresholdHeartRate as? Change.Set)?.let {
+            body["thresholdHeartRate"] = it.value?.let(::JsonPrimitive) ?: JsonNull
+        }
         val physics =
             listOfNotNull(
                 patch.physics.systemMassKg?.let { "systemMassKg" to JsonPrimitive(it) },
@@ -179,6 +207,9 @@ public object ProfileApiJson {
             weeklyAvailability = element["weeklyAvailability"]?.let(::availabilityOf).orEmpty(),
             goals = element["goals"]?.let(::goalsOf),
             physics = element["physics"]?.let(::physicsOf) ?: PhysicsPatch(),
+            maxHeartRate = element["maxHeartRate"]?.let { Change.Set(nullableInt(it, "maxHeartRate")) } ?: Change.Keep,
+            thresholdHeartRate =
+                element["thresholdHeartRate"]?.let { Change.Set(nullableInt(it, "thresholdHeartRate")) } ?: Change.Keep,
         )
     }
 

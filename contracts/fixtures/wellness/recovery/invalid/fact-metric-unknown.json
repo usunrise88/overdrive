@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-18",
+  "nightsLogged": 31,
+  "nightsNeeded": 14,
+  "generatedAt": "2026-11-18T07:40:00Z",
+  "stale": false,
+  "state": "ready",
+  "reason": "All four signals are in your usual range.",
+  "guidance": "Train as planned.",
+  "rule": "OK",
+  "facts": [
+    {
+      "metric": "weight",
+      "label": "Weight",
+      "value": 70,
+      "unit": "bpm",
+      "baselineLow": null,
+      "baselineHigh": null,
+      "deviation": null,
+      "streak": 0
+    }
+  ]
+}

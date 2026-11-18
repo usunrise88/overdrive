@@ -22,9 +22,35 @@ public data class Profile(
     val goals: List<String>,
     val physics: ProfilePhysics,
     val updatedAt: String?,
+    /** Maximum heart rate in bpm, or null when not set (spec §6.7, ADR 0023). */
+    val maxHeartRate: Int? = null,
+    /** Threshold heart rate in bpm, or null when not set. */
+    val thresholdHeartRate: Int? = null,
+    /** The highest heart rate in the stored rides; read-only, null while they say nothing. */
+    val estimatedMaxHeartRate: Int? = null,
+    /** 95% of the best 20-minute average heart rate in the stored rides; read-only, null when not enough. */
+    val estimatedThresholdHeartRate: Int? = null,
 ) {
     init {
         require(ftp == null || ftp in MIN_FTP..MAX_FTP) { "FTP must be within $MIN_FTP..$MAX_FTP W, got $ftp" }
+        require(maxHeartRate == null || maxHeartRate in MIN_MAX_HR..MAX_MAX_HR) {
+            "Maximum heart rate must be within $MIN_MAX_HR..$MAX_MAX_HR bpm, got $maxHeartRate"
+        }
+        require(thresholdHeartRate == null || thresholdHeartRate in MIN_THRESHOLD_HR..MAX_THRESHOLD_HR) {
+            "Threshold heart rate must be within $MIN_THRESHOLD_HR..$MAX_THRESHOLD_HR bpm, got $thresholdHeartRate"
+        }
+        require(estimatedMaxHeartRate == null || estimatedMaxHeartRate in MIN_MAX_HR..MAX_MAX_HR) {
+            "Estimated maximum heart rate must be within $MIN_MAX_HR..$MAX_MAX_HR bpm, got $estimatedMaxHeartRate"
+        }
+        require(
+            estimatedThresholdHeartRate == null || estimatedThresholdHeartRate in MIN_THRESHOLD_HR..MAX_THRESHOLD_HR,
+        ) {
+            "Estimated threshold heart rate must be within $MIN_THRESHOLD_HR..$MAX_THRESHOLD_HR bpm, " +
+                "got $estimatedThresholdHeartRate"
+        }
+        require(maxHeartRate == null || thresholdHeartRate == null || thresholdHeartRate < maxHeartRate) {
+            "Threshold heart rate $thresholdHeartRate must be below the maximum $maxHeartRate"
+        }
         require(goals.size <= MAX_GOALS) { "At most $MAX_GOALS goals, got ${goals.size}" }
         for (goal in goals) {
             require(goal.isNotBlank()) { "A goal must not be blank" }
@@ -38,6 +64,10 @@ public data class Profile(
         public const val MAX_FTP: Int = 2000
         public const val MAX_GOALS: Int = 10
         public const val MAX_GOAL_LENGTH: Int = 200
+        public const val MIN_MAX_HR: Int = 100
+        public const val MAX_MAX_HR: Int = 230
+        public const val MIN_THRESHOLD_HR: Int = 80
+        public const val MAX_THRESHOLD_HR: Int = 220
 
         private val INSTANT = Regex("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$")
 

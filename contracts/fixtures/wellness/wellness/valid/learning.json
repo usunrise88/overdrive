@@ -1,0 +1,228 @@
+{
+  "from": "2026-11-16",
+  "to": "2026-11-18",
+  "generatedAt": "2026-11-18T07:40:00Z",
+  "stale": false,
+  "nightsLogged": 3,
+  "nightsNeeded": 14,
+  "baselineDays": 42,
+  "usual": {
+    "bedtime": null,
+    "wake": null
+  },
+  "days": [
+    {
+      "date": "2026-11-16",
+      "restingHr": {
+        "value": 54,
+        "source": "healthconnect",
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "sleepSeconds": {
+        "value": 26400,
+        "source": "healthconnect",
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "bedtimeMinutes": {
+        "value": -50,
+        "source": "healthconnect",
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "wakeMinutes": {
+        "value": 400,
+        "source": "healthconnect",
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "respiratoryRate": {
+        "value": null,
+        "source": null,
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "spo2": {
+        "value": null,
+        "source": null,
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "sleepingHr": {
+        "value": null,
+        "source": null,
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "hrvRmssd": {
+        "value": null,
+        "source": null,
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "sleepStart": "2026-11-15T22:10:00Z",
+      "sleepEnd": "2026-11-16T05:30:00Z",
+      "steps": null,
+      "hrvSdnn": null
+    },
+    {
+      "date": "2026-11-17",
+      "restingHr": {
+        "value": 53,
+        "source": "healthconnect",
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "sleepSeconds": {
+        "value": null,
+        "source": null,
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "bedtimeMinutes": {
+        "value": null,
+        "source": null,
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "wakeMinutes": {
+        "value": null,
+        "source": null,
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "respiratoryRate": {
+        "value": 14.1,
+        "source": "healthconnect",
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "spo2": {
+        "value": 96,
+        "source": "healthconnect",
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "sleepingHr": {
+        "value": null,
+        "source": null,
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "hrvRmssd": {
+        "value": null,
+        "source": null,
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "sleepStart": null,
+      "sleepEnd": null,
+      "steps": null,
+      "hrvSdnn": null
+    },
+    {
+      "date": "2026-11-18",
+      "restingHr": {
+        "value": null,
+        "source": null,
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "sleepSeconds": {
+        "value": null,
+        "source": null,
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "bedtimeMinutes": {
+        "value": null,
+        "source": null,
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "wakeMinutes": {
+        "value": null,
+        "source": null,
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "respiratoryRate": {
+        "value": null,
+        "source": null,
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "spo2": {
+        "value": null,
+        "source": null,
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "sleepingHr": {
+        "value": null,
+        "source": null,
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "hrvRmssd": {
+        "value": null,
+        "source": null,
+        "baselineLow": null,
+        "baselineHigh": null,
+        "deviation": null,
+        "streak": 0
+      },
+      "sleepStart": null,
+      "sleepEnd": null,
+      "steps": null,
+      "hrvSdnn": null
+    }
+  ]
+}

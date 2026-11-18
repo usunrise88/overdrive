@@ -1,0 +1,11 @@
+{
+  "source": "healthconnect",
+  "records": [
+    {
+      "kind": "respiratoryRate",
+      "id": "resp-0001",
+      "time": "2026-11-18T03:00:00Z",
+      "rate": -1
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "accepted": 5,
+  "duplicates": 2,
+  "rejected": 1,
+  "byType": {
+    "weight": {
+      "accepted": 1,
+      "duplicates": 0,
+      "rejected": 0
+    }
+  },
+  "generatedAt": "2026-11-18T07:40:12.345Z"
+}

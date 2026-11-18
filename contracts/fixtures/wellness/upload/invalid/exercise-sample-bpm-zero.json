@@ -1,0 +1,19 @@
+{
+  "source": "healthconnect",
+  "records": [
+    {
+      "kind": "exerciseSession",
+      "id": "ex-0001",
+      "type": "other_workout",
+      "title": "Synthetic VR session",
+      "start": "2026-11-17T19:05:00Z",
+      "end": "2026-11-17T19:47:00Z",
+      "heartRateSamples": [
+        {
+          "t": "2026-11-17T19:05:05Z",
+          "bpm": 0
+        }
+      ]
+    }
+  ]
+}

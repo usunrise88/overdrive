@@ -5,6 +5,7 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 export * from "./plan.ts";
 export * from "./profile.ts";
 export * from "./sync.ts";
+export * from "./wellness.ts";
 
 // ---- Workout (spec §8.1) -------------------------------------------------------------------
 // Hand-written mirror of schema/workout.schema.json. The schema is the source of truth; the

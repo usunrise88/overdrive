@@ -1,0 +1,27 @@
+{
+  "accepted": 5,
+  "duplicates": 2,
+  "rejected": 1,
+  "byType": {
+    "restingHeartRate": {
+      "accepted": 1,
+      "duplicates": 0,
+      "rejected": 0
+    },
+    "heartRateSamples": {
+      "accepted": 2,
+      "duplicates": 1,
+      "rejected": 0
+    },
+    "sleepSession": {
+      "accepted": 1,
+      "duplicates": 1,
+      "rejected": 0
+    },
+    "exerciseSession": {
+      "accepted": 1,
+      "duplicates": 0,
+      "rejected": 1
+    }
+  }
+}

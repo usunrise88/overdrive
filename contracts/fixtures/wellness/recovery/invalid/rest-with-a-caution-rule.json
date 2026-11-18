@@ -1,0 +1,53 @@
+{
+  "date": "2026-11-18",
+  "nightsLogged": 31,
+  "nightsNeeded": 14,
+  "generatedAt": "2026-11-18T07:40:00Z",
+  "stale": false,
+  "state": "rest",
+  "reason": "Three signals are well outside your usual range: resting heart rate, sleep and respiratory rate.",
+  "guidance": "Keep today easy or take it off.",
+  "rule": "C2",
+  "facts": [
+    {
+      "metric": "restingHr",
+      "label": "Resting heart rate",
+      "value": 64,
+      "unit": "bpm",
+      "baselineLow": 49.6,
+      "baselineHigh": 55.8,
+      "deviation": "above",
+      "streak": 3
+    },
+    {
+      "metric": "sleepSeconds",
+      "label": "Sleep",
+      "value": 18000,
+      "unit": "s",
+      "baselineLow": 24000,
+      "baselineHigh": 28800,
+      "deviation": "below",
+      "streak": 2
+    },
+    {
+      "metric": "respiratoryRate",
+      "label": "Respiratory rate",
+      "value": 16.1,
+      "unit": "/min",
+      "baselineLow": 13.6,
+      "baselineHigh": 14.8,
+      "deviation": "above",
+      "streak": 1
+    },
+    {
+      "metric": "spo2",
+      "label": "Oxygen saturation",
+      "value": 96,
+      "unit": "%",
+      "baselineLow": 95.2,
+      "baselineHigh": 97.4,
+      "deviation": "inside",
+      "streak": 0
+    }
+  ]
+}

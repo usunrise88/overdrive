@@ -45,6 +45,14 @@ export interface Profile {
   physics: Physics;
   /** UTC instant of the last change, null while it is the defaults. */
   updatedAt: string | null;
+  /** Maximum heart rate in bpm, or null when not set (spec §6.7, ADR 0023). */
+  maxHeartRate: number | null;
+  /** Threshold heart rate in bpm, or null when not set. */
+  thresholdHeartRate: number | null;
+  /** The highest heart rate in the stored rides; read-only, null while they say nothing. */
+  estimatedMaxHeartRate: number | null;
+  /** 95% of the best 20-minute average heart rate in the stored rides; read-only, null when not enough. */
+  estimatedThresholdHeartRate: number | null;
 }
 
 /** What `PATCH /v1/profile` takes (see `profile-patch.schema.json`). */
@@ -55,6 +63,10 @@ export interface ProfilePatch {
   weeklyAvailability?: Partial<Record<Weekday, number | null>>;
   goals?: string[];
   physics?: Partial<Physics>;
+  /** null clears it. */
+  maxHeartRate?: number | null;
+  /** null clears it. */
+  thresholdHeartRate?: number | null;
 }
 
 /** The profile of a rider who has set nothing. */
@@ -69,7 +81,27 @@ export function defaultProfile(): Profile {
     goals: [],
     physics: { ...DEFAULT_PHYSICS },
     updatedAt: null,
+    maxHeartRate: null,
+    thresholdHeartRate: null,
+    estimatedMaxHeartRate: null,
+    estimatedThresholdHeartRate: null,
   };
+}
+
+/** The four heart-rate keys of a profile that may lack them (one cached before they existed). */
+const HEART_RATE_KEYS = [
+  "maxHeartRate",
+  "thresholdHeartRate",
+  "estimatedMaxHeartRate",
+  "estimatedThresholdHeartRate",
+] as const;
+
+/** `profile` with the heart-rate keys it lacks set to null: what the service always writes. */
+export function withHeartRateKeys(profile: Profile): Profile {
+  if (HEART_RATE_KEYS.every((key) => profile[key] !== undefined)) return profile;
+  const filled = { ...profile };
+  for (const key of HEART_RATE_KEYS) filled[key] ??= null;
+  return filled;
 }
 
 // ---- Validation ------------------------------------------------------------------------------
@@ -91,8 +123,8 @@ function errorsOf(errors: typeof checkPatch.errors): string[] {
 }
 
 /**
- * What the schema cannot say: the six zone bounds strictly increase and no goal is blank. Returns
- * the violations, or an empty list.
+ * What the schema cannot say: the six zone bounds strictly increase, no goal is blank and a threshold
+ * heart rate is below the maximum when both are set. Returns the violations, or an empty list.
  */
 export function profileConsistencyErrors(profile: Profile): string[] {
   const errors: string[] = [];
@@ -113,14 +145,23 @@ export function profileConsistencyErrors(profile: Profile): string[] {
       break;
     }
   }
+  const { maxHeartRate: max, thresholdHeartRate: threshold } = profile;
+  if (max != null && threshold != null && threshold >= max) {
+    errors.push(`/thresholdHeartRate ${threshold} is not below /maxHeartRate ${max}`);
+  }
   return errors;
 }
 
-/** Validates a profile (as GET /v1/profile answers): the schema first, then the rules a schema cannot state. */
+/**
+ * Validates a profile (as GET /v1/profile answers): the schema first, then the rules a schema cannot state.
+ * A profile written before the heart-rate keys existed is valid; the value returned has them, null.
+ */
 export function validateProfile(input: unknown): Validation<Profile> {
   if (!checkProfile(input)) return { ok: false, errors: errorsOf(checkProfile.errors) };
   const errors = profileConsistencyErrors(input);
-  return errors.length === 0 ? { ok: true, value: input } : { ok: false, errors };
+  return errors.length === 0
+    ? { ok: true, value: withHeartRateKeys(input) }
+    : { ok: false, errors };
 }
 
 /** Validates the shape of a patch; whether it makes a valid profile is {@link applyProfilePatch}'s to say. */
@@ -153,6 +194,8 @@ export function applyProfilePatch(profile: Profile, patch: unknown): Validation<
     if (minutes !== undefined) next.weeklyAvailability[day] = minutes;
   }
   if (change.goals !== undefined) next.goals = [...change.goals];
+  if (change.maxHeartRate !== undefined) next.maxHeartRate = change.maxHeartRate;
+  if (change.thresholdHeartRate !== undefined) next.thresholdHeartRate = change.thresholdHeartRate;
   if (change.physics !== undefined) {
     next.physics = { ...next.physics, ...change.physics };
   }

@@ -60,6 +60,22 @@ describe("profile schema", () => {
     expect(errors("zones-not-increasing.json")).toMatch(/not above the bound before it/);
     expect(errors("zones-equal-bounds.json")).toMatch(/not above/);
     expect(errors("goals-blank.json")).toMatch(/blank/);
+    expect(errors("threshold-not-below-max.json")).toMatch(/not below/);
+  });
+
+  it("accepts a profile cached before the heart-rate keys existed and gives it nulls", () => {
+    const old = JSON.parse(JSON.stringify(defaultProfile())) as Record<string, unknown>;
+    for (const key of [
+      "maxHeartRate",
+      "thresholdHeartRate",
+      "estimatedMaxHeartRate",
+      "estimatedThresholdHeartRate",
+    ]) {
+      delete old[key];
+    }
+    const result = validateProfile(old);
+    expect(result).toMatchObject({ ok: true });
+    if (result.ok) expect(result.value).toEqual(defaultProfile());
   });
 
   it("the defaults are the defaults fixture, Coggan's zones and the engine's physics", () => {

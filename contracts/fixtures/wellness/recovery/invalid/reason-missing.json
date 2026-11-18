@@ -1,0 +1,52 @@
+{
+  "date": "2026-11-18",
+  "nightsLogged": 31,
+  "nightsNeeded": 14,
+  "generatedAt": "2026-11-18T07:40:00Z",
+  "stale": false,
+  "state": "ready",
+  "guidance": "Train as planned.",
+  "rule": "OK",
+  "facts": [
+    {
+      "metric": "restingHr",
+      "label": "Resting heart rate",
+      "value": 52,
+      "unit": "bpm",
+      "baselineLow": 49.4,
+      "baselineHigh": 55.6,
+      "deviation": "inside",
+      "streak": 0
+    },
+    {
+      "metric": "sleepSeconds",
+      "label": "Sleep",
+      "value": 27000,
+      "unit": "s",
+      "baselineLow": 24000,
+      "baselineHigh": 28800,
+      "deviation": "inside",
+      "streak": 0
+    },
+    {
+      "metric": "respiratoryRate",
+      "label": "Respiratory rate",
+      "value": 14.2,
+      "unit": "/min",
+      "baselineLow": 13.6,
+      "baselineHigh": 14.8,
+      "deviation": "inside",
+      "streak": 0
+    },
+    {
+      "metric": "spo2",
+      "label": "Oxygen saturation",
+      "value": 96,
+      "unit": "%",
+      "baselineLow": 95.2,
+      "baselineHigh": 97.4,
+      "deviation": "inside",
+      "streak": 0
+    }
+  ]
+}

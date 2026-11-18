@@ -1,0 +1,12 @@
+{
+  "source": "healthconnect",
+  "records": [
+    {
+      "kind": "steps",
+      "id": "steps-0001",
+      "start": "2026-11-18T07:00:00Z",
+      "end": "2026-11-18T08:00:00Z",
+      "count": 1000001
+    }
+  ]
+}

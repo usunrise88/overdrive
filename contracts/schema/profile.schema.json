@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Overdrive profile",
-  "description": "The rider's profile: the answer to GET /v1/profile and the body PATCH /v1/profile returns (spec §8.3, ADR 0018). One profile per service. ftp is in watts, or null when the owner has not set one (the tablet then keeps its own). zones.upperPercentOfFtp are the inclusive upper bounds of zones 1 to 6 as whole percentages of FTP (zone 7 has none); the default is Coggan's, 55 75 90 105 120 150, the same as the ride app's PowerZone, and the watts of each zone are derived from the FTP by code, never stored. weeklyAvailability is the minutes the rider can train on each weekday, null where unknown (0 is a rest day). goals are short free-text lines, at most 10. physics mirrors the ride engine's PhysicsSettings, same names and units. updatedAt is when the profile last changed (UTC), null while it is still the defaults. Rules a schema cannot state, checked by every implementation: the six zone bounds strictly increase, and no goal is blank.",
+  "description": "The rider's profile: the answer to GET /v1/profile and the body PATCH /v1/profile returns (spec §8.3, ADR 0018). One profile per service. ftp is in watts, or null when the owner has not set one (the tablet then keeps its own). zones.upperPercentOfFtp are the inclusive upper bounds of zones 1 to 6 as whole percentages of FTP (zone 7 has none); the default is Coggan's, 55 75 90 105 120 150, the same as the ride app's PowerZone, and the watts of each zone are derived from the FTP by code, never stored. weeklyAvailability is the minutes the rider can train on each weekday, null where unknown (0 is a rest day). goals are short free-text lines, at most 10. physics mirrors the ride engine's PhysicsSettings, same names and units. updatedAt is when the profile last changed (UTC), null while it is still the defaults. maxHeartRate and thresholdHeartRate (bpm, or null while the owner has not set them) are what the heart-rate load of watch activities is scaled by (spec §6.7, ADR 0023); estimatedMaxHeartRate (the highest heart rate in the stored rides) and estimatedThresholdHeartRate (95% of the best 20-minute average heart rate in the stored rides) are read-only, null while the rides do not say, and are used for the load only where the owner has set nothing. These four keys are optional so that a profile cached before they existed stays valid; the service always writes all four. Rules a schema cannot state, checked by every implementation: the six zone bounds strictly increase, no goal is blank, and a threshold heart rate is below the maximum when both are set.",
   "type": "object",
   "required": ["ftp", "zones", "weeklyAvailability", "goals", "physics", "updatedAt"],
   "additionalProperties": false,
@@ -42,6 +42,10 @@
         "drivetrainEfficiency": { "$ref": "#/$defs/drivetrainEfficiency" }
       }
     },
+    "maxHeartRate": { "$ref": "#/$defs/maxHeartRate" },
+    "thresholdHeartRate": { "$ref": "#/$defs/thresholdHeartRate" },
+    "estimatedMaxHeartRate": { "$ref": "#/$defs/maxHeartRate" },
+    "estimatedThresholdHeartRate": { "$ref": "#/$defs/thresholdHeartRate" },
     "updatedAt": {
       "description": "When the profile last changed (UTC, ISO-8601 with a Z), or null while it is the defaults.",
       "type": ["string", "null"],
@@ -65,6 +69,18 @@
       }
     },
     "minutes": { "type": ["integer", "null"], "minimum": 0, "maximum": 1440 },
+    "maxHeartRate": {
+      "description": "Maximum heart rate in bpm, or null when not set.",
+      "type": ["integer", "null"],
+      "minimum": 100,
+      "maximum": 230
+    },
+    "thresholdHeartRate": {
+      "description": "Threshold (lactate threshold) heart rate in bpm, or null when not set.",
+      "type": ["integer", "null"],
+      "minimum": 80,
+      "maximum": 220
+    },
     "goals": {
       "description": "Short free-text goals, in the rider's words.",
       "type": "array",

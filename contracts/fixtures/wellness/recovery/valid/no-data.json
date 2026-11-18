@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-18",
+  "nightsLogged": 31,
+  "nightsNeeded": 14,
+  "generatedAt": "2026-11-18T07:40:00Z",
+  "stale": false,
+  "state": "noData",
+  "reason": "No reading from last night. Wear the watch to sleep, then open Overdrive in the morning.",
+  "guidance": null,
+  "rule": null,
+  "facts": []
+}

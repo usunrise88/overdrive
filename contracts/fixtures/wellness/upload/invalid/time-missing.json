@@ -1,0 +1,10 @@
+{
+  "source": "healthconnect",
+  "records": [
+    {
+      "kind": "restingHeartRate",
+      "id": "rhr-0001",
+      "bpm": 52
+    }
+  ]
+}

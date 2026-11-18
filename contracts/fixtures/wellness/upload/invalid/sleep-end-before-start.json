@@ -1,0 +1,13 @@
+{
+  "source": "healthconnect",
+  "records": [
+    {
+      "kind": "sleepSession",
+      "id": "sleep-0001",
+      "start": "2026-11-17T22:10:00Z",
+      "end": "2026-11-17T21:00:00Z",
+      "title": "Night",
+      "stages": []
+    }
+  ]
+}

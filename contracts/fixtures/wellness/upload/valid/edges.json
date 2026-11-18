@@ -1,0 +1,38 @@
+{
+  "source": "healthconnect",
+  "records": [
+    {
+      "kind": "restingHeartRate",
+      "id": "a",
+      "time": "2026-11-18T06:30:00Z",
+      "bpm": 1,
+      "zoneOffsetSeconds": -64800
+    },
+    {
+      "kind": "restingHeartRate",
+      "id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "time": "2026-11-18T06:30:00Z",
+      "bpm": 300,
+      "zoneOffsetSeconds": 64800
+    },
+    {
+      "kind": "oxygenSaturation",
+      "id": "c",
+      "time": "2026-11-18T03:00:00Z",
+      "percent": 0
+    },
+    {
+      "kind": "respiratoryRate",
+      "id": "d",
+      "time": "2026-11-18T03:00:00Z",
+      "rate": 0
+    },
+    {
+      "kind": "steps",
+      "id": "e",
+      "start": "2026-11-18T07:00:00Z",
+      "end": "2026-11-18T07:00:00Z",
+      "count": 0
+    }
+  ]
+}

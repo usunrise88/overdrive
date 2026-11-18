@@ -1,0 +1,33 @@
+{
+  "date": "2026-11-18",
+  "nightsLogged": 9,
+  "nightsNeeded": 14,
+  "generatedAt": "2026-11-18T07:40:00Z",
+  "stale": false,
+  "state": "learning",
+  "reason": "Overdrive rates recovery after 14 nights with the watch. 9 nights so far.",
+  "guidance": "Train as planned.",
+  "rule": null,
+  "facts": [
+    {
+      "metric": "restingHr",
+      "label": "Resting heart rate",
+      "value": 53,
+      "unit": "bpm",
+      "baselineLow": null,
+      "baselineHigh": null,
+      "deviation": null,
+      "streak": 0
+    },
+    {
+      "metric": "sleepSeconds",
+      "label": "Sleep",
+      "value": 26400,
+      "unit": "s",
+      "baselineLow": null,
+      "baselineHigh": null,
+      "deviation": null,
+      "streak": 0
+    }
+  ]
+}

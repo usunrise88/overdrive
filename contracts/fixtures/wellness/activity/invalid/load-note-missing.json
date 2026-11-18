@@ -1,0 +1,40 @@
+{
+  "id": "watch-ex-0001",
+  "kind": "activity",
+  "source": "watch",
+  "type": "other_workout",
+  "name": "Synthetic VR session",
+  "start": "2026-11-17T19:05:00Z",
+  "end": "2026-11-17T19:47:00Z",
+  "startDate": "2026-11-17",
+  "durationSeconds": 2520,
+  "averageHeartRate": 128.4,
+  "maxHeartRate": 171,
+  "load": 38.2,
+  "loadApproximate": true,
+  "countsTowardLoad": true,
+  "overlapsRideId": null,
+  "thresholdHr": 166,
+  "maxHr": 186,
+  "heartRate": {
+    "samples": 504,
+    "medianGapSeconds": 5,
+    "maxGapSeconds": 20,
+    "coverage": 0.98
+  },
+  "series": [
+    {
+      "t": 0,
+      "heartRate": 98
+    },
+    {
+      "t": 60,
+      "heartRate": 112.5
+    },
+    {
+      "t": 120,
+      "heartRate": 131
+    }
+  ],
+  "generatedAt": "2026-11-18T07:40:00Z"
+}

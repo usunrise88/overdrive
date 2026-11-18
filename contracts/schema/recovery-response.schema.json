@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive recovery response",
+  "description": "The answer to GET /v1/recovery (spec §6.4, §8.3, ADR 0023): the recovery state for one morning and the facts behind it. date is the morning it is for: today, or yesterday while this morning's watch data has not arrived (the app says so); with no reading in the last two days it is today and the state is noData. state is ready, caution, rest, learning (fewer than nightsNeeded nights logged, or no metric has a personal baseline yet: no verdict is given) or noData (no reading from last night). The state comes from a fixed rule table (ADR 0023) over how far each metric is from the rider's own baseline, in the direction that matters; rule names the row that decided it (R1, R2, C1, C2, C3, OK) and is null for learning and noData. reason is one plain sentence written from that rule by a template, never by a model; it names signals and directions only, never a cause. guidance is one short sentence of training advice for ready, caution and rest, null otherwise. facts are the three or four metrics that decided the state, in decisive order (the ones that triggered the rule first, strongest first, then the rest); for learning they are last night's readings without a range; for noData there are none. A fact's value is the metric's reading for date (for hrvRmssd the 7-day mean in milliseconds, the geometric mean of the daily values), null with no reading. metric is one of restingHr, sleepSeconds, bedtimeMinutes, respiratoryRate, spo2, sleepingHr, hrvRmssd; unit is bpm, s, min, /min, % or ms. stale is true when a source the service pulls from failed at its last read. Rules a schema cannot state, checked by every implementation: ready, caution and rest have a rule, a guidance sentence and at least one fact; learning and noData have neither rule nor guidance; ready, caution and rest need nightsLogged of at least nightsNeeded; noData has no facts; ready has rule OK, caution has C1, C2 or C3, rest has R1 or R2; at most four facts, each metric at most once.",
+  "type": "object",
+  "required": [
+    "date",
+    "state",
+    "reason",
+    "guidance",
+    "rule",
+    "nightsLogged",
+    "nightsNeeded",
+    "generatedAt",
+    "stale",
+    "facts"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "state": { "enum": ["ready", "caution", "rest", "learning", "noData"] },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "guidance": { "type": ["string", "null"], "minLength": 1, "maxLength": 120 },
+    "rule": { "enum": ["R1", "R2", "C1", "C2", "C3", "OK", null] },
+    "nightsLogged": { "type": "integer", "minimum": 0 },
+    "nightsNeeded": { "type": "integer", "minimum": 1 },
+    "generatedAt": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "stale": { "type": "boolean" },
+    "facts": {
+      "type": "array",
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/fact" }
+    }
+  },
+  "$defs": {
+    "fact": {
+      "type": "object",
+      "required": [
+        "metric",
+        "label",
+        "value",
+        "unit",
+        "baselineLow",
+        "baselineHigh",
+        "deviation",
+        "streak"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "metric": {
+          "enum": [
+            "restingHr",
+            "sleepSeconds",
+            "bedtimeMinutes",
+            "respiratoryRate",
+            "spo2",
+            "sleepingHr",
+            "hrvRmssd"
+          ]
+        },
+        "label": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "value": { "type": ["number", "null"] },
+        "unit": { "enum": ["bpm", "s", "min", "/min", "%", "ms"] },
+        "baselineLow": { "type": ["number", "null"] },
+        "baselineHigh": { "type": ["number", "null"] },
+        "deviation": { "enum": ["inside", "above", "below", null] },
+        "streak": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

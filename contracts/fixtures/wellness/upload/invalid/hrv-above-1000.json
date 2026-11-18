@@ -1,0 +1,11 @@
+{
+  "source": "healthconnect",
+  "records": [
+    {
+      "kind": "heartRateVariabilityRmssd",
+      "id": "hrv-0001",
+      "time": "2026-11-18T03:30:00Z",
+      "ms": 1001
+    }
+  ]
+}

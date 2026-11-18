@@ -27,5 +27,9 @@
     "airDensity": 1.225,
     "drivetrainEfficiency": 1
   },
-  "updatedAt": null
+  "updatedAt": null,
+  "maxHeartRate": null,
+  "thresholdHeartRate": null,
+  "estimatedMaxHeartRate": null,
+  "estimatedThresholdHeartRate": null
 }

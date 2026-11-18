@@ -77,8 +77,62 @@ class ProfileContractTest {
             val profile = ProfileApiJson.decodeProfile(file.readText())
             val written = ProfileApiJson.encodeProfile(profile)
             assertEquals(profile, ProfileApiJson.decodeProfile(written), file.name)
-            assertEquals(normalize(parse(file.readText())), normalize(parse(written)), file.name)
+            val original = parse(file.readText()).jsonObject
+            assertEquals(
+                normalize(original),
+                normalize(withoutAbsentNulls(parse(written).jsonObject, original)),
+                file.name,
+            )
         }
+    }
+
+    /** The four heart-rate keys are optional on read (a profile cached before they existed), and always written. */
+    private val heartRateKeys =
+        setOf("maxHeartRate", "thresholdHeartRate", "estimatedMaxHeartRate", "estimatedThresholdHeartRate")
+
+    private fun withoutAbsentNulls(
+        written: JsonObject,
+        original: JsonObject,
+    ): JsonObject =
+        JsonObject(written.filter { (key, value) -> key !in heartRateKeys || key in original || value != JsonNull })
+
+    @Test
+    fun `a profile without the heart-rate keys reads them as null`() {
+        val file = File(contracts, "fixtures/profile/profile/valid/full.json")
+        val profile = ProfileApiJson.decodeProfile(file.readText())
+        assertNull(profile.maxHeartRate)
+        assertNull(profile.thresholdHeartRate)
+        assertNull(profile.estimatedMaxHeartRate)
+        assertNull(profile.estimatedThresholdHeartRate)
+    }
+
+    @Test
+    fun `the heart-rate fixture reads every field`() {
+        val file = File(contracts, "fixtures/profile/profile/valid/heart-rates.json")
+        val profile = ProfileApiJson.decodeProfile(file.readText())
+        assertEquals(186, profile.maxHeartRate)
+        assertEquals(166, profile.thresholdHeartRate)
+        assertEquals(184, profile.estimatedMaxHeartRate)
+        assertEquals(162, profile.estimatedThresholdHeartRate)
+    }
+
+    @Test
+    fun `heart-rate patches change only what they name`() {
+        val before = Profile.default().copy(maxHeartRate = 186, thresholdHeartRate = 166)
+        val set = ProfileApiJson.decodePatch("""{"thresholdHeartRate":160}""").applyTo(before)
+        assertEquals(186, set.maxHeartRate)
+        assertEquals(160, set.thresholdHeartRate)
+        val cleared = ProfileApiJson.decodePatch("""{"maxHeartRate":null}""").applyTo(before)
+        assertNull(cleared.maxHeartRate)
+        assertEquals(166, cleared.thresholdHeartRate)
+        val patch =
+            ProfilePatch(
+                maxHeartRate = Change.Set(190),
+            ).andThen(ProfilePatch(thresholdHeartRate = Change.Set(null)))
+        assertEquals("""{"maxHeartRate":190,"thresholdHeartRate":null}""", ProfileApiJson.encodePatch(patch))
+        assertEquals(patch, ProfileApiJson.decodePatch(ProfileApiJson.encodePatch(patch)))
+        assertTrue(ProfilePatch().isEmpty)
+        assertTrue(!patch.isEmpty)
     }
 
     @Test
@@ -99,7 +153,10 @@ class ProfileContractTest {
     @Test
     fun `every key is written, null included`() {
         val written = parse(ProfileApiJson.encodeProfile(Profile.default())).jsonObject
-        assertEquals(setOf("ftp", "zones", "weeklyAvailability", "goals", "physics", "updatedAt"), written.keys)
+        assertEquals(
+            setOf("ftp", "zones", "weeklyAvailability", "goals", "physics", "updatedAt") + heartRateKeys,
+            written.keys,
+        )
         assertEquals(JsonNull, written.getValue("ftp"))
         assertEquals(JsonNull, written.getValue("updatedAt"))
         assertEquals(JsonNull, written.getValue("weeklyAvailability").jsonObject.getValue("mon"))
