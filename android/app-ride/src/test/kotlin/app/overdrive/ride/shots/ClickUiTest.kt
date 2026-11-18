@@ -33,8 +33,10 @@ import app.overdrive.ride.ui.DevicesActions
 import app.overdrive.ride.ui.DevicesScreen
 import app.overdrive.ride.ui.LearnActions
 import app.overdrive.ride.ui.LearnScreen
+import app.overdrive.ride.ui.NOT_ENCRYPTED
 import app.overdrive.ride.ui.SettingsActions
 import app.overdrive.ride.ui.SettingsScreen
+import app.overdrive.ride.ui.SyncUi
 import app.overdrive.ride.ui.unlockText
 import app.overdrive.ride.ui.unlockTitle
 import app.overdrive.uikit.DeviceStatus
@@ -456,7 +458,25 @@ class ClickUiTest : ShotTest() {
                 SettingsScreen(
                     settings.copy(syncUrl = "https://overdrive.example.org", syncToken = SecretText("a-long-token")),
                     SettingsActions({}, {}, {}),
-                    waitingToUpload = 3,
+                    sync = SyncUi(3, "Service unreachable. Trying again soon", "Today 18:04", canSendNow = true),
+                )
+            }
+        }
+
+    @Test
+    fun syncSettingsPlainAddressRejectedToken() =
+        shot("settings--sync-plain-http") {
+            OverdriveTheme {
+                SettingsScreen(
+                    settings.copy(syncUrl = "http://192.168.1.20:8080", syncToken = SecretText("a-long-token")),
+                    SettingsActions({}, {}, {}),
+                    sync =
+                        SyncUi(
+                            1,
+                            "The service did not accept the token. Check the token above",
+                            "18 Nov 09:12",
+                            true,
+                        ),
                 )
             }
         }
@@ -482,7 +502,8 @@ class ClickUiTest : ShotTest() {
     private fun settingsScreen(
         initial: AppSettings,
         onChange: (AppSettings) -> Unit,
-        waiting: Int = 0,
+        sync: SyncUi = SyncUi(),
+        onSendNow: () -> Unit = {},
     ) {
         val current = mutableStateOf(initial)
         rule.setContent {
@@ -496,21 +517,65 @@ class ClickUiTest : ShotTest() {
                             onChange(current.value)
                         },
                         onResetOverlayPosition = {},
+                        onSendNow = onSendNow,
                     ),
-                    waitingToUpload = waiting,
+                    sync = sync,
                 )
             }
         }
     }
 
     @Test
-    fun theSyncGroupSaysNothingIsUsedAndCountsWhatWaits() {
-        settingsScreen(settings, {}, waiting = 1)
+    fun theSyncGroupCountsWhatWaitsAndSaysWhenTheLastUploadWas() {
+        settingsScreen(settings, {}, sync = SyncUi(waiting = 1, lastUpload = "Today 18:04", canSendNow = true))
         rule.onNodeWithText("Sync").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithText("Not used yet").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithText("Not used yet. It stays on this tablet").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Where finished rides are sent").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Sent only to this address").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("1 ride").performScrollTo().assertIsDisplayed()
-        rule.onNodeWithText("Nothing is sent yet. Finished rides wait here for the next version").assertExists()
+        rule.onNodeWithText("Last upload").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Today 18:04").performScrollTo().assertIsDisplayed()
+        rule.onAllNodesWithText("Not used yet").assertCountEquals(0)
+    }
+
+    @Test
+    fun theLineSaysInPlainWordsWhatWentWrong() {
+        val line = "1 ride refused: Ride ride-1 is already stored with different content"
+        settingsScreen(settings, {}, sync = SyncUi(waiting = 1, line = line, canSendNow = true))
+        rule.onNodeWithText(line).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Never").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun sendNowIsOfferedOnlyWhileSomethingWaitsAndSaysSo() {
+        var sent = 0
+        settingsScreen(settings, {}, sync = SyncUi(waiting = 2, canSendNow = true), onSendNow = { sent++ })
+        rule.onNodeWithText("Send now").performScrollTo().assertIsEnabled().performClick()
+        assertEquals(1, sent)
+    }
+
+    @Test
+    fun sendNowIsOffWhenNothingWaitsOrAnUploadIsUnderWay() {
+        settingsScreen(settings, {}, sync = SyncUi(waiting = 0, canSendNow = false))
+        rule.onNodeWithText("Send now").performScrollTo().assertIsNotEnabled()
+    }
+
+    @Test
+    fun aPlainHttpAddressIsAcceptedAndFlaggedNotEncrypted() {
+        var latest = settings
+        settingsScreen(settings, { latest = it })
+        rule.onAllNodesWithText(NOT_ENCRYPTED).assertCountEquals(0)
+        rule
+            .onNodeWithContentDescription("Service address")
+            .performScrollTo()
+            .performTextInput("http://192.168.1.20:8080")
+        assertEquals("accepted and stored", "http://192.168.1.20:8080", latest.syncUrl)
+        rule.onNodeWithText(NOT_ENCRYPTED).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun anHttpsAddressIsNotFlagged() {
+        settingsScreen(settings.copy(syncUrl = "https://overdrive.example.org"), {})
+        rule.onAllNodesWithText(NOT_ENCRYPTED).assertCountEquals(0)
     }
 
     @Test

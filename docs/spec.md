@@ -145,7 +145,8 @@ Phase 1 delivers a complete offline ride: connect the devices, ride free or play
   N s", "Not found · retrying in N s", Bluetooth off, needs Nearby devices, or Not paired; **Retry now** cuts a wait. Bluetooth
   that cannot be used is **one notice with one action** ("Allow nearby devices" with **Allow**, then **Open settings** once
   refused; "Bluetooth is off" with **Turn on**), re-read on every resume. The manifest asks for `BLUETOOTH_SCAN`
-  (`neverForLocation`) and `BLUETOOTH_CONNECT` only: **no location, no network**. **A ride with no trainer paired does not
+  (`neverForLocation`) and `BLUETOOTH_CONNECT` only: **no location** (and, until stage P2-1b, no network; §4.9 says what the
+  one network permission is for). **A ride with no trainer paired does not
   start** and says so ("No trainer is paired." with **Pair a trainer**); the simulation is a Developer choice (Settings,
   Developer, **Devices**: Bluetooth, the default, or Simulated), never a fallback. The overlay's foreground service is
   `connectedDevice|specialUse`, passing `connectedDevice` only while `BLUETOOTH_CONNECT` is granted (Android 14 refuses a
@@ -326,7 +327,7 @@ left puck, what it does after about three minutes, and every acceptance criterio
 
 - A `SyncProvider` interface with a no-op implementation.
 - Finished rides go into a persistent outbox, so Phase 2 uploads them without touching ride code.
-- Settings hold the service URL and token, unused until Phase 2.
+- Settings hold the service URL and token, unused until Phase 2 (used since stage P2-1b, below).
 
 **Settled in stage M4-1** (`app.overdrive.core.sync`, ADR 0011): `SyncProvider` (`upload(entry)` answers `Acknowledged`,
 `RetryLater` or `NotConfigured`) with `NoopSyncProvider`, which acknowledges nothing; `Outbox` (`enqueue`, `pending`, `markDone`,
@@ -351,6 +352,26 @@ blocks or fails a ride: finishing a ride only queues it. With the no-op provider
   host are written in lower case and an address that fails is explained and not stored. The token loses control characters and
   surrounding spaces and is cut at 512 characters; it prints as dots, is hidden until **Show**, is never written to a log, a
   ride record or the outbox, and is not backed up (`allowBackup` is off).
+
+**Settled in stage P2-1b** (`core` `HttpSyncProvider`, `android/data` `UrlConnectionTransport`, ADR 0014 sections 6 and 8): the
+outbox drains for real, and what M4-2 said about "no network code, no `INTERNET` permission" and "Not used yet" no longer holds.
+
+- The container's coordinator runs `HttpSyncProvider`, which sends a stored ride as `PUT {address}/v1/rides/{id}` (the record,
+  `application/json`) and then `PUT .../fit` (`application/vnd.ant.fit`), streamed from the files the tablet already keeps, with
+  `Authorization: Bearer <token>`. A ride leaves the outbox only when **both** answered 200 or 201 with the service's own upload
+  response. The address and token are read at every upload: a changed setting takes effect, settled for 1.5 s, with no restart.
+- `SyncResult` grew two answers. **`TokenRejected`** (401): nothing is asked again with that address and token; a changed
+  address or token, or **Send now**, asks again. **`Refused(message)`** (409, 422, any other 4xx): the ride stays in the outbox
+  and in the report with the service's short message, is skipped by the coordinator (no loop, the rides behind it go on) for this
+  process, and is tried once more by a changed setting or **Send now**. 5xx, 408, 429, no answer (unreachable, timeout, TLS), a
+  redirect and an answer that is not the service's upload response are `RetryLater` with the usual backoff.
+  `SyncCoordinator.report` carries the last success time (kept in `filesDir/sync/last-upload`) and the refused rides.
+- The manifest asks for `INTERNET` and nothing else of the network (no network-state permission, no Play Services), and sets
+  `usesCleartextTraffic`, without which Android 9 and later refuse the plain `http://` address that Settings still accepts.
+- Settings, **Sync**: the address (a plain `http://` one is flagged "Not encrypted: the token is sent as plain text") and the
+  token ("Sent only to this address"); **Waiting to upload** with the count and one line in plain words about the last
+  problem (not configured, "The service did not accept the token", "Service unreachable. Trying again soon", "1 ride refused:
+  <the service's message>"); **Last upload** (a time, or "Never") with **Send now**, which tries the queue at once.
 
 ### 4.10 Acceptance criteria
 
@@ -417,6 +438,8 @@ Phase 2 connects the ride app to a plan: an AI agent schedules workouts, they ap
 - A list of today's and this week's planned workouts, pulled from the service.
 - Starting a planned workout links the recording to it.
 - The Phase 1 outbox starts uploading. Local workout files keep working.
+- *Settled in stage P2-1b (ADR 0014 section 8):* the outbox uploads through `HttpSyncProvider` (§4.9); Settings, Sync shows the
+  waiting count, the last success and the last error, and has **Send now**. The list of planned workouts is stage P2-2.
 
 ## 6. Phase 3: Statistics and analysis
 
@@ -650,7 +673,9 @@ path: everything is under `/v1`.
 - **Failure**: `{ "error": { "code", "message" } }` with a stable `code` from a closed list (`api-error.schema.json`): `400`
   `invalid_json`, `invalid_ride_id`; `401` `unauthorized`; `404` `not_found`; `413` `payload_too_large` (16 MiB record, 8 MiB
   FIT); `415` `unsupported_media_type`; `422` `invalid_record`, `ride_id_mismatch`, `invalid_fit`; `500` `internal_error`. The
-  tablet retries `5xx` and network errors, treats `401` as "token rejected" and other `4xx` as permanent (ADR 0014 section 6).
+  tablet retries `5xx` and network errors, treats `401` as "token rejected" and other `4xx` as permanent (ADR 0014 section 6),
+  except that `408` and `429` are retried and a `404 ride_not_found` for the FIT of a record it has just stored is retried too
+  (section 8).
 
 ### 8.4 MCP tools
 

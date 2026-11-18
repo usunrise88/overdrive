@@ -7,8 +7,8 @@ import java.util.Locale
 /**
  * A secret kept in the settings (the sync token, spec §4.9): it prints as bullets, never as its value, so a settings object
  * that ends up in a log line, an exception message or a test failure cannot leak it. Equality is by value, so a changed
- * token is a changed setting. Use [value] only where the secret itself is needed: the field that edits it and, in Phase 2,
- * the request that sends it.
+ * token is a changed setting. Use [value] only where the secret itself is needed: the field that edits it and the request
+ * that sends it.
  */
 class SecretText(
     val value: String = "",
@@ -30,7 +30,13 @@ sealed interface UrlCheck {
     /** An address the app accepts, in the form that is stored. */
     data class Valid(
         val url: String,
-    ) : UrlCheck
+    ) : UrlCheck {
+        /**
+         * Whether the token and the rides would travel encrypted. A plain `http://` address is accepted (a bench on the local
+         * network) but the Settings screen says so: anyone on the network could read the token.
+         */
+        val isEncrypted: Boolean get() = url.startsWith("https://")
+    }
 
     /** Not stored. [reason] is plain words for the field. */
     data class Invalid(
@@ -39,8 +45,8 @@ sealed interface UrlCheck {
 }
 
 /**
- * The rules of the sync settings (spec §4.9): the service address and the token are **stored and unused** in Phase 1, and
- * the rules are what keeps a damaged or hand-edited settings file from putting anything odd where Phase 2 will read it.
+ * The rules of the sync settings (spec §4.9): the service address and the token are what the upload to the service reads
+ * (ADR 0014), and the rules are what keeps a damaged or hand-edited settings file from putting anything odd where it does.
  *
  * - **Address:** `http://` or `https://`, a host, an optional port and path, at most 2048 characters, no spaces or control
  *   characters, **no user name or password in it** (that is what the token field is for). The scheme and the host are

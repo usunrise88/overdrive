@@ -10,14 +10,30 @@ public sealed interface SyncResult {
         val reason: String? = null,
     ) : SyncResult
 
-    /** There is nowhere to upload to (no URL, no token, Phase 1): keep everything and wait for a [SyncCoordinator.kick]. */
+    /** There is nowhere to upload to (no URL, no token): keep everything and wait for a [SyncCoordinator.kick]. */
     public data object NotConfigured : SyncResult
+
+    /**
+     * The destination does not accept the credentials (HTTP 401, ADR 0014 section 6). Retrying with the same address and token
+     * cannot help, so the coordinator stops without backing off, keeps every ride, and waits for a [SyncCoordinator.kick]:
+     * a changed setting or the rider's **Send now**.
+     */
+    public data object TokenRejected : SyncResult
+
+    /**
+     * The destination refused **this ride** for good (a 4xx other than 401, ADR 0014 section 6): sending it again as it is
+     * will not change the answer. [message] is the destination's short reason in plain words. The coordinator keeps the ride
+     * in the outbox, remembers the refusal for the Settings line, **does not retry it in a loop** and carries on with the
+     * rides behind it; a changed setting or **Send now** tries it once more.
+     */
+    public data class Refused(
+        val message: String,
+    ) : SyncResult
 }
 
 /**
- * Where finished rides go (spec §4.9). Phase 1 has only [NoopSyncProvider]; Phase 2 adds the one that talks to the service,
- * and the ride code never changes. **There is no network code and no payload format here**: what [upload] sends and how is
- * Phase 2's (spec §5, §8.3), and the result type may grow with it.
+ * Where finished rides go (spec §4.9). Phase 1 had only [NoopSyncProvider]; Phase 2 adds [HttpSyncProvider], which talks to
+ * the service, and the ride code never changed.
  */
 public interface SyncProvider {
     /** A short name for the log and the settings screen. */

@@ -444,4 +444,188 @@ class SyncCoordinatorTest {
         }
 
     // endregion
+
+    // region a rejected token and refused rides (stage P2-1b)
+
+    /** A provider whose answer depends on the ride, with the asks written down. */
+    private class RideProvider(
+        private val byRide: MutableMap<String, SyncResult> = mutableMapOf(),
+    ) : SyncProvider {
+        override val name = "by ride"
+        val asked = mutableListOf<String>()
+
+        fun answer(
+            id: String,
+            result: SyncResult,
+        ) {
+            byRide[id] = result
+        }
+
+        override suspend fun upload(entry: OutboxEntry): SyncResult {
+            asked += entry.rideId
+            return byRide[entry.rideId] ?: SyncResult.Acknowledged
+        }
+    }
+
+    private class FixedClock(
+        var millis: Long,
+    ) : kotlin.time.Clock {
+        override fun now() = kotlin.time.Instant.fromEpochMilliseconds(millis)
+    }
+
+    @Test
+    fun `a rejected token stops the round without backing off, keeps every ride and waits to be kicked`() =
+        runTest {
+            val outbox = InMemoryOutbox()
+            val provider = RideProvider()
+            provider.answer("a", SyncResult.TokenRejected)
+            val sync = coordinator(outbox, { provider })
+            outbox.enqueue(entry("a", 1))
+            outbox.enqueue(entry("b", 2))
+            sync.start()
+            advance(10)
+            assertEquals(SyncStatus.TokenRejected(2), sync.status.value)
+            assertEquals(listOf("a"), provider.asked, "b was not tried with a token the service has just refused")
+            advance(60 * 60 * 1000L)
+            assertEquals(listOf("a"), provider.asked, "no schedule is running")
+            assertEquals(listOf("a", "b"), outbox.pending().map { it.rideId })
+
+            // The settings changed, the app kicked: the provider now accepts.
+            provider.answer("a", SyncResult.Acknowledged)
+            sync.kick()
+            advance(10)
+            assertEquals(emptyList(), outbox.pending())
+            assertEquals(SyncStatus.Idle(0), sync.status.value)
+        }
+
+    @Test
+    fun `a refused ride stays in the outbox, is not retried in a loop and does not hold up the rides behind it`() =
+        runTest {
+            val outbox = InMemoryOutbox()
+            val provider = RideProvider()
+            provider.answer("b", SyncResult.Refused("Ride b is already stored with different content"))
+            val sync = coordinator(outbox, { provider })
+            outbox.enqueue(entry("a", 1))
+            outbox.enqueue(entry("b", 2))
+            outbox.enqueue(entry("c", 3))
+            sync.start()
+            advance(10)
+            assertEquals(listOf("a", "b", "c"), provider.asked, "oldest first, and c was not held up by b")
+            assertEquals(listOf("b"), outbox.pending().map { it.rideId }, "b is kept, never dropped")
+            assertEquals(SyncStatus.Idle(1), sync.status.value, "nothing is left to try, one ride is stuck")
+            assertEquals(
+                listOf(RefusedRide("b", "Ride b is already stored with different content")),
+                sync.report.value.refused,
+            )
+            advance(60 * 60 * 1000L)
+            assertEquals(3, provider.asked.size, "no backoff, no loop")
+
+            // A plain kick (a ride finished) does not ask about b again; a ride that finished is sent.
+            sync.rideFinished(entry("d", 4))
+            advance(10)
+            assertEquals(listOf("a", "b", "c", "d"), provider.asked)
+            assertEquals(listOf("b"), outbox.pending().map { it.rideId })
+        }
+
+    @Test
+    fun `send now tries the refused rides once more, and one that is accepted leaves the report`() =
+        runTest {
+            val outbox = InMemoryOutbox()
+            val provider = RideProvider()
+            provider.answer("a", SyncResult.Refused("No"))
+            val sync = coordinator(outbox, { provider })
+            outbox.enqueue(entry("a", 1))
+            sync.start()
+            advance(10)
+            assertEquals(listOf(RefusedRide("a", "No")), sync.report.value.refused)
+
+            provider.answer("a", SyncResult.Refused("Still no"))
+            sync.kick(retryRefused = true)
+            advance(10)
+            assertEquals(listOf("a", "a"), provider.asked)
+            assertEquals(listOf(RefusedRide("a", "Still no")), sync.report.value.refused)
+
+            provider.answer("a", SyncResult.Acknowledged)
+            sync.kick(retryRefused = true)
+            advance(10)
+            assertEquals(emptyList(), outbox.pending())
+            assertEquals(emptyList(), sync.report.value.refused)
+            assertEquals(SyncStatus.Idle(0), sync.status.value)
+        }
+
+    @Test
+    fun `a send now that arrives during a failing upload ends the wait at once`() =
+        runTest {
+            val outbox = InMemoryOutbox()
+            val provider = ScriptedProvider().then(SyncResult.RetryLater("down"))
+            val sync = coordinator(outbox, { provider })
+            outbox.enqueue(entry("a", 1))
+            sync.start()
+            advance(10)
+            assertEquals(SyncStatus.WaitingToRetry(1, 5_000, "down"), sync.status.value)
+            sync.kick(retryRefused = true)
+            advance(10)
+            assertEquals(2, provider.asked.size, "tried at once, not after 5 s")
+            assertEquals(SyncStatus.Idle(0), sync.status.value)
+        }
+
+    @Test
+    fun `a refusal and a failure in one round - the failure backs off, the refusal waits`() =
+        runTest {
+            val outbox = InMemoryOutbox()
+            val provider = RideProvider()
+            provider.answer("a", SyncResult.Refused("No"))
+            provider.answer("b", SyncResult.RetryLater("down"))
+            val sync = coordinator(outbox, { provider })
+            outbox.enqueue(entry("a", 1))
+            outbox.enqueue(entry("b", 2))
+            sync.start()
+            advance(10)
+            assertEquals(SyncStatus.WaitingToRetry(2, 5_000, "down"), sync.status.value)
+            provider.answer("b", SyncResult.Acknowledged)
+            advance(5_000)
+            assertEquals(listOf("a", "b", "b"), provider.asked, "a was not asked again")
+            assertEquals(SyncStatus.Idle(1), sync.status.value)
+        }
+
+    @Test
+    fun `the report knows the last success, from an earlier run or from this one`() =
+        runTest {
+            val outbox = InMemoryOutbox()
+            val clock = FixedClock(1_700_000_500_000)
+            val sync =
+                SyncCoordinator(
+                    backgroundScope,
+                    outbox,
+                    { ScriptedProvider() },
+                    exact,
+                    testTimeSource,
+                    clock = clock,
+                    lastSuccessMillis = 1_600_000_000_000,
+                )
+            assertEquals(1_600_000_000_000, sync.report.value.lastSuccessMillis, "remembered from before")
+            sync.start()
+            sync.rideFinished(entry("a", 1))
+            advance(10)
+            assertEquals(1_700_000_500_000, sync.report.value.lastSuccessMillis)
+            clock.millis = 1_700_000_900_000
+            sync.rideFinished(entry("b", 2))
+            advance(10)
+            assertEquals(1_700_000_900_000, sync.report.value.lastSuccessMillis)
+        }
+
+    @Test
+    fun `the report starts empty and a failure leaves the last success alone`() =
+        runTest {
+            val outbox = InMemoryOutbox()
+            val provider = ScriptedProvider().then(SyncResult.RetryLater("down"))
+            val sync = coordinator(outbox, { provider })
+            assertEquals(SyncReport(), sync.report.value)
+            outbox.enqueue(entry("a", 1))
+            sync.start()
+            advance(10)
+            assertEquals(null, sync.report.value.lastSuccessMillis)
+        }
+
+    // endregion
 }

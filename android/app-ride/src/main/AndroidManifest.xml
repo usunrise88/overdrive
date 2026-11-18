@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- The overlay (spec §4.6, ADR 0006) and Bluetooth (spec §4.1, ADR 0010). Nothing here touches the network: the
-         ride app works fully offline, and there is no location permission.
+    <!-- The overlay (spec §4.6, ADR 0006), Bluetooth (spec §4.1, ADR 0010) and the upload of finished rides (spec §4.9,
+         ADR 0014). The ride app works fully offline; there is no location permission.
          SYSTEM_ALERT_WINDOW: the "Display over other apps" special access, granted by the rider in system settings.
          FOREGROUND_SERVICE, FOREGROUND_SERVICE_SPECIAL_USE and FOREGROUND_SERVICE_CONNECTED_DEVICE: the service that
          owns the window and keeps the ride and its trainer and strap links alive behind other apps. On Android 14 and
@@ -12,8 +12,10 @@
          POST_NOTIFICATIONS: the service's "Ride in progress" notification is shown on Android 13 and later only if
          the rider allows it; the overlay works either way.
          Rides (ADR 0008) and Bluetooth logs (ADR 0010) are private app data and need no permission: they are shared
-         through the FileProvider below and saved through the system file picker. The app has no network permission, and
-         allowBackup stays false. -->
+         through the FileProvider below and saved through the system file picker. allowBackup stays false.
+         INTERNET: the only network access, used only to send finished rides to the owner's own service, at the address
+         typed in Settings, Sync (ADR 0014). Nothing else: no network-state permission, no Play Services. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
@@ -30,9 +32,14 @@
         android:name="android.hardware.bluetooth_le"
         android:required="false" />
 
+    <!-- usesCleartextTraffic: Android 9 and later refuse plain http:// unless the app says it may use it. Settings, Sync
+         accepts a plain address for a bench on the local network and flags it "Not encrypted" (ADR 0014 sections 6 and 8);
+         the app makes no other request, so this reaches nothing but the address the owner typed. Remove it to make the
+         upload https-only. -->
     <application
         android:name=".OverdriveApp"
         android:allowBackup="false"
+        android:usesCleartextTraffic="true"
         android:label="Overdrive"
         android:theme="@style/Theme.Overdrive">
         <activity

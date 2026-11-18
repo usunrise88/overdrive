@@ -657,15 +657,24 @@ Everything a ride is, once, on all three devices, then the file it leaves.
 - [ ] **7.7 Optional, Strava virtual ride and map.** Upload the same file from the Strava web page, manually (Phase
   1 does not upload anything). Write down whether Strava keeps it as a virtual ride, and whether a map shows. Expect:
   unknown (spec §9 "Strava map for virtual rides"). Strava's sub-sport choice is FIT 2. Not needed for acceptance.
-- [ ] **7.8 Waiting to upload (spec §4.9).** Open **Settings, Sync**. Expect: **Service address** and **Token** both say "Not
-  used yet", and **Waiting to upload** counts the rides stored on the tablet (the finished ride of 7.1 is one of them; a
-  tablet updated from an alpha also queues every ride that was already stored, simulated ones included, once). Nothing is
-  sent: the app asks for no network permission (`adb shell dumpsys package app.overdrive.ride`, look for
-  `android.permission.INTERNET` in the permission lists: expect it absent; unverified output format). Type an address like
-  `https://example.org/api` and a token: its scheme and host are kept in lower case, `https://user:pw@host` is refused with a reason,
-  the token shows as dots until **Show**. Force-stop and relaunch (8.2): the count is unchanged and nothing is lost or
-  doubled, and the address and token are still there. Settles: spec §4.9 (a persistent outbox that survives restarts),
+- [ ] **7.8 Waiting to upload (spec §4.9).** Open **Settings, Sync** with no address and no token. Expect: **Waiting to
+  upload** counts the rides stored on the tablet (the finished ride of 7.1 is one of them; a tablet updated from an alpha
+  also queues every ride that was already stored, simulated ones included, once) and its line says "Add the address and the
+  token to send rides": nothing is sent. Type an address like `https://example.org/api` and a token: its scheme and host are
+  kept in lower case, `https://user:pw@host` is refused with a reason, `http://192.168.1.20:8080` is accepted and flagged "Not
+  encrypted", the token shows as dots until **Show**. (Typing a real address and token starts the upload: that is 7.9, so do
+  this check on a throwaway address, or before 7.9.) Force-stop and relaunch (8.2): the count is unchanged and nothing is lost
+  or doubled, and the address and token are still there. Settles: spec §4.9 (a persistent outbox that survives restarts),
   ADR 0012.
+- [ ] **7.9 Upload to the service (stage P2-1b, ADR 0014).** In **Settings, Sync** type `https://overdrive.llmto.day` and the
+  tablet's token (from the server's `DEVICE_TOKENS`, never from a chat). Within a few seconds expect: **Waiting to upload**
+  goes to "0 rides", **Last upload** says "Today" and the time, and the rides are on the server (`rides` table, or the
+  server's log line "ride record" and "ride fit file" per ride) and, once the intervals.icu step exists, there. Try the failures:
+  a wrong token says "The service did not accept the token. Check the token above" and sends nothing more until the token
+  changes or **Send now**; flight mode says "Service unreachable. Trying again soon", and the ride goes by itself (or at once
+  with **Send now**) when the network is back. Finish a new ride and watch it upload with the app in the background. Write
+  down the time from the end of the ride to the server's log line, and anything the Settings line said that was not plain.
+  Settles: ADR 0014 section 8 (what only the tablet can show).
 
 ---
 
@@ -860,6 +869,7 @@ the app in the background and with the screen off, a 60-minute ride, the laps an
 | 7.6 Distance and speed | | | |
 | 7.7 Strava (optional) | | | |
 | 7.8 Waiting to upload | | | |
+| 7.9 Upload to the service | | | |
 | 8.1 to 8.3 Crash recovery (AC 5) | | | |
 | 8.4 Swipe away | | | |
 | 8.5 The outbox survives it | | | |

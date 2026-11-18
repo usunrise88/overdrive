@@ -27,7 +27,7 @@ import java.io.File
 
 /**
  * Sharing a FIT file (ADR 0008): one `content://` URI for one file under `files/rides/`, served by a provider that nothing
- * else can reach, and an app that has no network permission and is not backed up.
+ * else can reach, and an app whose only network permission is INTERNET (to upload rides) and that is not backed up.
  */
 @RunWith(RobolectricTestRunner::class)
 // A plain Application, not OverdriveApp: OverdriveApp builds the container at start, whose ride library scans
@@ -142,11 +142,14 @@ class RideFilesTest {
     }
 
     @Test
-    fun theAppAsksForNoNetworkAndIsNotBackedUp() {
+    fun theAppAsksForTheInternetAndNothingElseOfTheNetworkAndIsNotBackedUp() {
         val info = context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS)
         val requested = info.requestedPermissions.orEmpty().toList()
-        assertFalse(requested.contains(Manifest.permission.INTERNET))
+        // The upload of finished rides to the owner's service (ADR 0014): INTERNET, and no more of the network than that.
+        assertTrue(requested.contains(Manifest.permission.INTERNET))
         assertFalse(requested.contains(Manifest.permission.ACCESS_NETWORK_STATE))
+        assertFalse(requested.contains(Manifest.permission.CHANGE_NETWORK_STATE))
+        assertFalse(requested.contains(Manifest.permission.ACCESS_WIFI_STATE))
         // Bluetooth needs the Nearby-devices permissions only: a location permission would be a worse question to ask.
         assertFalse(requested.contains(Manifest.permission.ACCESS_FINE_LOCATION))
         assertFalse(requested.contains(Manifest.permission.ACCESS_COARSE_LOCATION))

@@ -99,6 +99,39 @@ FIT from where the ride is stored; the outbox entry stays free of payload (ADR 0
 - **Compose** passes `DATABASE_URL` (built from `POSTGRES_PASSWORD`, which must therefore be URL-safe) and `DEVICE_TOKENS`, and the
   server waits for the database to be healthy.
 
+### 8. Settled in the implementation (stage P2-1b, the tablet)
+
+- **Where it lives.** The provider's logic is in `core` (`HttpSyncProvider`, over an `HttpTransport` interface and a
+  `RidePayloads` source, tested against a scripted transport); `android/data` has the `HttpURLConnection` transport
+  (`UrlConnectionTransport`: 10 s to connect, 30 s to wait for the answer, a fixed-length streamed body, no redirects followed,
+  nothing logged) and `StoredRidePayloads`. The tablet already keeps `<id>.json` and `<id>.fit` (ADR 0008), so **both are sent as
+  stored**; the FIT is not regenerated. A ride whose files are gone or damaged, or larger than the limits of section 7, is a
+  refusal of that ride, not a retry.
+- **The ride's own id.** The outbox entry holds the file-safe form of the id; the path uses `ride.id` read from the record, which
+  is what the service keys by and checks. An id the service would not accept is refused before anything is sent.
+- **What counts as success.** 200 or 201 **and** a body that is the service's upload response for this ride id. A bare 200 (a
+  proxy, the wrong server) is `RetryLater("That is not the Overdrive service")`, so a ride is never forgotten on a guess.
+- **Status table** (beyond section 6): `401` is `TokenRejected`; `408`, `429`, `5xx`, no answer, a redirect (a `PUT` cannot follow
+  one) and any other unexpected status are `RetryLater` with a plain reason; `409`, `422` and every other `4xx` are `Refused` with
+  the service's message; **one exception**, a `404 ride_not_found` on the FIT right after the record was stored (the service lost
+  it) is a retry, since the next attempt sends both again. A token that is not visible ASCII is `TokenRejected` without a request.
+- **A rejected token** is remembered by the provider with the address and token it was rejected for, so nothing is sent while
+  they are unchanged, however often the coordinator is kicked. A changed address or token, or **Send now**, asks again.
+- **Refused rides** stay in the outbox (a ride is never dropped for a refusal) and are skipped by the coordinator for the life of
+  the process: no retry loop, no hold-up of the rides behind. They are listed in `SyncCoordinator.report` for Settings. A new
+  process tries each once more (a server fixed meanwhile may take it); a changed setting or **Send now** does too. The refusal is
+  **not persisted**: the cost is one extra request pair per refused ride at each start, and the outbox journal (ADR 0012) stays as
+  it is.
+- **Settings take effect without a restart.** The provider reads the address and token at every upload; the container kicks the
+  coordinator 1.5 s after the last change (typing a token is one change per letter, and each would otherwise be a request with a
+  partial token). The last success time is kept in `filesDir/sync/last-upload` (one number, written atomically).
+- **Plain `http://`.** It stays accepted and is flagged "Not encrypted" in Settings. On Android 9 and later it only works because
+  the manifest sets `android:usesCleartextTraffic="true"`, so the ride app permits cleartext to the one address the owner typed
+  (it makes no other request). Removing the attribute makes the upload https-only; nothing else changes.
+- **Not decided here (the real tablet and server).** The Android `HttpURLConnection` is OkHttp underneath and may answer a streamed
+  `401` differently from the JDK used in the tests (the status is read the same way; the body of a 401 is not needed).
+  Early-closed connections from a proxy that answers before it has read the body show as "Service unreachable" and are retried.
+
 ## Consequences
 
 - One extra file per ride on the wire (the FIT), in exchange for no FIT writer in TypeScript and no regeneration on the server.
