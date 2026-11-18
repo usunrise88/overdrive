@@ -64,7 +64,7 @@
             android:foregroundServiceType="connectedDevice|specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Draws the ride's numbers in a small window over other apps while the rider watches video, and keeps the ride and its Bluetooth trainer and heart-rate links alive" />
+                android:value="Draws the ride's numbers in a small window over other apps while the rider watches video, and keeps the ride, its Bluetooth trainer, heart-rate and handlebar-controller links and the controller's actions alive" />
         </service>
     </application>
 </manifest>

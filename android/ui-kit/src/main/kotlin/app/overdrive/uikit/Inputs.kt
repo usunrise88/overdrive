@@ -25,18 +25,24 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -49,6 +55,10 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -323,4 +333,53 @@ fun SettingRow(
             control()
         }
     }
+}
+
+/**
+ * A single-line text field (design/system.md §7.8): 48 dp, surface 2, hairline edge, radius 8, body text; the edge is
+ * the strong hairline while it has focus. A [secret] field shows bullets and asks the keyboard for no suggestions. A
+ * message about the text (a mistake in an address) is the caller's: a label under the field in text 2.
+ */
+@Composable
+fun OdTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    placeholder: String = "",
+    secret: Boolean = false,
+    keyboardType: KeyboardType = KeyboardType.Text,
+) {
+    var focused by remember { mutableStateOf(false) }
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier =
+            modifier
+                .height(OverdriveDimens.sizeTouchMin)
+                .surface(
+                    OverdriveColors.surface2,
+                    md,
+                    if (focused) OverdriveColors.borderStrong else OverdriveColors.border,
+                ).onFocusChanged { focused = it.isFocused }
+                .semantics { this.contentDescription = contentDescription },
+        singleLine = true,
+        textStyle = OdType.body.copy(color = OverdriveColors.textPrimary),
+        cursorBrush = SolidColor(OverdriveColors.textPrimary),
+        visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
+        keyboardOptions =
+            KeyboardOptions(
+                keyboardType = if (secret) KeyboardType.Password else keyboardType,
+                autoCorrectEnabled = false,
+                imeAction = ImeAction.Done,
+            ),
+        decorationBox = { inner ->
+            Box(Modifier.padding(horizontal = 16.dp), contentAlignment = Alignment.CenterStart) {
+                if (value.isEmpty()) {
+                    OdText(placeholder, style = OdType.body, color = OverdriveColors.textTertiary, maxLines = 1)
+                }
+                inner()
+            }
+        },
+    )
 }

@@ -1,5 +1,9 @@
 package app.overdrive.ride.host
 
+import app.overdrive.core.click.UnlockSignal
+import app.overdrive.core.control.ActionRouter
+import app.overdrive.core.control.ClickAction
+import app.overdrive.core.control.MediaKeys
 import app.overdrive.core.device.ConnectionState
 import app.overdrive.core.record.CompositeRideRecorder
 import app.overdrive.core.record.InMemoryRideRecorder
@@ -8,7 +12,6 @@ import app.overdrive.core.ride.FlatStep
 import app.overdrive.core.ride.RideSession
 import app.overdrive.core.ride.RideSnapshot
 import app.overdrive.core.ride.RideState
-import app.overdrive.core.ride.TrainerMode
 import app.overdrive.core.ride.flatSteps
 import app.overdrive.ride.rides.RideDiskLog
 import app.overdrive.ride.rides.RidePersistence
@@ -129,8 +132,14 @@ class RideHost(
     /** Trainer, strap and Click, for the Devices screen and the top bar. */
     val devices: StateFlow<DevicesUi> = mutableDevices.asStateFlow()
 
-    /** The action dispatcher behind every ride button; the Click's gesture layer (M4) uses the same one. */
-    val actions: RideActions = RideActions({ active?.handle?.session }, { mutableSnapshots.value })
+    /**
+     * The action dispatcher behind every ride button. It delegates to core's [ActionRouter], the rule the Click's gesture
+     * layer uses too (ADR 0012), reading the ride's state from the session itself.
+     */
+    val actions: RideActions = RideActions({ currentSession() })
+
+    /** The session of the ride in the making or under way, or null before the first is built. The Click's router reads it. */
+    fun currentSession(): RideSession? = active?.handle?.session
 
     /** The latest of [rideTriggers]; null until the first one arrives. */
     private val trigger = MutableStateFlow<Any?>(null)
@@ -341,14 +350,30 @@ class RideHost(
 }
 
 /**
- * Every ride button as one function (design/system.md §12: "one action dispatcher"). The ride screen's buttons and,
- * from M4, the Click's gesture layer call these; the routing rule of spec §4.7 lives here once: in an ERG step the
- * gear buttons change the intensity.
+ * Every ride button as one function (design/system.md §12: "one action dispatcher"). The ride screen's buttons call
+ * these, and the Click's gesture layer calls the same rule: **the routing rule of spec §4.7 lives once, in core's
+ * [ActionRouter]**, and the actions that have a rule (the two gear buttons, the interval skips and the pause toggle)
+ * delegate to it here, so an on-screen button and a handlebar button can never diverge (ADR 0012). Only the commands
+ * with no rule (start, finish, and the explicit pause and resume buttons) go straight to the session.
+ *
+ * @param session the ride to drive, read at every action (the host's session changes from ride to ride).
+ * @param snapshot where the router reads the step's mode and the ride's state. Leave it out to read them from the session
+ * itself, which is what the host does: the Click reads the same, so the two cannot see different rides. A preview or a
+ * test with its own state passes it.
  */
 class RideActions(
     private val session: () -> RideSession?,
-    private val snapshot: () -> RideSnapshot,
+    snapshot: (() -> RideSnapshot)? = null,
+    media: MediaKeys = NoMedia,
 ) {
+    /** The one rule. Exposed so the container can give the same one to the Click, with the real media keys. */
+    val router: ActionRouter =
+        if (snapshot == null) {
+            ActionRouter(session, media)
+        } else {
+            ActionRouter(session, media) { snapshot() }
+        }
+
     fun start() = session()?.start()
 
     fun pause() = session()?.pause()
@@ -356,29 +381,19 @@ class RideActions(
     fun resume() = session()?.resume()
 
     /** The Click's long press on button 3: pause while riding, resume while paused. */
-    fun togglePause() {
-        when (snapshot().state) {
-            RideState.RIDING -> pause()
-            RideState.PAUSED -> resume()
-            else -> Unit
-        }
-    }
+    fun togglePause() = router.dispatch(ClickAction.TOGGLE_RIDE_PAUSE)
 
     fun finish() = session()?.finish()
 
-    fun nextInterval() = session()?.nextInterval()
+    fun nextInterval() = router.dispatch(ClickAction.NEXT_INTERVAL)
 
-    fun previousInterval() = session()?.previousInterval()
+    fun previousInterval() = router.dispatch(ClickAction.PREVIOUS_INTERVAL)
 
     /** One gear harder, or in an ERG step the intensity 5 points up. */
-    fun levelUp() {
-        if (snapshot().mode == TrainerMode.ERG) session()?.intensityUp() else session()?.gearUp()
-    }
+    fun levelUp() = router.dispatch(ClickAction.GEAR_UP)
 
     /** One gear easier, or in an ERG step the intensity 5 points down. */
-    fun levelDown() {
-        if (snapshot().mode == TrainerMode.ERG) session()?.intensityDown() else session()?.gearDown()
-    }
+    fun levelDown() = router.dispatch(ClickAction.GEAR_DOWN)
 }
 
 /** Maps device link states to the rows of the Devices screen (design/system.md §7.7). */
@@ -432,11 +447,19 @@ object DeviceRows {
             click = clickRow(click),
         )
 
-    /** The Click row: simulated until M4 brings the real one (developer setting), in Bluetooth mode as well. */
+    /** The Click row with **simulated devices** (developer setting); the real Click's is `BleDeviceRows.clickRow`. */
     fun clickRow(click: SimulatedClick): DeviceRowUi =
         when (click) {
-            SimulatedClick.Connected -> DeviceRowUi(DeviceStatus.Connected, "Simulated Click")
-            SimulatedClick.Locked -> DeviceRowUi(DeviceStatus.Locked, "Simulated Click · connected")
-            SimulatedClick.NotPaired -> DeviceRowUi(DeviceStatus.NotPaired, "Not paired")
+            SimulatedClick.Connected -> {
+                DeviceRowUi(DeviceStatus.Connected, "Simulated Click")
+            }
+
+            SimulatedClick.Locked -> {
+                DeviceRowUi(DeviceStatus.Locked, "Simulated Click · connected", locked = UnlockSignal.NO_EVENTS)
+            }
+
+            SimulatedClick.NotPaired -> {
+                DeviceRowUi(DeviceStatus.NotPaired, "Not paired")
+            }
         }
 }

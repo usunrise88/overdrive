@@ -1,6 +1,7 @@
 package app.overdrive.ride.host
 
 import androidx.compose.runtime.Immutable
+import app.overdrive.core.click.UnlockSignal
 import app.overdrive.core.record.RideRecord
 import app.overdrive.core.record.RideSummary
 import app.overdrive.core.ride.FlatStep
@@ -119,6 +120,11 @@ data class DeviceRowUi(
     val subtitle: String,
     /** The row has a paired device that **Forget** can remove. */
     val canForget: Boolean = false,
+    /**
+     * Set on a Click row that looks locked by Zwift, with the sign that showed it, for the notice below the row (spec
+     * §4.7, ADR 0012): its service is hidden, or it answered and sent nothing. Null for every other row.
+     */
+    val locked: UnlockSignal? = null,
 )
 
 /** Why Bluetooth cannot be used right now, as the rider can fix it (design/system.md §6.5). */

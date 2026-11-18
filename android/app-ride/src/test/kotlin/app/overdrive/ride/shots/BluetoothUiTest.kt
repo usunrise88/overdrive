@@ -53,7 +53,7 @@ class BluetoothUiTest : ShotTest() {
 
     private val trainerOk = DeviceRowUi(DeviceStatus.Connected, "D500", canForget = true)
     private val strapOk = DeviceRowUi(DeviceStatus.Connected, "HR7", canForget = true)
-    private val click = DeviceRowUi(DeviceStatus.Connected, "Simulated Click")
+    private val click = DeviceRowUi(DeviceStatus.Connected, "Zwift Click (right)", canForget = true)
     private val none = DeviceRowUi(DeviceStatus.NotPaired, "Not paired")
 
     private val connected = DevicesUi(trainerOk, strapOk, click)
@@ -395,10 +395,12 @@ class BluetoothUiTest : ShotTest() {
     }
 
     @Test
-    fun theClickRowStaysThePlaceholderOfM4() {
+    fun theClickRowShowsItsNameAndLearningIsOfferedWithAConnectedClick() {
         devices(connected)
-        rule.onNodeWithText("Simulated Click").assertIsDisplayed()
-        rule.onNodeWithText("Change button mapping").assertIsNotEnabled()
+        rule.onNodeWithText("Zwift Click (right)").assertIsDisplayed()
+        rule.onNodeWithText("Learn buttons").assertIsEnabled()
+        // The default mapping is on: there is nothing to reset.
+        rule.onNodeWithText("Reset to default").assertIsNotEnabled()
     }
 
     @Test

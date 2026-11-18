@@ -9,6 +9,9 @@ import app.overdrive.core.ble.HeartRateUuids
 import app.overdrive.core.ble.ScanEvent
 import app.overdrive.core.ble.ScanFailure
 import app.overdrive.core.ble.ScanFilter
+import app.overdrive.core.click.ClickAdvertisements
+import app.overdrive.core.click.ClickOptions
+import app.overdrive.core.click.ClickSide
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
@@ -52,8 +55,10 @@ data class PairingUi(
     val timedOut: Boolean = false,
     /** A scan has run since the screen was opened, so an empty list means "nothing found", not "not looked yet". */
     val scanned: Boolean = false,
+    /** The Zwift Click pucks heard, by side: "Zwift Click (right)". */
+    val clicks: List<FoundDevice> = emptyList(),
 ) {
-    val isEmpty: Boolean get() = trainers.isEmpty() && straps.isEmpty()
+    val isEmpty: Boolean get() = trainers.isEmpty() && straps.isEmpty() && clicks.isEmpty()
 }
 
 /**
@@ -73,6 +78,8 @@ class PairingController(
     private val scanTimeout: Duration = 30.seconds,
     private val staleAfter: Duration = 12.seconds,
     private val timeSource: TimeSource = TimeSource.Monotonic,
+    /** The Click's options at the time of a scan or of a result: which pucks count and whether the service is required. */
+    private val clickOptions: () -> ClickOptions = { ClickOptions() },
 ) {
     /** An advertisement and when it was heard. */
     private class Heard(
@@ -94,21 +101,39 @@ class PairingController(
 
     /** The scan panel's state: what was heard, which of it is paired, and how the scan is doing. */
     val state: StateFlow<PairingUi> =
-        combine(heard, progress, devices.trainer, devices.strap) { found, progress, trainer, strap ->
+        combine(
+            heard,
+            progress,
+            devices.trainer,
+            devices.strap,
+            devices.click,
+        ) { found, progress, trainer, strap, click ->
             val trainers = mutableListOf<FoundDevice>()
             val straps = mutableListOf<FoundDevice>()
+            val clicks = mutableListOf<FoundDevice>()
+            val options = clickOptions()
             for (advertisement in found.values.map { it.advertisement }) {
-                val role = roleOf(advertisement) ?: continue
-                val pairedId = (if (role == DeviceRole.Trainer) trainer?.remembered else strap?.remembered)?.id
+                val who = identify(advertisement, options) ?: continue
+                val role = who.role
+                val pairedId =
+                    when (role) {
+                        DeviceRole.Trainer -> trainer?.remembered
+                        DeviceRole.Strap -> strap?.remembered
+                        DeviceRole.Click -> click?.remembered
+                    }?.id
                 val device =
                     FoundDevice(
                         id = advertisement.id,
                         role = role,
-                        name = cleanDeviceName(advertisement.name, role),
+                        name = who.name,
                         rssi = (advertisement.rssi / RSSI_STEP.toDouble()).roundToInt() * RSSI_STEP,
                         paired = advertisement.id == pairedId,
                     )
-                if (role == DeviceRole.Trainer) trainers += device else straps += device
+                when (role) {
+                    DeviceRole.Trainer -> trainers += device
+                    DeviceRole.Strap -> straps += device
+                    DeviceRole.Click -> clicks += device
+                }
             }
             PairingUi(
                 scanning = progress.scanning,
@@ -117,6 +142,7 @@ class PairingController(
                 failure = progress.failure,
                 timedOut = progress.timedOut,
                 scanned = progress.scanned,
+                clicks = clicks.sortedWith(compareBy({ it.name }, { -it.rssi })),
             )
         }.stateIn(scope, SharingStarted.Eagerly, PairingUi())
 
@@ -139,7 +165,7 @@ class PairingController(
                                         heard.update { it.filterValues { entry -> entry.isAlive() } }
                                     }
                                 }
-                            scanner.scan(FILTER).collect { event ->
+                            scanner.scan(filter()).collect { event ->
                                 when (event) {
                                     is ScanEvent.Found -> {
                                         val entry = Heard(event.advertisement, timeSource.markNow())
@@ -183,17 +209,46 @@ class PairingController(
         scope.launch { devices.forget(role) }
     }
 
-    private fun roleOf(advertisement: Advertisement): DeviceRole? =
-        when {
-            FtmsUuids.SERVICE in advertisement.serviceUuids -> DeviceRole.Trainer
-            HeartRateUuids.SERVICE in advertisement.serviceUuids -> DeviceRole.Strap
-            else -> null
-        }
+    /** What a heard advertisement is, and the name the list shows for it. */
+    private class Identified(
+        val role: DeviceRole,
+        val name: String,
+    )
 
-    private companion object {
-        /** The services of a trainer and of a strap; the scanner filters on them (docs/adr/0010). */
-        val FILTER = ScanFilter(setOf(FtmsUuids.SERVICE, HeartRateUuids.SERVICE))
-        const val RSSI_STEP = 5
-        val SWEEP_INTERVAL = 2.seconds
+    private fun identify(
+        advertisement: Advertisement,
+        options: ClickOptions,
+    ): Identified? {
+        if (FtmsUuids.SERVICE in advertisement.serviceUuids) {
+            return Identified(DeviceRole.Trainer, cleanDeviceName(advertisement.name, DeviceRole.Trainer))
+        }
+        if (HeartRateUuids.SERVICE in advertisement.serviceUuids) {
+            return Identified(DeviceRole.Strap, cleanDeviceName(advertisement.name, DeviceRole.Strap))
+        }
+        // A Click is told by its manufacturer data and its service, never by its name (docs/protocols/click-v2.md §1); the
+        // side is part of what the rider reads, because only the right puck drives a ride (spec §4.7).
+        val match = ClickAdvertisements.recognise(advertisement, options) ?: return null
+        return Identified(DeviceRole.Click, clickName(match.side))
+    }
+
+    /**
+     * What a scan listens for: the services of a trainer, a strap and a Click (docs/adr/0010, 0012), or **everything**
+     * when the Click's service is not required in its advertisement (a developer setting for bench question CK 12), because
+     * then the Click can only be told by its manufacturer data.
+     */
+    private fun filter(): ScanFilter {
+        val options = clickOptions()
+        if (!options.requireAdvertisedService) return ScanFilter()
+        return ScanFilter(
+            setOf(FtmsUuids.SERVICE, HeartRateUuids.SERVICE) + ClickAdvertisements.scanFilter(options).serviceUuids,
+        )
+    }
+
+    companion object {
+        /** The name a Click goes by on the Devices screen and in the store: its side is what the rider needs to know. */
+        fun clickName(side: ClickSide): String = "Zwift Click (${side.name.lowercase()})"
+
+        private const val RSSI_STEP = 5
+        private val SWEEP_INTERVAL = 2.seconds
     }
 }

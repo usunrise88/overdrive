@@ -71,7 +71,7 @@ class BleRideHostTest {
         choice: RideChoice = RideChoice.Planned(erg),
     ): Rig {
         val rows =
-            BleDevicesModel(world.devices, world.ble, settings.map { it.simulatedClick }, testTimeSource).ui
+            BleDevicesModel(world.devices, world.ble, testTimeSource).ui
         val host =
             RideHost(
                 factory =

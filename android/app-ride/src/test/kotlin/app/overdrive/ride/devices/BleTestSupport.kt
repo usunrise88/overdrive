@@ -9,6 +9,7 @@ import app.overdrive.core.ble.DeviceId
 import app.overdrive.core.ble.GattScanner
 import app.overdrive.core.ble.GattTransportFactory
 import app.overdrive.core.ble.fake.FakeBle
+import app.overdrive.core.ble.fake.FakeClick
 import app.overdrive.core.ble.fake.FakeFtmsTrainer
 import app.overdrive.core.ble.fake.FakeHeartRateStrap
 import app.overdrive.core.ble.link.BackoffPolicy
@@ -25,6 +26,7 @@ import org.junit.Assert.assertEquals
 internal val TRAINER_ID = DeviceId("test-trainer")
 internal val STRAP_ID = DeviceId("test-strap")
 internal val OTHER_TRAINER_ID = DeviceId("test-trainer-2")
+internal val CLICK_ID = DeviceId("test-click")
 
 private const val NANOS_PER_MILLI = 1_000_000L
 
@@ -59,11 +61,13 @@ internal class BleWorld(
     val fakeTrainer = FakeFtmsTrainer()
     val fakeStrap = FakeHeartRateStrap()
     val otherTrainer = FakeFtmsTrainer(advertisedName = "Other D500")
+    val fakeClick = FakeClick()
 
     init {
         ble.add(TRAINER_ID, fakeTrainer)
         ble.add(STRAP_ID, fakeStrap)
         ble.add(OTHER_TRAINER_ID, otherTrainer)
+        ble.add(CLICK_ID, fakeClick)
     }
 
     val devices =
@@ -76,10 +80,14 @@ internal class BleWorld(
             timeSource = test.testTimeSource,
         )
 
-    /** Pairs both devices in the store and starts, as a launch after the rider had paired them. */
-    suspend fun launchPaired() {
+    /**
+     * Pairs the trainer and the strap (and the Click, with [withClick]) in the store and starts, as a launch after the
+     * rider had paired them.
+     */
+    suspend fun launchPaired(withClick: Boolean = false) {
         store.remember(DeviceRole.Trainer, RememberedDevice(TRAINER_ID, "D500"))
         store.remember(DeviceRole.Strap, RememberedDevice(STRAP_ID, "HR7"))
+        if (withClick) store.remember(DeviceRole.Click, RememberedDevice(CLICK_ID, "Zwift Click (right)"))
         devices.start()
         advance(2_000)
     }

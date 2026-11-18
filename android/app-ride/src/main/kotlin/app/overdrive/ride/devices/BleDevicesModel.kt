@@ -4,11 +4,10 @@ import app.overdrive.core.ble.BleAvailability
 import app.overdrive.core.ble.BleEnvironment
 import app.overdrive.core.ble.link.LinkFailureKind
 import app.overdrive.core.ble.link.LinkStatus
+import app.overdrive.core.click.ClickState
 import app.overdrive.ride.host.DeviceRowUi
-import app.overdrive.ride.host.DeviceRows
 import app.overdrive.ride.host.DevicesUi
 import app.overdrive.ride.host.RadioIssue
-import app.overdrive.ride.settings.SimulatedClick
 import app.overdrive.uikit.DeviceStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -25,6 +24,15 @@ internal data class RoleState(
     val device: RememberedDevice?,
     val status: LinkStatus?,
     /** Seconds until the next attempt while [status] is a retry wait; null otherwise. */
+    val retryInSeconds: Int?,
+)
+
+/** What the Click is doing, for its row: the paired puck, its state, its battery and the retry countdown. */
+internal data class ClickRowState(
+    val device: RememberedDevice?,
+    val state: ClickState?,
+    val battery: Int?,
+    /** Seconds until the next attempt while [state] is a retry wait; null otherwise. */
     val retryInSeconds: Int?,
 )
 
@@ -52,14 +60,7 @@ object BleDeviceRows {
         retryInSeconds: Int? = null,
     ): DeviceRowUi {
         if (name == null) return DeviceRowUi(DeviceStatus.NotPaired, "Not paired")
-        val blocked =
-            when (availability) {
-                BleAvailability.READY -> null
-                BleAvailability.BLUETOOTH_OFF -> "$name · Bluetooth is off"
-                BleAvailability.PERMISSION_DENIED -> "$name · needs Nearby devices"
-                BleAvailability.UNSUPPORTED -> "$name · no Bluetooth on this tablet"
-            }
-        if (blocked != null) return DeviceRowUi(DeviceStatus.Blocked, blocked, canForget = true)
+        blockedRow(name, availability)?.let { return it }
         return when (status) {
             LinkStatus.Connected -> {
                 DeviceRowUi(DeviceStatus.Connected, name, canForget = true)
@@ -80,12 +81,90 @@ object BleDeviceRows {
         }
     }
 
+    /**
+     * The Click's row (ADR 0012, spec §4.7), in plain words:
+     *
+     * | State | Row |
+     * |---|---|
+     * | not paired | Not paired, **Pair** |
+     * | Bluetooth off, permission missing | the same blocked row as the others |
+     * | connecting, or connected and waiting for a first message | searching: "Connecting to …" or "… · checking it answers" |
+     * | connected and delivering | connected: the name, with "battery 87%" once the Click said |
+     * | not found, or a link that dropped, or a set-up that failed | "Not found · retrying in 8 s", "Connection lost · …", "Could not connect · …" and **Retry now** |
+     * | locked (the Zwift service is hidden, or it answers and says nothing) | locked: "… · locked" and the unlock notice below the row |
+     *
+     * Nothing about the Click is ever an error for the ride: every state but "connected" means "carry on with the on-screen
+     * controls".
+     */
+    fun clickRow(
+        name: String?,
+        state: ClickState?,
+        battery: Int?,
+        availability: BleAvailability,
+        retryInSeconds: Int? = null,
+    ): DeviceRowUi {
+        if (name == null) return DeviceRowUi(DeviceStatus.NotPaired, "Not paired")
+        blockedRow(name, availability)?.let { return it }
+        val wait = waitText(retryInSeconds)
+        return when (state) {
+            ClickState.Active -> {
+                val level = battery?.takeIf { it in 0..PERCENT }?.let { " · battery $it%" }.orEmpty()
+                DeviceRowUi(DeviceStatus.Connected, "$name$level", canForget = true)
+            }
+
+            ClickState.Waiting -> {
+                DeviceRowUi(DeviceStatus.Searching, "$name · checking it answers", canForget = true)
+            }
+
+            is ClickState.NotFound -> {
+                val lead = if (state.wasConnected) "Connection lost" else "Not found"
+                DeviceRowUi(DeviceStatus.Lost, "$lead · $wait", canForget = true)
+            }
+
+            is ClickState.SetupFailed -> {
+                DeviceRowUi(DeviceStatus.Lost, "Could not connect · $wait", canForget = true)
+            }
+
+            is ClickState.NeedsUnlock -> {
+                DeviceRowUi(DeviceStatus.Locked, "$name · locked", canForget = true, locked = state.signal)
+            }
+
+            is ClickState.BluetoothUnavailable, is ClickState.Connecting, ClickState.Stopped, null -> {
+                DeviceRowUi(DeviceStatus.Searching, "Connecting to $name…", canForget = true)
+            }
+        }
+    }
+
+    /** The row for a paired device while Bluetooth cannot be used, or null when it can. */
+    private fun blockedRow(
+        name: String,
+        availability: BleAvailability,
+    ): DeviceRowUi? {
+        val text =
+            when (availability) {
+                BleAvailability.READY -> return null
+                BleAvailability.BLUETOOTH_OFF -> "$name · Bluetooth is off"
+                BleAvailability.PERMISSION_DENIED -> "$name · needs Nearby devices"
+                BleAvailability.UNSUPPORTED -> "$name · no Bluetooth on this tablet"
+            }
+        return DeviceRowUi(DeviceStatus.Blocked, text, canForget = true)
+    }
+
+    private fun waitText(seconds: Int?): String =
+        if (seconds != null &&
+            seconds > 0
+        ) {
+            "retrying in $seconds s"
+        } else {
+            "retrying…"
+        }
+
     private fun retryText(
         role: DeviceRole,
         status: LinkStatus.WaitingToRetry,
         seconds: Int?,
     ): String {
-        val wait = if (seconds != null && seconds > 0) "retrying in $seconds s" else "retrying…"
+        val wait = waitText(seconds)
         return when (status.failure.kind) {
             LinkFailureKind.LINK_LOST -> {
                 "Connection lost · $wait"
@@ -100,9 +179,7 @@ object BleDeviceRows {
             }
 
             LinkFailureKind.SERVICE_MISSING -> {
-                if (role ==
-                    DeviceRole.Trainer
-                ) {
+                if (role == DeviceRole.Trainer) {
                     "Not a trainer · check the pairing"
                 } else {
                     "Not a heart-rate strap · check the pairing"
@@ -114,20 +191,20 @@ object BleDeviceRows {
             }
         }
     }
+
+    private const val PERCENT = 100
 }
 
 /**
- * The Devices screen's and the top bar's rows for Bluetooth mode (ADR 0010): the paired devices' link states and the radio,
- * as [DevicesUi]. A link that is waiting to retry counts its seconds down once a second, only while it waits; at rest
- * nothing ticks.
- *
- * @param click the Click row is the simulated one until M4.
+ * The Devices screen's and the top bar's rows for Bluetooth mode (ADR 0010, ADR 0012): the paired devices' link states and
+ * the radio, as [DevicesUi]. A link that is waiting to retry counts its seconds down once a second, only while it waits; at
+ * rest nothing ticks. The Click's row is its own [app.overdrive.core.click.ClickState] in plain words (and **a locked Click
+ * is a row and a notice, never a failure of the ride**).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class BleDevicesModel(
     private val devices: PairedDevices,
     private val environment: BleEnvironment,
-    private val click: Flow<SimulatedClick>,
     private val timeSource: TimeSource = TimeSource.Monotonic,
 ) {
     val ui: Flow<DevicesUi> =
@@ -142,10 +219,10 @@ class BleDevicesModel(
                     s?.device?.status?.map { s.remembered to it } ?: flowOf(null)
                 },
             ),
+            clickState(),
             environment.availability,
-            click,
             devices.loaded,
-        ) { trainer, strap, availability, clickState, loaded ->
+        ) { trainer, strap, click, availability, loaded ->
             if (!loaded) {
                 DevicesUi.Unknown
             } else {
@@ -166,7 +243,14 @@ class BleDevicesModel(
                             availability,
                             strap.retryInSeconds,
                         ),
-                    click = DeviceRows.clickRow(clickState),
+                    click =
+                        BleDeviceRows.clickRow(
+                            click.device?.name,
+                            click.state,
+                            click.battery,
+                            availability,
+                            click.retryInSeconds,
+                        ),
                     radio = BleDeviceRows.radioIssue(availability),
                 )
             }
@@ -175,34 +259,53 @@ class BleDevicesModel(
     /** One role's link as a [RoleState], with a once-a-second countdown while it waits to retry. */
     private fun roleState(link: Flow<Pair<RememberedDevice, LinkStatus>?>): Flow<RoleState> =
         link.flatMapLatest { pair ->
+            val status = pair?.second
             when {
                 pair == null -> {
                     flowOf(RoleState(null, null, null))
                 }
 
-                pair.second is LinkStatus.WaitingToRetry -> {
-                    countdown(
-                        pair.first,
-                        pair.second as LinkStatus.WaitingToRetry,
-                    )
+                status is LinkStatus.WaitingToRetry -> {
+                    countdown(status.retryInMillis).map { RoleState(pair.first, status, it) }
                 }
 
                 else -> {
-                    flowOf(RoleState(pair.first, pair.second, null))
+                    flowOf(RoleState(pair.first, status, null))
                 }
             }
         }
 
-    private fun countdown(
-        device: RememberedDevice,
-        status: LinkStatus.WaitingToRetry,
-    ): Flow<RoleState> =
+    /** The Click's state, its battery and the countdown of a retry wait, for its row. */
+    private fun clickState(): Flow<ClickRowState> =
+        devices.click.flatMapLatest { paired ->
+            if (paired == null) {
+                flowOf(ClickRowState(null, null, null, null))
+            } else {
+                // The battery is combined after the countdown, so a battery report never restarts a retry wait.
+                val counting: Flow<Pair<ClickState, Int?>> =
+                    paired.device.state.flatMapLatest { state ->
+                        val wait =
+                            when (state) {
+                                is ClickState.NotFound -> state.retryInMillis
+                                is ClickState.SetupFailed -> state.retryInMillis
+                                else -> null
+                            }
+                        if (wait == null) flowOf(state to null) else countdown(wait).map { state to it }
+                    }
+                combine(counting, paired.device.battery) { (state, seconds), battery ->
+                    ClickRowState(paired.remembered, state, battery, seconds)
+                }
+            }
+        }
+
+    /** The whole seconds left of [retryInMillis], once a second, down to 0; it ends there. */
+    private fun countdown(retryInMillis: Long): Flow<Int> =
         flow {
             val begun = timeSource.markNow()
             while (true) {
-                val left = status.retryInMillis - begun.elapsedNow().inWholeMilliseconds
+                val left = retryInMillis - begun.elapsedNow().inWholeMilliseconds
                 val seconds = ((left + MILLIS_PER_SECOND - 1) / MILLIS_PER_SECOND).toInt().coerceAtLeast(0)
-                emit(RoleState(device, status, seconds))
+                emit(seconds)
                 if (left <= 0) break
                 // Until the displayed second changes: the milliseconds above the next whole second, and one more.
                 delay(left - (seconds - 1) * MILLIS_PER_SECOND + 1)

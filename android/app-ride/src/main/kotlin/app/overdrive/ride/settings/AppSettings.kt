@@ -1,5 +1,6 @@
 package app.overdrive.ride.settings
 
+import app.overdrive.core.control.ButtonMapping
 import app.overdrive.core.physics.PhysicsSettings
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -27,7 +28,7 @@ enum class DeviceSource(
     Simulated("Simulated"),
 }
 
-/** What the simulated Zwift Click reports on the Devices screen until M4 brings the real one (developer setting). */
+/** What the simulated Zwift Click reports on the Devices screen with simulated devices (developer setting). */
 enum class SimulatedClick(
     val label: String,
 ) {
@@ -71,6 +72,18 @@ data class AppSettings(
      * machine (developer setting, **on** in the early builds; ADR 0010). The files hold the rider's heart rate.
      */
     val recordBleSessions: Boolean = true,
+    /**
+     * Which of the Click's five buttons is which of the five roles (spec §4.7: "The mapping is a setting"), as learned on
+     * the Devices screen. Always a valid mapping, never empty and never overlapping; a stored value that is not one reads as
+     * [ButtonMapping.DEFAULT] (see [SettingsRepository]).
+     */
+    val buttonMapping: ButtonMapping = ButtonMapping.DEFAULT,
+    /** What the owner flips at the bench without a rebuild: the Click's connection options and the gesture timings. */
+    val click: ClickSettings = ClickSettings(),
+    /** The web service's address (spec §4.9): stored and **not used** in Phase 1. Empty when none, otherwise a valid address. */
+    val syncUrl: String = "",
+    /** The web service's token (spec §4.9): stored and **not used** in Phase 1. A secret: it prints as bullets. */
+    val syncToken: SecretText = SecretText(),
 ) {
     /** The neutral gear, the one that rides the flat: the middle, with the spare gear on the hard side. */
     val neutralGear: Int get() = (gearCount + 1) / 2
@@ -78,6 +91,9 @@ data class AppSettings(
     /** The same settings with every value brought into its valid range and onto its step. */
     fun sanitized(): AppSettings =
         copy(
+            click = click.sanitized(),
+            syncUrl = SyncRules.cleanUrl(syncUrl),
+            syncToken = SecretText(SyncRules.cleanToken(syncToken.value)),
             ftp = SettingsRules.ftp.normalize(ftp),
             gearCount = SettingsRules.gears.normalize(gearCount),
             gradePerGear = SettingsRules.gradePerGear.normalize(gradePerGear),

@@ -3,18 +3,21 @@ package app.overdrive.ride.host
 import android.content.Context
 import android.media.AudioManager
 import android.view.KeyEvent
+import app.overdrive.core.control.MediaKeys
 
 /**
  * The three media buttons of the ride bar (design/system.md §6.2): play or pause whatever app is playing, and the
- * volume. They are the same calls the Click's buttons 3 to 5 make in M4. Both are system APIs that need no permission;
- * a refusal is swallowed because a ride must never fail on a media key.
+ * volume. They are core's [MediaKeys], so the same object is the media of the Click's router (spec §4.7, ADR 0012): a
+ * press on the handlebar with a video app in front reaches the video through these calls. Both are system APIs that need
+ * no permission; a refusal is swallowed because a ride must never fail on a media key. That a media key and a volume step
+ * from the app's background reach the video app on the tablet is bench-checked (overlay-notes §7, bench 5.6).
  */
-interface MediaController {
-    fun playPause()
+interface MediaController : MediaKeys {
+    override fun playPause()
 
-    fun volumeUp()
+    override fun volumeUp()
 
-    fun volumeDown()
+    override fun volumeDown()
 }
 
 class AudioManagerMediaController(
