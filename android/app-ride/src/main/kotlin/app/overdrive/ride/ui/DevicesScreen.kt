@@ -334,7 +334,17 @@ private val clickMap =
     )
 
 /** What the Click's own names for the bits of [mask] read as: `Y`, `Plus`, `A + Z`. */
-fun buttonNames(mask: Int): String = ClickBits.namesOf(mask).joinToString(" + ")
+fun buttonNames(mask: Int): String = buttonNames(ClickBits.namesOf(mask))
+
+/** The Click's names as the rider reads them: a single letter stays, `PLUS` is `Plus`, `NAV_LEFT` is `Nav left`. */
+fun buttonNames(names: List<String>): String = names.joinToString(" + ") { readable(it) }
+
+private fun readable(name: String): String =
+    if (name.length > 1 && name.all { it.isUpperCase() || it == '_' }) {
+        name.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
+    } else {
+        name
+    }
 
 /** The press and hold map of the five buttons (spec §4.7), each with the Click button it is on now. */
 @Composable

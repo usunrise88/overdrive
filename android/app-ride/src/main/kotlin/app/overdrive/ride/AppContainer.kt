@@ -55,6 +55,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * What lives as long as the process (ADR 0005): the settings store, the workout library, the stored rides and the one
@@ -66,6 +67,10 @@ import java.io.File
  * except through the FileProvider (ADR 0008). A test passes a temporary folder, which is how a "restart" is simulated.
  * @param settingsName the settings' DataStore file; a second container in one process (a test) needs its own, because
  * DataStore allows one instance per file.
+ * @param outboxFile the sync outbox's journal (ADR 0012); a test passes a temporary one.
+ * @param mediaFactory the media keys of the ride bar and of the Click; a test records them.
+ * @param elapsedMillis the monotonic clock of the gesture layer (a hold is 500 ms of it); Robolectric's is a fake one, so a
+ * test of real holds passes a real clock.
  */
 class AppContainer(
     context: Context,
@@ -75,6 +80,8 @@ class AppContainer(
     bleLogDirectory: File = File(context.applicationContext.filesDir, "ble-logs"),
     bleStack: (Context, CoroutineScope) -> BleStack = { appContext, scope -> AndroidBle(appContext, scope) },
     outboxFile: File = File(context.applicationContext.filesDir, "sync/outbox.log"),
+    mediaFactory: (Context) -> MediaController = { AudioManagerMediaController(it) },
+    elapsedMillis: () -> Long = SystemClock::elapsedRealtime,
 ) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -111,6 +118,16 @@ class AppContainer(
     val sync: SyncCoordinator = SyncCoordinator(scope, outbox, { NoopSyncProvider }).also { it.start() }
 
     /**
+     * Wall-clock milliseconds for an entry's `enqueuedAtMillis`, **strictly increasing**: the coordinator queues each ride on
+     * a coroutine of its own and the outbox orders by this time, so two rides announced in the same millisecond (the rides
+     * on disk at a start, oldest first) would otherwise come out in whatever order the coroutines ran.
+     */
+    private val lastEnqueueTime = AtomicLong(0)
+
+    private fun nextEnqueueTime(): Long =
+        lastEnqueueTime.updateAndGet { previous -> maxOf(previous + 1, System.currentTimeMillis()) }
+
+    /**
      * The rides on disk: records the ride as it happens, stores it when it ends, and on start offers the ones that were
      * cut off (ADR 0008). The scan runs in the background from the moment the container exists. Every stored ride is
      * queued in the outbox, a recovered one and the rides already on disk at start included.
@@ -124,7 +141,7 @@ class AppContainer(
                 sync.rideFinished(
                     OutboxEntry(
                         rideId = stored.id,
-                        enqueuedAtMillis = System.currentTimeMillis(),
+                        enqueuedAtMillis = nextEnqueueTime(),
                         startedAtMillis = stored.startEpochMillis,
                         durationSeconds = stored.durationSeconds,
                         title = stored.title,
@@ -238,7 +255,7 @@ class AppContainer(
         )
 
     /** The media keys of the ride bar and of the Click: system volume and a media key for whichever app plays. */
-    val media: MediaController = AudioManagerMediaController(appContext)
+    val media: MediaController = mediaFactory(appContext)
 
     /**
      * **The one routing rule** (spec §4.7, ADR 0012): core's [ActionRouter] over the host's current session and the media.
@@ -276,7 +293,7 @@ class AppContainer(
                     .distinctUntilChanged()
                     .map { (hold, repeat) -> GestureTiming(hold.toLong(), repeat.toLong()) },
             router = router,
-            nowMillis = SystemClock::elapsedRealtime,
+            nowMillis = elapsedMillis,
             suspended = { learning.active },
         )
 

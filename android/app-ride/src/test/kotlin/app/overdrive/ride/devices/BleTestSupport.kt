@@ -10,12 +10,16 @@ import app.overdrive.core.ble.GattScanner
 import app.overdrive.core.ble.GattTransportFactory
 import app.overdrive.core.ble.fake.FakeBle
 import app.overdrive.core.ble.fake.FakeClick
+import app.overdrive.core.ble.fake.FakeClickOptions
 import app.overdrive.core.ble.fake.FakeFtmsTrainer
 import app.overdrive.core.ble.fake.FakeHeartRateStrap
 import app.overdrive.core.ble.link.BackoffPolicy
+import app.overdrive.core.click.ClickOptions
+import app.overdrive.core.click.ClickSide
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -27,6 +31,7 @@ internal val TRAINER_ID = DeviceId("test-trainer")
 internal val STRAP_ID = DeviceId("test-strap")
 internal val OTHER_TRAINER_ID = DeviceId("test-trainer-2")
 internal val CLICK_ID = DeviceId("test-click")
+internal val OTHER_CLICK_ID = DeviceId("test-click-2")
 
 private const val NANOS_PER_MILLI = 1_000_000L
 
@@ -56,6 +61,7 @@ internal class InMemoryPreferences(
 internal class BleWorld(
     val test: TestScope,
     val store: DeviceStore = DeviceStore(InMemoryPreferences()),
+    clickOptions: Flow<ClickOptions> = flowOf(ClickOptions()),
 ) {
     val ble = FakeBle(test.backgroundScope, nanoClock = { test.testScheduler.currentTime * NANOS_PER_MILLI })
     val fakeTrainer = FakeFtmsTrainer()
@@ -63,11 +69,15 @@ internal class BleWorld(
     val otherTrainer = FakeFtmsTrainer(advertisedName = "Other D500")
     val fakeClick = FakeClick()
 
+    // The left puck: a scan lists it only when the developer setting asks for either side.
+    val otherClick = FakeClick(FakeClickOptions(side = ClickSide.LEFT), advertisedName = "Other Click")
+
     init {
         ble.add(TRAINER_ID, fakeTrainer)
         ble.add(STRAP_ID, fakeStrap)
         ble.add(OTHER_TRAINER_ID, otherTrainer)
         ble.add(CLICK_ID, fakeClick)
+        ble.add(OTHER_CLICK_ID, otherClick)
     }
 
     val devices =
@@ -78,6 +88,7 @@ internal class BleWorld(
             transports = { ble },
             reconnect = BackoffPolicy.EXACT,
             timeSource = test.testTimeSource,
+            clickOptions = clickOptions,
         )
 
     /**

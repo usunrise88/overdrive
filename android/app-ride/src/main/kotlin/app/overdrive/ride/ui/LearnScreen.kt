@@ -155,7 +155,7 @@ private fun Roles(ui: LearnUi) {
     OdCard(padding = PaddingValues(8.dp)) {
         HandlebarButton.entries.forEachIndexed { index, role ->
             if (index > 0) HorizontalRule(Modifier.padding(horizontal = 8.dp))
-            val learned = ui.learned[role]?.joinToString(" + ")
+            val learned = ui.learned[role]?.let(::buttonNames)
             val asking = !ui.done && role == ui.role
             Row(
                 Modifier

@@ -182,6 +182,21 @@ class ActionRouterTest {
     }
 
     @Test
+    fun `a host that keeps its own copy of the state says where it is read from`() {
+        // The session itself says RIDING in a simulation step; the host's copy says ERG and PAUSED. The rule reads the host's.
+        val session = RecordingSession(snapshot())
+        val copy = snapshot(RideState.PAUSED, TrainerMode.ERG, PauseReason.MANUAL)
+        val router = ActionRouter({ session }, RecordingMedia()) { copy }
+        router.dispatch(ClickAction.GEAR_UP)
+        router.dispatch(ClickAction.TOGGLE_RIDE_PAUSE)
+        assertEquals(listOf("intensityUp", "resume"), session.calls)
+        // Without one, the session's own snapshot is what is read.
+        val plain = RecordingSession(snapshot(mode = TrainerMode.ERG))
+        ActionRouter({ plain }, RecordingMedia()).dispatch(ClickAction.GEAR_DOWN)
+        assertEquals(listOf("intensityDown"), plain.calls)
+    }
+
+    @Test
     fun `the repeated volume steps are the same keys as the first step`() {
         val media = RecordingMedia()
         val router = ActionRouter({ null }, media)

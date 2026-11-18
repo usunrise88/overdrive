@@ -430,10 +430,15 @@ private fun SyncGroup(
             )
         }
         var showToken by remember { mutableStateOf(false) }
+        // Typed text is kept here, like the address: the stored value comes back a moment later and would eat letters.
+        var token by remember { mutableStateOf(settings.syncToken.value) }
         FieldRow("Token", "Not used yet. It stays on this tablet") {
             OdTextField(
-                settings.syncToken.value,
-                { text -> actions.onChange { it.copy(syncToken = SecretText(text)) } },
+                token,
+                { text ->
+                    token = text
+                    actions.onChange { it.copy(syncToken = SecretText(text)) }
+                },
                 contentDescription = "Token",
                 modifier = Modifier.weight(1f),
                 placeholder = "Paste the token",

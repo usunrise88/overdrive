@@ -63,6 +63,9 @@ object SyncRules {
         if (!lower.startsWith("https://") && !lower.startsWith("http://")) {
             return UrlCheck.Invalid("Start with https:// or http://.")
         }
+        // "https://" and "https:///path": a scheme and no host yet, which is a thing a rider types on the way to an address.
+        val authority = text.substringAfter("://").substringBefore('/').substringBefore('?').substringBefore('#')
+        if (authority.isEmpty()) return UrlCheck.Invalid("The address needs a host, like example.com.")
         val uri =
             try {
                 URI(text)
