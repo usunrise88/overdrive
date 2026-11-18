@@ -1,0 +1,2 @@
+{ "from": "2026-11-20", "to": "2026-11-26", "generatedAt": "2026-11-19T07:30:12Z", "stale": false, "configured": true,
+  "workouts": [ { "id": "icu-1", "date": "2026-11-20", "name": "Easy", "source": "trainerroad", "workout": { "schema": 1, "id": "icu-1", "name": "Easy", "steps": [ { "type": "free", "duration": 600 } ] } } ] }

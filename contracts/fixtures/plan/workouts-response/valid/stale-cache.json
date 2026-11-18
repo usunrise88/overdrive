@@ -1,0 +1,27 @@
+{
+  "from": "2026-11-18",
+  "to": "2026-11-18",
+  "generatedAt": "2026-11-18T06:15:00.250Z",
+  "stale": true,
+  "configured": true,
+  "workouts": [
+    {
+      "id": "icu-998877",
+      "date": "2026-11-18",
+      "name": "Threshold 2x20",
+      "source": "intervals.icu",
+      "workout": {
+        "schema": 1,
+        "id": "icu-998877",
+        "name": "Threshold 2x20",
+        "steps": [
+          { "type": "steady", "duration": 900, "target": 0.6 },
+          { "type": "repeat", "count": 2, "steps": [
+            { "type": "steady", "duration": 1200, "target": 0.95 },
+            { "type": "steady", "duration": 300, "target": 0.5 }
+          ] }
+        ]
+      }
+    }
+  ]
+}

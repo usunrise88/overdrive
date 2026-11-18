@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { Ajv2020 } from "ajv/dist/2020.js";
 
-// The sync API's request and response shapes (spec §8.3) live in their own file.
+// The sync API's request and response shapes (spec §8.3) live in their own files.
+export * from "./plan.ts";
 export * from "./sync.ts";
 
 // ---- Workout (spec §8.1) -------------------------------------------------------------------

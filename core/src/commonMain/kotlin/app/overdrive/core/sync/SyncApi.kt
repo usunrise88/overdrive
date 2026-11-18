@@ -44,6 +44,9 @@ public enum class ApiErrorCode(
     @SerialName("invalid_ride_id")
     INVALID_RIDE_ID(400),
 
+    @SerialName("invalid_range")
+    INVALID_RANGE(400),
+
     @SerialName("invalid_record")
     INVALID_RECORD(422),
 
