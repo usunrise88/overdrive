@@ -14,21 +14,28 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.overdrive.core.workout.Workout
+import app.overdrive.data.rides.StoredRide
 import app.overdrive.ride.host.DevicesUi
 import app.overdrive.ride.host.RideChoice
 import app.overdrive.ride.overlay.OverlayAccess
+import app.overdrive.ride.rides.RecoveryState
 import app.overdrive.ride.settings.AppSettings
 import app.overdrive.ride.workouts.StepRow
 import app.overdrive.ride.workouts.WorkoutDescriber
 import app.overdrive.ride.workouts.WorkoutDescription
 import app.overdrive.ride.workouts.WorkoutFileError
 import app.overdrive.uikit.ButtonVariant
+import app.overdrive.uikit.ConfirmSheet
 import app.overdrive.uikit.HorizontalRule
 import app.overdrive.uikit.Notice
 import app.overdrive.uikit.OdButton
@@ -52,6 +59,10 @@ class ReadyActions(
     val onDismissError: () -> Unit,
     /** The overlay row's **Allow**: asks for what the overlay needs (ADR 0006). */
     val onAllowOverlay: () -> Unit = {},
+    /** The recovery notice's **Save** (and **Retry** after a failed save): keep the interrupted ride (ADR 0008). */
+    val onRecoverySave: () -> Unit = {},
+    /** The recovery notice's **Discard**, called once the rider has confirmed. */
+    val onRecoveryDiscard: () -> Unit = {},
 )
 
 /**
@@ -60,6 +71,9 @@ class ReadyActions(
  *
  * @param startEnabled false until the trainer is connected (the engine is `IDLE`); the button then says why.
  * @param overlayAccess what the overlay may do; while "Display over other apps" is missing a row at the top asks for it.
+ * @param recovery an interrupted ride found on disk (ADR 0008): a notice at the top asks to save or discard it.
+ * @param lastRide the ride saved last, with **Share** and **Save to folder** so its FIT file is reachable after the summary.
+ * @param files share and save of a FIT file; the screen only calls them. [fileMessage] is what the last one said.
  */
 @Composable
 fun ReadyScreen(
@@ -73,22 +87,52 @@ fun ReadyScreen(
     actions: ReadyActions,
     modifier: Modifier = Modifier,
     overlayAccess: OverlayAccess = OverlayAccess.Granted,
+    recovery: RecoveryState = RecoveryState.None,
+    lastRide: StoredRide? = null,
+    files: RideFileActions = RideFileActions.None,
+    fileMessage: String? = null,
+    forceDiscardConfirm: Boolean = false,
 ) {
-    Column(modifier.fillMaxSize().background(OverdriveColors.bg)) {
-        RideTopBar("Overdrive", TopBarChip.Calm(if (startEnabled) "Ready" else "Waiting for trainer"), devices, topBar)
-        Row(Modifier.weight(1f).fillMaxWidth()) {
-            WorkoutList(choice, workouts, settings, actions, Modifier.width(360.dp).fillMaxHeight())
-            VerticalRule()
-            Detail(
-                choice,
-                settings,
-                startEnabled,
-                openError,
-                overlayAccess,
-                actions,
-                Modifier.weight(1f).fillMaxHeight(),
+    var confirmDiscard by rememberSaveable { mutableStateOf(false) }
+    Box(modifier.fillMaxSize().background(OverdriveColors.bg)) {
+        Column(Modifier.fillMaxSize()) {
+            RideTopBar(
+                "Overdrive",
+                TopBarChip.Calm(if (startEnabled) "Ready" else "Waiting for trainer"),
+                devices,
+                topBar,
             )
+            Row(Modifier.weight(1f).fillMaxWidth()) {
+                WorkoutList(choice, workouts, settings, actions, Modifier.width(360.dp).fillMaxHeight())
+                VerticalRule()
+                Detail(
+                    choice,
+                    settings,
+                    startEnabled,
+                    openError,
+                    overlayAccess,
+                    actions,
+                    Modifier.weight(1f).fillMaxHeight(),
+                    recovery = recovery,
+                    onAskDiscard = { confirmDiscard = true },
+                    lastRide = lastRide,
+                    files = files,
+                    fileMessage = fileMessage,
+                )
+            }
         }
+        // Throwing a ride away cannot be undone, so it asks once (the same sheet as finishing a ride).
+        ConfirmSheet(
+            visible = confirmDiscard || forceDiscardConfirm,
+            title = "Discard this ride?",
+            confirmLabel = "Discard",
+            dismissLabel = "Keep it",
+            onConfirm = {
+                confirmDiscard = false
+                actions.onRecoveryDiscard()
+            },
+            onDismiss = { confirmDiscard = false },
+        )
     }
 }
 
@@ -139,8 +183,14 @@ private fun Detail(
     overlayAccess: OverlayAccess,
     actions: ReadyActions,
     modifier: Modifier,
+    recovery: RecoveryState,
+    onAskDiscard: () -> Unit,
+    lastRide: StoredRide?,
+    files: RideFileActions,
+    fileMessage: String?,
 ) {
     Column(modifier.padding(horizontal = 40.dp, vertical = 32.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        RecoveryNotice(recovery, actions.onRecoverySave, onAskDiscard)
         if (!overlayAccess.canDrawOverlays) OverlayPermissionNotice(actions.onAllowOverlay)
         if (openError != null) {
             Notice(
@@ -151,6 +201,7 @@ private fun Detail(
                 onAction = actions.onDismissError,
             )
         }
+        if (lastRide != null) LastRideRow(lastRide, files, fileMessage)
         when (choice) {
             RideChoice.Free -> FreeRideDetail(settings, Modifier.weight(1f))
             is RideChoice.Planned -> WorkoutDetail(choice.workout, settings, Modifier.weight(1f))

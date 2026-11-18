@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What the app's FileProvider may hand to other apps (ADR 0008): the stored rides, nothing else under the app's files. -->
+<paths>
+    <files-path
+        name="rides"
+        path="rides/" />
+</paths>

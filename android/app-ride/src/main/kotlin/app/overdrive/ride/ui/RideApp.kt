@@ -35,6 +35,7 @@ import app.overdrive.ride.host.RideChoice
 import app.overdrive.ride.host.RideMapping
 import app.overdrive.ride.overlay.OverlayController
 import app.overdrive.ride.overlay.OverlayPolicy
+import app.overdrive.ride.rides.SaveState
 import app.overdrive.ride.settings.OverlayStartMode
 import app.overdrive.ride.settings.SimulatedClick
 import app.overdrive.ride.workouts.WorkoutFileError
@@ -83,6 +84,9 @@ fun RideApp(
     val settings by container.settings.collectAsStateWithLifecycle()
     val workouts by container.library.workouts.collectAsStateWithLifecycle()
     val choice by host.choice.collectAsStateWithLifecycle()
+    val recovery by container.rides.recovery.collectAsStateWithLifecycle()
+    val lastRide by container.rides.lastSaved.collectAsStateWithLifecycle()
+    val rideFiles = rememberRideFiles(container.rides)
 
     var screen by rememberSaveable { mutableStateOf(Screen.Ride) }
     var overlayShown by rememberSaveable { mutableStateOf(false) }
@@ -196,8 +200,14 @@ fun RideApp(
                                 onOpenFile = { picker.launch(arrayOf("*/*")) },
                                 onDismissError = { openError = null },
                                 onAllowOverlay = allowOverlay,
+                                onRecoverySave = container.rides::saveRecovered,
+                                onRecoveryDiscard = container.rides::discardRecovered,
                             ),
                         overlayAccess = access,
+                        recovery = recovery,
+                        lastRide = lastRide,
+                        files = rideFiles.actions,
+                        fileMessage = rideFiles.message?.takeIf { it.rideId == lastRide?.id }?.text,
                     )
                 }
 
@@ -206,7 +216,16 @@ fun RideApp(
                 }
 
                 Page.Finished -> {
-                    FinishedScreen(ui.finished, devices, topBar, onDone = host::reset)
+                    val saved = (ui.finished?.save as? SaveState.Saved)?.ride
+                    FinishedScreen(
+                        ui.finished,
+                        devices,
+                        topBar,
+                        onDone = host::reset,
+                        files = rideFiles.actions,
+                        fileMessage = rideFiles.message?.takeIf { it.rideId == saved?.id }?.text,
+                        onRetrySave = host::retrySave,
+                    )
                 }
 
                 Page.Devices -> {

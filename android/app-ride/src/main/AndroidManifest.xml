@@ -6,7 +6,9 @@
          FOREGROUND_SERVICE and FOREGROUND_SERVICE_SPECIAL_USE: the service that owns the window and keeps the ride
          alive behind other apps. M3 adds connectedDevice and BLUETOOTH_CONNECT when real Bluetooth arrives.
          POST_NOTIFICATIONS: the service's "Ride in progress" notification is shown on Android 13 and later only if
-         the rider allows it; the overlay works either way. -->
+         the rider allows it; the overlay works either way.
+         Rides (ADR 0008) are private app data and need no permission: they are shared through the FileProvider below
+         and saved through the system file picker. The app has no network permission, and allowBackup stays false. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
@@ -26,6 +28,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Hands one FIT file at a time to the app the rider chose in the share sheet, read-only, through a URI the
+             sheet is granted. Not exported: nothing else can ask it for a file. Only filesDir/rides/ is served. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <service
             android:name=".overlay.OverlayService"

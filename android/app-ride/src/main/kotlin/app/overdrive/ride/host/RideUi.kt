@@ -8,6 +8,7 @@ import app.overdrive.core.ride.PowerZone
 import app.overdrive.core.ride.RideSnapshot
 import app.overdrive.core.ride.RideState
 import app.overdrive.core.workout.Workout
+import app.overdrive.ride.rides.SaveState
 import app.overdrive.uikit.DeviceStatus
 import app.overdrive.uikit.chart.ProfileData
 import app.overdrive.uikit.chart.TracePoint
@@ -52,6 +53,8 @@ data class FinishedRide(
     val laps: List<LapRow>,
     /** Seconds in Z1 to Z7 over the seconds that were not paused and had a power reading. */
     val zoneSeconds: List<Int>,
+    /** Whether the ride is stored yet: the record and the FIT file are written after the finish (ADR 0008). */
+    val save: SaveState = SaveState.Saving,
 ) {
     companion object {
         /** Builds the summary from [record]; [steps] name the laps (empty for a free ride, whose single lap is the ride). */
@@ -105,6 +108,8 @@ data class RideUi(
     val finished: FinishedRide?,
     /** 1, 2, 3, … per ride in this process; changes when a new ride is prepared. */
     val rideNumber: Int,
+    /** True while the ride is not being written to disk (a full disk, a missing folder); the ride itself is unaffected. */
+    val logFailed: Boolean = false,
 )
 
 /** One row of the Devices screen. */

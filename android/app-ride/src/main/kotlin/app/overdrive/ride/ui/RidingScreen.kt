@@ -92,6 +92,7 @@ fun RidingScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 if (paused) PausedBanner(snapshot)
+                if (ui.logFailed) NotSavedNotice()
                 Row(Modifier.fillMaxWidth().height(312.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     PowerCard(ui, paused, Modifier.width(424.dp).fillMaxHeight())
                     LiveTiles(ui, paused, Modifier.weight(1f).fillMaxHeight())

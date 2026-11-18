@@ -10,6 +10,7 @@ import app.overdrive.core.record.RideLog
 import app.overdrive.core.record.RideLogStatus
 import app.overdrive.core.record.RideRecord
 import app.overdrive.core.record.RideRecordJson
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -317,11 +318,10 @@ class RideStore(
             properties.setProperty("title", title)
             properties.setProperty("startEpochMillis", startEpochMillis.toString())
             durationSeconds?.let { properties.setProperty("durationSeconds", it.toString()) }
-            val out = java.io.ByteArrayOutputStream()
+            val out = ByteArrayOutputStream()
             OutputStreamWriter(out, Charsets.UTF_8).use { properties.store(it, null) }
             // `Properties.store` starts with a comment line holding the date; the file is the same whenever it is written.
-            return out
-                .toString(Charsets.UTF_8)
+            return String(out.toByteArray(), Charsets.UTF_8)
                 .lines()
                 .filterNot { it.startsWith("#") }
                 .joinToString("\n")

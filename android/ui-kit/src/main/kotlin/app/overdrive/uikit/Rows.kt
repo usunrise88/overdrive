@@ -175,7 +175,7 @@ fun DeviceRow(
 
 /**
  * A notice for a recoverable problem (design/system.md §7.6): surface 2, radius 8, a 20 dp icon, a title over
- * a short text and an optional secondary action. No colour and no border.
+ * a short text and up to two 40 dp buttons (the second one, [secondaryLabel], follows the first). No colour and no border.
  */
 @Composable
 fun Notice(
@@ -185,6 +185,8 @@ fun Notice(
     modifier: Modifier = Modifier,
     actionLabel: String? = null,
     onAction: () -> Unit = {},
+    secondaryLabel: String? = null,
+    onSecondary: () -> Unit = {},
 ) {
     Row(
         modifier.fillMaxWidth().background(OverdriveColors.surface2, md).padding(horizontal = 16.dp, vertical = 12.dp),
@@ -196,6 +198,11 @@ fun Notice(
             OdText(title, style = OdType.bodyStrong)
             OdText(text, style = OdType.label, color = OverdriveColors.textSecondary)
         }
-        if (actionLabel != null) OdButton(actionLabel, onAction, height = 40.dp)
+        if (actionLabel != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OdButton(actionLabel, onAction, height = 40.dp)
+                if (secondaryLabel != null) OdButton(secondaryLabel, onSecondary, height = 40.dp)
+            }
+        }
     }
 }

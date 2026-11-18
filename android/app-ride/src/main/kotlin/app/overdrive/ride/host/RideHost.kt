@@ -1,13 +1,18 @@
 package app.overdrive.ride.host
 
 import app.overdrive.core.device.ConnectionState
+import app.overdrive.core.record.CompositeRideRecorder
 import app.overdrive.core.record.InMemoryRideRecorder
+import app.overdrive.core.record.RideRecord
 import app.overdrive.core.ride.FlatStep
 import app.overdrive.core.ride.RideSession
 import app.overdrive.core.ride.RideSnapshot
 import app.overdrive.core.ride.RideState
 import app.overdrive.core.ride.TrainerMode
 import app.overdrive.core.ride.flatSteps
+import app.overdrive.ride.rides.RideDiskLog
+import app.overdrive.ride.rides.RidePersistence
+import app.overdrive.ride.rides.SaveState
 import app.overdrive.ride.settings.AppSettings
 import app.overdrive.ride.settings.SimulatedClick
 import app.overdrive.ride.workouts.WorkoutDescriber
@@ -46,6 +51,11 @@ import kotlinx.coroutines.launch
  * whenever a different workout is chosen, the ride-affecting settings change before the start, or the rider is done
  * with a finished ride. A session in `READY` that is replaced is simply cancelled. A ride that is under way is never
  * replaced; it finishes first.
+ *
+ * **Persistence (ADR 0008).** Every ride gets a [RideDiskLog] from [persistence]: the engine's recorder is the
+ * in-memory record plus a queue in front of the crash-safe log, so the engine never waits for the disk. When the ride
+ * finishes the host hands the record over to be stored (record JSON and FIT) and shows the progress in
+ * [FinishedRide.save]; if the log fails mid-ride [RideUi.logFailed] turns true and the ride goes on.
  */
 class RideHost(
     private val factory: RideSessionFactory,
@@ -53,19 +63,30 @@ class RideHost(
     initialChoice: RideChoice = RideChoice.Free,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1),
     private val debounceMillis: Long = SETTINGS_DEBOUNCE_MS,
+    private val persistence: RidePersistence = RidePersistence.None,
 ) : AutoCloseable {
     private class Run(
         val number: Int,
         val choice: RideChoice,
         val settings: AppSettings,
         val job: Job,
+        val scope: CoroutineScope,
         val handle: RideSessionHandle,
+        /** The ride in memory: what the finished summary and the stored files are made from. */
         val recorder: InMemoryRideRecorder,
+        val disk: RideDiskLog,
         val stats: RideStatsAccumulator,
         val profile: ProfileData?,
         val stepsOfWorkout: List<FlatStep>,
     ) {
         var finished: FinishedRide? = null
+
+        /** The finished ride's record, kept for a retry of the save. */
+        var record: RideRecord? = null
+
+        /** The last snapshot and statistics published, so the UI can be republished when only the save state changed. */
+        var lastSnapshot: RideSnapshot? = null
+        var lastStats: RideStats = RideStats()
     }
 
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -153,6 +174,18 @@ class RideHost(
         active?.handle?.controls?.retryHeartRate()
     }
 
+    /** Tries to store the finished ride again after a failed save (the finished screen's **Retry**). */
+    fun retrySave() {
+        scope.launch {
+            val run = active ?: return@launch
+            val failed = run.finished?.save as? SaveState.Failed ?: return@launch
+            if (failed.retryable) {
+                setSave(run, SaveState.Saving)
+                store(run)
+            }
+        }
+    }
+
     /** Stops the ride's coroutines for good; the host cannot be used afterwards. */
     override fun close() {
         scope.cancel()
@@ -164,9 +197,11 @@ class RideHost(
         val number = ++counter
         val job = SupervisorJob(scope.coroutineContext[Job])
         val runScope = CoroutineScope(scope.coroutineContext + job)
-        val recorder = InMemoryRideRecorder()
+        val live = InMemoryRideRecorder()
+        val disk = persistence.begin(choice.title)
         val workout = choice.workoutOrNull
-        val handle = factory.create(RideRequest(runScope, workout, settings, recorder, number))
+        val handle =
+            factory.create(RideRequest(runScope, workout, settings, CompositeRideRecorder(disk.recorder, live), number))
         val steps = workout?.flatSteps().orEmpty()
         val run =
             Run(
@@ -174,14 +209,17 @@ class RideHost(
                 choice = choice,
                 settings = settings,
                 job = job,
+                scope = runScope,
                 handle = handle,
-                recorder = recorder,
+                recorder = live,
+                disk = disk,
                 stats = RideStatsAccumulator(settings.ftp),
                 profile = if (steps.isEmpty()) null else WorkoutDescriber.profileOf(steps),
                 stepsOfWorkout = steps,
             )
         active = run
         runScope.launch { handle.session.snapshots.collect { publish(run, it) } }
+        runScope.launch { disk.failed.collect { republish(run) } }
         runScope.launch {
             combine(
                 handle.trainer.connection,
@@ -199,23 +237,60 @@ class RideHost(
     ) {
         if (active !== run) return
         val stats = run.stats.accept(snapshot)
+        run.lastSnapshot = snapshot
+        run.lastStats = stats
+        var justFinished = false
         if (snapshot.state == RideState.FINISHED && run.finished == null) {
             run.recorder.record?.let { record ->
+                run.record = record
                 run.finished = FinishedRide.from(record, run.choice.title, run.stepsOfWorkout)
+                justFinished = true
             }
         }
         mutableSnapshots.value = snapshot
-        mutableUi.value =
-            RideUi(
-                snapshot = snapshot,
-                choice = run.choice,
-                profile = run.profile,
-                averagePower = stats.averagePower,
-                lapAveragePower = stats.lapAveragePower,
-                trace = stats.trace,
-                finished = run.finished,
-                rideNumber = run.number,
-            )
+        mutableUi.value = uiOf(run, snapshot, stats)
+        if (justFinished) store(run)
+    }
+
+    /** Publishes the current ride again without a new snapshot: the save state or the log's health changed. */
+    private fun republish(run: Run) {
+        val snapshot = run.lastSnapshot
+        if (active !== run || snapshot == null) return
+        mutableUi.value = uiOf(run, snapshot, run.lastStats)
+    }
+
+    private fun uiOf(
+        run: Run,
+        snapshot: RideSnapshot,
+        stats: RideStats,
+    ) = RideUi(
+        snapshot = snapshot,
+        choice = run.choice,
+        profile = run.profile,
+        averagePower = stats.averagePower,
+        lapAveragePower = stats.lapAveragePower,
+        trace = stats.trace,
+        finished = run.finished,
+        rideNumber = run.number,
+        logFailed = run.disk.failed.value,
+    )
+
+    /**
+     * Starts storing the finished ride (the screen shows [SaveState.Saving] already). The disk work runs where
+     * [RideDiskLog] puts it, not on this thread; leaving the summary does not stop it, it only stops this ride's screen
+     * from updating.
+     */
+    private fun store(run: Run) {
+        val record = run.record ?: return
+        run.scope.launch { setSave(run, run.disk.finish(record)) }
+    }
+
+    private fun setSave(
+        run: Run,
+        state: SaveState,
+    ) {
+        run.finished = run.finished?.copy(save = state)
+        republish(run)
     }
 
     companion object {

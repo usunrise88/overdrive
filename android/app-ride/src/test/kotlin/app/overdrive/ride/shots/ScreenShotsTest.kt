@@ -3,12 +3,9 @@ package app.overdrive.ride.shots
 import app.overdrive.core.ride.PauseReason
 import app.overdrive.core.ride.RideSnapshot
 import app.overdrive.core.ride.RideState
-import app.overdrive.ride.host.FinishedRide
 import app.overdrive.ride.host.NoMedia
 import app.overdrive.ride.host.RideActions
 import app.overdrive.ride.host.RideChoice
-import app.overdrive.ride.host.RideHost
-import app.overdrive.ride.host.SimulatedRideSessionFactory
 import app.overdrive.ride.settings.AppSettings
 import app.overdrive.ride.ui.DevicesActions
 import app.overdrive.ride.ui.DevicesScreen
@@ -21,11 +18,6 @@ import app.overdrive.ride.ui.SettingsScreen
 import app.overdrive.ride.ui.TopBarActions
 import app.overdrive.ride.workouts.WorkoutFileError
 import app.overdrive.uikit.OverdriveTheme
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.robolectric.annotation.Config
 
@@ -138,30 +130,9 @@ class ScreenShotsTest : ShotTest() {
             }
         }
 
-    /** A whole simulated Sweet spot 3x10 ridden by the real engine in virtual time, then summarised by the host. */
-    private fun finishedRide(): FinishedRide {
-        var result: FinishedRide? = null
-        runTest {
-            val host =
-                RideHost(
-                    SimulatedRideSessionFactory(),
-                    flowOf(AppSettings(ftp = 250)),
-                    RideChoice.Planned(TestData.sweetSpot),
-                    StandardTestDispatcher(testScheduler),
-                )
-            runCurrent()
-            host.actions.start()
-            advanceTimeBy(3_905_000)
-            runCurrent()
-            result = host.ui.value.finished
-            host.close()
-        }
-        return checkNotNull(result)
-    }
-
     @Test
     fun finished() {
-        val ride = finishedRide()
+        val ride = TestData.finishedRide()
         shot("ride--finished") {
             OverdriveTheme { FinishedScreen(ride, TestData.devicesOk, topBar, onDone = {}) }
         }

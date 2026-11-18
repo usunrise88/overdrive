@@ -11,14 +11,25 @@ import app.overdrive.core.ride.TrainerMode
 import app.overdrive.core.ride.WorkoutProgress
 import app.overdrive.core.ride.flatSteps
 import app.overdrive.core.workout.Workout
+import app.overdrive.data.rides.StoredRide
+import app.overdrive.data.rides.StoredRideStatus
 import app.overdrive.ride.host.DeviceRowUi
 import app.overdrive.ride.host.DevicesUi
+import app.overdrive.ride.host.FinishedRide
 import app.overdrive.ride.host.RideChoice
+import app.overdrive.ride.host.RideHost
 import app.overdrive.ride.host.RideUi
+import app.overdrive.ride.host.SimulatedRideSessionFactory
+import app.overdrive.ride.settings.AppSettings
 import app.overdrive.ride.workouts.WorkoutDescriber
 import app.overdrive.ride.workouts.WorkoutLibrary
 import app.overdrive.uikit.DeviceStatus
 import app.overdrive.uikit.preview.PreviewSamples
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 
 /** Synthetic rides for the screenshot tests: the numbers of the design mock-ups. Nothing here is a real ride. */
 object TestData {
@@ -94,6 +105,42 @@ object TestData {
         trace = if (profile) PreviewSamples.trace else emptyList(),
         finished = null,
         rideNumber = 1,
+    )
+
+    /** A whole simulated Sweet spot 3x10 ridden by the real engine in virtual time, then summarised by the host. */
+    fun finishedRide(): FinishedRide {
+        var result: FinishedRide? = null
+        runTest {
+            val host =
+                RideHost(
+                    SimulatedRideSessionFactory(),
+                    flowOf(AppSettings(ftp = 250)),
+                    RideChoice.Planned(sweetSpot),
+                    StandardTestDispatcher(testScheduler),
+                )
+            runCurrent()
+            host.actions.start()
+            advanceTimeBy(3_905_000)
+            runCurrent()
+            result = host.ui.value.finished
+            host.close()
+        }
+        return checkNotNull(result)
+    }
+
+    /** The mock-up's ride, as the store lists it: Wednesday 18 November 2026, 18:04 in the test's zone. */
+    fun storedRide(
+        status: StoredRideStatus = StoredRideStatus.Saved,
+        durationSeconds: Int = 3900,
+        fitBytes: Long? = 312_480,
+        title: String = "Sweet spot 3×10",
+    ) = StoredRide(
+        id = "ride-1794996000000",
+        title = title,
+        startEpochMillis = 1_794_996_000_000L,
+        durationSeconds = durationSeconds,
+        status = status,
+        fitBytes = fitBytes,
     )
 
     val devicesOk =
