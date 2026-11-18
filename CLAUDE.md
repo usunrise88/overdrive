@@ -36,6 +36,9 @@ Layout rationale: `docs/adr/0001-repository-layout-and-toolchain.md`.
 
 ## Process
 
+- **Tasks live in Lific**, project `OVD` (https://tasks.llmto.day/OVD/overview), via the `lific` MCP tools: file what the owner asks
+  for later, what a stage leaves open and what only the owner can do (assignee `human`); set `status='done'` when finished.
+  `docs/backlog.md` is the old list and only points there.
 - **Work autonomously.** Make decisions yourself and record the significant ones as ADRs in
   `docs/adr/`. Ask the owner only for things only they can do (their hardware, their accounts and
   secrets).
