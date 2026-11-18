@@ -1,5 +1,7 @@
 package app.overdrive.core.record
 
+import kotlinx.serialization.Serializable
+
 /**
  * The ride record of spec §8.2, in memory: what the ride engine recorded, from which the FIT file is generated
  * (spec §4.8) and which can be regenerated at any time. All times are offsets in whole seconds from the start
@@ -8,6 +10,9 @@ package app.overdrive.core.record
  * **Gaps are nulls.** A power, heart-rate or cadence value that was not measured is null in its
  * [RideSample]; the sample itself is still there, so [RideRecord.samples] has one entry for every second of the
  * ride, however many sensor readings were missing.
+ *
+ * The wire format is `contracts/schema/ride-record.schema.json`; [RideRecordJson] reads and writes it. The parts
+ * (header, sample, RR interval, lap, summary) are `@Serializable` under exactly their property names.
  */
 public data class RideRecord(
     val ride: RideHeader,
@@ -24,6 +29,7 @@ public data class RideRecord(
  * The ride's identity (spec §8.2 "Ride"). The sync state of the finished ride lives in the outbox of the data
  * layer (spec §4.9), not here.
  */
+@Serializable
 public data class RideHeader(
     val id: String,
     /** Wall-clock start of the ride, milliseconds since the Unix epoch. */
@@ -39,6 +45,7 @@ public data class RideHeader(
 ) {
     init {
         require(id.isNotEmpty()) { "A ride needs an id" }
+        require(startEpochMillis >= 0) { "A ride cannot start before 1970, got $startEpochMillis" }
         require(ftp > 0) { "FTP must be positive, got $ftp" }
     }
 }
@@ -48,6 +55,7 @@ public data class RideHeader(
  * seconds after the start: the sensor readings at its end, and the plan that was in force during it (target,
  * gear, step). So the samples of a workout step add up to exactly the step's duration.
  */
+@Serializable
 public data class RideSample(
     /** Seconds since the start of the ride, at the end of the second described. At least 1. */
     val timeOffsetSeconds: Int,
@@ -75,6 +83,13 @@ public data class RideSample(
 ) {
     init {
         require(timeOffsetSeconds >= 1) { "A sample's offset is at least 1 second, got $timeOffsetSeconds" }
+        require(speedKmh.isFinite() && speedKmh >= 0.0) { "Speed must be a number, not negative, got $speedKmh" }
+        require(distanceMeters.isFinite() && distanceMeters >= 0.0) {
+            "Distance must be a number, not negative, got $distanceMeters"
+        }
+        require(gear == null || gear >= 1) { "Gears are numbered from 1, got $gear" }
+        require(targetPower == null || targetPower >= 0) { "Target power must not be negative, got $targetPower" }
+        require(stepIndex == null || stepIndex >= 0) { "A step index must not be negative, got $stepIndex" }
         require(power == null || power >= 0) { "Power must not be negative, got $power" }
         require(heartRate == null || heartRate >= 0) { "Heart rate must not be negative, got $heartRate" }
         require(cadence == null || cadence >= 0) { "Cadence must not be negative, got $cadence" }
@@ -82,6 +97,7 @@ public data class RideSample(
 }
 
 /** One RR interval (spec §8.2 "RR series"): the time between two heartbeats. */
+@Serializable
 public data class RrInterval(
     /** The second of the ride in which the strap's notification carrying it arrived. */
     val timeOffsetSeconds: Int,
@@ -100,6 +116,7 @@ public data class RrInterval(
  * back to an earlier step starts another lap for it and a skipped step has none; a ride without a workout is a
  * single lap with a null [stepIndex].
  */
+@Serializable
 public data class Lap(
     val stepIndex: Int?,
     /** Offset at which the lap starts, which is the end of the previous lap (0 for the first). */
@@ -126,6 +143,7 @@ public data class Lap(
  * **paused seconds are left out** of the averages, the maxima, the work and the normalised power, as a head unit with
  * auto-pause would; a second without a reading for a quantity is left out of that quantity only.
  */
+@Serializable
 public data class RideSummary(
     /** Length of the ride in seconds, pauses included: the number of samples. */
     val durationSeconds: Int,
