@@ -91,6 +91,8 @@ fun SegmentedControl(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    segmentHeight: Dp = 40.dp,
+    equalWidth: Boolean = false,
 ) {
     Row(
         modifier
@@ -106,8 +108,8 @@ fun SegmentedControl(
             )
             val source = rememberInteractionSource()
             Box(
-                Modifier
-                    .height(40.dp)
+                (if (equalWidth) Modifier.weight(1f) else Modifier)
+                    .height(segmentHeight)
                     .clip(RoundedCornerShape(6.dp))
                     .background(fill)
                     .then(
