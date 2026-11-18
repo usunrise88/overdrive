@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "id": "test-10-minutes",
+  "name": "Test ride, 10 minutes",
+  "description": "Short ride that touches every step type: ramp, repeats, a free-ride step and a cool-down.",
+  "steps": [
+    { "type": "ramp", "duration": 120, "from": 0.50, "to": 0.70, "label": "Warm-up" },
+    { "type": "repeat", "count": 3, "steps": [
+      { "type": "steady", "duration": 60, "target": 1.00, "label": "Hard" },
+      { "type": "steady", "duration": 60, "target": 0.55, "label": "Easy" }
+    ] },
+    { "type": "free", "duration": 60, "label": "Free ride" },
+    { "type": "ramp", "duration": 60, "from": 0.60, "to": 0.40, "label": "Cool-down" }
+  ]
+}

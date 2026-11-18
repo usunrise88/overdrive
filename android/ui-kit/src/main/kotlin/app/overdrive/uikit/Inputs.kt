@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -237,7 +238,7 @@ fun SettingRow(
     description: String? = null,
     first: Boolean = false,
     titleWidth: Dp? = null,
-    control: @Composable () -> Unit,
+    control: @Composable RowScope.() -> Unit,
 ) {
     Column(modifier.fillMaxWidth()) {
         if (!first) HorizontalRule()

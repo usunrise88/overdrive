@@ -79,7 +79,7 @@ fun BackTopBar(
 ) {
     OdTopBar(modifier) {
         OdIconButton(OverdriveIcons.ChevronLeft, onBack, "Back", Modifier.offset(x = (-12).dp))
-        OdText(title, Modifier.weight(1f), style = OdType.heading, maxLines = 1)
+        OdText(title, Modifier.weight(1f).offset(x = (-12).dp), style = OdType.heading, maxLines = 1)
     }
 }
 

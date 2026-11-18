@@ -71,10 +71,10 @@ private fun SheetTitle(text: String) {
 fun DeviceRowStates(modifier: Modifier = Modifier) {
     OdCard(modifier.width(640.dp), padding = PaddingValues(0.dp)) {
         DeviceRow(OverdriveIcons.Heart, "Heart rate", "Not paired", DeviceStatus.NotPaired)
-        DeviceRow(OverdriveIcons.Heart, "Heart rate", "Searching for heart-rate straps…", DeviceStatus.Searching)
-        DeviceRow(OverdriveIcons.Heart, "Heart rate", "Coospo HR7 · battery 80%", DeviceStatus.Connected)
-        DeviceRow(OverdriveIcons.Bike, "Trainer", "Connection lost · retrying in 8 s", DeviceStatus.Lost)
-        DeviceRow(OverdriveIcons.Gamepad2, "Click", "Zwift Click v2 · connected", DeviceStatus.Locked, notice = { ClickLockedNotice() })
+        DeviceRow(OverdriveIcons.Heart, "Heart rate", "Searching for heart-rate straps…", DeviceStatus.Searching, divider = true)
+        DeviceRow(OverdriveIcons.Heart, "Heart rate", "Coospo HR7 · battery 80%", DeviceStatus.Connected, divider = true)
+        DeviceRow(OverdriveIcons.Bike, "Trainer", "Connection lost · retrying in 8 s", DeviceStatus.Lost, divider = true)
+        DeviceRow(OverdriveIcons.Gamepad2, "Click", "Zwift Click v2 · connected", DeviceStatus.Locked, divider = true, notice = { ClickLockedNotice() })
     }
 }
 

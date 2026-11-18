@@ -278,7 +278,7 @@ private fun IntervalSection(interval: OverlayInterval) {
         IntervalHead(interval.name, interval.repeatText, interval.remainingSeconds)
         Row {
             OdText("Next", style = OdType.label, color = OverdriveColors.textTertiary, maxLines = 1)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(6.dp))
             OdText(interval.next, style = OdType.labelNum, color = OverdriveColors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         WorkoutProfile(

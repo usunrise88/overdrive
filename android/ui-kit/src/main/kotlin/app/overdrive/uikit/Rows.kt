@@ -93,9 +93,11 @@ fun DeviceRow(
     modifier: Modifier = Modifier,
     onPair: () -> Unit = {},
     onRetry: () -> Unit = {},
+    divider: Boolean = false,
     notice: (@Composable () -> Unit)? = null,
 ) {
     Column(modifier.fillMaxWidth()) {
+        if (divider) HorizontalRule()
         Row(
             Modifier.fillMaxWidth().heightIn(min = OverdriveDimens.sizeDeviceRow).padding(horizontal = 20.dp, vertical = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
