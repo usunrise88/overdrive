@@ -26,6 +26,12 @@ services:
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
       OWNER_PASSPHRASE_HASH: ${OWNER_PASSPHRASE_HASH:-}
       MCP_STATIC_TOKENS: ${MCP_STATIC_TOKENS:-}
+      # The Strava upload (ADR 0020): on only when the first three are all set; STRAVA_BACKFILL defaults to false.
+      STRAVA_CLIENT_ID: ${STRAVA_CLIENT_ID:-}
+      STRAVA_CLIENT_SECRET: ${STRAVA_CLIENT_SECRET:-}
+      STRAVA_REFRESH_TOKEN: ${STRAVA_REFRESH_TOKEN:-}
+      STRAVA_BACKFILL: ${STRAVA_BACKFILL:-}
+      STRAVA_BASE_URL: ${STRAVA_BASE_URL:-}
     ports:
       - "127.0.0.1:${SERVER_PORT:-8080}:8080"
 

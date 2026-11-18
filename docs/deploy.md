@@ -190,6 +190,11 @@ Values in `.env` are never in the repository.
 | `PUBLIC_BASE_URL` | unset | `https://overdrive.llmto.day`: the service's public address (https, no path). **With `OWNER_PASSPHRASE_HASH`, turns the MCP server on.** ADR 0018 |
 | `OWNER_PASSPHRASE_HASH` | unset | The hash of the owner's passphrase, `scrypt:…` (section 12). **With `PUBLIC_BASE_URL`, turns the MCP server on.** The plain passphrase is never configured |
 | `MCP_STATIC_TOKENS` | empty | `name:token,name:token`: fixed bearer tokens for an MCP client that cannot do OAuth; at least 32 characters each; open `/mcp` only |
+| `STRAVA_CLIENT_ID` | unset | The number shown as Client ID on strava.com/settings/api. **With the next two, turns the Strava upload on.** Write-only; ADR 0020 |
+| `STRAVA_CLIENT_SECRET` | unset | The Client Secret of that application. Secret: only in `.env` |
+| `STRAVA_REFRESH_TOKEN` | unset | Printed by `strava-auth` (section 13). Only **seeds** the first run: Strava rotates the token and the server keeps the newest in its database. Put a new value here after running `strava-auth` again and it replaces the stored one |
+| `STRAVA_BACKFILL` | `false` | `true` also posts the rides stored before Strava was turned on, at the next start. Leave it off unless you want the history on Strava |
+| `STRAVA_BASE_URL` | `https://www.strava.com` | Only for tests and benches |
 | `SERVER_PORT` | `8080` | Host loopback port for the server. Here `27180`; the Caddy site file must match |
 | `POSTGRES_PORT` | `5432` | Host loopback port for the database. Here `27181` |
 | `LOG_LEVEL` | `info` | `fatal`, `error`, `warn`, `info`, `debug`, `trace` or `silent` |
@@ -202,6 +207,7 @@ Values in `.env` are never in the repository.
 | `DEVICE_TOKENS` | from `.env` | As above |
 | `INTERVALS_*`, `PLAN_REFRESH_MINUTES`, `TIMEZONE` | from `.env` | As above; empty means the default |
 | `PUBLIC_BASE_URL`, `OWNER_PASSPHRASE_HASH`, `MCP_STATIC_TOKENS` | from `.env` | As above; empty means unset |
+| `STRAVA_*` | from `.env` | As above; empty means unset (the upload is off unless the first three are all set) |
 | `LOG_LEVEL` | from `.env` | As above |
 
 ### Set by the image (`server/Dockerfile`)
@@ -218,7 +224,6 @@ Values in `.env` are never in the repository.
 |---|---|---|
 | `TELEGRAM_*` (names not fixed) | planned: P2-4, the Telegram bot | Telegram bot token and chat settings (spec §5.4) |
 | `GOOGLE_*` (names not fixed) | planned: P2-4, Google Calendar | Google OAuth client for the calendar (spec §5.3) |
-| `STRAVA_*` (names not fixed) | planned: P2-5, Strava upload | Strava access; write-only (spec §5.5) |
 | LLM endpoint (name not fixed) | planned: insights, not yet in the roadmap | Endpoint and key of the model that writes insight text (spec §7.2) |
 
 ## 12. The MCP server
@@ -267,6 +272,62 @@ put it in `.env` (grants already issued stay; delete them as above if you want t
 The plan tools (`create_workout` and the others) need `INTERVALS_API_KEY`; without it they answer `plan source not configured` and
 the profile and ride tools still work.
 
+## 13. Strava
+
+Each ride is posted to your Strava account as a **virtual ride** with a short text description (ADR 0020). The server only
+**posts**: it never reads anything from Strava (spec §5.5), and the only permission it asks for is `activity:write`. It stays off
+until you give it the three values below. You do the Strava side once, in your own terminal; none of these values belongs in a
+chat, an issue or a commit.
+
+1. **Create the Strava API application** (you need a Strava account with an active subscription: Strava requires one to create an
+   application). At <https://www.strava.com/settings/api> create an application (any name, any website) and set **Authorization
+   Callback Domain** to `localhost`. Note the **Client ID** (a number) and the **Client Secret**. A new application works for your own
+   account only, which is all this needs.
+2. **Get the refresh token**, once, in a terminal of yours (from a clone of this repository, or on the host from the image):
+
+   ```bash
+   pnpm --filter @overdrive/server run strava-auth
+   # on the host, from the image:  docker compose run --rm --no-deps -it server node dist/strava-auth.js
+   ```
+
+   It asks for the Client ID and the Client Secret (nothing is shown as you type the secret) and prints an address. Open it in a
+   browser where you are signed in to Strava and press **Authorize** (it asks only to upload activities). The browser then lands on
+   a page on `localhost` that does not load: that is expected. Copy the **whole address from the address bar**, paste it into the
+   terminal, and it prints one line, `STRAVA_REFRESH_TOKEN=…`. It prints only to the terminal and refuses to run when its output is
+   a file or a pipe.
+3. **Put the three values in the server's `.env`** (on the host, never in the repository) and start the server:
+
+   ```bash
+   # STRAVA_CLIENT_ID=<the number>
+   # STRAVA_CLIENT_SECRET=<the secret>
+   # STRAVA_REFRESH_TOKEN=<the line step 2 printed>
+   docker compose up -d server
+   docker compose logs --tail 20 server        # no "Strava upload is off" line; the first ride shows "ride sent to Strava"
+   ```
+
+4. **Ride.** The next ride that reaches the server goes to Strava a few seconds later. Rides you made **before** this step are not
+   posted. To post them as well, add `STRAVA_BACKFILL=true`, `docker compose up -d server`, let it finish (Strava allows about 100
+   status checks per 15 minutes, so a long history takes a while and the server paces itself), then remove the line.
+5. **Look at the first real upload** and tell the project what you see (ADR 0020 section 7): is it a Virtual Ride with the right
+   start time and length, do the title and description read as written, are the power and heart-rate graphs there, and does Strava show
+   a map (none is expected).
+
+If your intervals.icu account is also linked to Strava (Settings, Connections), turn its upload to Strava off: Strava would see the same
+ride twice. The server counts "duplicate of activity N" as sent, but whichever arrives first wins, and that may be intervals.icu's
+copy, without the description this server writes.
+
+The refresh token changes by itself: Strava rotates it and the server keeps the newest one in its database, so `.env` holds an old
+value after the first ride and that is fine. **If the value in `.env` and the database ever disagree**, the rule is: a value in `.env`
+that is different from the one the database was started with wins at the next start. So to recover from any trouble (a revoked
+application, a token the log says Strava refused) run `strava-auth` again, replace `STRAVA_REFRESH_TOKEN` in `.env` with its new line
+and `docker compose up -d server`.
+
+To see where each ride is: `docker compose exec db psql -U overdrive -d overdrive -c "SELECT ride_id, state, attempts, last_error, external_id
+FROM ride_destinations WHERE destination = 'strava'"`. A ride in `pending` with a `last_error` that mentions Strava refusing the
+token, the scope or the account (HTTP 401 or 403) needs you: check the subscription and the application, run `strava-auth` again
+if needed; the server asks again after a restart or six hours, and says it only once in the log. To turn the upload off, empty any of
+the three values.
+
 ## Troubleshooting
 
 - `Invalid configuration:` at start: the message names the variable. Fix it in `.env`, then `docker compose up -d server`.
@@ -279,5 +340,9 @@ the profile and ride tools still work.
 - `Invalid configuration:` naming `OWNER_PASSPHRASE_HASH`: the value is not a hash from `hash-passphrase` (a plain passphrase, a
   line cut in the middle, quotes around it that were not meant). `PUBLIC_BASE_URL` must be `https://` and only the address.
 - The page says `Too many wrong passphrases`: wait for the time it names. The lock is for the whole service, not for one browser.
+- The log says `Strava upload is off: … is not set`: all of `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET` and `STRAVA_REFRESH_TOKEN` must be
+  in `.env`, and the server restarted with `docker compose up -d server`.
+- The log says `Strava upload stopped: it needs the owner`: the reason is in the line and in `last_error` of the waiting rides (a token
+  or scope Strava refused, or an account that may not upload: section 13). Fix it and restart; nothing is lost.
 - The log says `oauth refresh token reused`: a client used an old refresh token after its grace period, so that client's sign-in was
   ended; approve it again.
