@@ -9,7 +9,7 @@ import app.overdrive.core.ble.DeviceId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -32,12 +32,16 @@ class DeviceStoreTest {
         name: String = "devices",
         block: suspend (DataStore<Preferences>) -> T,
     ): T {
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val job = SupervisorJob()
+        val scope = CoroutineScope(job + Dispatchers.IO)
         try {
             val store = PreferenceDataStoreFactory.create(scope = scope) { File(folder.root, "$name.preferences_pb") }
             return runBlocking { block(store) }
         } finally {
-            scope.cancel()
+            // Wait until the store's own coroutine has finished: DataStore frees the file for the next store only then,
+            // and a plain cancel() returns before that, so a second store over the same file ("the next launch") could
+            // find it still taken and fail with "multiple DataStores active for the same file".
+            runBlocking { job.cancelAndJoin() }
         }
     }
 
