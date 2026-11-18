@@ -45,7 +45,7 @@ public data class ProfilePatch(
     public val isEmpty: Boolean
         get() =
             ftp == Change.Keep && zones == Change.Keep && weeklyAvailability.isEmpty() && goals == null &&
-                physics == PhysicsPatch()
+                physics == PhysicsPatch() && wPrimeKj == Change.Keep
 
     /**
      * The one patch that does what this one does and then [later] does: where both name a field, [later] wins (the last write
@@ -56,6 +56,7 @@ public data class ProfilePatch(
         ProfilePatch(
             ftp = if (later.ftp == Change.Keep) ftp else later.ftp,
             zones = if (later.zones == Change.Keep) zones else later.zones,
+            wPrimeKj = if (later.wPrimeKj == Change.Keep) wPrimeKj else later.wPrimeKj,
             weeklyAvailability = weeklyAvailability + later.weeklyAvailability,
             goals = later.goals ?: goals,
             physics =
@@ -147,6 +148,7 @@ public object ProfileApiJson {
     public fun encodePatch(patch: ProfilePatch): String {
         val body = LinkedHashMap<String, JsonElement>()
         (patch.ftp as? Change.Set)?.let { body["ftp"] = it.value?.let(::JsonPrimitive) ?: JsonNull }
+        (patch.wPrimeKj as? Change.Set)?.let { body["wPrimeKj"] = it.value?.let(::JsonPrimitive) ?: JsonNull }
         (patch.zones as? Change.Set)?.let { change ->
             body["zones"] = change.value?.let { json.encodeToJsonElement(PowerZones.serializer(), it) } ?: JsonNull
         }
