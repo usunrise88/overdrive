@@ -85,7 +85,7 @@ internal class FtmsSession(
     private var lastOrder: ControlPointCommand? = null
 
     // The target power most recently put on the wire, before its answer: the status echo can arrive first.
-    private var sentTargetWatts: Int? = null
+    private val sentTargetWatts = MutableStateFlow<Int?>(null)
     private var recovery: Job? = null
 
     override suspend fun establish(): SessionOutcome {
@@ -229,7 +229,7 @@ internal class FtmsSession(
                     }
 
                     is FitnessMachineStatus.TargetPowerChanged -> {
-                        val sent = sentTargetWatts
+                        val sent = sentTargetWatts.value
                         if (sent != status.watts) listener.onEvent(TrainerEvent.TargetPowerAltered(sent, status.watts))
                     }
 
@@ -360,7 +360,7 @@ internal class FtmsSession(
         val point = controlPoint ?: throw TrainerCommandException(command.opcode, Kind.NOT_CONNECTED)
         val waiting = Pending(command.opcode, CompletableDeferred())
         pending.value = waiting
-        if (command is ControlPointCommand.SetTargetPower) sentTargetWatts = command.watts
+        if (command is ControlPointCommand.SetTargetPower) sentTargetWatts.value = command.watts
         try {
             when (val write = io.run { write(point, ControlPointCodec.encode(command)) }) {
                 is GattResult.Ok -> {
