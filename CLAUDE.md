@@ -42,7 +42,7 @@ Layout rationale: `docs/adr/0001-repository-layout-and-toolchain.md`.
 - **The repository is public.** Never commit secrets, keystores, tokens, personal data or raw
   recordings of the owner's body (heart rate, rides). Test data is synthetic or short and anonymised.
   Release signing material lives in GitHub Actions secrets only.
-- **Every stage ends with a release.** Stages are the milestones inside a phase. Before tagging:
+- **Every stage ends with a release** (Phase 2 is the exception, by the owner's decision of 2026-11-18: its stages merge and the phase ends with one `v0.2.0`; alphas optional). Stages are the milestones inside a phase. Before tagging:
   `make check` and `make android-check` are green, `docs/spec.md` and the ADRs reflect what was
   built, and CI on the commit is green. Then tag `vX.Y.Z` (pre-releases `vX.Y.Z-alpha.N`) on that
   commit. `.github/workflows/release.yml` builds, signs and publishes the APKs as a GitHub Release.

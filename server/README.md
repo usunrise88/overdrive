@@ -88,7 +88,8 @@ and `DEVICE_TOKENS` in `.env` (copy `.env.example`; the file is git-ignored). Th
 reverse proxy on the host fronts the service (ADR 0014 section 1):
 
 ```
-overdrive.example.com {
-    reverse_proxy 127.0.0.1:8080
+overdrive.llmto.day {
+    import common
+    reverse_proxy 127.0.0.1:27180
 }
 ```

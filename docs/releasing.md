@@ -28,7 +28,7 @@ The tag is the version. The workflow strips the leading `v` for the version name
 | Stage M1 to M3 (see `docs/roadmap.md`) | `v0.1.0-alpha.1`, `v0.1.0-alpha.2`, `v0.1.0-alpha.3` | yes |
 | Stage M4, the MVP | `v0.1.0` | no |
 | Fix after `v0.1.0` | `v0.1.1`, `v0.1.2`, ... | no |
-| Phase 2 onwards | `v0.2.0-alpha.N`, then `v0.2.0` | yes, then no |
+| Phase 2 | `v0.2.0` directly (owner's decision, 2026-11-18: no alphas required; `v0.2.0-alpha.N` stays available) | no |
 
 Rules:
 
