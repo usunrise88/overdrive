@@ -823,6 +823,47 @@ tests cannot settle (`docs/adr/0024-companion-app.md`).
 
 ---
 
+## Session 11: the companion's watch data on the phone (stage P3-4b)
+
+Needs: the Xiaomi 14 Ultra with **OHealth** writing to Health Connect (the watch worn for a few nights, a VR or other workout recorded once), the `app-companion`
+APK from the release and the service with the wellness and insights routes (ADR 0023, 0025). Companion-only. **The stage was written without OHealth's data**: this session is
+where the real records meet the code (`docs/adr/0027-health-connect-reader.md`, "What only a phone with OHealth settles").
+
+- [ ] **11.1 Which records OHealth writes.** First run, step 2, **Continue**: the system dialog lists nine permissions (and, on a Health Connect that has them, "past data" and
+  "background"). Allow all. Then Health Connect, **Data and access**, Overdrive: which of resting heart rate, heart rate, sleep, respiratory rate, oxygen saturation, exercise,
+  weight, heart rate variability and steps show data from OHealth? Settings, Health Connect, **Sent: ...** after the first read lists the types that arrived (`heartRateVariabilityRmssd`
+  never appears if OHealth does not write it). Write the list down: it settles spec §9 "Sleep stages in Health Connect" and "HRV from the watch".
+- [ ] **11.2 Sample density.** In the service, `get_activity` (or `GET /v1/activities/{id}`) for the VR session: `heartRate.samples`, `medianGapSeconds`, `maxGapSeconds` and `coverage`
+  say how dense OHealth's heart rate is inside a workout; `get_wellness` says whether "Heart rate in sleep" has a value (it needs 20 samples and one every 20 minutes). If both are poor,
+  the load of watch activities is approximate and the sleeping heart rate absent: note it (ADR 0023 section 4 and 7).
+- [ ] **11.3 Exercise types.** The VR session's `type` at the service (`other_workout`, `biking`, `biking_stationary`, ...) and its title as OHealth writes it. Does the watch write a session
+  for a ride the tablet also recorded? The service then marks it as the same ride (`overlapsRideId`) and counts it once.
+- [ ] **11.4 The first read.** Step 4 shows "N of about M records" and a bar moving window by window. Leave the app during it (home, then the app switcher): the read goes on (open the app after a few
+  minutes: Today has the recovery card or the learning card with the nights so far). Force-stop it half way and open: it resumes with the next window, not from the start. How long did 60 days take,
+  and how many records? (Send the two numbers.)
+- [ ] **11.5 Permissions, partial and refused.** Allow everything but sleep: step 2 lists "Allowed" and "Off", the Notice says "Sleep is off", **Allow sleep** asks again once and then opens Health
+  Connect. Today still rates recovery from the other signals once 14 nights have been read. Take a permission away in Health Connect afterwards: Settings and Today say "Overdrive can no longer read
+  your watch data" and nothing crashes. Give it back, **Manage**, and the next read is normal.
+- [ ] **11.6 The daily read at 06:00.** Leave the phone alone overnight with the app closed and the two Xiaomi settings on (step 3: **No battery restrictions**, **Autostart**). In the morning Settings,
+  Health Connect, **Last read** says about 06:00 today and the morning note (Notes) exists before you open the app. Repeat with battery saving on: Settings shows "Blocked by the phone's battery saving"
+  and Today shows "The phone stopped this morning's read" after the missed day. Does the read run at all without Health Connect's background permission (Settings, Background reading)?
+- [ ] **11.7 Offline and retry.** Airplane mode, open the app: it reads Health Connect, Settings says "N watch records are waiting"; back online the records go by themselves within a few minutes (the
+  backoff doubles from 30 s) or at once with **Sync now**. Kill the app while records wait: they are still there and go on the next open.
+- [ ] **11.8 The charts and words.** Wellness against the Health Connect app's own figures for the same nights: resting heart rate, sleep time and timing, respiratory rate, oxygen saturation. The
+  usual range appears after 14 nights ("Your usual range appears after 14 nights."); a night with no reading is a gap, never a zero. Selecting a past day moves every card (and "Showing Sun 15
+  Nov" appears). A year loads (two requests) and scrolls without dropping frames.
+- [ ] **11.9 The recovery rating in use.** A week of mornings: does Ready, Caution and Rest match how you felt? Are Caution and Rest too frequent or too rare? (The thresholds are first guesses,
+  ADR 0023 "What only real data can settle".) Do the facts in a row open Wellness at that metric?
+- [ ] **11.10 Notes and topics.** The morning note exists on Today after the morning's read (before 10:00 without it Today says when it is written); an after-ride note ends with a topic and its
+  opening question; **Copy question** puts it on the clipboard and it pastes into the chat with the coach; the link under a ride note opens the ride; an alert (Heads-up) appears after three
+  mornings outside the range.
+- [ ] **11.11 Heart rate settings.** Settings, Heart rate: the steppers change by 1 (hold repeats), the estimates from the rides appear under them, **Use** takes one; the change shows in the service's
+  profile (`get_profile`) within a second of stopping, and watch activities are counted with it from the next load computation.
+- [ ] **11.12 What to send back.** The list of record types (11.1), the density figures (11.2), the exercise types (11.3), the first read's duration and size (11.4), whether the 06:00 job ran (11.6),
+  and screenshots of anything that looks wrong. They show your own body: send them privately, never in a commit.
+
+---
+
 ## Coverage: what settles what
 
 ### Acceptance criteria (`docs/phase1-acceptance.md`)
@@ -845,8 +886,8 @@ tests cannot settle (`docs/adr/0024-companion-app.md`).
 | Click firmware | 5.1 (record the version) and the rule "never update" | Not testable on the bench without updating the Click; do not. |
 | Click v2 reliability | 5.8, 5.10, 5.11 | |
 | RR intervals from the Coospo strap | 4.2 | |
-| Sleep stages in Health Connect | none | Companion app, not on the bench. |
-| HRV from the watch | none | Watch probe, not on the bench. |
+| Sleep stages in Health Connect | 11.1, 11.2 | Companion app, session 11. |
+| HRV from the watch | 11.1 | Whether OHealth writes rMSSD to Health Connect; the watch probe of spec §6.2 is separate. |
 | Strava map for virtual rides | 7.7 | Optional. |
 | Gear feel | 3.6 | Tune by feel; record the chosen gear count and step. |
 | ZUI background limits | 6.9, 6.10, 6.11, 6.12, 6.17, 1.3, 1.6, 5.11 | |

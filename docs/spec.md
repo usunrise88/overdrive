@@ -546,6 +546,14 @@ Phase 3 turns the recorded data into answers: how fit, how tired, how recovered,
   on disk and shows it, with the time it was fetched, when the service cannot be reached. The five tabs, Fitness, Power, Rides, ride detail, Settings (address, token,
   last sync, Sync now) and the first run's connect step are built; the watch data (Health Connect, Wellness, the recovery rating, notes, the heart-rate settings) is
   stage P3-4b and is drawn as the design's learning and empty states until then. No Google Play Services and no Firebase.
+- **Settled in stage P3-4b** (ADR 0027, `design/companion.md` §4.1, §4.2, §4.5, §4.9, §4.10; **written without a phone that has OHealth's data**): the watch data is
+  built. Health Connect is read through the AndroidX client (`androidx.health.connect:connect-client`, no Play Services) behind one interface, read only; the
+  phone sends it to `POST /v1/wellness` and draws **Wellness** (`GET /v1/wellness`: small multiples in the personal band, sleep timing, weight with its 7-day
+  average, a year as two requests of the service's 186 days), Today's **recovery card** (`GET /v1/recovery`, every state), the **note card** and **Notes**
+  (`GET /v1/insights`: morning, ride, week and the two alerts; a ride note's open topic with a Copy action; read only), Settings' **Health Connect** and **Heart rate**
+  groups (the maximum and threshold as steppers sent with `PATCH /v1/profile`, the estimates from the rides beside them), and the first run's three steps with the
+  first 60-day read. One WorkManager job a day at about 06:00 (network connected, no foreground service) plus the read on app open. What only the phone settles is
+  in `docs/bench-checklist.md`, session 11.
 
 ### 6.2 Wellness sources
 
@@ -572,6 +580,20 @@ Health Connect batch or an intervals.icu account**: what OHealth really writes i
 - *Daily figures:* a night belongs to the morning it ends, in `TIMEZONE`; bedtime and waking are minutes from local midnight (before midnight
   negative); the sleeping heart rate is the mean of the night's samples only when there are at least 20 and one per 20 minutes; body weight is
   the day's mean with a 7-day average (`weightKg`, `weightKg7d`) and **changes nothing** in the settings or the physics.
+
+**Settled in stage P3-4b (the phone's side, ADR 0027):**
+
+- *What is read:* resting heart rate, heart rate, sleep sessions with their stages, respiratory rate, oxygen saturation, exercise sessions, and, optional, weight,
+  heart rate variability (rMSSD) and steps: nine read permissions in one request, plus the history and background permissions where this Health Connect has them.
+  No write permission exists in the app.
+- *First read, then changes:* the last 60 days in windows of 5 (newest first, in pages, progress kept after each window, the changes token made before the first
+  window), then the Changes API with the token kept; an expired token or a permission added or taken away is a new token and a window read of what the old one
+  does not cover. Records carry Health Connect's `metadata.id` and `lastModified`, so the service's idempotence by (source, id) makes every re-read and re-send safe.
+- *What is sent:* the wire records of the contract, pure and tested against every valid fixture; a record the contract would refuse is skipped, never sent to refuse a
+  whole batch; **heart rate is sent only inside sleep sessions (as heart-rate records) and inside exercise sessions (attached to them)**, since nothing else reads it.
+- *Outbox:* batches of at most 2000 records and 3 MiB, one file each, on disk before the read is kept; removed only on a 2xx answer that is the contract's; retried
+  with a backoff (30 s doubling to 30 min, kept across restarts, at once when the rider asks); a batch the service refuses for good is set aside, never deleted.
+- *Privacy:* health data goes only to the owner's service; no log line holds a figure, a failure's words or the token.
 
 ### 6.3 Training load
 

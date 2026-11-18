@@ -620,3 +620,30 @@ What the implementation added or fixed to build the components above (`android/u
   missing reading is a gap, never a zero, and the readout says "—"; the stepped FTP line is drawn from daily points so a day can be selected on it.
 - **Touch**: a hold of 250 ms and a slide scrubs; a vertical scroll that starts without the hold scrolls the page. The haptic is `TextHandleMove`.
 
+
+### 13.2 Settled in stage P3-4b
+
+What the watch data's screens added (`android/ui-kit`, `android/app-companion`, `docs/adr/0027-health-connect-reader.md`); no token changed:
+
+- **SleepTimingChart**: floating bars on a clock axis (21:00 at the top, extended in whole hours when a night falls outside, a tick every 2 h), one bar per night
+  from bedtime to waking (width `min(8, slot − 3)` dp, at least 1.5 dp, fully rounded, text 3; the selected night text 1), two surface-3 bands for the usual bedtime and
+  waking. Times are minutes from local midnight, a bedtime before midnight negative, as the service writes them. It shares the screen's `ChartSelection` and is built like
+  `PlotChart`: bars and text once per size, the selection in the draw phase. The first and last night are inset by half a bar, so every Wellness card keeps one gutter (40 dp).
+- **RangeBandLayer** (on `PlotSpec`): a surface-3 band whose edges follow the days (the personal range of a metric is a rolling mean and spread), drawn under the gridlines; a
+  day with no range breaks it, a run of one day draws nothing. `DotLayer(drawn = false)` is a layer that only carries the 8 dp selection dot (Wellness marks every day it can
+  select in text 1, and draws a 6 dp dot only on the days outside their range).
+- **ShowingLine**: "Showing Sun 15 Nov" (label, text 1) with the **Today** pill at the right, in the same item as the range selector so selecting a day recomposes that
+  item and not the list. It appears only while a past day is selected.
+- **Wellness card**: padding 16 × 8 × 16 × 12; a head row of 48 dp (the name in label text 3, "usual 50–56" in label text 3 right-aligned and wrapping to two lines, a 48 dp ghost
+  **Values**), a value line of 36 dp (the figure in numS with its unit, the verdict at the right: `triangle-alert` and text 1 outside the range, text 2 inside, text 3 for "No reading"),
+  then the chart (112 dp, the timing chart 168 dp). A metric with no reading in the whole range is the head row and one sentence in body text 2. Weight shows "7-day average"
+  as its usual text and "average 78.2 kg" as its verdict: no band and no alert.
+- **Permission list** (first run, step 2): rows of 64 dp (48 dp after the dialog) between hairlines, the name in bodyStrong with " · optional" for weight, heart rate variability and steps,
+  the reason in label text 2; after the dialog the right side is a 16 dp `check` with "Allowed" (text 2) or `triangle-alert` with "Off" (text 1), and a Notice (`info`) says what is lost.
+  **Setting rows** of the background step show **On** (check, text 2), **Off** (alert, text 1) or **Not checked** (text 3).
+- **Note card**: label text 3 (kind and time), text body; an after-ride note adds a **topic block** (surface 2, hairline, radius 8: "Worth a chat with your coach" in label text 3, the sentence in
+  body text 2, the opening question in bodyStrong, a 48 dp ghost **Copy question** that becomes **Copied** with a `check`) and a 48 dp link row to the ride (label text 2, `chevron-right` 16 dp).
+  Today's note card has no padding on the card itself: the text is padded, and the **All notes** row (48 dp, `chevron-right`) sits under a hairline.
+- **Heart rate group** (Settings): a stepper row (64 dp at least, the note in label text 2 on the left, the `Stepper` at the right) per value, and a 48 dp ghost "Use 184 bpm" under the note
+  when the rides suggest another value.
+- **Empty block with a button**: "Overdrive cannot read Health Connect yet." and a primary **Allow** (`EmptyBlock.actionLabel`).

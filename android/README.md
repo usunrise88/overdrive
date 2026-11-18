@@ -9,7 +9,7 @@ One Gradle build for everything that runs on Android. The shared `core` is a sep
 | `data` | The rides folder: `RideStore` (log, record, FIT, atomic finalize, scan) and `RideLogWriter`; `FileOutbox`, the sync outbox on disk (ADR 0012); the answers cached for the phone (`FileTextStore`) and its service settings rules (ADR 0024) | §4.2, §4.8, §4.9, §6.1, §7.1 |
 | `ui-kit` | Design system: theme on the generated tokens, components, charts (workout profile, zone bars, and the companion's line, column and ride charts), the overlay composables, Lucide icons | §7.4 |
 | `app-ride` | Tablet app: ride, devices and settings screens over the real trainer, strap and Click (or a simulated ride); remembered devices and pairing; Learn buttons; the handlebar; the overlay service and window; the sync outbox and settings | §4 |
-| `app-companion` | Phone app (ADR 0024): Today, Fitness, Power, Wellness, Rides, ride detail, Settings and the first run, over the service's metrics, rides, plan and profile, cached on disk for offline. The Health Connect reader and the wellness data come with P3-4b | §6.1 |
+| `app-companion` | Phone app (ADR 0024, 0027): Today (with the recovery card and the note), Fitness, Power, Wellness, Rides, ride detail, Notes, Settings (service, Health Connect, heart rate) and the first run, over the service's metrics, rides, plan, profile, wellness and notes, cached on disk for offline; reads Health Connect (AndroidX, no Play Services) and sends it to the service from an outbox, once a day (WorkManager) and on app open | §6.1, §6.2 |
 
 Dependency direction: apps → `ui-kit`, `data`, `ble` → `core`.
 
@@ -150,8 +150,12 @@ flow through the tabs against a local stand-in of the service:
 
 ```bash
 ./gradlew :app-companion:testDebugUnitTest   # tests and screenshots
-ls app-companion/build/shots/                # today--*, fitness--*, power--*, rides--*, ride--*, settings--*, connect--*
+ls app-companion/build/shots/                # today--*, fitness--*, power--*, wellness--*, notes--*, rides--*, ride--*, settings--*, onboarding--*, connect--*
 ```
+
+The watch data's reading logic is not in the app: `core/health` is pure Kotlin with a `HealthSource` interface, tested with a fake Health Connect (permissions, the first 60-day
+read in pages, the Changes API, an expired token, an upload that fails and is retried, a restart) in `cd core && ./gradlew check`. `android/data` has the thin Health Connect adapter and the
+outbox on disk. The container tests (`WatchContainerTest`) run the real container against the loopback stand-in of the service with a fake Health Connect.
 
 ## SDK levels
 
