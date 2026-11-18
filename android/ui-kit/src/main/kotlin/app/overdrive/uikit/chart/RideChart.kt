@@ -6,7 +6,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.CacheDrawScope
+import androidx.compose.ui.draw.DrawResult
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -181,6 +184,19 @@ fun RideChart(
     val measurer = rememberTextMeasurer()
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
+    // One lambda for as long as the data is the same: a new one at every recomposition would rebuild the paths at every snap.
+    val build: CacheDrawScope.() -> DrawResult =
+        remember(spec, selection, measurer) {
+            {
+                val layout = RideLayout(spec, size, this, measurer)
+                onDrawWithContent {
+                    with(layout) {
+                        drawStatic()
+                        drawSelection(selection.x)
+                    }
+                }
+            }
+        }
     CompositionLocalProvider(LocalViewConfiguration provides ScrubViewConfiguration(LocalViewConfiguration.current)) {
         Box(
             modifier
@@ -189,15 +205,7 @@ fun RideChart(
                 .chartSemantics(description, spec.seconds, spec.restX, selection)
                 .chartGestures(spec, haptics, snap = { px, size -> with(density) { snapSeconds(spec, px, size) } }) {
                     selection.select(it)
-                }.drawWithCache {
-                    val layout = RideLayout(spec, size, this, measurer)
-                    onDrawWithContent {
-                        with(layout) {
-                            drawStatic()
-                            drawSelection(selection.x)
-                        }
-                    }
-                },
+                }.drawWithCache(build),
         )
     }
 }

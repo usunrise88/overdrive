@@ -47,8 +47,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.overdrive.uikit.BottomSheet
 import app.overdrive.uikit.HorizontalRule
-import app.overdrive.uikit.LocalMotionEnabled
 import app.overdrive.uikit.OdCard
 import app.overdrive.uikit.OdIconButton
 import app.overdrive.uikit.OdText
@@ -275,74 +275,21 @@ fun ValuesSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val motion = LocalMotionEnabled.current
-    val noInteraction = remember { MutableInteractionSource() }
-    AnimatedVisibility(
-        visible = visible,
-        modifier = modifier,
-        enter = if (motion) fadeIn(tween(OverdriveMotion.durationStandard)) else EnterTransition.None,
-        exit = if (motion) fadeOut(tween(OverdriveMotion.durationFast)) else ExitTransition.None,
-    ) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(OverdriveColors.scrim)
-                .clickable(interactionSource = noInteraction, indication = null, onClick = onDismiss),
-            contentAlignment = Alignment.BottomCenter,
+    BottomSheet(visible, onDismiss, modifier, heightFraction = SHEET_HEIGHT) {
+        Row(
+            Modifier.fillMaxWidth().padding(top = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(
-                Modifier
-                    .animateEnterExit(
-                        enter =
-                            if (motion) {
-                                slideInVertically(
-                                    tween(OverdriveMotion.durationStandard, easing = OverdriveMotion.easingDecelerate),
-                                ) { it }
-                            } else {
-                                EnterTransition.None
-                            },
-                        exit =
-                            if (motion) {
-                                slideOutVertically(
-                                    tween(OverdriveMotion.durationFast, easing = OverdriveMotion.easingAccelerate),
-                                ) { it }
-                            } else {
-                                ExitTransition.None
-                            },
-                    ).fillMaxWidth()
-                    .fillMaxHeight(SHEET_HEIGHT)
-                    .clickable(interactionSource = noInteraction, indication = null) {}
-                    .surface(
-                        OverdriveColors.surface1,
-                        RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
-                        OverdriveColors.border,
-                    ).padding(horizontal = 16.dp),
-            ) {
-                Box(Modifier.fillMaxWidth().padding(top = 12.dp), contentAlignment = Alignment.Center) {
-                    Box(
-                        Modifier
-                            .width(
-                                32.dp,
-                            ).height(4.dp)
-                            .background(OverdriveColors.surface3, RoundedCornerShape(2.dp)),
-                    )
-                }
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    OdText(title, Modifier.weight(1f), style = OdType.title, maxLines = 1)
-                    OdIconButton(OverdriveIcons.X, onDismiss, "Close")
-                }
-                TableRow(firstColumn, columns, header = true)
+            OdText(title, Modifier.weight(1f), style = OdType.title, maxLines = 1)
+            OdIconButton(OverdriveIcons.X, onDismiss, "Close")
+        }
+        TableRow(firstColumn, columns, header = true)
+        HorizontalRule()
+        LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
+            items(rows, key = { it.key }) { row ->
+                TableRow(row.label, row.cells, header = false)
                 HorizontalRule()
-                LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
-                    items(rows, key = { it.key }) { row ->
-                        TableRow(row.label, row.cells, header = false)
-                        HorizontalRule()
-                    }
-                }
             }
         }
     }
