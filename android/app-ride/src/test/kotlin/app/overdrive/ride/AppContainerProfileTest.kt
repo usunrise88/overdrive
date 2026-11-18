@@ -138,6 +138,14 @@ class AppContainerProfileTest {
                         "effective ftp=${c.effectiveSettings.value.ftp} stored ftp=${c.settings.value.ftp} " +
                         "ride=${c.host.snapshots.value.state} ride ftp=${c.host.snapshots.value.ftp}",
                 )
+                // Which of the host's two steps is missing: no session was ever built (ride number 0), or the ones built are
+                // not from the settings in force (the sources differ).
+                appendLine(
+                    "  host: ride number=${c.host.ui.value.rideNumber} devices=${c.host.devices.value} " +
+                        "stored source=${c.settings.value.deviceSource} " +
+                        "effective source=${c.effectiveSettings.value.deviceSource} " +
+                        "devices loaded=${c.pairedDevices.loaded.value} changes=${c.pairedDevices.changes.value}",
+                )
             }
             val cached = cachedProfile()
             appendLine(
