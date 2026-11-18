@@ -9,15 +9,17 @@ mock-ups for the ride app (tablet), its overlay and the companion (phone). Nothi
 | Path | What it is |
 |---|---|
 | `system.md` | **The spec for implementers.** Rules, every component with sizes and states, overlay geometry and behaviour, charts, motion, copy, Compose notes |
+| `companion.md` | The phone companion (Phase 3): navigation, every screen and state, every chart, copy, accessibility, performance, the data each screen needs |
 | `tokens.json` | Source of truth for colour, type, spacing, radii, strokes, sizes, overlay metrics, chart and motion values |
 | `tools/build-tokens.mjs` | Writes `mockups/tokens.css`, `android/ui-kit` `OverdriveTokens.kt` and the Geist font resources from `tokens.json`; `--check` fails when any is stale |
 | `tools/check-contrast.mjs` | Checks the contrast rules (zones ≥ 7:1 on the overlay over white video, text tiers on every surface) and prints the colour-vision distances; exits 1 on failure |
-| `tools/render-mockups.mjs` | Serves `design/` locally and screenshots every frame of every mock-up with Playwright |
+| `tools/render-mockups.mjs` | Serves `design/` locally and screenshots every frame of every mock-up with Playwright (`mockups/companion/` pages go to `mockups/companion/png/`) |
 | `fonts/` | Geist 400, 500, 600 (TTF, ~380 KB) and its licence, SIL OFL 1.1. From npm `geist` 1.9.2 |
 | `icons/` | The Lucide icons we use (SVG, stroke 1.5) and the ISC licence. From npm `lucide-static` 1.74.0 |
-| `mockups/*.html` | Static mock-ups: `overlay`, `ride`, `devices` (with the component sheet), `settings`, `companion` |
+| `mockups/*.html` | Static mock-ups: `overlay`, `ride`, `devices` (with the component sheet), `settings` |
+| `mockups/companion/` | Companion mock-ups (phone, 412 dp): `today`, `fitness`, `power`, `wellness`, `rides`, `settings` (with first run), `states`; renders in `png/` |
 | `mockups/components.css`, `charts.js`, `overlay.js`, `ui.js` | Mock-up building blocks; `charts.js` holds the reference geometry of the workout profile |
-| `mockups/screenshots/` | Rendered PNGs at 2× (one per frame) |
+| `mockups/screenshots/` | Rendered PNGs at 2× (one per frame); the companion's are in `mockups/companion/png/` (index in `companion.md` §13) |
 
 ### Mock-up index
 
@@ -30,7 +32,6 @@ mock-ups for the ride app (tablet), its overlay and the companion (phone). Nothi
 | `devices--pairing` | Devices with the Click "locked" notice, and the Click button map |
 | `devices--components` | Device-row states, buttons, chips, zone chips, stat tiles, inputs |
 | `settings--settings` | Overlay (live preview, mode, opacity, blur), FTP, gears, physics |
-| `companion--today`, `--fitness`, `--rides`, `--power`, `--wellness` | Phone, 412 × 915 dp; power and wellness at lower fidelity |
 
 All numbers in the mock-ups are synthetic.
 

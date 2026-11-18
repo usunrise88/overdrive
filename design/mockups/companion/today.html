@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Companion: Today</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../components.css">
+<link rel="stylesheet" href="companion.css">
+</head>
+<body data-ready="false">
+
+<figure class="shot"><figcaption><b>Today · Ready.</b> Full scroll; the fold of a 915 dp screen falls inside the note. Fresh data: the subtitle carries the update time.</figcaption><div class="frame phone tall" id="today"></div></figure>
+<figure class="shot"><figcaption><b>Today · Caution, offline.</b> Last good data with its time; one signal outside the usual range; FTP suggestion waiting for an answer.</figcaption><div class="frame phone tall" id="today-caution"></div></figure>
+<figure class="shot"><figcaption><b>Today · Rest.</b> Two signals outside; nothing planned; the morning note has not arrived yet.</figcaption><div class="frame phone" id="today-rest"></div></figure>
+<figure class="shot"><figcaption><b>Today · first nights.</b> No state until the baseline has 14 nights; values are shown without a verdict.</figcaption><div class="frame phone" id="today-learning"></div></figure>
+<figure class="shot"><figcaption><b>Notes</b> (pushed from "All notes"). Newest first, grouped by day.</figcaption><div class="frame phone" id="notes"></div></figure>
+
+<script type="module">
+import { SWEET_SPOT, VO2, backbar, head, ic, miniProfile, shell, statusLine } from "./companion.js";
+
+const meter = (n) => `<span class="meter" aria-hidden="true">${[1, 2, 3].map((i) => `<i class="${i <= n ? "on" : ""}"></i>`).join("")}</span>`;
+const fact = (name, value, unit, caption, out = false) => `
+  <div class="fact">
+    <span class="name t-body">${out ? ic("triangle-alert", "i-16") : ""}${name}</span>
+    <span class="val"><span class="num t-num-xs">${value}${unit ? `<span class="unit">${unit}</span>` : ""}</span><span class="t-caption num ${out ? "c1" : "c3"}">${caption}</span></span>
+  </div>`;
+const recovery = (when, icon, word, filled, reason, facts) => `
+  <div class="card pad stack gap12">
+    <div class="between"><span class="t-label c3">Recovery · ${when}</span>${meter(filled)}</div>
+    <div class="stack gap4">
+      <div class="state">${ic(icon, "i-24")}<span class="t-num-m">${word}</span></div>
+      <p class="t-body c2">${reason}</p>
+    </div>
+    <div class="stack">${facts}</div>
+  </div>`;
+const planned = (name, line, workout) => `
+  <div class="card pad stack gap12">
+    <span class="t-label c3">Planned today</span>
+    <div class="stack"><span class="t-heading">${name}</span><span class="t-label c2 num">${line}</span></div>
+    ${miniProfile(workout, 346, 44)}
+  </div>`;
+const nothingPlanned = `
+  <div class="card pad stack gap4">
+    <span class="t-label c3">Planned today</span>
+    <span class="t-body c2">Nothing planned today</span>
+  </div>`;
+const note = (label, text) => `
+  <div class="card stack">
+    <div class="stack gap8" style="padding:16px 16px 12px"><span class="t-label c3 num">${label}</span><p class="t-body">${text}</p></div>
+    <div class="row" style="min-height:48px"><span class="t-strong main">All notes</span><span class="c2">${ic("chevron-right")}</span></div>
+  </div>`;
+
+// ---------- Ready ----------
+shell("today", {
+  tab: "Today",
+  body: `${head("Today", "Wednesday 18 November · updated 07:40", { settings: true })}
+  ${recovery(
+    "this morning",
+    "check",
+    "Ready",
+    3,
+    "All four signals are in your usual range. Train as planned.",
+    fact("Resting heart rate", 52, "bpm", "usual 50–56") +
+      fact("Sleep", "7:40", "", "usual 6:50–7:50") +
+      fact("Respiratory rate", "14.2", "/min", "usual 13.6–14.6") +
+      fact("Oxygen saturation", 96, "%", "usual 95–98"),
+  )}
+  ${planned("Sweet spot 3×10", "1:05:00 · load 73 · IF 0.76", SWEET_SPOT)}
+  ${note(
+    "Morning note · 07:30",
+    "You slept 7 hours 40 and your resting heart rate is at its usual 52. Ride the sweet spot session as planned. Last week the third effort faded to 205 W: start it at 215 W and keep cadence above 85.",
+  )}`,
+});
+
+// ---------- Caution, offline, FTP suggestion ----------
+shell("today-caution", {
+  tab: "Today",
+  body: `${head("Today", "Wednesday 18 November", { settings: true })}
+  ${statusLine("Offline · updated 06:10", "No network connection. Pull down to try again.")}
+  ${recovery(
+    "this morning",
+    "triangle-alert",
+    "Caution",
+    2,
+    "Resting heart rate is above your usual range for the second morning. Train, but keep the hard parts short.",
+    fact("Resting heart rate", 59, "bpm", "above usual 50–56", true) +
+      fact("Sleep", "7:05", "", "usual 6:50–7:50") +
+      fact("Respiratory rate", "14.5", "/min", "usual 13.6–14.6") +
+      fact("Oxygen saturation", 96, "%", "usual 95–98"),
+  )}
+  ${planned("VO2 5×3", "56:00 · load 68 · IF 0.85", VO2)}
+  <div class="notice">${ic("zap")}<div class="stack gap8" style="flex:1;min-width:0">
+    <div class="stack"><span class="t-strong">Your FTP may be 256 W</span><span class="t-label c2">Your best efforts of the last 6 weeks point to 256 W; it is 250 W now. Zones change only when you confirm.</span></div>
+    <div style="display:flex;gap:8px"><span class="btn btn-secondary" style="height:40px">Use 256 W</span><span class="btn btn-ghost" style="height:40px">Keep 250 W</span></div>
+  </div></div>
+  ${note(
+    "Morning note · 06:05",
+    "Your resting heart rate has been 59 for two mornings, 6 above your usual. Today's VO2 session is the hardest of the week: ride it as 3×3 instead of 5×3, or swap it for 60 minutes at 150–170 W.",
+  )}`,
+});
+
+// ---------- Rest ----------
+shell("today-rest", {
+  tab: "Today",
+  body: `${head("Today", "Wednesday 18 November · updated 07:40", { settings: true })}
+  ${recovery(
+    "this morning",
+    "pause",
+    "Rest",
+    1,
+    "Two signals are outside your usual range. Keep today easy or take it off.",
+    fact("Resting heart rate", 61, "bpm", "above usual 50–56", true) +
+      fact("Sleep", "5:10", "", "below usual 6:50–7:50", true) +
+      fact("Respiratory rate", "14.4", "/min", "usual 13.6–14.6") +
+      fact("Oxygen saturation", 95, "%", "usual 95–98"),
+  )}
+  ${nothingPlanned}
+  <div class="card pad stack gap4"><span class="t-label c3">Morning note</span><span class="t-body c2">No note yet today. It is written after this morning's watch data reaches the service.</span></div>`,
+});
+
+// ---------- Learning the baseline ----------
+shell("today-learning", {
+  tab: "Today",
+  body: `${head("Today", "Wednesday 18 November · updated 07:40", { settings: true })}
+  <div class="card pad stack gap12">
+    <span class="t-label c3">Recovery</span>
+    <div class="stack gap4">
+      <span class="t-heading">Learning your usual range</span>
+      <p class="t-body c2">Overdrive rates recovery after 14 nights with the watch. 9 nights so far.</p>
+    </div>
+    <div class="bar-track" role="progressbar" aria-valuenow="9" aria-valuemax="14"><i style="width:${(9 / 14) * 100}%"></i></div>
+    <div class="stack">
+      ${fact("Resting heart rate", 54, "bpm", "last night")}
+      ${fact("Sleep", "7:12", "", "last night")}
+      ${fact("Respiratory rate", "14.1", "/min", "last night")}
+      ${fact("Oxygen saturation", "—", "", "no reading")}
+    </div>
+  </div>
+  ${nothingPlanned}`,
+});
+
+// ---------- Notes ----------
+const noteCard = (label, text, link = "") => `
+  <div class="card pad stack gap8"><span class="t-label c3 num">${label}</span><p class="t-body">${text}</p>${link}</div>`;
+shell("notes", {
+  top: backbar("Notes"),
+  body: `
+  <span class="section-label" style="padding:4px 4px 0">Today</span>
+  ${noteCard("Morning note · 07:30", "You slept 7 hours 40 and your resting heart rate is at its usual 52. Ride the sweet spot session as planned. Last week the third effort faded to 205 W: start it at 215 W and keep cadence above 85.")}
+  <span class="section-label" style="padding:4px 4px 0">Monday 16 November</span>
+  ${noteCard("After your ride · 19:42", "Threshold 2×20 went to plan: both efforts held 236 and 233 W against a target of 235. Heart rate drifted 4% in the second effort, less than the 7% of four weeks ago.", `<span class="values-link">Threshold 2×20 ${ic("chevron-right", "i-16")}</span>`)}
+  ${noteCard("Weekly review · 08:00", "Last week's load was 395 against a plan of 410, with all five sessions done. Fitness held at 55. This week is lighter by design: four sessions, 330 planned.")}`,
+});
+
+document.body.dataset.ready = "true";
+</script>
+</body>
+</html>

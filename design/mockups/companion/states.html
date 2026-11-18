@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Companion: States</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../components.css">
+<link rel="stylesheet" href="companion.css">
+</head>
+<body data-ready="false">
+
+<figure class="shot"><figcaption><b>Loading, nothing cached.</b> Only on the very first open of a screen: the header and controls are real, the content says what it waits for. No skeletons.</figcaption><div class="frame phone" id="loading"></div></figure>
+<figure class="shot"><figcaption><b>Error, nothing cached.</b> The cause in plain words with the technical hint, and the two ways out.</figcaption><div class="frame phone" id="error"></div></figure>
+<figure class="shot"><figcaption><b>Stale with a cause that needs the rider.</b> Cached rides stay; the line names the problem and its one action.</figcaption><div class="frame phone" id="stale"></div></figure>
+<figure class="shot"><figcaption><b>Empty.</b> Connected, but no rides yet: say what fills this screen.</figcaption><div class="frame phone" id="empty"></div></figure>
+<figure class="shot"><figcaption><b>Values sheet.</b> The table twin of a chart, from "Values" in its header.</figcaption><div class="frame phone" id="values"></div></figure>
+
+<script type="module">
+import { fitnessData, fmtDay, formWord, head, ic, minus, range, shell, statusLine } from "./companion.js";
+
+shell("loading", {
+  tab: "Fitness",
+  body: `${head("Fitness", "Updating…")}
+  ${range(["6 weeks", "6 months", "1 year"], "6 months")}
+  <div class="center-block"><div class="fresh"><span class="spin"></span><span class="t-body c2">Loading your fitness…</span></div></div>`,
+});
+
+shell("error", {
+  tab: "Today",
+  body: `${head("Today", "Wednesday 18 November", { settings: true })}
+  <div class="center-block">
+    ${ic("triangle-alert", "i-24")}
+    <span class="t-heading">Could not reach your service</span>
+    <span class="t-body c2">The phone could not find overdrive.example.net. Check the address in Settings, or try again on another network.</span>
+    <span class="t-label c3">(UnknownHostException · DNS)</span>
+    <div style="display:flex;gap:8px;margin-top:8px"><span class="btn btn-secondary">${ic("refresh-cw")}Try again</span><span class="btn btn-ghost">Open settings</span></div>
+  </div>`,
+});
+
+const ride = (name, when, d, load, watts) => `
+  <div class="row"><div class="main"><span class="t-strong">${name}</span><span class="t-label c2 num">${when} · ${d}</span></div>
+  <div class="end"><span class="num t-num-xs">${load}</span><span class="t-caption c3 num">${watts} W</span></div></div>`;
+shell("stale", {
+  tab: "Rides",
+  time: "21:15",
+  body: `${head("Rides")}
+  ${statusLine("Out of date · updated yesterday 21:10", "The service did not accept the token. Check it in Settings.", `<span class="btn btn-secondary" style="height:40px;padding:0 14px">Settings</span>`)}
+  <div class="between" style="padding:4px 4px 0"><span class="section-label">November</span><span class="section-label num">Load 519</span></div>
+  <div class="card list">
+    ${ride("Threshold 2×20", "Mon 16", "1:15:00", 97, 211)}
+    ${ride("Free ride", "Sat 14", "1:32:10", 81, 172)}
+    ${ride("VO2 5×3", "Thu 12", "56:00", 68, 189)}
+    ${ride("Endurance 90", "Tue 10", "1:30:00", 74, 165)}
+  </div>`,
+});
+
+shell("empty", {
+  tab: "Power",
+  body: `${head("Power", "Updated 07:40")}
+  <div class="center-block">
+    <span class="t-heading">No rides yet</span>
+    <span class="t-body c2">The power curve, FTP and aerobic drift fill in from rides on the tablet. They appear here after the tablet uploads its first ride.</span>
+  </div>`,
+});
+
+const days = fitnessData().slice(-14).reverse();
+shell("values", {
+  tab: "Fitness",
+  body: `${head("Fitness", "Updated 07:40")}${range(["6 weeks", "6 months", "1 year"], "6 months")}`,
+  overlay: `<div class="sheet-scrim"></div><div class="bottom-sheet" style="top:180px">
+    <span class="grabber"></span>
+    <div class="between"><span class="t-heading">Fitness and fatigue</span><span class="iconbtn" style="margin-right:-12px">${ic("x")}</span></div>
+    <div class="tbl" style="grid-template-columns:1fr auto auto auto">
+      <span class="h">Day</span><span class="h r">Fitness</span><span class="h r">Fatigue</span><span class="h r">Form</span>
+      ${days.map((d) => `<span class="t-label">${fmtDay(d.date)}</span><span class="r t-label">${Math.round(d.ctl)}</span><span class="r t-label">${Math.round(d.atl)}</span><span class="r t-label">${minus(Math.round(d.tsb))}</span>`).join("")}
+    </div>
+  </div>`,
+});
+
+void formWord;
+document.body.dataset.ready = "true";
+</script>
+</body>
+</html>

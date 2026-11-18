@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Companion: Rides</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../components.css">
+<link rel="stylesheet" href="companion.css">
+</head>
+<body data-ready="false">
+
+<figure class="shot"><figcaption><b>Rides.</b> Rides and watch activities in one list by month. A watch activity is marked by the heart icon and "Watch" before its date, and shows average heart rate where a ride shows average power.</figcaption><div class="frame phone" id="rides"></div></figure>
+<figure class="shot"><figcaption><b>Ride detail.</b> Full scroll. Power over the plan (steps in their zone colours, blended), heart rate and W′ balance share one time axis and one selection. Resting state: no crosshair; readout shows the whole ride.</figcaption><div class="frame phone tall" id="ride"></div></figure>
+<figure class="shot"><figcaption><b>Ride detail · selected.</b> Holding at 37:30, inside the fourth VO2 effort: one crosshair through the three plots, the readout gives every value at that second.</figcaption><div class="frame phone" id="ride-selected"></div></figure>
+<figure class="shot"><figcaption><b>Watch activity detail.</b> Heart rate only; load from heart rate, marked approximate.</figcaption><div class="frame phone" id="activity"></div></figure>
+
+<script type="module">
+import {
+  FTP, VO2, backbar, dur, flatten, head, ic, minus, niceTicks, planSteps, readout, rng, shell, tile, zoneOf,
+} from "./companion.js";
+
+const T1 = "var(--color-text-primary)";
+const T2 = "var(--color-text-secondary)";
+const T3 = "var(--color-text-tertiary)";
+
+// ---------- List ----------
+const ride = (name, when, d, load, watts) => `
+  <div class="row">
+    <div class="main"><span class="t-strong">${name}</span><span class="t-label c2 num">${when} · ${d}</span></div>
+    <div class="end"><span class="num t-num-xs">${load}</span><span class="t-caption c3 num">${watts} W</span></div>
+  </div>`;
+const watch = (name, when, d, load, bpm) => `
+  <div class="row">
+    <div class="main"><span class="t-strong">${name}</span><span class="t-label c2 num fresh">${ic("heart-pulse", "i-16")}Watch · ${when} · ${d}</span></div>
+    <div class="end"><span class="num t-num-xs">${load}</span><span class="t-caption c3 num">${bpm} bpm</span></div>
+  </div>`;
+const month = (name, total) =>
+  `<div class="between" style="padding:4px 4px 0"><span class="section-label">${name}</span><span class="section-label num">Load ${total}</span></div>`;
+
+shell("rides", {
+  tab: "Rides",
+  time: "21:15",
+  body: `${head("Rides", "Updated 21:10")}
+  ${month("November", 593)}
+  <div class="card list">
+    ${ride("Sweet spot 3×10", "Wed 18", "1:05:12", 74, 196)}
+    ${ride("Threshold 2×20", "Mon 16", "1:15:00", 97, 211)}
+    ${watch("Beat Saber", "Sun 15", "42:10", 38, 142)}
+    ${ride("Free ride", "Sat 14", "1:32:10", 81, 172)}
+    ${ride("VO2 5×3", "Thu 12", "56:00", 68, 189)}
+    ${watch("Superhot VR", "Wed 11", "35:40", 27, 131)}
+    ${ride("Endurance 90", "Tue 10", "1:30:00", 74, 165)}
+  </div>
+  ${month("October", 1544)}
+  <div class="card list">
+    ${ride("Sweet spot 3×10", "Fri 30", "1:05:00", 71, 194)}
+    ${ride("Free ride", "Wed 28", "48:22", 39, 158)}
+  </div>`,
+});
+
+// ---------- Ride detail: VO2 5×3 ----------
+const segs = flatten(VO2.steps);
+const total = segs.at(-1).start + segs.at(-1).duration; // 3360 s
+const r = rng(9);
+const CP = 255;
+const WP = 18000;
+const STEP = 10;
+const pts = [];
+let hr = 92;
+let wbal = WP;
+for (let t = 0; t < total; t += STEP) {
+  const s = segs.find((g) => t >= g.start && t < g.start + g.duration);
+  const f = s.from + (s.to - s.from) * ((t - s.start) / s.duration);
+  const p = Math.max(0, FTP * f + (r() - 0.5) * 16);
+  hr += (68 + 0.38 * p - hr) * 0.09;
+  if (p > CP) wbal -= (p - CP) * STEP;
+  else wbal = WP - (WP - wbal) * Math.exp((-(CP - p) * STEP) / WP);
+  pts.push({ t, p, hr, w: wbal / 1000, step: s });
+}
+const minW = pts.reduce((m, q) => (q.w < m.w ? q : m), pts[0]);
+
+/** Three stacked plots on one time axis. */
+const rideChart = (selT) => {
+  const Wd = 346;
+  const padL = 32;
+  const padR = 6;
+  const x = (t) => padL + (t / total) * (Wd - padL - padR);
+  const out = [];
+  const plots = [
+    { key: "p", h: 150, y: { min: 0, max: 450, ticks: [0, 100, 200, 300, 400] } },
+    { key: "hr", h: 88, y: { min: 80, max: 190, ticks: [100, 140, 180] } },
+    { key: "w", h: 72, y: { min: 0, max: 18, ticks: [0, 9, 18] } },
+  ];
+  let top = 0;
+  const gap = 16;
+  for (const pl of plots) {
+    const padT = 6;
+    const plotB = top + pl.h;
+    const y = (v) => top + padT + (1 - (v - pl.y.min) / (pl.y.max - pl.y.min)) * (pl.h - padT);
+    if (pl.key === "p") out.push(planSteps(VO2, { x, y, plotB, ftp: FTP }));
+    for (const v of pl.y.ticks) {
+      const yy = Math.round(y(v)) + 0.5;
+      const base = v === pl.y.min;
+      out.push(
+        `<line x1="${padL}" x2="${Wd - padR}" y1="${yy}" y2="${yy}" style="stroke:var(${base ? "--color-border-strong" : "--color-border"});stroke-width:1"/>`,
+        `<text x="${padL - 8}" y="${yy + 4}" text-anchor="end" class="axis">${v}</text>`,
+      );
+    }
+    if (pl.key === "p") {
+      const yy = Math.round(y(FTP)) + 0.5;
+      out.push(`<text x="${Wd - padR}" y="${yy - 5}" text-anchor="end" class="axis">FTP</text>`, `<line x1="${padL}" x2="${Wd - padR}" y1="${yy}" y2="${yy}" style="stroke:var(--color-border-strong);stroke-width:1"/>`);
+    }
+    if (pl.key === "hr") {
+      const yy = Math.round(y(168)) + 0.5;
+      out.push(`<line x1="${padL}" x2="${Wd - padR}" y1="${yy}" y2="${yy}" style="stroke:var(--color-border-strong);stroke-width:1"/>`, `<text x="${Wd - padR}" y="${yy - 5}" text-anchor="end" class="axis">Threshold</text>`);
+    }
+    const color = pl.key === "p" ? T1 : pl.key === "hr" ? T2 : T1;
+    const d = pts.map((q, i) => `${i ? "L" : "M"}${x(q.t).toFixed(1)},${y(Math.min(q[pl.key], pl.y.max)).toFixed(1)}`).join("");
+    if (pl.key === "w") out.push(`<path d="${d}L${x(pts.at(-1).t)},${plotB}L${x(0)},${plotB}Z" style="fill:${T1};fill-opacity:0.1"/>`);
+    out.push(`<path d="${d}" style="fill:none;stroke:${color};stroke-width:${pl.key === "p" ? 1.5 : pl.key === "hr" ? 1.5 : 2};stroke-linejoin:round"/>`);
+    if (pl.key === "w" && selT == null) {
+      out.push(`<circle cx="${x(minW.t)}" cy="${y(minW.w)}" r="4" style="fill:${T1};stroke:var(--color-surface1);stroke-width:2"/>`);
+    }
+    if (selT != null) {
+      const q = pts.find((z) => z.t >= selT);
+      out.push(`<circle cx="${x(q.t)}" cy="${y(Math.min(q[pl.key], pl.y.max))}" r="4" style="fill:${color};stroke:var(--color-surface1);stroke-width:2"/>`);
+    }
+    out.push(`<text x="${padL}" y="${top - 2}" class="axis">${pl.key === "p" ? "" : pl.key === "hr" ? "Heart rate, bpm" : "W′ balance, kJ"}</text>`);
+    pl.top = top;
+    top = plotB + gap + (pl.key === "p" ? 6 : 6);
+  }
+  const H = top - gap + 14;
+  if (selT != null) {
+    const sx = Math.round(x(selT)) + 0.5;
+    out.unshift(`<line x1="${sx}" x2="${sx}" y1="0" y2="${H - 22}" style="stroke:var(--color-text-secondary);stroke-width:1"/>`);
+  }
+  for (const m of [0, 10, 20, 30, 40, 50]) {
+    out.push(`<text x="${x(m * 60)}" y="${H - 4}" text-anchor="${m === 0 ? "start" : "middle"}" class="axis">${m}</text>`);
+  }
+  out.push(`<text x="${Wd - padR}" y="${H - 4}" text-anchor="end" class="axis">min</text>`);
+  return `<svg width="${Wd}" height="${H}" viewBox="0 0 ${Wd} ${H}" style="margin-top:14px">${out.join("")}</svg>`;
+};
+
+const avg = (k) => Math.round(pts.reduce((a, q) => a + q[k], 0) / pts.length);
+const chartCard = (selT) => {
+  const q = selT != null ? pts.find((z) => z.t >= selT) : null;
+  const pct = q ? Math.round((100 * q.p) / FTP) : 0;
+  return `<div class="card chart">
+    <div class="between"><span class="t-label c3">Power, heart rate and W′ balance</span><span class="t-label c2">Values</span></div>
+    ${
+      q
+        ? readout(dur(selT), [
+            ["line", T1, "Power", `${Math.round(q.p)} W`],
+            ["line", T2, "Heart", `${Math.round(q.hr)}`],
+            ["line", T1, "W′", `${q.w.toFixed(1)} kJ`],
+            [null, null, `${q.step.label} ${segs.filter((g) => g.label === q.step.label && g.start <= q.step.start).length} of ${segs.filter((g) => g.label === q.step.label).length} · Z${zoneOf(pct)}`],
+          ])
+        : readout("Whole ride", [
+            ["line", T1, "Power", `avg ${avg("p")} W`],
+            ["line", T2, "Heart", `avg ${avg("hr")}`],
+            ["dot", T1, "W′ lowest", `${minW.w.toFixed(1)} kJ at ${dur(minW.t)}`],
+          ])
+    }
+    ${rideChart(selT)}
+  </div>`;
+};
+
+const tiles = `
+  <div class="tiles" style="grid-template-columns:repeat(3,1fr)">
+    ${tile("Duration", "56:00")}${tile("Normalised", 211, "W")}${tile("Load", 68)}
+    ${tile("Average", 189, "W")}${tile("Intensity", "0.85")}${tile("Work", 635, "kJ")}
+    ${tile("Avg heart", 141, "bpm")}${tile("Max heart", 178, "bpm")}${tile("Moving", "56:00")}
+  </div>`;
+
+const plan = `
+  <div class="card list">
+    <div class="row">
+      <div class="main"><span class="t-label c3">Planned workout</span><span class="t-strong">VO2 5×3 · all 15 steps ridden</span><span class="t-label c2 num">Efforts 287–291 W against 288 W</span></div>
+    </div>
+  </div>`;
+
+const zones = [
+  ["Z1", "Recovery", 1180, 1], ["Z2", "Endurance", 720, 2], ["Z3", "Tempo", 260, 3], ["Z4", "Threshold", 330, 4],
+  ["Z5", "VO2 max", 810, 5], ["Z6", "Anaerobic", 0, 6], ["Z7", "Neuromuscular", 60, 7],
+];
+const zoneBars = `
+  <div class="card pad stack gap8">
+    <span class="t-label c3">Time in power zones</span>
+    ${zones
+      .map(
+        ([z, n, s, k]) => `<div style="display:grid;grid-template-columns:28px 104px 1fr 48px;gap:8px;align-items:center;height:28px">
+      <span class="t-label c2 num">${z}</span><span class="t-label c2">${n}</span>
+      <span style="height:12px;display:flex"><i style="display:block;height:12px;width:${s ? (s / 1180) * 100 : 0.5}%;min-width:1px;background:var(--zone-${k});border-radius:0 4px 4px 0"></i></span>
+      <span class="t-label num" style="text-align:right">${dur(s)}</span></div>`,
+      )
+      .join("")}
+  </div>`;
+
+const laps = segs.map((s, i) => {
+  const ps = pts.filter((q) => q.t >= s.start && q.t < s.start + s.duration);
+  const a = (k) => Math.round(ps.reduce((m, q) => m + q[k], 0) / ps.length);
+  const target = Math.round(((s.from + s.to) / 2) * FTP);
+  return { i: i + 1, name: s.label, d: dur(s.duration), w: a("p"), target, hr: a("hr"), ramp: s.from !== s.to };
+});
+const lapTable = `
+  <div class="card stack">
+    <div style="padding:16px 16px 4px"><span class="t-label c3">Laps</span></div>
+    <div class="tbl" style="grid-template-columns:24px 1fr auto auto auto;padding:0 16px 8px">
+      <span class="h">#</span><span class="h">Step</span><span class="h r">Time</span><span class="h r">Watts</span><span class="h r">Heart</span>
+      ${laps
+        .map(
+          (l) =>
+            `<span class="t-label c3">${l.i}</span><span class="t-label">${l.name}</span><span class="r t-label c2">${l.d}</span><span class="r" style="flex-direction:column;align-items:flex-end;justify-content:center"><span class="t-label">${l.w}</span><span class="t-caption c3">${l.ramp ? "ramp" : `of ${l.target}`}</span></span><span class="r t-label">${l.hr}</span>`,
+        )
+        .join("")}
+    </div>
+  </div>`;
+
+const note = `
+  <div class="card pad stack gap8"><span class="t-label c3">After your ride · 19:20</span>
+    <p class="t-body">All five VO2 efforts held 287 to 291 W against a target of 288. W′ balance went lowest in the sprint, to ${minW.w.toFixed(1)} kJ, and came back to 15 kJ within the cool-down. Heart rate reached 174 in the last effort against 171 in the first.</p></div>`;
+
+shell("ride", {
+  time: "21:15",
+  top: backbar("VO2 5×3", "Thu 12 Nov · 18:02–18:58"),
+  body: `${tiles}${plan}${chartCard(null)}${zoneBars}${lapTable}${note}`,
+});
+shell("ride-selected", {
+  time: "21:15",
+  top: backbar("VO2 5×3", "Thu 12 Nov · 18:02–18:58"),
+  body: `${chartCard(37 * 60 + 30)}${zoneBars}`,
+});
+
+// ---------- Watch activity ----------
+const ra = rng(14);
+let h = 88;
+const hrs = Array.from({ length: 254 }, (_, i) => {
+  const burst = Math.sin(i / 6) > 0.2 ? 160 : 125;
+  h += (burst - h) * 0.25 + (ra() - 0.5) * 6;
+  return Math.round(i < 6 ? 88 + i * 8 : h);
+});
+const W2 = 346;
+const xa = (i) => 32 + (i / (hrs.length - 1)) * (W2 - 38);
+const ya = (v) => 6 + (1 - (v - 80) / 110) * 150;
+const hrSvg = `<svg width="${W2}" height="180" viewBox="0 0 ${W2} 180">
+  ${[100, 140, 180].map((v) => `<line x1="32" x2="${W2 - 6}" y1="${Math.round(ya(v)) + 0.5}" y2="${Math.round(ya(v)) + 0.5}" style="stroke:var(--color-border);stroke-width:1"/><text x="24" y="${ya(v) + 4}" text-anchor="end" class="axis">${v}</text>`).join("")}
+  <line x1="32" x2="${W2 - 6}" y1="${Math.round(ya(168)) + 0.5}" y2="${Math.round(ya(168)) + 0.5}" style="stroke:var(--color-border-strong);stroke-width:1"/><text x="${W2 - 6}" y="${ya(168) - 5}" text-anchor="end" class="axis">Threshold</text>
+  <path d="${hrs.map((v, i) => `${i ? "L" : "M"}${xa(i).toFixed(1)},${ya(v).toFixed(1)}`).join("")}" style="fill:none;stroke:${T2};stroke-width:1.5;stroke-linejoin:round"/>
+  ${[0, 10, 20, 30].map((m) => `<text x="${xa((m * 60) / 10)}" y="176" text-anchor="${m ? "middle" : "start"}" class="axis">${m}</text>`).join("")}<text x="${W2 - 6}" y="176" text-anchor="end" class="axis">min</text>
+</svg>`;
+
+shell("activity", {
+  time: "21:15",
+  top: backbar("Beat Saber", "Sun 15 Nov · 20:05–20:47 · from the watch"),
+  body: `
+  <div class="tiles" style="grid-template-columns:repeat(3,1fr)">
+    ${tile("Duration", "42:10")}${tile("Avg heart", 142, "bpm")}${tile("Max heart", 171, "bpm")}
+  </div>
+  <div class="tiles" style="grid-template-columns:1fr">
+    ${tile("Load", "38", "", "From heart rate, approximate: short hard efforts are under-counted.")}
+  </div>
+  <div class="card chart">
+    <div class="between"><span class="t-label c3">Heart rate, bpm</span><span class="t-label c2">Values</span></div>
+    ${readout("Whole activity", [["line", T2, "Heart", "avg 142 · max 171"]])}
+    ${hrSvg}
+  </div>
+  <span class="t-label c2" style="padding:0 4px">Counts toward fatigue, form and recovery. Not used for the power curve, FTP or aerobic drift.</span>`,
+});
+
+document.body.dataset.ready = "true";
+</script>
+</body>
+</html>

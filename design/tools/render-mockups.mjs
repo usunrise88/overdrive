@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // Renders every .frame / .sheet element of design/mockups/*.html to
-// design/mockups/screenshots/<page>--<id>.png at device scale factor 2.
+// design/mockups/screenshots/<page>--<id>.png, and of design/mockups/companion/*.html to
+// design/mockups/companion/png/<page>--<id>.png, at device scale factor 2.
 // Needs Playwright with Chromium (not a repo dependency): it is resolved from the global
 // installation, e.g. NODE_PATH=$(npm root -g) node design/tools/render-mockups.mjs [page ...]
+// CHROMIUM_PATH=/path/to/chrome uses that browser binary instead of Playwright's own.
 
 import { readdirSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
@@ -41,23 +43,31 @@ await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
 const base = `http://127.0.0.1:${server.address().port}`;
 
 const only = process.argv.slice(2);
-const pages = readdirSync(mockDir)
-  .filter((f) => f.endsWith(".html"))
-  .filter((f) => only.length === 0 || only.some((o) => f.startsWith(o)));
+const pages = [
+  ...readdirSync(mockDir)
+    .filter((f) => f.endsWith(".html"))
+    .map((f) => ({ file: f, out: join(mockDir, "screenshots") })),
+  ...readdirSync(join(mockDir, "companion"))
+    .filter((f) => f.endsWith(".html"))
+    .map((f) => ({ file: `companion/${f}`, out: join(mockDir, "companion", "png") })),
+].filter(({ file }) => only.length === 0 || only.some((o) => file.startsWith(o)));
 
-const browser = await chromium.launch();
+const browser = await chromium.launch(
+  process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
+);
 const page = await browser.newPage({
   deviceScaleFactor: 2,
   viewport: { width: 1400, height: 900 },
 });
-for (const file of pages) {
+for (const { file, out: outDir } of pages) {
   await page.goto(`${base}/mockups/${file}`);
   await page.evaluate(() => document.fonts.ready);
   await page.waitForFunction(() => document.body.dataset.ready !== "false");
   const frames = await page.$$(".frame[id], .sheet[id]");
   for (const frame of frames) {
     const id = await frame.getAttribute("id");
-    const out = join(mockDir, "screenshots", `${file.replace(".html", "")}--${id}.png`);
+    const name = file.split("/").at(-1).replace(".html", "");
+    const out = join(outDir, `${name}--${id}.png`);
     await frame.screenshot({ path: out });
     console.log(out.slice(designDir.length + 1));
   }
