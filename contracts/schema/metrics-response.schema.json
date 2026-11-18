@@ -26,7 +26,7 @@
       "$ref": "#/$defs/instant"
     },
     "firstLoadDate": {
-      "description": "The first local day on which the rider has any load, as far as the stored history goes (not limited to the range); null when there is none. Fitness, fatigue and form are 0 before it.",
+      "description": "The first local day on which the rider has any load up to `to`, before `from` or not; null when there is none. Fitness, fatigue and form are 0 before it.",
       "oneOf": [{ "$ref": "#/$defs/date" }, { "type": "null" }]
     },
     "daily": {
