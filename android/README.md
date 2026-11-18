@@ -6,10 +6,10 @@ One Gradle build for everything that runs on Android. The shared `core` is a sep
 | Module | Contents | Spec |
 |---|---|---|
 | `ble` | Android Bluetooth under core's four interfaces: GATT transport over a thin platform shim, scanner, radio and permission state, raw session logs (ADR 0010) | §4.1, §7.1 |
-| `data` | The rides folder: `RideStore` (log, record, FIT, atomic finalize, scan) and `RideLogWriter`; `FileOutbox`, the sync outbox on disk (ADR 0012) | §4.2, §4.8, §4.9, §7.1 |
-| `ui-kit` | Design system: theme on the generated tokens, components, charts, the overlay composables, Lucide icons | §7.4 |
+| `data` | The rides folder: `RideStore` (log, record, FIT, atomic finalize, scan) and `RideLogWriter`; `FileOutbox`, the sync outbox on disk (ADR 0012); the answers cached for the phone (`FileTextStore`) and its service settings rules (ADR 0024) | §4.2, §4.8, §4.9, §6.1, §7.1 |
+| `ui-kit` | Design system: theme on the generated tokens, components, charts (workout profile, zone bars, and the companion's line, column and ride charts), the overlay composables, Lucide icons | §7.4 |
 | `app-ride` | Tablet app: ride, devices and settings screens over the real trainer, strap and Click (or a simulated ride); remembered devices and pairing; Learn buttons; the handlebar; the overlay service and window; the sync outbox and settings | §4 |
-| `app-companion` | Phone app: statistics, Health Connect reader | §6.1 |
+| `app-companion` | Phone app (ADR 0024): Today, Fitness, Power, Wellness, Rides, ride detail, Settings and the first run, over the service's metrics, rides, plan and profile, cached on disk for offline. The Health Connect reader and the wellness data come with P3-4b | §6.1 |
 
 Dependency direction: apps → `ui-kit`, `data`, `ble` → `core`.
 
@@ -144,6 +144,14 @@ ls app-ride/build/shots/                   # the PNGs, one per screen and state
 
 The PNGs are build output and never committed; compare them with `../design/mockups/screenshots/` by eye. The tests also
 assert the overlay's measured size (464 dp wide; 84, 159 and 282 dp high).
+
+`app-companion` does the same for its screens and states (`design/mockups/companion/png/` is the target), and also drives the charts' touch and a whole
+flow through the tabs against a local stand-in of the service:
+
+```bash
+./gradlew :app-companion:testDebugUnitTest   # tests and screenshots
+ls app-companion/build/shots/                # today--*, fitness--*, power--*, rides--*, ride--*, settings--*, connect--*
+```
 
 ## SDK levels
 

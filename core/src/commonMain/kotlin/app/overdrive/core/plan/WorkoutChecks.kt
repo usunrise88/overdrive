@@ -88,6 +88,20 @@ public fun Workout.intensityFactor(): Double? {
     return sqrt(sqrt(fourthPowerSum / windows))
 }
 
+/**
+ * The training stress the workout's own targets add up to, as the service counts a ride's load (spec §6.3): intensity factor
+ * squared, times the hours of the structured part, times 100. Like [intensityFactor] it needs no FTP (the targets are fractions
+ * of it) and leaves the free-ride steps out, which prescribe no power. Null when there is no [intensityFactor].
+ */
+public fun Workout.plannedLoad(): Double? {
+    val factor = intensityFactor() ?: return null
+    val seconds = flatSteps().filter { it.targetFrom != null }.sumOf { it.durationSeconds }
+    return factor * factor * seconds / SECONDS_PER_HOUR * LOAD_PER_HOUR_AT_FTP
+}
+
+private const val SECONDS_PER_HOUR = 3600.0
+private const val LOAD_PER_HOUR_AT_FTP = 100.0
+
 private fun saturatingAdd(
     a: Long,
     b: Long,

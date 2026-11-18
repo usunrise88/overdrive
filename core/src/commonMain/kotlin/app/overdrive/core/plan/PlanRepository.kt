@@ -114,6 +114,9 @@ public class PlanRepository(
     private val running = Mutex()
     private val askAgain = MutableStateFlow(false)
 
+    /** A request of the rider is waiting for the one under way: a second press while it waits adds nothing. */
+    private val requestWaiting = MutableStateFlow(false)
+
     /** The address and token of the last request that got an outcome (an answer or no answer); not one that was cancelled. */
     private val lastAsked = MutableStateFlow<SyncConfig?>(null)
 
@@ -166,6 +169,20 @@ public class PlanRepository(
      * that request's last look and its letting go, is made by the holder or by whoever takes the lock next.
      */
     public suspend fun refresh(why: PlanRefresh) {
+        if (why == PlanRefresh.REQUESTED) {
+            // The rider asked (the refresh button): never dropped. It waits for the request under way, which may be stale or
+            // failing, and asks once more; presses meanwhile are one.
+            if (!requestWaiting.compareAndSet(false, true)) return
+            running.lock()
+            requestWaiting.value = false
+            try {
+                attempt(PlanRefresh.REQUESTED)
+                while (askAgain.compareAndSet(true, false)) attempt(PlanRefresh.SETTINGS_CHANGED)
+            } finally {
+                running.unlock()
+            }
+            return
+        }
         if (why == PlanRefresh.SETTINGS_CHANGED) askAgain.value = true
         var pending: PlanRefresh? = if (why == PlanRefresh.SETTINGS_CHANGED) null else why
         while (true) {

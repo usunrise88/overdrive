@@ -1,13 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- INTERNET: the only network access, used only to talk to the owner's own service, at the address typed in Settings
+         (spec section 6.1, ADR 0024): the metrics, the rides, the planned workout and the profile, and the answer to an FTP
+         suggestion. Nothing else: no network-state permission, no location, no Play Services, no Firebase. Health Connect and its
+         permissions come with the watch data stage (P3-4b). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- usesCleartextTraffic: Android 9 and later refuse plain http:// unless the app says it may use it. Settings accepts a plain
+         address for a bench on the local network and flags it "Not encrypted" next to the field (ADR 0024, the same decision as
+         the ride app's, ADR 0014 sections 6 and 8); the app makes no other request, so this reaches nothing but the address the
+         owner typed. Remove it to make the companion https-only. -->
     <application
+        android:name=".CompanionApp"
         android:allowBackup="false"
+        android:usesCleartextTraffic="true"
         android:label="Overdrive Companion"
-        android:theme="@android:style/Theme.Material.NoActionBar">
+        android:theme="@style/Theme.OverdriveCompanion">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

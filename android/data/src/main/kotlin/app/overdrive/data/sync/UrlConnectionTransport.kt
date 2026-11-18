@@ -6,6 +6,8 @@ import app.overdrive.core.sync.HttpGetRequest
 import app.overdrive.core.sync.HttpGetTransport
 import app.overdrive.core.sync.HttpPatchRequest
 import app.overdrive.core.sync.HttpPatchTransport
+import app.overdrive.core.sync.HttpPostRequest
+import app.overdrive.core.sync.HttpPostTransport
 import app.overdrive.core.sync.HttpRequest
 import app.overdrive.core.sync.HttpTransport
 import app.overdrive.core.sync.TransportException
@@ -35,7 +37,8 @@ import java.net.URL
  * same bearer header and the same rules (no redirects, nothing logged), whose answer is read up to the request's `maxBytes`.
  * And it is the [HttpPatchTransport] of the rider's profile (ADR 0021): one `PATCH` with a small JSON body
  * (`application/json`), the same stack and rules. Android's `HttpURLConnection` (OkHttp inside) knows the verb PATCH; the JDK's
- * does not, which only matters to a test on a plain JVM (see [setPatchMethod]).
+ * does not, which only matters to a test on a plain JVM (see [setPatchMethod]). And it is the [HttpPostTransport] of the
+ * companion's FTP answer (ADR 0024): one `POST` with a small JSON body, the same stack and rules again.
  *
  * **It logs nothing and keeps neither the token nor the body anywhere but the request being sent.** What went wrong without an
  * answer is a [TransportException] whose message names only the kind of failure; its hint for the owner is a fixed vocabulary
@@ -53,7 +56,8 @@ class UrlConnectionTransport(
     private val setPatchMethod: (HttpURLConnection) -> Unit = { it.requestMethod = "PATCH" },
 ) : HttpTransport,
     HttpGetTransport,
-    HttpPatchTransport {
+    HttpPatchTransport,
+    HttpPostTransport {
     override suspend fun get(request: HttpGetRequest): HttpAnswer =
         withContext(dispatcher) {
             val connection =
@@ -127,32 +131,45 @@ class UrlConnectionTransport(
         }
 
     override suspend fun patch(request: HttpPatchRequest): HttpAnswer =
+        sendJson(request.url, request.bearerToken, request.body, request.maxBytes, setPatchMethod)
+
+    override suspend fun post(request: HttpPostRequest): HttpAnswer =
+        sendJson(request.url, request.bearerToken, request.body, request.maxBytes) { it.requestMethod = "POST" }
+
+    /** One request with a small JSON body of known length ([PATCH][patch] and [POST][post]), the answer read up to [maxBytes]. */
+    private suspend fun sendJson(
+        url: String,
+        bearerToken: String,
+        text: String,
+        maxBytes: Int,
+        setMethod: (HttpURLConnection) -> Unit,
+    ): HttpAnswer =
         withContext(dispatcher) {
             val connection =
                 try {
-                    URL(request.url).openConnection() as HttpURLConnection
+                    URL(url).openConnection() as HttpURLConnection
                 } catch (e: IOException) {
                     throw TransportException(TransportFailure.Other, e)
                 } catch (e: ClassCastException) {
                     throw TransportException(TransportFailure.Other, e)
                 }
             try {
-                val body = request.body.encodeToByteArray()
-                setPatchMethod(connection)
+                val body = text.encodeToByteArray()
+                setMethod(connection)
                 connection.connectTimeout = connectTimeoutMillis
                 connection.readTimeout = readTimeoutMillis
                 connection.instanceFollowRedirects = false
                 connection.useCaches = false
                 connection.doInput = true
                 connection.doOutput = true
-                connection.setRequestProperty("Authorization", "Bearer ${request.bearerToken}")
+                connection.setRequestProperty("Authorization", "Bearer $bearerToken")
                 connection.setRequestProperty("Content-Type", "application/json")
                 connection.setRequestProperty("Accept", "application/json")
                 connection.setFixedLengthStreamingMode(body.size)
                 connection.outputStream.use { it.write(body) }
                 val status = connection.responseCode
                 val stream = if (status >= HTTP_BAD_REQUEST) connection.errorStream else connection.inputStream
-                HttpAnswer(status, stream?.use { readAtMost(it, request.maxBytes) }.orEmpty())
+                HttpAnswer(status, stream?.use { readAtMost(it, maxBytes) }.orEmpty())
             } catch (e: IOException) {
                 currentCoroutineContext().ensureActive()
                 throw NetworkFailures.exceptionOf(e)

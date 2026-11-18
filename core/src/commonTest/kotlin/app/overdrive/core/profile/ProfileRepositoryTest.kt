@@ -394,15 +394,20 @@ class ProfileRepositoryTest {
             started.await()
             assertTrue(repository.state.value.refreshing)
 
-            repository.refresh(ProfileRefresh.REQUESTED)
+            val requested = launch { repository.refresh(ProfileRefresh.REQUESTED) }
             repository.refresh(ProfileRefresh.SCREEN_OPENED)
-            assertEquals(1, service.gets.size, "dropped: the one under way answers for them")
+            assertEquals(1, service.gets.size, "nothing is asked while one is under way")
 
             config = SyncConfig(address, "tok-another-0123456789abcdef0123456789")
             repository.refresh(ProfileRefresh.SETTINGS_CHANGED)
             release.complete(Unit)
             first.join()
-            assertEquals(2, service.gets.size, "the change was made with the old token, so once more")
+            requested.join()
+            assertEquals(
+                3,
+                service.gets.size,
+                "the change was made with the old token, so once more; and the rider's own request, which waited, once more",
+            )
             assertEquals("tok-another-0123456789abcdef0123456789", service.gets.last().token)
             assertFalse(repository.state.value.refreshing)
         }
