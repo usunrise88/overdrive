@@ -1,6 +1,7 @@
 package app.overdrive.ride.shots
 
 import app.overdrive.core.ride.PauseReason
+import app.overdrive.core.ride.RideSnapshot
 import app.overdrive.core.ride.RideState
 import app.overdrive.ride.host.FinishedRide
 import app.overdrive.ride.host.NoMedia
@@ -34,7 +35,9 @@ class ScreenShotsTest : ShotTest() {
     private val topBar = TopBarActions({}, {}, {})
     private val settings = AppSettings(ftp = 250, massKg = 82.0, cdA = 0.32)
 
-    private fun actions(snapshot: app.overdrive.core.ride.RideSnapshot) = RideActions({ null }, { snapshot })
+    private val workouts = TestData.library.workouts.value
+
+    private fun actions(snapshot: RideSnapshot) = RideActions({ null }, { snapshot })
 
     @Test
     fun ready() =
@@ -42,7 +45,7 @@ class ScreenShotsTest : ShotTest() {
             OverdriveTheme {
                 ReadyScreen(
                     choice = RideChoice.Planned(TestData.sweetSpot),
-                    workouts = TestData.library.workouts.value,
+                    workouts = workouts,
                     settings = settings,
                     devices = TestData.devicesOk,
                     startEnabled = true,
@@ -59,7 +62,7 @@ class ScreenShotsTest : ShotTest() {
             OverdriveTheme {
                 ReadyScreen(
                     choice = RideChoice.Free,
-                    workouts = TestData.library.workouts.value,
+                    workouts = workouts,
                     settings = settings,
                     devices = TestData.devicesOk,
                     startEnabled = false,

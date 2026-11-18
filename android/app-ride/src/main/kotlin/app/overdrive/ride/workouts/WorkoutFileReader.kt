@@ -3,7 +3,9 @@ package app.overdrive.ride.workouts
 import android.content.ContentResolver
 import android.net.Uri
 import android.provider.OpenableColumns
+import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.io.InputStream
 
 /** Reads a workout the rider picked with the system file picker (Storage Access Framework). Call off the main thread. */
 object WorkoutFileReader {
@@ -14,10 +16,7 @@ object WorkoutFileReader {
         val name = displayName(resolver, uri)
         return try {
             val bytes =
-                resolver.openInputStream(uri)?.use { input ->
-                    val buffer = input.readNBytes(WorkoutFiles.MAX_BYTES + 1)
-                    if (buffer.size > WorkoutFiles.MAX_BYTES) null else buffer
-                }
+                resolver.openInputStream(uri)?.use { readAtMost(it, WorkoutFiles.MAX_BYTES) }
                     ?: return WorkoutFiles.unreadable(
                         name,
                         "The file is larger than a workout file can be. Pick a workout file in the native JSON format or a Zwift .zwo file.",
@@ -32,6 +31,23 @@ object WorkoutFileReader {
             )
         }
     }
+
+    /** The bytes of [input], or null when there are more than [limit] (`readNBytes` needs API 33, the minimum is 31). */
+    private fun readAtMost(
+        input: InputStream,
+        limit: Int,
+    ): ByteArray? {
+        val out = ByteArrayOutputStream()
+        val chunk = ByteArray(CHUNK_BYTES)
+        while (true) {
+            val read = input.read(chunk)
+            if (read < 0) return out.toByteArray()
+            out.write(chunk, 0, read)
+            if (out.size() > limit) return null
+        }
+    }
+
+    private const val CHUNK_BYTES = 8192
 
     private fun displayName(
         resolver: ContentResolver,
