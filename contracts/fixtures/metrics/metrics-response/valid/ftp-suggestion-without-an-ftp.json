@@ -2,6 +2,7 @@
   "from": "2026-11-09",
   "to": "2026-11-15",
   "generatedAt": "2026-11-16T07:30:12Z",
+  "stale": false,
   "firstLoadDate": "2026-11-10",
   "daily": [
     {
@@ -72,75 +73,127 @@
     {
       "weekStart": "2026-11-09",
       "load": 266.4,
+      "rideLoad": 266.4,
+      "otherLoad": 0,
       "rides": 4,
-      "durationSec": 15300
+      "activities": 0
     }
   ],
   "powerCurve": {
-    "windowDays": 7,
-    "best": [
+    "range": [
       {
         "durationSec": 1,
         "power": 612,
-        "rideId": "ride-1794996000000",
-        "date": "2026-11-14"
+        "date": "2026-11-14",
+        "rideId": "ride-1794996000000"
       },
       {
         "durationSec": 5,
         "power": 548.4,
-        "rideId": "ride-1794996000000",
-        "date": "2026-11-14"
+        "date": "2026-11-14",
+        "rideId": "ride-1794996000000"
       },
       {
         "durationSec": 60,
         "power": 388.2,
-        "rideId": "ride-1794996000000",
-        "date": "2026-11-14"
+        "date": "2026-11-14",
+        "rideId": "ride-1794996000000"
       },
       {
         "durationSec": 300,
         "power": 301.7,
-        "rideId": "ride-1794996000000",
-        "date": "2026-11-14"
+        "date": "2026-11-14",
+        "rideId": "ride-1794996000000"
       },
       {
         "durationSec": 1200,
         "power": 262.5,
-        "rideId": "ride-1795160000000",
-        "date": "2026-11-12"
+        "date": "2026-11-12",
+        "rideId": "ride-1795160000000"
       },
       {
         "durationSec": 3600,
         "power": 221.9,
-        "rideId": "ride-1795160000000",
-        "date": "2026-11-12"
+        "date": "2026-11-12",
+        "rideId": "ride-1795160000000"
+      }
+    ],
+    "allTime": [
+      {
+        "durationSec": 1,
+        "power": 640,
+        "date": "2026-09-20",
+        "rideId": "ride-1789900000000"
+      },
+      {
+        "durationSec": 5,
+        "power": 562.1,
+        "date": "2026-09-20",
+        "rideId": "ride-1789900000000"
+      },
+      {
+        "durationSec": 60,
+        "power": 391,
+        "date": "2026-10-04",
+        "rideId": "ride-1791100000000"
+      },
+      {
+        "durationSec": 300,
+        "power": 305.2,
+        "date": "2026-10-04",
+        "rideId": "ride-1791100000000"
+      },
+      {
+        "durationSec": 1200,
+        "power": 262.5,
+        "date": "2026-11-12",
+        "rideId": "ride-1795160000000"
+      },
+      {
+        "durationSec": 3600,
+        "power": 221.9,
+        "date": "2026-11-12",
+        "rideId": "ride-1795160000000"
+      },
+      {
+        "durationSec": 7200,
+        "power": 190.3,
+        "date": "2026-08-30",
+        "rideId": "ride-1788100000000"
       }
     ]
   },
   "ftp": {
     "current": null,
+    "setAt": null,
     "suggestion": {
       "id": 7,
-      "value": 262,
+      "watts": 262,
+      "basedOnRides": 2,
+      "windowDays": 42,
+      "createdAt": "2026-11-12T19:05:44Z",
+      "confidence": "low",
       "basis": {
         "durationSec": 1200,
         "power": 275.8,
         "rideId": "ride-1795160000000",
         "date": "2026-11-12"
-      },
-      "confidence": "low",
-      "currentFtp": null,
-      "differencePercent": null,
-      "status": "pending",
-      "createdAt": "2026-11-12T19:05:44Z"
+      }
     },
-    "suggestionNote": null,
-    "history": []
+    "latestEstimate": 262,
+    "history": [],
+    "estimates": [
+      {
+        "date": "2026-11-15",
+        "eftp": 262
+      }
+    ]
   },
   "drift": [
     {
       "date": "2026-11-12",
       "rideId": "ride-1795160000000",
+      "name": "Endurance 90",
       "driftPercent": 3.4,
       "efFirst": 1.512,
       "efSecond": 1.461

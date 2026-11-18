@@ -61,21 +61,35 @@ class MetricsContractTest {
 
     private val cases: List<Case<*>> =
         listOf(
-            Case("metrics-response", MetricsApiJson::decodeMetrics, MetricsApiJson::encodeMetrics, 6, 25),
+            Case("metrics-response", MetricsApiJson::decodeMetrics, MetricsApiJson::encodeMetrics, 8, 35),
             Case(
                 "ride-metrics-response",
                 MetricsApiJson::decodeRideMetrics,
                 MetricsApiJson::encodeRideMetrics,
                 4,
-                14,
+                17,
             ),
-            Case("rides-response", MetricsApiJson::decodeRides, MetricsApiJson::encodeRides, 3, 12),
+            Case("rides-response", MetricsApiJson::decodeRides, MetricsApiJson::encodeRides, 3, 20),
             Case(
                 "ride-detail-response",
                 MetricsApiJson::decodeRideDetail,
                 MetricsApiJson::encodeRideDetail,
+                5,
+                20,
+            ),
+            Case(
+                "ftp-suggestion-dismiss-request",
+                MetricsApiJson::decodeDismissRequest,
+                MetricsApiJson::encodeDismissRequest,
+                1,
+                5,
+            ),
+            Case(
+                "ftp-suggestion-dismiss-response",
+                MetricsApiJson::decodeDismissResponse,
+                MetricsApiJson::encodeDismissResponse,
                 3,
-                10,
+                3,
             ),
         )
 
@@ -119,6 +133,16 @@ class MetricsContractTest {
     }
 
     @Test
+    fun `the power curve has the 25 durations of the design`() {
+        assertEquals(25, MetricsApiJson.POWER_CURVE_DURATIONS.size)
+        val minutes = listOf(1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0, 40.0, 60.0, 90.0, 120.0)
+        assertEquals(
+            listOf(1, 2, 3, 5, 8, 10, 15, 20, 30, 45) + minutes.map { (it * 60).toInt() },
+            MetricsApiJson.POWER_CURVE_DURATIONS,
+        )
+    }
+
+    @Test
     fun `a ride without power or a drift is a valid answer`() {
         val file = File(contracts, "fixtures/metrics/ride-metrics-response/valid/no-power-no-drift.json")
         val ride = MetricsApiJson.decodeRideMetrics(file.readText())
@@ -129,7 +153,7 @@ class MetricsContractTest {
     }
 
     @Test
-    fun `serves 400 days and refuses 401`() {
+    fun `serves 366 days and refuses 367`() {
         val empty = File(contracts, "fixtures/metrics/metrics-response/valid/no-rides-yet.json").readText()
         val day = MetricsApiJson.decodeMetrics(empty).daily.first()
 
@@ -141,15 +165,19 @@ class MetricsContractTest {
             val monday = { d: Long -> d - (d + 3).mod(7L) }
             val weeks = (monday(first)..monday(end) step 7).map { date(it) }
             val daily = dates.joinToString(",") { dayJson(day, it) }
-            val weekly = weeks.joinToString(",") { """{"weekStart":"$it","load":0,"rides":0,"durationSec":0}""" }
+            val weekly =
+                weeks.joinToString(",") {
+                    """{"weekStart":"$it","load":0,"rideLoad":0,"otherLoad":0,"rides":0,"activities":0}"""
+                }
             return """{"from":"${dates.first()}","to":"2026-11-18","generatedAt":"2026-11-18T08:00:00Z",""" +
-                """"firstLoadDate":null,"daily":[$daily],"weekly":[$weekly],""" +
-                """"powerCurve":{"windowDays":$days,"best":[]},""" +
-                """"ftp":{"current":null,"suggestion":null,"suggestionNote":"No ride","history":[]},"drift":[]}"""
+                """"stale":false,"firstLoadDate":null,"daily":[$daily],"weekly":[$weekly],""" +
+                """"powerCurve":{"range":[],"allTime":[]},""" +
+                """"ftp":{"current":null,"setAt":null,"suggestion":null,"latestEstimate":null,""" +
+                """"history":[],"estimates":[]},"drift":[]}"""
         }
-        assertEquals(400, MetricsApiJson.decodeMetrics(over(400)).daily.size)
+        assertEquals(366, MetricsApiJson.decodeMetrics(over(366)).daily.size)
         assertEquals(1, MetricsApiJson.decodeMetrics(over(1)).daily.size)
-        assertFailsWith<IllegalArgumentException> { MetricsApiJson.decodeMetrics(over(401)) }
+        assertFailsWith<IllegalArgumentException> { MetricsApiJson.decodeMetrics(over(367)) }
     }
 
     private fun dayJson(
@@ -175,7 +203,7 @@ class MetricsContractTest {
 
     @Test
     fun `power curve durations are the schemas`() {
-        for (name in listOf("metrics-response", "ride-metrics-response")) {
+        for (name in listOf("metrics-response")) {
             val schema = parse(File(contracts, "schema/$name.schema.json").readText()) as JsonObject
             val definitions = schema.getValue("\$defs") as JsonObject
             val durations = (definitions.getValue("duration") as JsonObject).getValue("enum") as JsonArray

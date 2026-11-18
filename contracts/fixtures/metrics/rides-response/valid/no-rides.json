@@ -1,9 +1,9 @@
 {
-  "from": "2026-11-01",
-  "to": "2026-11-02",
-  "total": 0,
-  "offset": 0,
-  "limit": 20,
+  "generatedAt": "2026-11-18T08:00:00Z",
+  "stale": false,
+  "before": null,
+  "limit": 50,
   "hasMore": false,
-  "rides": []
+  "nextBefore": null,
+  "items": []
 }

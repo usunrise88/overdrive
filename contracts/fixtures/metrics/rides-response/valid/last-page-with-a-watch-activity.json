@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-11-18T08:00:00Z",
+  "stale": true,
+  "before": "2026-11-12T18:40:00Z",
+  "limit": 50,
+  "hasMore": false,
+  "nextBefore": null,
+  "items": [
+    {
+      "id": "act-1794800000000",
+      "kind": "activity",
+      "name": "Beat Saber",
+      "start": "2026-11-11T20:05:00Z",
+      "date": "2026-11-11",
+      "durationSeconds": 2530,
+      "load": 38.2,
+      "loadApproximate": true,
+      "sport": "VirtualReality",
+      "averagePower": null,
+      "averageHeartRate": 142.3
+    },
+    {
+      "id": "ride-1794996000000",
+      "kind": "ride",
+      "name": "Sweet spot 2x20",
+      "start": "2026-11-10T19:00:00Z",
+      "date": "2026-11-10",
+      "durationSeconds": 3600,
+      "load": 64.1,
+      "loadApproximate": false,
+      "sport": null,
+      "averagePower": 187.4,
+      "averageHeartRate": null
+    },
+    {
+      "id": "act-1794500000000",
+      "kind": "activity",
+      "name": "Beat Saber",
+      "start": "2026-11-07T10:00:00.250Z",
+      "date": "2026-11-07",
+      "durationSeconds": 2530,
+      "load": null,
+      "loadApproximate": true,
+      "sport": "VirtualReality",
+      "averagePower": null,
+      "averageHeartRate": 142.3
+    }
+  ]
+}

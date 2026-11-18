@@ -1,0 +1,50 @@
+{
+  "generatedAt": "2026-11-18T08:00:00Z",
+  "stale": false,
+  "id": "ride-1795160000000",
+  "name": "Free ride",
+  "startTime": "2026-11-12T18:40:00Z",
+  "endTime": "2026-11-12T18:42:00Z",
+  "date": "2026-11-12",
+  "workoutId": null,
+  "devices": [
+    "Wahoo KICKR",
+    "Polar H10"
+  ],
+  "ftp": 250,
+  "cp": 250,
+  "wPrime": 20,
+  "wPrimeLowest": {
+    "kilojoules": 20,
+    "atSec": 0
+  },
+  "summary": {
+    "durationSeconds": 120,
+    "movingSeconds": 120,
+    "distanceMeters": 900,
+    "averagePower": 150,
+    "workKilojoules": 18
+  },
+  "secondsInZones": [
+    0,
+    120,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "laps": [
+    {
+      "stepIndex": null,
+      "label": null,
+      "type": null,
+      "startSeconds": 0,
+      "endSeconds": 120,
+      "averagePower": 150,
+      "averageHeartRate": null,
+      "targetPower": null
+    }
+  ],
+  "plan": null
+}

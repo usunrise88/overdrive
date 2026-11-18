@@ -1,0 +1,22 @@
+{
+  "from": "2025-11-17",
+  "to": "2026-11-18",
+  "generatedAt": "2026-11-18T08:00:00Z",
+  "stale": false,
+  "firstLoadDate": null,
+  "daily": [],
+  "weekly": [],
+  "powerCurve": {
+    "range": [],
+    "allTime": []
+  },
+  "ftp": {
+    "current": null,
+    "setAt": null,
+    "suggestion": null,
+    "latestEstimate": null,
+    "history": [],
+    "estimates": []
+  },
+  "drift": []
+}

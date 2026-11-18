@@ -1,54 +1,135 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Overdrive ride detail response",
-  "description": "The service's answer to GET /v1/rides/{rideId}[?series=true[&step=seconds]] (spec §8.3, ADR 0022): one stored ride with its summary and laps as recorded (ride-record.schema.json), without the samples. With series=true it also carries the time series, each point the mean of `stepSeconds` seconds (step= asks for it, 1 to 600, default 10; a long ride gets a longer step so that no series has more than 1200 points): power, heart rate, cadence and the workout's target power, whole numbers, null where nothing was measured in the whole step. Computed values such as the power curve are not here: see GET /v1/rides/{rideId}/metrics. Rules a schema cannot state, checked by every implementation: the laps follow each other from 0 to the ride's duration (as in the record); the four series have the same length, and with a step of stepSeconds that is the ceiling of the duration over the step.",
+  "description": "The service's answer to GET /v1/rides/{rideId}[?series=true] (spec §8.3, ADR 0022): one stored ride, as the companion's ride screen shows it, without the raw samples. generatedAt is when (UTC) and stale is true when the workout the ride was played from could not be looked up because a source failed (plan is then null). name is the workout the ride was played from, or Free ride. summary is the one the tablet recorded (ride-record.schema.json). ftp is the FTP the ride was recorded with; cp (watts) and wPrime (kilojoules) are what the W′ balance used: the profile's FTP, else the ride's own, as critical power, and the profile's W′, else 20 kJ; wPrimeLowest is the lowest the balance reached and the second it did (the balance model of Skiba et al. 2012, see ADR 0022). secondsInZones are the seconds in power zones 1 to 7 (not paused, with a reading) by the ride's FTP and the profile's zone bounds. laps are the record's laps with what the plan says of each: label is the step's name and type its kind (steady, ramp or free) when the ride followed a workout and the lap has a step, targetPower the step's target in watts (the target fraction times the ride's FTP, whole watts) for a steady step, null for a ramp, a free step or a ride without a plan. plan is null for a ride that followed no workout or whose workout is gone; otherwise workout is the workout as it was when the ride was stored (workout.schema.json), stepsPlanned the number of its steps with repeats expanded, stepsRidden how many of them the ride stayed in for their whole planned time, effortTarget the planned average power in watts of the effort steps (the steady steps at 90% of FTP or more, else the steady steps at the workout's highest target) and effortRange the lowest and highest average power the ride held in each of them, null when the workout has no such steps. series is present only when asked with series=true: one point per `step` seconds (10, or longer so that there are at most 600 points), t the second at the end of the step, power and heartRate the means over the step in whole numbers (null where nothing was measured in the whole step) and wBal the W′ balance in kilojoules at second t (two decimals). Rules a schema cannot state, checked by every implementation: the laps follow each other from 0 to the ride's duration; secondsInZones has 7 entries; series t values ascend, none past the duration; plan.effortRange is ordered and null exactly when effortTarget is.",
   "type": "object",
   "required": [
+    "generatedAt",
+    "stale",
     "id",
+    "name",
     "startTime",
     "endTime",
     "date",
     "workoutId",
-    "workoutName",
-    "ftp",
     "devices",
+    "ftp",
+    "cp",
+    "wPrime",
+    "wPrimeLowest",
     "summary",
-    "laps"
+    "secondsInZones",
+    "laps",
+    "plan"
   ],
   "additionalProperties": false,
   "properties": {
-    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
-    "startTime": { "$ref": "#/$defs/instant" },
-    "endTime": { "oneOf": [{ "$ref": "#/$defs/instant" }, { "type": "null" }] },
-    "date": { "description": "The rider's local day of the start.", "$ref": "#/$defs/date" },
+    "generatedAt": { "$ref": "metrics-response.schema.json#/$defs/instant" },
+    "stale": { "type": "boolean" },
+    "id": { "$ref": "metrics-response.schema.json#/$defs/rideId" },
+    "name": { "type": "string", "minLength": 1 },
+    "startTime": { "$ref": "metrics-response.schema.json#/$defs/instant" },
+    "endTime": {
+      "oneOf": [{ "$ref": "metrics-response.schema.json#/$defs/instant" }, { "type": "null" }]
+    },
+    "date": {
+      "description": "The rider's local day of the start.",
+      "$ref": "metrics-response.schema.json#/$defs/date"
+    },
     "workoutId": { "type": ["string", "null"] },
-    "workoutName": { "type": ["string", "null"] },
-    "ftp": { "type": "integer", "minimum": 1 },
     "devices": { "type": "array", "items": { "type": "string" } },
-    "summary": { "$ref": "ride-record.schema.json#/$defs/summary" },
-    "laps": { "type": "array", "items": { "$ref": "ride-record.schema.json#/$defs/lap" } },
-    "series": {
-      "type": ["object", "null"],
-      "required": ["stepSeconds", "power", "heartRate", "cadence", "targetPower"],
+    "ftp": { "type": "integer", "minimum": 1 },
+    "cp": { "type": "number", "exclusiveMinimum": 0 },
+    "wPrime": { "type": "number", "exclusiveMinimum": 0 },
+    "wPrimeLowest": {
+      "type": "object",
+      "required": ["kilojoules", "atSec"],
       "additionalProperties": false,
       "properties": {
-        "stepSeconds": { "type": "integer", "minimum": 1 },
-        "power": { "$ref": "#/$defs/points" },
-        "heartRate": { "$ref": "#/$defs/points" },
-        "cadence": { "$ref": "#/$defs/points" },
-        "targetPower": { "$ref": "#/$defs/points" }
+        "kilojoules": {
+          "description": "Two decimals; below 0 means W′ was exceeded.",
+          "type": "number"
+        },
+        "atSec": { "description": "0 when W′ was never used.", "type": "integer", "minimum": 0 }
       }
+    },
+    "summary": { "$ref": "ride-record.schema.json#/$defs/summary" },
+    "secondsInZones": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": { "type": "integer", "minimum": 0 }
+    },
+    "laps": { "type": "array", "items": { "$ref": "#/$defs/lap" } },
+    "plan": {
+      "oneOf": [{ "$ref": "#/$defs/plan" }, { "type": "null" }]
+    },
+    "series": {
+      "type": ["array", "null"],
+      "maxItems": 600,
+      "items": { "$ref": "#/$defs/point" }
     }
   },
   "$defs": {
-    "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
-    "instant": {
-      "type": "string",
-      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    "lap": {
+      "type": "object",
+      "required": [
+        "stepIndex",
+        "label",
+        "type",
+        "startSeconds",
+        "endSeconds",
+        "averagePower",
+        "averageHeartRate",
+        "targetPower"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "stepIndex": { "type": ["integer", "null"], "minimum": 0 },
+        "label": { "type": ["string", "null"], "minLength": 1 },
+        "type": { "enum": ["steady", "ramp", "free", null] },
+        "startSeconds": { "type": "integer", "minimum": 0 },
+        "endSeconds": { "type": "integer", "minimum": 1 },
+        "averagePower": { "type": ["number", "null"], "minimum": 0 },
+        "averageHeartRate": { "type": ["number", "null"], "minimum": 0 },
+        "targetPower": { "type": ["integer", "null"], "minimum": 0 }
+      }
     },
-    "points": {
-      "type": "array",
-      "items": { "type": ["integer", "null"], "minimum": 0 }
+    "plan": {
+      "type": "object",
+      "required": ["workout", "stepsRidden", "stepsPlanned", "effortRange", "effortTarget"],
+      "additionalProperties": false,
+      "properties": {
+        "workout": { "$ref": "workout.schema.json" },
+        "stepsRidden": { "type": "integer", "minimum": 0 },
+        "stepsPlanned": { "type": "integer", "minimum": 0 },
+        "effortRange": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["minWatts", "maxWatts"],
+              "additionalProperties": false,
+              "properties": {
+                "minWatts": { "type": "integer", "minimum": 0 },
+                "maxWatts": { "type": "integer", "minimum": 0 }
+              }
+            },
+            { "type": "null" }
+          ]
+        },
+        "effortTarget": { "type": ["number", "null"], "minimum": 0 }
+      }
+    },
+    "point": {
+      "type": "object",
+      "required": ["t", "power", "heartRate", "wBal"],
+      "additionalProperties": false,
+      "properties": {
+        "t": { "type": "integer", "minimum": 1 },
+        "power": { "type": ["integer", "null"], "minimum": 0 },
+        "heartRate": { "type": ["integer", "null"], "minimum": 0 },
+        "wBal": { "type": "number" }
+      }
     }
   }
 }

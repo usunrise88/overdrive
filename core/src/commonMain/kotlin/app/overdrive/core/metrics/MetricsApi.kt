@@ -4,11 +4,14 @@ import app.overdrive.core.plan.PlanDates
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.math.abs
 
-// The training metrics of the sync API (spec §6.3, §8.3, ADR 0022): `GET /v1/metrics` and
-// `GET /v1/rides/{id}/metrics`, as `contracts/schema/metrics-response.schema.json` and
-// `ride-metrics-response.schema.json` say. Every number is computed by the service.
+// The training metrics of the sync API (spec §6.3, §8.3, ADR 0022): `GET /v1/metrics`,
+// `GET /v1/rides/{id}/metrics` and `POST /v1/ftp-suggestion/dismiss`, as
+// `contracts/schema/metrics-response.schema.json`, `ride-metrics-response.schema.json` and
+// `ftp-suggestion-dismiss-*.schema.json` say. Every number is computed by the service.
 
 /**
  * How sure the service is of an FTP suggestion: low is two rides with a comparable effort, medium three or four, high
@@ -24,13 +27,6 @@ public enum class Confidence {
 
     @SerialName("high")
     HIGH,
-}
-
-/** The state of a suggestion in an answer: only pending ones are shown; accepting or dismissing is another request. */
-@Serializable
-public enum class SuggestionStatus {
-    @SerialName("pending")
-    PENDING,
 }
 
 /**
@@ -57,18 +53,26 @@ public data class MetricsDay(
     }
 }
 
-/** One ISO week: the Monday it starts, its load, the number of rides and their moving time in seconds. */
+/**
+ * One ISO week: the Monday it starts, its [load] (the [rideLoad] of rides plus the [otherLoad] of other activities),
+ * the number of [rides] and of other [activities].
+ */
 @Serializable
 public data class MetricsWeek(
     val weekStart: String,
     val load: Double,
+    val rideLoad: Double,
+    val otherLoad: Double,
     val rides: Int,
-    val durationSec: Int,
+    val activities: Int,
 ) {
     init {
         val day = requireNotNull(PlanDates.epochDay(weekStart)) { "Not a calendar date: '$weekStart'" }
         require(MetricsDates.isMonday(day)) { "$weekStart is not a Monday" }
-        require(load >= 0.0 && rides >= 0 && durationSec >= 0) { "$weekStart: counts are not negative" }
+        require(load >= 0.0 && rideLoad >= 0.0 && otherLoad >= 0.0 && rides >= 0 && activities >= 0) {
+            "$weekStart: loads and counts are not negative"
+        }
+        require(abs(load - (rideLoad + otherLoad)) <= ROUNDING) { "$weekStart: load $load is not its two parts" }
     }
 }
 
@@ -77,14 +81,14 @@ public data class MetricsWeek(
 public data class CurvePoint(
     val durationSec: Int,
     val power: Double,
-    val rideId: String,
     val date: String,
+    val rideId: String,
 ) {
     init {
         require(durationSec in MetricsApiJson.POWER_CURVE_DURATIONS) { "Not a power curve duration: $durationSec s" }
         require(power >= 0.0) { "Power is not negative" }
-        require(MetricsApiJson.isValidRideId(rideId)) { "Not a ride id: '$rideId'" }
         require(PlanDates.epochDay(date) != null) { "Not a calendar date: '$date'" }
+        require(MetricsApiJson.isValidRideId(rideId)) { "Not a ride id: '$rideId'" }
     }
 }
 
@@ -106,33 +110,24 @@ public data class FtpBasis(
 
 /**
  * An FTP the service estimates from recent best efforts; only a suggestion: the profile changes when the rider accepts
- * it. [differencePercent] is [value] against [currentFtp] (null when there was none).
+ * it. [id] is what `POST /v1/ftp-suggestion/dismiss` takes; [basedOnRides] is how many rides had an effort close to the
+ * [basis] one, within the last [windowDays] days.
  */
 @Serializable
 public data class FtpSuggestion(
     val id: Int,
-    val value: Int,
-    val basis: FtpBasis,
-    val confidence: Confidence,
-    val currentFtp: Int?,
-    val differencePercent: Double?,
-    val status: SuggestionStatus,
+    val watts: Int,
+    val basedOnRides: Int,
+    val windowDays: Int,
     val createdAt: String,
+    val confidence: Confidence,
+    val basis: FtpBasis,
 ) {
     init {
         require(id >= 1) { "A suggestion id is positive" }
-        require(value in MetricsApiJson.MIN_FTP..MetricsApiJson.MAX_FTP) { "Not an FTP: $value W" }
+        require(watts in MetricsApiJson.MIN_FTP..MetricsApiJson.MAX_FTP) { "Not an FTP: $watts W" }
+        require(basedOnRides >= 1 && windowDays >= 1) { "basedOnRides and windowDays are at least 1" }
         require(MetricsApiJson.isValidInstant(createdAt)) { "createdAt is not a UTC instant: '$createdAt'" }
-        if (currentFtp == null) {
-            require(differencePercent == null) { "differencePercent needs a currentFtp" }
-        } else {
-            require(differencePercent != null) { "differencePercent is missing" }
-            require(
-                abs(differencePercent - (value - currentFtp).toDouble() / currentFtp * PERCENT) <= PERCENT_ROUNDING,
-            ) {
-                "differencePercent $differencePercent is not $value against $currentFtp"
-            }
-        }
     }
 }
 
@@ -148,14 +143,27 @@ public data class FtpHistoryEntry(
     }
 }
 
+/** An estimate of the FTP as of a day, in whole watts. */
+@Serializable
+public data class FtpEstimate(
+    val date: String,
+    val eftp: Int,
+) {
+    init {
+        require(PlanDates.epochDay(date) != null) { "Not a calendar date: '$date'" }
+        require(eftp in MetricsApiJson.MIN_FTP..MetricsApiJson.MAX_FTP) { "Not an FTP: $eftp W" }
+    }
+}
+
 /**
- * The aerobic drift of a steady ride: how much the efficiency factor (power over heart rate) fell from the first half
- * to the second.
+ * The aerobic drift of a steady ride, [name]d after its workout: how much the efficiency factor (power over heart
+ * rate) fell from the first half to the second.
  */
 @Serializable
 public data class DriftPoint(
     val date: String,
     val rideId: String,
+    val name: String,
     val driftPercent: Double,
     val efFirst: Double,
     val efSecond: Double,
@@ -163,73 +171,87 @@ public data class DriftPoint(
     init {
         require(PlanDates.epochDay(date) != null) { "Not a calendar date: '$date'" }
         require(MetricsApiJson.isValidRideId(rideId)) { "Not a ride id: '$rideId'" }
+        require(name.isNotEmpty()) { "A drift point names its ride" }
         require(efFirst > 0.0 && efSecond > 0.0) { "An efficiency factor is positive" }
     }
 }
 
-/** The best efforts of the range: [windowDays] long, ascending durations with a power that does not rise. */
+/**
+ * The best efforts: ascending durations with a power that does not rise, among the rides of the range ([range]) and
+ * among all rides up to the end of it ([allTime]).
+ */
 @Serializable
-public data class PowerCurveBest(
-    val windowDays: Int,
-    val best: List<CurvePoint>,
+public data class PowerCurves(
+    val range: List<CurvePoint>,
+    val allTime: List<CurvePoint>,
 ) {
     init {
-        require(
-            windowDays in 1..MetricsApiJson.MAX_RANGE_DAYS,
-        ) { "windowDays is 1 to ${MetricsApiJson.MAX_RANGE_DAYS}" }
-        for (i in 1 until best.size) {
-            require(best[i].durationSec > best[i - 1].durationSec) { "Curve durations must ascend" }
-            require(best[i].power <= best[i - 1].power) {
-                "The ${best[i].durationSec} s power is above the ${best[i - 1].durationSec} s power"
+        for (curve in listOf(range, allTime)) {
+            for (i in 1 until curve.size) {
+                require(curve[i].durationSec > curve[i - 1].durationSec) { "Curve durations must ascend" }
+                require(curve[i].power <= curve[i - 1].power) {
+                    "The ${curve[i].durationSec} s power is above the ${curve[i - 1].durationSec} s power"
+                }
+            }
+        }
+        for (point in range) {
+            val best = allTime.firstOrNull { it.durationSec == point.durationSec }
+            require(best != null && best.power >= point.power) {
+                "No all-time effort of ${point.durationSec} s is at least as good as the range's"
             }
         }
     }
 }
 
 /**
- * The FTP: the profile's [current], the pending [suggestion] (or in [suggestionNote] why there is none) and its
- * [history].
+ * The FTP: the profile's [current] and the day it was set ([setAt], null exactly when there is none), the pending
+ * [suggestion], the [latestEstimate] of today whether or not it is worth suggesting, the [history] with the value in
+ * force at the start of the range first, and the weekly [estimates].
  */
 @Serializable
 public data class FtpInfo(
     val current: Int?,
+    val setAt: String?,
     val suggestion: FtpSuggestion?,
-    val suggestionNote: String?,
+    val latestEstimate: Int?,
     val history: List<FtpHistoryEntry>,
+    val estimates: List<FtpEstimate>,
 ) {
     init {
-        require(
-            current == null || current in MetricsApiJson.MIN_FTP..MetricsApiJson.MAX_FTP,
-        ) { "Not an FTP: $current W" }
-        if (suggestion != null) {
-            require(suggestionNote == null) { "suggestionNote must be null while a suggestion is pending" }
-        } else {
-            require(!suggestionNote.isNullOrEmpty()) { "suggestionNote must say why there is no suggestion" }
+        require(current == null || current in MetricsApiJson.MIN_FTP..MetricsApiJson.MAX_FTP) {
+            "Not an FTP: $current W"
         }
-        for (i in 1 until history.size) {
-            require(
-                checkNotNull(PlanDates.epochDay(history[i].date)) >=
-                    checkNotNull(PlanDates.epochDay(history[i - 1].date)),
-            ) { "FTP history must not go back in time" }
+        require((setAt == null) == (current == null)) { "setAt is null exactly when current is" }
+        require(setAt == null || PlanDates.epochDay(setAt) != null) { "Not a calendar date: '$setAt'" }
+        require(latestEstimate == null || latestEstimate in MetricsApiJson.MIN_FTP..MetricsApiJson.MAX_FTP) {
+            "Not an FTP: $latestEstimate W"
+        }
+        for (dates in listOf(history.map { it.date }, estimates.map { it.date })) {
+            for (i in 1 until dates.size) {
+                require(checkNotNull(PlanDates.epochDay(dates[i])) >= checkNotNull(PlanDates.epochDay(dates[i - 1]))) {
+                    "FTP history and estimates must not go back in time"
+                }
+            }
         }
     }
 }
 
 /**
  * The answer to `GET /v1/metrics?from&to` (spec §6.3, §8.3): the training metrics of the local days [from] to [to]
- * inclusive, at most [MetricsApiJson.MAX_RANGE_DAYS] days. [daily] has one entry per day; [weekly] one per ISO week
- * from the week of [from] to the week of [to]; [firstLoadDate] is the first day with any load (fitness, fatigue and
- * form are 0 before it), null when there is none.
+ * inclusive, at most [MetricsApiJson.MAX_RANGE_DAYS] days, computed at [generatedAt]; [stale] is true when an input
+ * source failed. [daily] has one entry per day; [weekly] one per ISO week from the week of [from] to the week of [to];
+ * [firstLoadDate] is the first day with any load (fitness, fatigue and form are 0 before it), null when there is none.
  */
 @Serializable
 public data class MetricsResponse(
     val from: String,
     val to: String,
     val generatedAt: String,
+    val stale: Boolean,
     val firstLoadDate: String?,
     val daily: List<MetricsDay>,
     val weekly: List<MetricsWeek>,
-    val powerCurve: PowerCurveBest,
+    val powerCurve: PowerCurves,
     val ftp: FtpInfo,
     val drift: List<DriftPoint>,
 ) {
@@ -256,12 +278,14 @@ public data class MetricsResponse(
                 "weekly[$index] is ${week.weekStart}, not week ${index + 1} of the range"
             }
         }
-        require(
-            powerCurve.windowDays.toLong() == days,
-        ) { "windowDays is ${powerCurve.windowDays}, the range is $days days" }
-        for (point in powerCurve.best) {
+        for (point in powerCurve.range) {
             require(checkNotNull(PlanDates.epochDay(point.date)) in first..last) {
                 "The ${point.durationSec} s effort on ${point.date} is outside $from to $to"
+            }
+        }
+        for (estimate in ftp.estimates) {
+            require(checkNotNull(PlanDates.epochDay(estimate.date)) in first..last) {
+                "The estimate of ${estimate.date} is outside $from to $to"
             }
         }
         var previous = Long.MIN_VALUE
@@ -381,11 +405,14 @@ public data class WPrimeBalance(
 }
 
 /**
- * The answer to `GET /v1/rides/{rideId}/metrics`: what the service computed from one ride. [powerCurve] is empty when
- * no power was measured; [wPrimeBalance] is there only when it was asked for.
+ * The answer to `GET /v1/rides/{rideId}/metrics`: what the service computed from one ride at [generatedAt]
+ * ([stale]: an input source failed). [powerCurve] is empty when no power was measured; [wPrimeBalance] is there only
+ * when it was asked for.
  */
 @Serializable
 public data class RideMetricsResponse(
+    val generatedAt: String,
+    val stale: Boolean,
     val rideId: String,
     val startTime: String,
     val date: String,
@@ -398,6 +425,7 @@ public data class RideMetricsResponse(
     val wPrimeBalance: WPrimeBalance? = null,
 ) {
     init {
+        require(MetricsApiJson.isValidInstant(generatedAt)) { "generatedAt is not a UTC instant: '$generatedAt'" }
         require(MetricsApiJson.isValidRideId(rideId)) { "Not a ride id: '$rideId'" }
         require(MetricsApiJson.isValidInstant(startTime)) { "startTime is not a UTC instant: '$startTime'" }
         require(PlanDates.epochDay(date) != null) { "Not a calendar date: '$date'" }
@@ -406,9 +434,9 @@ public data class RideMetricsResponse(
         require(load == null || load >= 0.0) { "Load is not negative" }
         for (i in 1 until powerCurve.size) {
             require(powerCurve[i].durationSec > powerCurve[i - 1].durationSec) { "Curve durations must ascend" }
-            require(
-                powerCurve[i].power <= powerCurve[i - 1].power,
-            ) { "The curve's power must not rise with the duration" }
+            require(powerCurve[i].power <= powerCurve[i - 1].power) {
+                "The curve's power must not rise with the duration"
+            }
         }
         if (drift.available) require(checkNotNull(drift.endSec) <= durationSec) { "The drift ends after the ride" }
         if (wPrimeBalance != null) {
@@ -420,6 +448,40 @@ public data class RideMetricsResponse(
                 }
             }
         }
+    }
+}
+
+/** The body of `POST /v1/ftp-suggestion/dismiss`: the suggestion to hide ([FtpSuggestion.id]). */
+@Serializable
+public data class FtpSuggestionDismissRequest(
+    val suggestionId: Int,
+) {
+    init {
+        require(suggestionId >= 1) { "A suggestion id is positive" }
+    }
+}
+
+/** What became of a suggestion that was dismissed. */
+@Serializable
+public enum class DismissedStatus {
+    @SerialName("dismissed")
+    DISMISSED,
+
+    @SerialName("accepted")
+    ACCEPTED,
+
+    @SerialName("superseded")
+    SUPERSEDED,
+}
+
+/** The answer to `POST /v1/ftp-suggestion/dismiss`: the suggestion and its state (dismissed if it was pending). */
+@Serializable
+public data class FtpSuggestionDismissResponse(
+    val suggestionId: Int,
+    val status: DismissedStatus,
+) {
+    init {
+        require(suggestionId >= 1) { "A suggestion id is positive" }
     }
 }
 
@@ -437,7 +499,6 @@ internal object MetricsDates {
 /** The rounding of one decimal, with room for the representation of sums. */
 private const val ROUNDING: Double = 0.1 + 1e-9
 private const val PERCENT: Double = 100.0
-private const val PERCENT_ROUNDING: Double = 0.051
 private const val KJ_ROUNDING: Double = 0.005
 private const val DEPLETION_ROUNDING: Double = 0.5
 private const val DAYS_PER_WEEK: Long = 7
@@ -449,10 +510,37 @@ private const val DAYS_PER_WEEK: Long = 7
  */
 public object MetricsApiJson {
     /** The durations of the power curve, in seconds. */
-    public val POWER_CURVE_DURATIONS: List<Int> = listOf(1, 2, 5, 10, 20, 30, 60, 120, 300, 600, 1200, 1800, 3600)
+    public val POWER_CURVE_DURATIONS: List<Int> =
+        listOf(
+            1,
+            2,
+            3,
+            5,
+            8,
+            10,
+            15,
+            20,
+            30,
+            45,
+            60,
+            90,
+            120,
+            180,
+            240,
+            300,
+            420,
+            600,
+            900,
+            1200,
+            1800,
+            2400,
+            3600,
+            5400,
+            7200,
+        )
 
     /** The longest range `GET /v1/metrics` serves, in days, both ends included. */
-    public const val MAX_RANGE_DAYS: Int = 400
+    public const val MAX_RANGE_DAYS: Int = 366
 
     internal const val MIN_FTP: Int = 30
     internal const val MAX_FTP: Int = 2000
@@ -478,6 +566,24 @@ public object MetricsApiJson {
 
     public fun encodeRideMetrics(response: RideMetricsResponse): String =
         json.encodeToString(RideMetricsResponse.serializer(), response)
+
+    /** @throws IllegalArgumentException if [text] is not a dismissal request of the schema. */
+    public fun decodeDismissRequest(text: String): FtpSuggestionDismissRequest {
+        // kotlinx reads "7" as the number 7; the schema does not.
+        val id = (json.parseToJsonElement(text) as? JsonObject)?.get("suggestionId")
+        require(id !is JsonPrimitive || !id.isString) { "suggestionId must be a number, not a string" }
+        return json.decodeFromString(FtpSuggestionDismissRequest.serializer(), text)
+    }
+
+    public fun encodeDismissRequest(request: FtpSuggestionDismissRequest): String =
+        json.encodeToString(FtpSuggestionDismissRequest.serializer(), request)
+
+    /** @throws IllegalArgumentException if [text] is not a dismissal answer of the schema. */
+    public fun decodeDismissResponse(text: String): FtpSuggestionDismissResponse =
+        json.decodeFromString(FtpSuggestionDismissResponse.serializer(), text)
+
+    public fun encodeDismissResponse(response: FtpSuggestionDismissResponse): String =
+        json.encodeToString(FtpSuggestionDismissResponse.serializer(), response)
 
     /** @throws IllegalArgumentException if [text] is not a rides list answer of the schema. */
     public fun decodeRides(text: String): RidesResponse = json.decodeFromString(RidesResponse.serializer(), text)

@@ -1,9 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Overdrive ride metrics response",
-  "description": "The service's answer to GET /v1/rides/{rideId}/metrics[?wbal=true[&series=true][&cp=watts][&wPrimeKj=kilojoules]] (spec §6.3, §8.3, ADR 0022): what the service computed from one stored ride. powerCurve is the best average power over each duration in which the ride is long enough, pauses and missing readings counting as 0 W; empty when no power was measured. drift says whether the ride (or a steady stretch of it) allowed a measure of aerobic drift and, if not, why. wPrimeBalance is present only when asked (wbal=true) because it reads the whole record: the W′ balance model of Skiba et al. (2012) for the critical power cpWatts (the profile's FTP, else the ride's own FTP, else the cp asked for) and the W′ wPrimeKj (the profile's, else 20 kJ, else the one asked for); series, present only with series=true, is the balance in kilojoules at the end of every stepSeconds-th second. Rules a schema cannot state, checked by every implementation: powerCurve durations ascend and the power does not rise with the duration; drift is available exactly when driftPercent, efFirst, efSecond, startSec and endSec are all present and reason is null, and not available exactly when reason is present and the others are null; minBalanceKj is not above wPrimeKj and maxDepletionPercent follows from them; the series has no more than one point per stepSeconds of the ride.",
+  "description": "The service's answer to GET /v1/rides/{rideId}/metrics[?wbal=true[&series=true][&cp=watts][&wPrimeKj=kilojoules]] (spec §6.3, §8.3, ADR 0022): what the service computed from one stored ride. generatedAt is when (UTC) and stale is true when an input source failed. powerCurve is the best average power over each of the 25 durations (see metrics-response.schema.json) in which the ride is long enough, pauses and missing readings counting as 0 W; empty when no power was measured. drift says whether the ride (or a steady stretch of it) allowed a measure of aerobic drift and, if not, why. wPrimeBalance is present only when asked (wbal=true) because it reads the whole record: the W′ balance model of Skiba et al. (2012) for the critical power cpWatts (the profile's FTP, else the ride's own FTP, else the cp asked for) and the W′ wPrimeKj (the profile's, else 20 kJ, else the one asked for); series, present only with series=true, is the balance in kilojoules at the end of every stepSeconds-th second. Rules a schema cannot state, checked by every implementation: powerCurve durations ascend and the power does not rise with the duration; drift is available exactly when driftPercent, efFirst, efSecond, startSec and endSec are all present and reason is null, and not available exactly when reason is present and the others are null; minBalanceKj is not above wPrimeKj and maxDepletionPercent follows from them; the series has no more than one point per stepSeconds of the ride.",
   "type": "object",
   "required": [
+    "generatedAt",
+    "stale",
     "rideId",
     "startTime",
     "date",
@@ -16,9 +18,14 @@
   ],
   "additionalProperties": false,
   "properties": {
-    "rideId": { "$ref": "#/$defs/rideId" },
-    "startTime": { "$ref": "#/$defs/instant" },
-    "date": { "description": "The rider's local day of the start.", "$ref": "#/$defs/date" },
+    "generatedAt": { "$ref": "metrics-response.schema.json#/$defs/instant" },
+    "stale": { "type": "boolean" },
+    "rideId": { "$ref": "metrics-response.schema.json#/$defs/rideId" },
+    "startTime": { "$ref": "metrics-response.schema.json#/$defs/instant" },
+    "date": {
+      "description": "The rider's local day of the start.",
+      "$ref": "metrics-response.schema.json#/$defs/date"
+    },
     "ftp": {
       "description": "The FTP in watts the ride was recorded with.",
       "type": "integer",
@@ -42,7 +49,7 @@
         "required": ["durationSec", "power"],
         "additionalProperties": false,
         "properties": {
-          "durationSec": { "$ref": "#/$defs/duration" },
+          "durationSec": { "$ref": "metrics-response.schema.json#/$defs/duration" },
           "power": { "description": "Watts, one decimal.", "type": "number", "minimum": 0 }
         }
       }
@@ -51,13 +58,6 @@
     "wPrimeBalance": { "$ref": "#/$defs/wPrimeBalance" }
   },
   "$defs": {
-    "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
-    "instant": {
-      "type": "string",
-      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
-    },
-    "rideId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
-    "duration": { "enum": [1, 2, 5, 10, 20, 30, 60, 120, 300, 600, 1200, 1800, 3600] },
     "drift": {
       "type": "object",
       "required": [

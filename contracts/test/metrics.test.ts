@@ -6,6 +6,8 @@ import {
   type MetricsResponse,
   POWER_CURVE_DURATIONS,
   type Validation,
+  validateFtpSuggestionDismissRequest,
+  validateFtpSuggestionDismissResponse,
   validateMetricsResponse,
   validateRideDetailResponse,
   validateRideMetricsResponse,
@@ -24,10 +26,12 @@ function load(set: string, dir: "valid" | "invalid"): [string, unknown][] {
 }
 
 const sets: [string, (input: unknown) => Validation<unknown>, number, number][] = [
-  ["metrics-response", validateMetricsResponse, 6, 25],
-  ["ride-metrics-response", validateRideMetricsResponse, 4, 14],
-  ["rides-response", validateRidesResponse, 3, 12],
-  ["ride-detail-response", validateRideDetailResponse, 3, 10],
+  ["metrics-response", validateMetricsResponse, 8, 35],
+  ["ride-metrics-response", validateRideMetricsResponse, 4, 17],
+  ["rides-response", validateRidesResponse, 3, 20],
+  ["ride-detail-response", validateRideDetailResponse, 5, 20],
+  ["ftp-suggestion-dismiss-request", validateFtpSuggestionDismissRequest, 1, 5],
+  ["ftp-suggestion-dismiss-response", validateFtpSuggestionDismissResponse, 3, 3],
 ];
 
 describe.each(sets)("%s", (set, validate, valid, invalid) => {
@@ -62,17 +66,17 @@ describe("what a schema cannot say is named in the error", () => {
     ["load-is-not-the-sum", /load 99.9 is not loadCycling plus loadOther/],
     ["week-does-not-start-on-a-monday", /is not a Monday/],
     ["a-week-is-missing", /touches 1 weeks/],
+    ["week-load-is-not-the-sum", /is not rideLoad plus otherLoad/],
     ["curve-durations-not-ascending", /does not follow/],
     ["curve-power-rises-with-the-duration", /is above the 60 s power/],
-    ["curve-date-outside-the-range", /is outside 2026-11-09 to 2026-11-15/],
-    ["curve-window-days-differs", /windowDays is 30/],
-    ["suggestion-difference-is-wrong", /differencePercent 9.9 is not 262 against 250/],
-    ["suggestion-and-a-note-together", /must be null while a suggestion is pending/],
-    ["no-suggestion-and-no-note", /must say why there is no suggestion/],
-    ["suggestion-without-an-ftp-has-a-difference", /must be null without a currentFtp/],
+    ["curve-date-outside-the-range", /is outside the range/],
+    ["curve-better-than-all-time", /no allTime effort of 60 s at least as good/],
+    ["ftp-set-at-without-an-ftp", /must be null exactly when/],
+    ["ftp-without-a-set-at", /must be null exactly when/],
     ["ftp-history-out-of-order", /is before the entry above it/],
+    ["estimate-outside-the-range", /is outside 2026-11-09 to 2026-11-15/],
     ["drift-outside-the-range", /is outside 2026-11-09 to 2026-11-15/],
-    ["range-of-401-days", /spans 401 days, at most 400/],
+    ["range-of-367-days", /spans 367 days, at most 366/],
     ["reversed-range", /is after \/to/],
     ["not-a-real-date", /real calendar dates/],
   ])("metrics: %s", (name, message) => {
@@ -95,12 +99,17 @@ describe("what a schema cannot say is named in the error", () => {
   });
 
   it.each([
-    ["has-more-is-wrong", /hasMore must be true/],
-    ["more-rides-than-the-limit", /the limit is 1/],
-    ["more-rides-than-are-left", /more entries than are left/],
-    ["oldest-first", /starts after the ride above it/],
+    ["has-more-without-a-next-before", /nextBefore must be the start of the last item/],
+    ["next-before-is-not-the-last-start", /nextBefore must be the start of the last item/],
+    ["next-before-without-more", /must be null when \/hasMore is false/],
+    ["more-items-than-the-limit", /the limit is 1/],
+    ["oldest-first", /does not start before the item above it/],
+    ["not-before-the-cursor", /does not start before \/before/],
     ["the-same-ride-twice", /is listed twice/],
-    ["reversed-dates", /is after \/to/],
+    ["ride-with-a-sport", /is a ride: no sport/],
+    ["ride-with-an-approximate-load", /is a ride: no sport/],
+    ["activity-with-a-power", /is an activity: no averagePower/],
+    ["activity-with-an-exact-load", /is an activity: no averagePower/],
   ])("rides: %s", (name, message) => {
     expect(errors("rides-response", name, validateRidesResponse)).toMatch(message);
   });
@@ -108,8 +117,12 @@ describe("what a schema cannot say is named in the error", () => {
   it.each([
     ["laps-leave-a-gap", /starts at 1900, where lap 1 ends/],
     ["first-lap-starts-late", /not 0/],
-    ["last-lap-stops-early", /the ride is 3600 s long/],
-    ["series-too-short", /\/series\/power has 5 points, expected 6/],
+    ["last-lap-stops-early", /the ride is 3900 s long/],
+    ["effort-range-without-a-target", /must be null exactly when effortTarget is/],
+    ["effort-range-reversed", /minWatts is above maxWatts/],
+    ["more-steps-ridden-than-planned", /stepsRidden 7 is more than stepsPlanned 6/],
+    ["series-times-not-ascending", /must ascend/],
+    ["series-past-the-end-of-the-ride", /must ascend and stay within the 3900 s/],
   ])("ride detail: %s", (name, message) => {
     expect(errors("ride-detail-response", name, validateRideDetailResponse)).toMatch(message);
   });
@@ -129,7 +142,6 @@ describe("the metrics range", () => {
       ...(empty.daily[0] as MetricsResponse["daily"][number]),
       date: addDaysToIsoDate(copy.from, i),
     }));
-    // Weeks: from the Monday of `from` to the Monday of 2026-11-16.
     const weeks = [];
     for (
       let monday = addDaysToIsoDate(
@@ -139,27 +151,47 @@ describe("the metrics range", () => {
       monday <= "2026-11-16";
       monday = addDaysToIsoDate(monday, 7)
     ) {
-      weeks.push({ weekStart: monday, load: 0, rides: 0, durationSec: 0 });
+      weeks.push({
+        weekStart: monday,
+        load: 0,
+        rideLoad: 0,
+        otherLoad: 0,
+        rides: 0,
+        activities: 0,
+      });
     }
     copy.weekly = weeks;
-    copy.powerCurve.windowDays = days;
     return copy;
   }
 
-  it("serves 400 days and refuses 401", () => {
-    expect(validateMetricsResponse(over(400))).toMatchObject({ ok: true });
-    expect(validateMetricsResponse(over(401)).ok).toBe(false);
+  it("serves 366 days (at most 54 weeks) and refuses 367", () => {
+    expect(validateMetricsResponse(over(366))).toMatchObject({ ok: true });
+    expect(over(366).weekly.length).toBeLessThanOrEqual(54);
+    expect(validateMetricsResponse(over(367)).ok).toBe(false);
     expect(validateMetricsResponse(over(1))).toMatchObject({ ok: true });
   });
 });
 
 describe("the power curve durations", () => {
-  it("are the ones of the schemas", () => {
-    for (const name of ["metrics-response", "ride-metrics-response"]) {
-      const schema = JSON.parse(readFileSync(join(schemas, `${name}.schema.json`), "utf8")) as {
-        $defs: { duration: { enum: number[] } };
-      };
-      expect(schema.$defs.duration.enum).toEqual([...POWER_CURVE_DURATIONS]);
-    }
+  it("are the 25 of the companion's design, in the schemas and in the code", () => {
+    expect(POWER_CURVE_DURATIONS).toHaveLength(25);
+    const schema = JSON.parse(
+      readFileSync(join(schemas, "metrics-response.schema.json"), "utf8"),
+    ) as { $defs: { duration: { enum: number[] } } };
+    expect(schema.$defs.duration.enum).toEqual([...POWER_CURVE_DURATIONS]);
+    // 1, 2, 3, 5, 8, 10, 15, 20, 30, 45 s; 1, 1.5, 2, 3, 4, 5, 7, 10, 15, 20, 30, 40, 60, 90, 120 min.
+    expect([...POWER_CURVE_DURATIONS]).toEqual([
+      1,
+      2,
+      3,
+      5,
+      8,
+      10,
+      15,
+      20,
+      30,
+      45,
+      ...[1, 1.5, 2, 3, 4, 5, 7, 10, 15, 20, 30, 40, 60, 90, 120].map((minutes) => minutes * 60),
+    ]);
   });
 });
