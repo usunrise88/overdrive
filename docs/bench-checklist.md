@@ -365,16 +365,24 @@ the firmware version from the Companion app and the Zwift app version before eac
 ## Session 6: crash recovery (AC 5)
 
 - [ ] **6.1 Start and build a record.** Start a ride with some pedalling, and let it run for at least five
-  minutes. Expect: the ride is recording (spec §4.2). Note the time you force-stop it. Where the per-second file
-  is stored is not defined in the research notes: see the M3 release notes.
+  minutes. Expect: nothing on screen says anything about saving (the ride is written to the app's private
+  `files/rides/` as it happens, ADR 0008). If the riding screen shows "This ride is not being saved", write down when
+  and what the tablet's storage looked like: that is the log failing. Note the time you force-stop it.
 - [ ] **6.2 Force-stop.** Stop the app while riding:
   ```
   adb shell am force-stop app.overdrive.ride
   ```
-  Expect: the app and the overlay disappear. Note the time.
-- [ ] **6.3 Relaunch and recover (AC 5).** Open the app again. Expect: the unfinished ride is recovered, and its
-  duration matches the time up to the force-stop (within a few seconds). Its samples are there, and the laps
-  look right. Settles: AC 5, spec §4.2 (crash safety).
+  Expect: the app and the overlay disappear. Note the time. Optional **(unverified)**: for a debuggable build,
+  `adb shell run-as app.overdrive.ride ls -l files/rides` shows `<id>.ridelog` and `<id>.meta`; the release APK does not
+  allow `run-as`, and the next step shows what the app found anyway.
+- [ ] **6.3 Relaunch and recover (AC 5).** Open the app again. Expect: the Ready screen has a notice, "An interrupted
+  ride was found", with the date, the start time and the length of the ride, and **Save** and **Discard**. The length
+  matches the time up to the force-stop (within a few seconds). Press **Save**. Expect: the notice says "Saving the
+  ride…", goes away, and the **Last ride** row shows the ride with **Share** and **Save to folder**. Save the file to a
+  folder and open it in intervals.icu in session 7: its samples and laps should look right. Also try **Discard** on
+  a second cut-off ride: it asks "Discard this ride?" first, and the ride is gone afterwards. A ride under one minute is
+  deleted without a question: force-stop within the first 30 seconds of a ride and relaunch, expect no notice.
+  Settles: AC 5, spec §4.2 (crash safety).
 - [ ] **6.4 Swipe away.** Repeat 6.1, then swipe the app away from recents instead of force-stopping. Expect: the
   foreground service keeps running, and the overlay and trainer connection stay up. If they do not, write down
   what stopped and when. Whether the service restarts is unverified (overlay-notes §6.5). Settles: OV 9.6.
@@ -383,10 +391,15 @@ the firmware version from the Companion app and the Zwift app version before eac
 
 ## Session 7: FIT export and intervals.icu (AC 6)
 
-- [ ] **7.1 Export.** Finish a ride of at least 10 minutes with a workout (or with the recovered ride from session
-  6). Use the app's share or save action and save the FIT file to a folder you can get to from the PC, such as
-  Downloads (the exact path is not in the research notes). Then `adb pull` it to `~/bench/`. Expect: a file named
-  for the ride. Settles: spec §4.8 (files can be shared or saved to any folder).
+- [ ] **7.1 Export.** Finish a ride of at least 10 minutes with a workout (or use the recovered ride from session
+  6). On the finished screen, wait for "Saved on this tablet" and press **Share FIT file**: the system share sheet opens;
+  send the file to an app you can reach from the PC (a file manager's "copy to", email to yourself). Then press
+  **Save to folder**: the system file picker opens with the name `YYYY-MM-DD HH-mm <workout name>.fit`; save it to
+  Downloads and `adb pull` it to `~/bench/`. After leaving the summary with **Done**, the same two actions are in the
+  **Last ride** row of the Ready screen. Expect: a file named for the date, time and workout (not `ride-<number>`), a
+  few hundred kilobytes at most, and that its extension is `.fit`, not `.bin`. Write down whether the share sheet showed
+  the friendly name and whether the receiving app could open the file. Settles: spec §4.8 (files can be shared or saved to
+  any folder), ADR 0008.
 - [ ] **7.2 Import into intervals.icu.** Upload the file to the owner's intervals.icu account. Expect: the activity
   appears. Settles: AC 6 (part), FIT 1 (protocol version byte: the import is accepted, or the error is written down).
   If it is refused, the first suspect is `FitOptions.protocolVersion` (`0x20`; try `0x02`) and then the manufacturer
@@ -541,9 +554,10 @@ Read these before the bench, so a surprising result is not taken as a bug in the
   The right-puck mode comes later (6.4.0). The no-unlock handshake is in closed code.
 - **Where the no-unlock method comes from.** Spec §9 says it can be settled by reading the BikeControl
   repository. The implementation notes say it is not in the open-source code. Treat 5.2 as the only test.
-- **FIT writer status.** The writer exists since M2b-1 (`app.overdrive.core.fit`, ADR 0007); the app's export button
-  arrives with M2b-2. Confirm that the release under test has it before session 7. Each open FIT question is a
-  field of `FitOptions`, so a finding in session 7 is a one-line change of its default.
+- **FIT writer status.** The writer exists since M2b-1 (`app.overdrive.core.fit`, ADR 0007) and the app's **Share FIT
+  file** and **Save to folder** buttons since M2b-2 (ADR 0008). Confirm that the release under test has them (the finished
+  screen and the Last ride row) before session 7. Each open FIT question is a field of `FitOptions`, so a finding in
+  session 7 is a one-line change of its default.
 - **Heart-rate contact.** The SIG XML says only status 3 means contact is detected. pycycling reads any non-zero
   value as contact (ftms-hr §6.5). The codec follows the XML. Session 4.3 settles it.
 - **Overlay frame-stats output.** The `dumpsys gfxinfo` commands in acceptance criterion 7 come from overlay-notes

@@ -216,6 +216,14 @@ chip, then right-aligned: device status icons (16 dp, see §7.7), overlay button
   step, Mode; label over numS); the profile (§8.1, height 168 dp, FTP line, 10-minute ticks);
   a step table (zone chip, name, duration, % FTP, watts); primary **Start** button 64 dp tall,
   240 dp wide, with the hint "Or start pedalling. The ride begins on the first pedal stroke."
+- **Rides on disk (stage M2b-2).** At the top of the right column, above the title, in this order, each only when it
+  applies: a Notice for an interrupted ride ("An interrupted ride was found", the start and length of the ride, **Save** and
+  **Discard**; while it is stored "Saving the ride…" with no buttons; after a failure "The ride could not be saved" with
+  **Retry** and **Discard**), the overlay permission Notice, a workout-file error Notice, and the **Last ride** card: surface 1,
+  radius 12, padding 16 × 12, "Last ride" (caption, text 3) over "title · duration" (bodyStrong), and two 40 dp buttons,
+  **Share** (`share-2`) and **Save to folder** (`folder-open`); a line of label text 2 under the title says what the last
+  share or save did. **Discard** opens the confirmation sheet of §6.3 ("Discard this ride?", **Discard** secondary left,
+  **Keep it** primary right). The mock-up PNG predates these rows.
 
 ### 6.2 Riding (`ride--riding.png`)
 
@@ -235,6 +243,9 @@ Body padding 20 dp top, 24 dp sides; 16 dp gaps.
   Right: Media group (ghost icon buttons play/pause, volume down, volume up, 56 dp, with caption
   "Media"), a 40 dp hairline separator, **Pause** (secondary, pause icon).
   These map 1:1 to the Click actions; volume buttons repeat every 150 ms while held.
+- **When the ride is not being written to disk** (stage M2b-2), one Notice with `triangle-alert` sits at the top of the
+  body, above row 1 (below the paused banner): "This ride is not being saved" over "Keep riding. Overdrive tries to save it
+  again when you finish." No button and no cause: the ride is unaffected.
 
 ### 6.3 Paused (`ride--paused.png`)
 
@@ -247,12 +258,24 @@ a bottom sheet ("Finish and save this ride?" Finish / Keep riding).
 
 ### 6.4 Finished (`ride--finished.png`)
 
-Top bar title "Ride saved". Left: workout name (title) + date and clock range; tile group 4 × 2
+Top bar title "Ride saved" (while the files are written or if that failed, "Ride finished"). Left: workout name (title) + date and clock range; tile group 4 × 2
 (Duration, Moving time, Average power, Normalised power, Average heart rate, Max heart rate,
-Work, Load; label over numS); "Time in power zones" card (§8.3); bottom row: **Share FIT file**
-(secondary), sync line "Saved on this tablet. It uploads once sync is set up." (label, text 2),
-**Done** (primary). Right, 440 dp: laps table (Lap, name, Time, Watts, HR), 36 dp rows,
+Work, Load; label over numS); "Time in power zones" card (§8.3); at the bottom, a status line over a button row.
+Right, 440 dp: laps table (Lap, name, Time, Watts, HR), 36 dp rows,
 hairline separators, numbers right-aligned and tabular.
+
+**Bottom, by state (stage M2b-2).** Status line (label, text 2, with a 16 dp icon), then the 64 dp button row with **Done**
+(primary) right-aligned:
+
+| State | Status line | Buttons |
+|---|---|---|
+| Saving | spinner ring (§7.7) + "Saving the ride…" | **Share FIT file** and **Save to folder** (secondary, disabled) |
+| Saved | `check` + "Saved on this tablet · 2026-11-18 18-04 Sweet spot 3×10.fit · 312 kB" | **Share FIT file** (`share-2`), **Save to folder** (`folder-open`) |
+| Failed | `triangle-alert` + what happened and what to do ("The ride could not be saved. Free up some space on the tablet and try again.") | **Retry** (`refresh-cw`) when retrying can help |
+
+A second line of label text under the status says what the last share or save did ("Saved to the folder you chose."). **Done**
+on a failed save asks "Leave without saving this ride?" (**Leave** / **Stay**) first. The mock-up PNG shows the Saved state
+as first drawn, with the sync line of Phase 2.
 
 ### 6.5 Devices (`devices--pairing.png`)
 
@@ -319,8 +342,9 @@ no dividers around it (selection lists use no dividers).
 ### 7.6 Notice
 
 surface2, radius 8, padding 12 × 16, 12 dp gap: 20 dp icon (text 1) · title (bodyStrong) over
-text (label, text 2) · optional secondary button (40 dp). Used for the Click unlock notice and
-similar recoverable problems. No colour, no border.
+text (label, text 2) · up to two 40 dp buttons side by side, 8 dp apart (the first is the main answer: **Save** before
+**Discard**). Used for the Click unlock notice and similar recoverable problems, and for an interrupted ride that was
+found. No colour, no border.
 
 ### 7.7 Device row
 

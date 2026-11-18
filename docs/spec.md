@@ -120,6 +120,11 @@ Phase 1 delivers a complete offline ride: connect the devices, ride free or play
   *Settled in stage M2b-1* (`RideLogRecorder`, `RideLog.recover`, ADR 0007): one checksummed line per record, in a
   file of its own; a log cut off or damaged anywhere recovers up to its last intact record, and says whether the
   ride had finished.
+  *Settled in stage M2b-2* (`RideStore`, `RideLibrary`, ADR 0008): the log is written on a thread of its own behind a
+  queue, so the engine never waits for the disk, in `filesDir/rides/` under the ride's id. On the next launch a ride
+  that finished but was never exported is completed silently; an interrupted ride of at least 60 s is offered on the
+  Ready screen (**Save** or **Discard**, after a confirmation) and one shorter is deleted. If the log cannot be written
+  the riding screen says so once ("This ride is not being saved") and the ride goes on.
 
 ### 4.3 Free ride on the flat
 
@@ -202,6 +207,17 @@ One controller, the right Click v2, drives everything with two gestures: press a
   virtual activity, with normalised power, TSS, intensity factor and work once there is a normalised power) and
   `activity` last; timer start and stop `event`s around the records. RR intervals are `hrv` messages after the record of
   the second they arrived in.
+
+**Settled in stage M2b-2** (`RideStore`, `RideLibrary`, ADR 0008):
+
+- When a ride ends the record (JSON, §8.2) and the FIT file are written into the app's private `files/rides/`, each through
+  a temporary file and a rename, and the crash-safe log is deleted only after both are on disk. The FIT file's local
+  time uses the tablet's offset from UTC at the ride's start; every other `FitOptions` value is still the default.
+- The finished screen shows "Saving the ride…", then "Saved on this tablet" with the file's name and size and two actions,
+  **Share FIT file** (the system share sheet, through a `FileProvider` that serves only `files/rides/`) and **Save to folder**
+  (the system file picker, suggested name `YYYY-MM-DD HH-mm <title>.fit`). If storing fails it says so and offers **Retry**.
+  The Ready screen shows the last saved ride with **Share** and **Save to folder**, so the file stays reachable.
+- Every ride is kept; there is no history screen or retention rule in Phase 1.
 
 ### 4.9 Sync stub
 
@@ -350,7 +366,7 @@ Both apps are native Android in Kotlin and Jetpack Compose, written from scratch
 |---|---|---|
 | `core` | Protocol codecs (FTMS, heart rate, Click), ride engine, workout model and player, physics, gear logic, FIT writer, gesture detection | Kotlin Multiplatform, no Android imports |
 | `ble` | Bluetooth transport behind an interface | Android |
-| `data` | Local database, outbox, sync client | Android |
+| `data` | Ride files (the rides folder, the log writer; ADR 0008), outbox, sync client | Android |
 | `ui-kit` | Design system: tokens, type, components, charts | Android, Compose |
 | `app-ride` | Tablet app: ride screens, overlay service | Android |
 | `app-companion` | Phone app: statistics, Health Connect reader | Android |

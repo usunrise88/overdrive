@@ -25,7 +25,7 @@ Currently implemented:
 | `record` | `RideRecord` (samples, laps, RR series, summary), `RideRecorder`, its JSON wire format, the crash-safe ride log | §4.2, §8.2 |
 | `fit` | `FitWriter`: a ride record as a FIT activity file | §4.8 |
 
-Not yet: the BLE codecs (M3), the Android storage and share button (M2b-2), gesture detection (M4).
+Not yet: the BLE codecs (M3), gesture detection (M4). The Android storage, recovery and share buttons are in `android/` (M2b-2, ADR 0008).
 
 The first section below is the real engine; the one after it is the UI's view of a session
 (`RideSession`, `RideSnapshot`), which the engine and the simulated session both provide.
@@ -36,7 +36,7 @@ The first section below is the real engine; the one after it is the UI's view of
 optional `HeartRateDevice` and the `WorkoutPlayer`. Decisions and reasons: `docs/adr/0004-ride-engine.md`.
 
 ```kotlin
-val recorder = InMemoryRideRecorder()        // or the persistent recorder of M2b
+val recorder = InMemoryRideRecorder()        // plus the crash-safe log: see "Durable and exportable" below
 val engine: RideSession = RideEngine(
     scope = rideScope,                       // background dispatcher, cancelled when the app stops
     trainer = trainer,                       // BLE adapter on the tablet, SimulatedTrainerDevice in tests
@@ -116,6 +116,9 @@ val json: String = RideRecordJson.encode(record)       // schema: contracts/sche
   a `finished` marker. `RideLog.recover` never throws and returns the intact beginning of whatever is on disk (cut off at
   any byte, zero-filled, garbled), saying whether the ride `FINISHED` or was `INTERRUPTED`; `toRecord()` rebuilds laps and
   summary with the live code. A failing sink is kept in `RideLogRecorder.failure` and never stops the ride.
+- **`AsyncRideRecorder(delegate, scope)`** puts a queue in front of any recorder: the engine's calls return at once and one
+  coroutine in `scope` passes them on in order, so a slow disk never delays the ride. `close()` waits until everything queued has
+  been written; `flush()` waits without ending. The Android app wraps the log writer in it (ADR 0008).
 - **The FIT writer** is our own (no Garmin SDK), deterministic, and reproduces the worked example of
   `docs/protocols/fit.md` section 6 byte for byte. What intervals.icu may disagree with is a field of `FitOptions`, with the
   doc's recommendation as default. Pass the device's UTC offset: the record holds UTC only. An opt-in test decodes the files

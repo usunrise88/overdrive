@@ -215,7 +215,8 @@ bike; every fixture is synthetic.
 
 ## Consequences
 
-- M2b-2 constructs a `RideLogRecorder(FileByteSink(file))` beside an `InMemoryRideRecorder`, runs `RideLog.recover` on launch,
+- *(Built in M2b-2: [ADR 0008](0008-ride-storage-and-export.md). It adds `AsyncRideRecorder` to `core`, which the wiring below
+  puts in front of the log so the engine never waits for the disk.)* M2b-2 constructs a `RideLogRecorder(FileByteSink(file))` beside an `InMemoryRideRecorder`, runs `RideLog.recover` on launch,
   writes the FIT file from `live.record` or from the recovered record, passes the time zone offset, and decides the
   storage directory, the file names, when a log is deleted, and what the recovery prompt says. The log file name should carry
   the ride id; a log with no valid header can be deleted.

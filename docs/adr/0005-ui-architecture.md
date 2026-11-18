@@ -110,6 +110,8 @@ stable parameters (checked once, the report configuration is not kept). The fram
 - No "Or start pedalling" hint: the engine cannot detect pedalling in the ready state (M3 with real devices).
 - The finished screen says "Ride finished" and "This ride is not saved yet"; there is no Share FIT button or sync
   line before persistence and FIT (M2b). The finish sheet asks "Finish this ride?".
+  (Settled in M2b-2: the finished screen shows the saved state with **Share FIT file** and **Save to folder**; see
+  [ADR 0008](0008-ride-storage-and-export.md).)
 - "Change button mapping" on the Devices screen is disabled: remapping the Click is not in Phase 1's scope.
 - The Ready screen's mode reads "ERG + gears" for a workout that contains a free step; the mock-up shows "ERG".
 - The device row's countdown ("Retry in 8 s") reads "retrying": the simulated devices do not publish their backoff.
