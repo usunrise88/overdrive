@@ -186,12 +186,18 @@ controls.start()
   See `ClickDeviceTest`, `ClickRideTest` (all ten actions through the real engine) and the sessions in
   `../contracts/fixtures/ble/click-*.click.session.txt`.
 
-### The sync stub (`app.overdrive.core.sync`; ADR 0011, spec §4.9)
+### Sync (`app.overdrive.core.sync`; ADR 0011, ADR 0014, spec §4.9)
 
 `SyncCoordinator(scope, outbox, { provider }).start()`; when a ride is stored, `coordinator.rideFinished(OutboxEntry.of(record, now))`
-returns at once. `NoopSyncProvider` acknowledges nothing, so every ride stays in the outbox for Phase 2; a failing provider or outbox is a
-`SyncStatus`, never an exception, and never reaches the ride. `InMemoryOutbox` is the tests' stand-in; the on-disk one is the app's
-(`FileOutbox` in `android/data`, ADR 0012). There is no network code and no payload format here.
+returns at once. A failing provider or outbox is a `SyncStatus`, never an exception, and never reaches the ride. `InMemoryOutbox` is the
+tests' stand-in; the on-disk one is the app's (`FileOutbox` in `android/data`, ADR 0012). `NoopSyncProvider` acknowledges nothing.
+
+`HttpSyncProvider(config, rides, transport)` is the real provider (ADR 0014 sections 6 and 8): `PUT /v1/rides/{id}` with the record, then
+`/fit` with the FIT, bearer token, and the answers read into `SyncResult` (`Acknowledged`, `RetryLater`, `NotConfigured`, `TokenRejected`,
+`Refused`). It has **no network code of its own**: `HttpTransport` is the one interface to a socket (`android/data` has the
+`HttpURLConnection` one; a test passes a scripted fake), `RidePayloads` opens the stored files, and `SyncConfig` and `HttpRequest` print
+without the token. The coordinator keeps a refused ride in the outbox but skips it, and `coordinator.report` gives the last success and the
+refused rides; `kick(retryRefused = true)` is the rider's **Send now**.
 
 ### Workouts (`app.overdrive.core.workout`)
 

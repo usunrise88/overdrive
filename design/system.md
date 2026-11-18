@@ -350,8 +350,12 @@ Two columns of grouped cards; group label (label, text 3) above each card; setti
   Scripted dropouts, Simulated Click). The logs hold heart-rate values: they leave the tablet only through **Share**.
 - **Sync** (stage M4-2), right column under the physics card: **Service address** and **Token** are *field rows* (title and note
   on top, the 48 dp field under them, surface2 with the border, radius 8; a refused address shows its reason under the field in
-  label, text 1). Both notes say "Not used yet" (the token's adds "It stays on this tablet"); the token shows as dots, with a
-  ghost **Show** / **Hide**; **Waiting to upload** is a setting row whose value (numXS, right) is "3 rides".
+  label, text 1; a plain `http://` address shows "Not encrypted: the token is sent as plain text" there). The notes say "Where
+  finished rides are sent" and "Sent only to this address" (stage P2-1b, which replaced "Not used yet"); the token shows as
+  dots, with a ghost **Show** / **Hide**; **Waiting to upload** is a setting row whose value (numXS, right) is "3 rides" and
+  whose note is one line in plain words about the last problem (absent when all is sent); **Last upload** is a setting row
+  whose value (numXS, right) is "Today 18:04", "17 Nov 23:59" or "Never", followed by a secondary 40 dp **Send now** (off while
+  nothing waits or an upload is under way).
 - **Developer · Click** (stage M4-2), last in the right column: setting rows only (switches, segmented controls, steppers with
   "ms") for the Click's connection options and the two gesture timings, and a final **Reset** (secondary, off at the defaults).
 - Later groups (About) use the same row.

@@ -48,7 +48,8 @@ state; Learn buttons and the mapping in the settings; the developer settings; th
 taps; the outbox (`FileOutboxTest`: a process stopped after every step of a write loses nothing, a torn tail is ignored, duplicates
 and order, compaction) and its wiring (a finished ride, a recovered ride and the rides on disk at a start are all queued, never
 twice, oldest first, nothing uploaded); the sync settings (an address checked and cleaned, a token that never prints as itself and
-never reaches a log, a ride file, the outbox or a backup) and a manifest with no `INTERNET` permission. Owner on the tablet and the bike:
+never reaches a log, a ride file, the outbox or a backup) and a manifest with no `INTERNET` permission (that was Phase 1; stage
+P2-1b adds it for the upload, ADR 0014). Owner on the tablet and the bike:
 everything in the table of `docs/adr/0012-click-on-android-and-sync-outbox.md` section 11, in `docs/bench-checklist.md` items 5.1 to
 5.12 and 7.8. The open checks it settles are CK 1 to CK 14 and spec §9 "Click v2 unlock bypass", "Click firmware" and "Click v2
 reliability".

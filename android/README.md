@@ -81,8 +81,9 @@ Click is replaced or forgotten while a button is down).
 - **`devices/BleDeviceRows.clickRow`** is the Click's row in plain words; `ui/DevicesScreen` shows the unlock notice below a locked
   Click and the button map with **Learn buttons** and **Reset to default**.
 - **Settings** (`settings/ClickSettings`, `SyncSettings`): the Click's connection options and gesture timings (every default is
-  `core`'s, every value is sanitised, a change replaces the Click's device only) and the sync address and token (stored, unused,
-  the token a `SecretText` that prints as dots). The manifest asks for no `INTERNET` permission and sets `allowBackup=false`.
+  `core`'s, every value is sanitised, a change replaces the Click's device only) and the sync address and token (read at every
+  upload, the token a `SecretText` that prints as dots). The manifest asks for `INTERNET` (and nothing else of the network, ADR 0014),
+  allows cleartext for a plain `http://` bench address, and sets `allowBackup=false`.
 - **Container injection for tests:** `AppContainer(mediaFactory = ..., elapsedMillis = ..., outboxFile = ..., bleStack = ...)`.
   Tests that write into `filesDir/rides` use a plain `Application` (`@Config(application = Application::class)`), like
   `AppContainerClickTest` and `AppContainerSyncTest`, so the app's own container does not start beside them.
@@ -94,7 +95,10 @@ Click is replaced or forgotten while a button is down).
 line, every append forced to storage, a torn last line ignored, compaction through a temporary file and an atomic rename, and a
 ride queued **once, ever**. `RideLibrary(onSaved = ...)` announces every stored ride (a finished one, a recovered one, one completed
 at start, and at each start every ride on disk, which the outbox ignores if it has seen it). The container runs a `SyncCoordinator`
-over `NoopSyncProvider`: **nothing is uploaded** and there is no network code. Settings, Sync, shows how many rides wait.
+over `HttpSyncProvider` (ADR 0014; `core` holds the logic, `data/.../sync/UrlConnectionTransport` the `HttpURLConnection` and
+`StoredRidePayloads` the stored files it sends). With no address or token nothing is sent. Settings, Sync, shows how many rides
+wait, the last error in plain words, the last upload and **Send now**. `AppContainer(syncTransport = ..., lastUploadFile = ...,
+syncSettleMillis = ...)` are the test seams; `LocalService` in the app tests is a stand-in for the intake on the loopback.
 
 ## Rides on disk (ADR 0008)
 
