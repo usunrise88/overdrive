@@ -403,6 +403,9 @@ Phase 2 connects the ride app to a plan: an AI agent schedules workouts, they ap
 - **Strava:** uploaded through the public upload endpoint as a virtual ride, with a text description of the session. Requires the user's Strava subscription, which the 2026 API terms demand for standard-tier access.
 - Nothing is read from Strava. Its API terms forbid using its data in AI models, and our analysis uses our own files.
 - Uploads are idempotent: a ride is identified by its start time and never posted twice.
+- *Settled in stage P2-1 (ADR 0014):* the tablet uploads the ride record and the FIT as two idempotent requests (§8.3); the
+  service identifies a ride by its id and by its start time, and a record whose start time is stored under another id is refused
+  (`409`, naming the stored id) rather than stored twice. The push to intervals.icu and Strava is a separate step after intake.
 
 ### 5.6 Strava presentation
 
@@ -617,17 +620,37 @@ The FIT file is generated from this record and can be regenerated at any time.
 
 ### 8.3 Sync API
 
-HTTPS and JSON between the apps and the service, authenticated with a per-device token.
+HTTPS and JSON between the apps and the service, authenticated with a per-device bearer token
+(`Authorization: Bearer …`; the service holds one named token per device, ADR 0014 section 4). The API is versioned in the
+path: everything is under `/v1`.
 
 | Endpoint | Used by | Purpose |
 |---|---|---|
-| `GET /workouts?from&to` | Ride app | Planned workouts in native format |
-| `POST /rides` | Ride app | Upload a FIT file and its summary |
-| `GET /rides`, `GET /rides/{id}` | Companion | History and detail |
-| `POST /wellness` | Companion | Batch of Health Connect records |
-| `GET /metrics?from&to` | Companion | Load, form, recovery state, baselines |
-| `GET /insights?from&to` | Companion | Written notes |
-| `GET /profile`, `PATCH /profile` | Both | FTP, zones, physics settings |
+| `PUT /v1/rides/{rideId}` | Ride app | Upload the ride record (§8.2), the JSON body. **Settled** |
+| `PUT /v1/rides/{rideId}/fit` | Ride app | Upload the FIT file generated from that record (`application/vnd.ant.fit`). **Settled** |
+| `GET /v1/workouts?from&to` | Ride app | Planned workouts in native format |
+| `GET /v1/rides`, `GET /v1/rides/{id}` | Companion | History and detail |
+| `POST /v1/wellness` | Companion | Batch of Health Connect records |
+| `GET /v1/metrics?from&to` | Companion | Load, form, recovery state, baselines |
+| `GET /v1/insights?from&to` | Companion | Written notes |
+| `GET /v1/profile`, `PATCH /v1/profile` | Both | FTP, zones, physics settings |
+
+**Settled in stage P2-1a (ride intake; ADR 0014, `server/README.md`, schemas in `contracts/`):**
+
+- A ride is **uploaded** (the outbox acknowledges it) only when both PUTs have succeeded. The tablet sends the FIT because the
+  service has no FIT writer; the service validates the record (schema and the structural rules of §8.2) and checks the FIT only
+  for its header, sizes and CRCs.
+- `{rideId}` is the record's `ride.id` (`ride-<start millis>`; 1 to 128 characters from `A-Z a-z 0-9 . _ -`). A different id in
+  the record is `422`; a path that is not an id is `400`.
+- **Success**: `201` when this request stored the record (or file), `200` when the identical body was stored before and nothing
+  changed. Body `{ "rideId", "status": "stored" | "already-stored" }` (`sync-upload-response.schema.json`).
+- **Immutability**: a stored ride never changes. Another record under a stored id, or another FIT for a stored ride, is `409`
+  (`ride_conflict`, `fit_conflict`); a record whose start time is stored under another id is `409` `start_time_conflict` and its
+  message names the stored id (§5.5). A FIT before its record is `404` `ride_not_found`.
+- **Failure**: `{ "error": { "code", "message" } }` with a stable `code` from a closed list (`api-error.schema.json`): `400`
+  `invalid_json`, `invalid_ride_id`; `401` `unauthorized`; `404` `not_found`; `413` `payload_too_large` (16 MiB record, 8 MiB
+  FIT); `415` `unsupported_media_type`; `422` `invalid_record`, `ride_id_mismatch`, `invalid_fit`; `500` `internal_error`. The
+  tablet retries `5xx` and network errors, treats `401` as "token rejected" and other `4xx` as permanent (ADR 0014 section 6).
 
 ### 8.4 MCP tools
 

@@ -6,12 +6,19 @@ services:
       context: .
       dockerfile: server/Dockerfile
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # The password sits in a URL, so it must be URL-safe: openssl rand -hex 24
+      DATABASE_URL: postgres://overdrive:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/overdrive
+      # name:token,name:token (ADR 0014); empty means the API answers 401 to everyone.
+      DEVICE_TOKENS: ${DEVICE_TOKENS:-}
     ports:
       - "127.0.0.1:${SERVER_PORT:-8080}:8080"
 
-  # PostgreSQL is the chosen store (spec §7.2). The server does not connect to it until Phase 2.
+  # PostgreSQL is the store (spec §7.2, ADR 0014): the server migrates it on start.
   db:
     image: postgres:18
     restart: unless-stopped
