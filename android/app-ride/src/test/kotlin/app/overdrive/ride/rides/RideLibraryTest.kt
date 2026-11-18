@@ -139,23 +139,43 @@ class RideLibraryTest {
             assertEquals("new", found.ride.id)
             assertEquals(2, found.more)
 
-            library.discardRecovered()
+            library.discardRecovered("new")
             runCurrent()
             found = library.recovery.value as RecoveryState.Found
             assertEquals("mid", found.ride.id)
             assertEquals(1, found.more)
 
-            library.saveRecovered()
+            library.saveRecovered("mid")
             runCurrent()
             found = library.recovery.value as RecoveryState.Found
             assertEquals("old", found.ride.id)
             assertEquals(0, found.more)
             assertEquals("mid", library.lastSaved.value?.id)
 
-            library.discardRecovered()
+            library.discardRecovered("old")
             runCurrent()
             assertEquals(RecoveryState.None, library.recovery.value)
             assertEquals(listOf("mid.fit", "mid.json", "mid.meta"), names())
+        }
+
+    @Test
+    fun aSecondTapOnTheSameButtonNeverSavesOrDiscardsTheNextRide() =
+        runTest {
+            leave("new", daysAgo = 0, seconds = 300, finished = false)
+            leave("old", daysAgo = 3, seconds = 200, finished = false)
+            val library = library()
+            library.start()
+            runCurrent()
+            library.saveRecovered("new")
+            library.saveRecovered("new") // a double tap: the notice has moved on to "old" by the time this one runs
+            library.discardRecovered("new")
+            runCurrent()
+            assertEquals("new", library.lastSaved.value?.id)
+            assertEquals("old", (library.recovery.value as RecoveryState.Found).ride.id)
+            assertTrue(File(directory, "old.ridelog").exists())
+            library.saveRecovered("something else")
+            runCurrent()
+            assertEquals("old", (library.recovery.value as RecoveryState.Found).ride.id)
         }
 
     @Test
@@ -180,7 +200,7 @@ class RideLibraryTest {
             val library = library()
             library.start()
             runCurrent()
-            library.saveRecovered()
+            library.saveRecovered("cut")
             runCurrent()
             assertEquals(RecoveryState.None, library.recovery.value)
             val last = checkNotNull(library.lastSaved.value)
@@ -201,7 +221,7 @@ class RideLibraryTest {
             val library = library()
             library.start()
             runCurrent()
-            library.discardRecovered()
+            library.discardRecovered("cut")
             runCurrent()
             assertEquals(RecoveryState.None, library.recovery.value)
             assertEquals(emptyList<String>(), names())
@@ -225,7 +245,7 @@ class RideLibraryTest {
             val library = library(store, reports)
             library.start()
             runCurrent()
-            library.saveRecovered()
+            library.saveRecovered("cut")
             runCurrent()
             val failed = library.recovery.value as RecoveryState.Failed
             assertEquals("cut", failed.ride.id)
@@ -235,7 +255,7 @@ class RideLibraryTest {
             assertTrue("the ride is still on disk", File(directory, "cut.ridelog").exists())
 
             full = false
-            library.saveRecovered()
+            library.saveRecovered("cut")
             runCurrent()
             assertEquals(RecoveryState.None, library.recovery.value)
             assertEquals("cut", library.lastSaved.value?.id)
@@ -255,7 +275,7 @@ class RideLibraryTest {
             current = library
             library.start()
             runCurrent()
-            library.saveRecovered()
+            library.saveRecovered("cut")
             runCurrent()
             assertTrue(seen.single() is RecoveryState.Saving)
         }

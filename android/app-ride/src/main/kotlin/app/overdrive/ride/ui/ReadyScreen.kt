@@ -29,6 +29,7 @@ import app.overdrive.ride.host.DevicesUi
 import app.overdrive.ride.host.RideChoice
 import app.overdrive.ride.overlay.OverlayAccess
 import app.overdrive.ride.rides.RecoveryState
+import app.overdrive.ride.rides.ride
 import app.overdrive.ride.settings.AppSettings
 import app.overdrive.ride.workouts.StepRow
 import app.overdrive.ride.workouts.WorkoutDescriber
@@ -59,10 +60,10 @@ class ReadyActions(
     val onDismissError: () -> Unit,
     /** The overlay row's **Allow**: asks for what the overlay needs (ADR 0006). */
     val onAllowOverlay: () -> Unit = {},
-    /** The recovery notice's **Save** (and **Retry** after a failed save): keep the interrupted ride (ADR 0008). */
-    val onRecoverySave: () -> Unit = {},
-    /** The recovery notice's **Discard**, called once the rider has confirmed. */
-    val onRecoveryDiscard: () -> Unit = {},
+    /** The recovery notice's **Save** (and **Retry** after a failed save): keep that interrupted ride (ADR 0008). */
+    val onRecoverySave: (StoredRide) -> Unit = {},
+    /** The recovery notice's **Discard** for that ride, called once the rider has confirmed. */
+    val onRecoveryDiscard: (StoredRide) -> Unit = {},
 )
 
 /**
@@ -129,7 +130,7 @@ fun ReadyScreen(
             dismissLabel = "Keep it",
             onConfirm = {
                 confirmDiscard = false
-                actions.onRecoveryDiscard()
+                recovery.ride?.let(actions.onRecoveryDiscard)
             },
             onDismiss = { confirmDiscard = false },
         )
@@ -190,7 +191,7 @@ private fun Detail(
     fileMessage: String?,
 ) {
     Column(modifier.padding(horizontal = 40.dp, vertical = 32.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-        RecoveryNotice(recovery, actions.onRecoverySave, onAskDiscard)
+        RecoveryNotice(recovery, onSave = { recovery.ride?.let(actions.onRecoverySave) }, onDiscard = onAskDiscard)
         if (!overlayAccess.canDrawOverlays) OverlayPermissionNotice(actions.onAllowOverlay)
         if (openError != null) {
             Notice(

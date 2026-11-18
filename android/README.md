@@ -6,7 +6,7 @@ One Gradle build for everything that runs on Android. The shared `core` is a sep
 | Module | Contents | Spec |
 |---|---|---|
 | `ble` | Bluetooth transport behind an interface | §7.1 |
-| `data` | Local database, outbox, sync client | §4.9, §7.1 |
+| `data` | The rides folder: `RideStore` (log, record, FIT, atomic finalize, scan) and `RideLogWriter`; the outbox and sync client come with §4.9 | §4.2, §4.8, §4.9, §7.1 |
 | `ui-kit` | Design system: theme on the generated tokens, components, charts, the overlay composables, Lucide icons | §7.4 |
 | `app-ride` | Tablet app: ride, devices and settings screens over a simulated ride; the overlay service and window | §4 |
 | `app-companion` | Phone app: statistics, Health Connect reader | §6.1 |
@@ -39,10 +39,30 @@ Google Play Services, anywhere.
 - **`app-ride`.** `AppContainer` (owned by `OverdriveApp`) holds the settings (DataStore Preferences), the workout
   library and the one `RideHost`, which runs a `RideSession` from a `RideSessionFactory` on a background
   dispatcher. Today the factory builds a `RideEngine` over `SimulatedBike`; real Bluetooth replaces it in M3.
-  Screens only read `StateFlow`s and call `RideActions`.
+  Screens only read `StateFlow`s and call `RideActions`. `rides` (`RideLibrary`) owns the files (below).
 - **Previews.** `ui-kit/.../preview/` has `@Preview`s for every component and state, and the overlay in each mode.
 - **Developer settings** (end of the Settings screen): demo speed (10× and 60×), scripted sensor dropouts and
   the simulated Click state.
+
+## Rides on disk (ADR 0008)
+
+Every ride is written to `filesDir/rides/` as it happens and stored when it ends; a ride that was cut off is offered at the
+next launch.
+
+- **`data/.../rides/RideStore`** is plain Kotlin over `java.io.File` (tested on a temporary folder): `<id>.ridelog` while the
+  ride runs, then `<id>.meta`, `<id>.json` (the wire format) and `<id>.fit`, each written through a temporary file and a
+  rename, the log deleted last. `scan()` tidies the folder and lists rides as `Saved`, `Interrupted`, `Unsaved` or
+  `Recording`; no call throws, every one returns a `StoreResult`.
+- **`app-ride/.../rides/RideLibrary`** is what the app uses: `begin(title)` gives the host a recorder that queues the log
+  writes (`AsyncRideRecorder` from `core`, on one `Dispatchers.IO` thread, so the engine never waits for the disk),
+  `finish(record)` stores the ride and its FIT file, `start()` scans on launch, and `recovery` and `lastSaved` are the
+  state flows the Ready screen reads (`saveRecovered()`, `discardRecovered()`).
+- **Screens:** the recovery notice and the **Last ride** row on Ready, the Saving, Saved and Failed states of the finished
+  screen, one notice on the riding screen if the log cannot be written. Share and Save go through `RideFileActions`
+  (an interface; the Android side is `rememberRideFiles`: a `FileProvider` that serves only `files/rides/`, and the system
+  file picker), so the screens are tested with a fake.
+- `RideHost(persistence = RidePersistence.None)` is the default: tests and previews that do not look at the disk need no
+  folder.
 
 ## The overlay (ADR 0006)
 

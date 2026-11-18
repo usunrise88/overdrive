@@ -214,7 +214,7 @@ class RideHostPersistenceTest {
             assertEquals("Free ride", found.ride.title)
             assertTrue("every second that reached the disk is there", found.ride.durationSeconds in 99..100)
 
-            second.saveRecovered()
+            second.saveRecovered(found.ride.id)
             runCurrent()
             assertEquals(RecoveryState.None, second.recovery.value)
             val stored = RideRecordJson.decode(File(directory, "${found.ride.id}.json").readText())

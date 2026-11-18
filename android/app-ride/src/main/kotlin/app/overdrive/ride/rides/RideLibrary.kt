@@ -65,6 +65,16 @@ sealed interface RecoveryState {
     ) : RecoveryState
 }
 
+/** The interrupted ride the notice is about, or null when there is none. */
+val RecoveryState.ride: StoredRide?
+    get() =
+        when (this) {
+            RecoveryState.None -> null
+            is RecoveryState.Found -> ride
+            is RecoveryState.Saving -> ride
+            is RecoveryState.Failed -> ride
+        }
+
 /** The disk side of one ride, as [app.overdrive.ride.host.RideHost] sees it. */
 interface RideDiskLog {
     /** What the engine writes to: cheap and non-blocking, the disk work happens elsewhere. */
@@ -147,10 +157,14 @@ class RideLibrary(
         scope.launch { scan() }
     }
 
-    /** Keeps the interrupted ride in the notice: recovers it, stores it like a finished ride and shows it as the last ride. */
-    fun saveRecovered() {
+    /**
+     * Keeps the interrupted ride in the notice, which is [id]: recovers it, stores it like a finished ride and shows it as
+     * the last ride. A call for a ride that is no longer the one in the notice (a second tap that arrived after the first
+     * had finished) does nothing, so a double tap never saves the next ride by accident.
+     */
+    fun saveRecovered(id: String) {
         scope.launch {
-            val ride = pending.firstOrNull() ?: return@launch
+            val ride = pending.firstOrNull()?.takeIf { it.id == id } ?: return@launch
             mutableRecovery.value = RecoveryState.Saving(ride, pending.size - 1)
             when (val result = store.finalizeStored(ride.id, utcOffsetSeconds)) {
                 is StoreResult.Ok -> {
@@ -167,10 +181,10 @@ class RideLibrary(
         }
     }
 
-    /** Deletes the interrupted ride in the notice (the screen has asked the rider to confirm). */
-    fun discardRecovered() {
+    /** Deletes the interrupted ride in the notice, which is [id] (the screen has asked the rider to confirm). */
+    fun discardRecovered(id: String) {
         scope.launch {
-            val ride = pending.firstOrNull() ?: return@launch
+            val ride = pending.firstOrNull()?.takeIf { it.id == id } ?: return@launch
             if (!store.delete(
                     ride.id,
                 )

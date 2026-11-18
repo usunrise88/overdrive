@@ -135,7 +135,7 @@ class AppContainerRecoveryTest {
         assertTrue("at least what was ridden before the last second reached the disk", found.durationSeconds >= 60)
         assertEquals("Free ride", found.title)
 
-        container.rides.saveRecovered()
+        container.rides.saveRecovered(found.id)
         await("the ride is saved") { container.rides.lastSaved.value?.id == found.id }
         assertEquals(RecoveryState.None, container.rides.recovery.value)
         val stored = RideRecordJson.decode(File(directory, "${found.id}.json").readText())
