@@ -106,6 +106,18 @@ class RemoteResourceTest {
         }
 
     @Test
+    fun `a resource that never loaded reads its cache before it asks`() =
+        runTest {
+            val store = MemoryTextStore()
+            resource(ScriptedTransport(answer), store).refresh(Refresh.START)
+            val fresh = resource(ScriptedTransport(TransportException(TransportFailure.NoNetwork)), store)
+            fresh.refresh(Refresh.SCREEN_OPENED)
+            assertEquals("2026-11-18", fresh.state.value.value?.to)
+            assertTrue(fresh.state.value.isStale)
+            assertTrue(fresh.state.value.loaded)
+        }
+
+    @Test
     fun `a failure with nothing cached is an error and not loading`() =
         runTest {
             val resource =

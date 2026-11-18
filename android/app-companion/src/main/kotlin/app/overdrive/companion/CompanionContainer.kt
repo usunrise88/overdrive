@@ -202,7 +202,11 @@ class CompanionContainer(
     private val syncingNow = MutableStateFlow(false)
 
     /** The state of one ride's detail. */
-    fun rideDetail(id: String): RemoteResource<RideDetailResponse> = rideDetails.resource(id)
+    fun rideDetail(id: String): RemoteResource<RideDetailResponse> =
+        rideDetails.resource(id).also { resource ->
+            // Its cache is read as soon as it is first asked for, so the screen has the ride at once and offline.
+            if (!resource.state.value.loaded) scope.launch { resource.load() }
+        }
 
     /** The Fitness and Power metrics for [range]. */
     fun metricsFor(range: MetricsRange): RemoteResource<app.overdrive.core.metrics.MetricsResponse> =

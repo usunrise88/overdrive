@@ -156,6 +156,9 @@ public class RemoteResource<T : Any>(
     }
 
     private suspend fun attempt(why: Refresh) {
+        // A resource made on first use (one ride's detail) has not read its cache yet: it does before it asks, so a failed
+        // request is shown next to the answer the phone already had.
+        if (!inner.value.loaded) load()
         val settings = config()
         if (!settings.isConfigured) {
             update(problem = null, refreshing = false)

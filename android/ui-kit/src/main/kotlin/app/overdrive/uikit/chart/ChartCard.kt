@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -106,15 +107,13 @@ fun ChartReadout(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier.fillMaxWidth().heightIn(min = 24.dp).semantics(mergeDescendants = true) {
-            liveRegion =
-                LiveRegionMode.Polite
-        },
+        modifier.fillMaxWidth().heightIn(min = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.Top,
     ) {
+        // The live region is the text only: the pill is a control of its own and stays a separate node for TalkBack.
         FlowRow(
-            Modifier.weight(1f),
+            Modifier.weight(1f).semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
@@ -180,6 +179,7 @@ private fun TodayPill(onClick: () -> Unit) {
         Modifier
             .reportHeight(24.dp)
             .heightIn(min = 48.dp)
+            .semantics { contentDescription = "Back to today" }
             .plainClickable(source, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
