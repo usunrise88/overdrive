@@ -87,7 +87,12 @@ public class FtmsTrainerDevice(
             device = device,
             transports = transports,
             environment = environment,
-            sessions = { transport, sessionScope -> FtmsSession(transport, sessionScope, options, listener) },
+            sessions = {
+                transport,
+                sessionScope,
+                ->
+                FtmsSession(transport, sessionScope, options, listener, timeSource)
+            },
             policy = reconnect,
             timeSource = timeSource,
             random = random,

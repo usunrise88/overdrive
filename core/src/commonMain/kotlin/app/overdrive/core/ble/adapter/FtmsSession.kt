@@ -38,6 +38,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.floor
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 /** What the session tells the device object that owns it. */
 internal interface FtmsListener {
@@ -58,7 +60,8 @@ internal interface FtmsListener {
  * Control Point, or a failed subscription to either, does.
  *
  * **Control.** Request Control (and Start or Resume, see [FtmsOptions.startAfterRequestControl]) runs once per
- * connection, and again after the trainer says control is lost. Every command first makes sure control is held.
+ * connection, and again after the trainer says control is lost (a Reset status right after our own Request Control is not
+ * a loss, [FtmsOptions.selfResetGrace]). Every command first makes sure control is held.
  * A Response Code other than success is handled as in §4.4: operation failed is retried a few times, control not
  * permitted takes control again once, the others fail the command.
  */
@@ -67,6 +70,7 @@ internal class FtmsSession(
     private val scope: CoroutineScope,
     private val options: FtmsOptions,
     private val listener: FtmsListener,
+    private val timeSource: TimeSource = TimeSource.Monotonic,
 ) : PeripheralSession {
     private class Pending(
         val opcode: Int,
@@ -87,6 +91,9 @@ internal class FtmsSession(
     // The target power most recently put on the wire, before its answer: the status echo can arrive first.
     private val sentTargetWatts = MutableStateFlow<Int?>(null)
     private var recovery: Job? = null
+
+    // When this connection last completed a Request Control, for FtmsOptions.selfResetGrace; null before the first.
+    private var controlGrantedAt: TimeMark? = null
 
     override suspend fun establish(): SessionOutcome {
         // Collect before enabling anything: the first indication can arrive before the CCCD write is acknowledged.
@@ -222,10 +229,13 @@ internal class FtmsSession(
                 val status = parsed.value
                 listener.onEvent(TrainerEvent.StatusReceived(status))
                 when (status) {
-                    FitnessMachineStatus.Reset, FitnessMachineStatus.ControlPermissionLost -> {
-                        control.value = false
-                        listener.onEvent(TrainerEvent.ControlLost(status))
-                        scheduleRecovery()
+                    FitnessMachineStatus.Reset -> {
+                        // The D500 answers every Request Control with a Reset (FT 10): that one is not a loss.
+                        if (!isOwnResetAnswer()) onControlLost(status)
+                    }
+
+                    FitnessMachineStatus.ControlPermissionLost -> {
+                        onControlLost(status)
                     }
 
                     is FitnessMachineStatus.TargetPowerChanged -> {
@@ -239,6 +249,18 @@ internal class FtmsSession(
                 }
             }
         }
+    }
+
+    private fun onControlLost(status: FitnessMachineStatus) {
+        control.value = false
+        listener.onEvent(TrainerEvent.ControlLost(status))
+        scheduleRecovery()
+    }
+
+    /** Whether a Reset now falls within [FtmsOptions.selfResetGrace] of the Request Control this connection completed. */
+    private fun isOwnResetAnswer(): Boolean {
+        val granted = controlGrantedAt ?: return false
+        return granted.elapsedNow() < options.selfResetGrace
     }
 
     // endregion
@@ -276,6 +298,7 @@ internal class FtmsSession(
             throw TrainerCommandException(response.requestOpcode, Kind.REJECTED, response.resultCode)
         }
         control.value = true
+        controlGrantedAt = timeSource.markNow()
         listener.onEvent(TrainerEvent.ControlGranted)
         if (options.startAfterRequestControl && ControlPointCodec.OPCODE_START_OR_RESUME !in unsupported) {
             try {
