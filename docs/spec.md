@@ -475,11 +475,27 @@ Phase 2 connects the ride app to a plan: an AI agent schedules workouts, they ap
   key. An activity intervals.icu already has counts as uploaded. The activity is paired with the planned workout of its day (the
   ride's `workoutId`, or the only cycling workout planned that day, in the rider's `TIMEZONE`). A failure there never fails or delays
   the tablet's upload. Strava will be another destination over the same queue.
+- *Settled in stage P2-5 (ADR 0020):* Strava is another destination over that queue, off unless `STRAVA_CLIENT_ID`,
+  `STRAVA_CLIENT_SECRET` and `STRAVA_REFRESH_TOKEN` are all set. The service posts the stored FIT (`POST /api/v3/uploads`,
+  `data_type=fit`, `sport_type=VirtualRide`, `trainer=1`, `commute=0`, the ride id as `external_id`) and then checks **its own
+  upload's** status until Strava names the activity (bounded, persisted, a repeat counts as sent). **Nothing else is requested from
+  Strava, and a test fails if anything is:** the only GET is the status of an upload we made, and the only scope is
+  `activity:write`. The refresh token rotates and the newest is kept in the database (the environment seeds the first run; a new
+  value there replaces it); the owner gets one with `pnpm --filter @overdrive/server run strava-auth`. Rides stored before Strava
+  was turned on are not posted unless `STRAVA_BACKFILL=true`. A 429 is waited out from the headers and `Retry-After`; a wrong
+  scope, a refused token or a missing subscription is one logged error that stops requests until a restart or six hours. What only
+  a real account settles (the subscription, the exact duplicate answer, the limits, the map) is in ADR 0020.
 
 ### 5.6 Strava presentation
 
 - **Photos are not possible.** Attaching images on upload is limited to Strava partners.
 - **Map, to be verified.** A FIT file with positions along a real route should render a map on a virtual ride. If the first test upload confirms it, free rides get a selectable route whose track is written into the file.
+- *Settled in stage P2-5 (ADR 0020):* the title is the planned workout's name, or `Virtual ride` and the date for a free ride. The
+  description is plain text written by code from the ride record and the linked workout, no model and no emoji: the session in one
+  line (`Sweet spot 3x10: 10 min ramp 45 to 70% FTP, 3 x (10 min at 88% FTP + 5 min at 50% FTP), …`), duration, average and
+  normalised power, average heart rate, work in kJ, load, the plan against the ride when one is linked, the FTP. No route feature
+  is built; ADR 0020 section 7 lists what the first real test upload should look at (the activity type, the text and its line
+  breaks, the streams, and whether any map shows).
 
 ### 5.7 Ride app changes
 
@@ -826,7 +842,7 @@ One risk can change how a ride starts: the Click v2 unlock. The rest are small c
 | RR intervals from the Coospo strap | Whether the strap sends them | Visible in the first build, or in nRF Connect | Ride HRV data is simply absent | 4.2 |
 | Sleep stages in Health Connect | Whether OHealth writes stages or only session duration | First companion build reads the record | Sleep analysis uses duration and timing only | none (Phase 3) |
 | HRV from the watch | Whether Wear OS passive monitoring exposes HRV on the OnePlus Watch 3 | One-evening probe on the watch, optional | Recovery model without HRV, already the baseline | none (Phase 3) |
-| Strava map for virtual rides | Whether positions in the FIT file render a map | First test upload in Phase 2 | Rides appear without a map | 7.7 (optional) |
+| Strava map for virtual rides | Whether positions in the FIT file render a map | First test upload in Phase 2 (what to look at: ADR 0020 section 7; the upload is built and tested against a fake only) | Rides appear without a map | 7.7 (optional) |
 | Gear feel | Whether a 1% grade step per gear feels right on the D500 | Tune by riding in Phase 1 | Step and gear count are settings | 3.6 |
 | ZUI background limits | Whether the China ROM interferes with the foreground service | First long ride on the tablet | Battery and autostart exemptions | 1.3, 1.6, 6.9 to 6.12, 6.17, 5.11 |
 | Literature citations | The references in section 10 were cited from memory | Verify each before relying on it | None needed for implementation | none (desk task) |

@@ -39,7 +39,7 @@ const migration = (version: number, sql: string): Migration => ({
 const versions = async (): Promise<number[]> => (await readMigrations()).map((m) => m.version);
 
 describe("the real migrations", () => {
-  it("create the ride, plan, profile, ride workout and OAuth tables", async () => {
+  it("create the ride, plan, profile, ride workout, OAuth and Strava tables", async () => {
     const applied = await migrate(db);
     expect(applied).toEqual(await versions());
     expect(await tables()).toEqual(
@@ -49,6 +49,8 @@ describe("the real migrations", () => {
         "ride_destinations",
         "rides",
         "schema_migrations",
+        "strava_auth",
+        "strava_uploads",
       ]),
     );
   });
