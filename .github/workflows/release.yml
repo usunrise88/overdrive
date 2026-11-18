@@ -1,11 +1,13 @@
 name: Release
 
 # Push a tag like v0.1.0 (or v0.2.0-alpha.1 for a pre-release) to build signed APKs and publish a
-# GitHub Release. Run manually with dry_run (the default) to do everything except publish: that also
-# verifies the signing secrets.
+# GitHub Release. Anything else is a dry run: everything except publishing, which also verifies the
+# signing secrets. Dry runs happen when this file changes on any branch, or manually.
 on:
   push:
     tags: ["v*"]
+    branches: ["**"]
+    paths: [".github/workflows/release.yml"]
   workflow_dispatch:
     inputs:
       dry_run:
