@@ -37,6 +37,12 @@ source). The tablet reads the service the ride upload already talks to (ADR 0014
   when the rider presses the refresh button, which always asks. One request at a time: a refresh that arrives during one is
   dropped (the one under way answers for it), except a change of settings, which is made again afterwards because the one under
   way used the old address or token.
+  A change is written down before the lock is tried and looked at again by whoever lets go of it, so none is lost in the instant
+  between a request's last look and its letting go; and a change that finds the last request made with these very address and
+  token asks nothing (the start and the first settle of the settings can both say so). **The plan follows the settings file
+  itself**, as a flow that is empty until the file has been read, and not the container's `settings` copy, which starts as the
+  defaults and can be a step behind the file: the first value read starts the plan (the cache is shown, then one request), every
+  later one is a change, and a change during a request abandons that request.
 - Nothing runs on the main thread: the request is the transport's (`Dispatchers.IO`), the repository runs on the container's
   scope, and the screen only reads a `StateFlow`. The Ready screen makes its rows again when the plan or the stored rides change
   and not otherwise, so nothing recomposes at rest. No timer re-reads the list at midnight; the Ready screen is entered again

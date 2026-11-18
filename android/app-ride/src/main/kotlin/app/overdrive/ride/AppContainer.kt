@@ -58,11 +58,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -160,6 +161,9 @@ class AppContainer(
     val sync: SyncCoordinator =
         SyncCoordinator(scope, outbox, { syncProvider }, lastSuccessMillis = lastUploadAtStart).also { it.start() }
 
+    /** The service address and token as the settings file has them: null until the file has been read, so nothing is asked before. */
+    private val planConfig = MutableStateFlow<SyncConfig?>(null)
+
     /**
      * The planned workouts (spec §5.7, ADR 0017): fetched from the same service, with the same address and token, at start,
      * when the Ready screen opens (at most once a minute) and when the rider asks; kept on disk so the list works offline.
@@ -167,7 +171,7 @@ class AppContainer(
      */
     val plan: PlanRepository =
         PlanRepository(
-            config = { settings.value.let { SyncConfig(it.syncUrl, it.syncToken.value) } },
+            config = { planConfig.value ?: SyncConfig("", "") },
             transport = planTransport,
             cache = FilePlanCache(planFile),
             today = today,
@@ -380,29 +384,27 @@ class AppContainer(
                     sync.kick(retryRefused = true)
                 }
         }
-        // The planned workouts: the cache first, so the list is there with no network, then a request once the settings have
-        // been read from disk (before that the address is empty and there is nothing to ask). After that, a changed address or
-        // token hides or shows the section at once and asks again once it has settled, like the upload above.
+        // The planned workouts follow the settings file itself (not the copy in [settings], which starts as the defaults and
+        // may be a step behind the file): the first value read from disk starts them, every later one is a change.
+        scope.launch {
+            settingsRepository.settings.collect { planConfig.value = SyncConfig(it.syncUrl, it.syncToken.value) }
+        }
+        // The cache first, so the list is there with no network, then a request as soon as the settings have been read. After
+        // that, a changed address or token hides or shows the section at once and asks again once it has settled, like the
+        // upload above. A change during a request abandons that request: it was made with the old address or token.
         scope.launch {
             plan.load()
-            val read = settingsRepository.settings.first()
-            settings.first { it == read }
-            val key = { s: AppSettings -> s.syncUrl to s.syncToken.value }
-            val atStart = key(read)
-            launch { plan.refresh(PlanRefresh.START) }
             var first = true
-            settings
-                .map(key)
-                .distinctUntilChanged()
-                .collectLatest { changed ->
-                    if (first) {
-                        first = false
-                        if (changed == atStart) return@collectLatest
-                    }
-                    plan.settingsChanged()
+            planConfig.filterNotNull().collectLatest {
+                plan.settingsChanged()
+                if (first) {
+                    first = false
+                    plan.refresh(PlanRefresh.START)
+                } else {
                     delay(syncSettleMillis)
                     plan.refresh(PlanRefresh.SETTINGS_CHANGED)
                 }
+            }
         }
         // The last success survives a restart; a disk that refuses the one-line file costs nothing but that.
         scope.launch(Dispatchers.IO) {

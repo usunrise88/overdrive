@@ -8,8 +8,13 @@ import app.overdrive.core.sync.SyncConfig
 import app.overdrive.core.sync.TransportException
 import app.overdrive.core.sync.TransportFailure
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -480,6 +485,90 @@ class PlanRepositoryTest {
             assertEquals(2, transport.requests.size, "the change was made with the old token, so once more")
             assertEquals("tok-another-0123456789abcdef0123456789", transport.requests.last().bearerToken)
             assertFalse(repository.state.value.refreshing)
+        }
+
+    @Test
+    fun `a settings change for the address and token the last request used asks nothing, and keeps its problem`() =
+        runTest {
+            val transport = ScriptedGetTransport(TransportException(TransportFailure.Unreachable))
+            val repository = repository(transport)
+            repository.refresh(PlanRefresh.START)
+            assertEquals(1, transport.requests.size)
+            // The settings are read again, unchanged (the start and the first settle both say so): nothing to ask.
+            repository.settingsChanged()
+            repository.refresh(PlanRefresh.SETTINGS_CHANGED)
+            assertEquals(1, transport.requests.size)
+            assertEquals(PlanProblem.Failed("Service unreachable"), repository.state.value.problem, "it is still true")
+
+            // A really changed token is asked, and the old problem was about the old one.
+            config = SyncConfig(address, "tok-another-0123456789abcdef0123456789")
+            transport.then(fortnight(listOf(today1)))
+            repository.settingsChanged()
+            assertNull(repository.state.value.problem)
+            repository.refresh(PlanRefresh.SETTINGS_CHANGED)
+            assertEquals(2, transport.requests.size)
+            assertEquals(listOf("icu-1"), repository.state.value.workouts.map { it.id })
+        }
+
+    @Test
+    fun `a request that was cancelled is not taken for one that was made`() =
+        runTest {
+            val transport = ScriptedGetTransport(fortnight(listOf(today1)))
+            val release = CompletableDeferred<Unit>()
+            val started = CompletableDeferred<Unit>()
+            transport.beforeAnswer = {
+                started.complete(Unit)
+                release.await()
+            }
+            val repository = repository(transport)
+            val first = launch { repository.refresh(PlanRefresh.START) }
+            started.await()
+            first.cancel()
+            first.join()
+            assertFalse(repository.state.value.refreshing, "a cancelled request leaves nothing under way")
+            release.complete(Unit)
+            repository.refresh(PlanRefresh.SETTINGS_CHANGED)
+            assertEquals(2, transport.requests.size, "the same settings, never answered: asked")
+            assertEquals(listOf("icu-1"), repository.state.value.workouts.map { it.id })
+        }
+
+    @Test
+    fun `settings changes from many threads are never lost, whatever instant they arrive at`() =
+        runTest {
+            repeat(300) { round ->
+                val settings = MutableStateFlow(SyncConfig(address, "tok-$round-0-0123456789abcdef0123456789"))
+                val transport = ScriptedGetTransport(fortnight())
+                // Every request lets the others run, so a change lands while one is under way and while it lets go.
+                transport.beforeAnswer = { yield() }
+                val repository =
+                    PlanRepository(
+                        config = { settings.value },
+                        transport = transport,
+                        cache = MemoryPlanCache(),
+                        today = { today },
+                        wallMillis = { wall },
+                        elapsedMillis = { elapsed },
+                    )
+                withContext(Dispatchers.Default) {
+                    (1..6)
+                        .map { writer ->
+                            launch {
+                                repeat(4) { step ->
+                                    settings.value =
+                                        SyncConfig(address, "tok-$round-$writer-$step-0123456789abcdef0123456789")
+                                    repository.refresh(PlanRefresh.SETTINGS_CHANGED)
+                                    yield()
+                                }
+                            }
+                        }.joinAll()
+                }
+                assertEquals(
+                    settings.value.token,
+                    transport.requests.last().bearerToken,
+                    "round $round: the settings as they ended were asked, whoever wrote them last",
+                )
+                assertFalse(repository.state.value.refreshing)
+            }
         }
 
     @Test

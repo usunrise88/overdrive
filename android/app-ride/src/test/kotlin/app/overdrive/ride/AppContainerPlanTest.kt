@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import app.overdrive.core.ble.fake.FakeBle
 import app.overdrive.core.plan.PlanApiJson
+import app.overdrive.core.plan.PlanCacheFormat
 import app.overdrive.core.plan.PlanProblem
 import app.overdrive.core.plan.PlanRefresh
 import app.overdrive.core.plan.PlanSource
@@ -220,7 +221,9 @@ class AppContainerPlanTest {
         val c = container("plan-damaged")
         c.configure()
         await("the list is there") { c.planState.workouts.map { it.id } == listOf("icu-1") }
-        assertTrue("the cache is rewritten whole", file.readText().startsWith("overdrive-plan 1 "))
+        await("the cache is rewritten whole, so it reads again") {
+            PlanCacheFormat.decode(file.readText())?.response?.workouts?.map { it.id } == listOf("icu-1")
+        }
         assertFalse(c.planState.stale)
     }
 
@@ -308,6 +311,8 @@ class AppContainerPlanTest {
         }
         c.configure()
         await("the plan is there") { c.planState.workouts.isNotEmpty() }
+        // The setting that chose the simulated devices rebuilds the ride after a pause; choose only once it has.
+        await("the simulated devices are in") { c.host.devices.value.simulated }
         val before = c.host.ui.value.rideNumber
 
         // What a tap on the planned row does: the workout of the plan is chosen like any workout.
@@ -355,6 +360,7 @@ class AppContainerPlanTest {
                 )
             }
         }
+        await("the simulated devices are in") { first.host.devices.value.simulated }
         val before = first.host.ui.value.rideNumber
         first.host.select(RideChoice.Planned(plannedWorkout.workout))
         await("ready") {
