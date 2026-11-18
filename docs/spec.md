@@ -440,6 +440,28 @@ Phase 2 connects the ride app to a plan: an AI agent schedules workouts, they ap
 - The Phase 1 outbox starts uploading. Local workout files keep working.
 - *Settled in stage P2-1b (ADR 0014 section 8):* the outbox uploads through `HttpSyncProvider` (§4.9); Settings, Sync shows the
   waiting count, the last success and the last error, and has **Send now**. The list of planned workouts is stage P2-2.
+- *Settled in stage P2-2b (the tablet's side; ADR 0017; the service's side is `GET /v1/workouts`, §8.3):*
+  - **Fetching.** `PlanRepository` in `core` (`app.overdrive.core.plan`) asks `GET {address}/v1/workouts?from&to` with the same
+    address, token and `HttpURLConnection` class as the ride upload (`UrlConnectionTransport` is also the `HttpGetTransport`), for
+    **today to today plus 13 days** in the tablet's local dates. It asks at start, when the Ready screen comes on screen (at
+    most once a minute), when the address or token has changed and settled (1.5 s), and on the **refresh** button; one request
+    at a time. The last good answer is kept in `filesDir/plan/workouts` (a header line with a checksum, then the answer as sent;
+    written through a temporary file and an atomic rename; a damaged or foreign file is no cache), so the list works with no
+    network and after a restart. The ride app still works with no network at all.
+  - **The Planned section** (Ready screen, left column, above Ride; design/system.md §6.1): today's workouts first (name, one line
+    of description or else the step kinds, length in minutes, "IF 0.76" computed from the native steps), then **This week**,
+    collapsed to a count, which holds tomorrow to six days on, by day. Below the label, one line says "Updated 07:30"; when the
+    service says `stale` or the last request failed it says "Out of date · updated 07:30" with an alert and, for a failure, the
+    reason ("Service unreachable"); a 401 says "The service did not accept the token. Check the token in Settings" (the Sync
+    settings' wording). **With no address or token, or when the service answers `configured: false`, the section is not drawn
+    and nothing is said.** The list is read through the clock, so a cache read days later shows the days that are now ahead.
+  - **Starting one.** A planned row is chosen like any workout and **Start** plays it in the existing workout player; the
+    ride's `workoutId` is the planned workout's id (it equals `workout.id`, so no mapping is involved), and the stored ride and the
+    uploaded record carry it. A workout the player cannot run (more than 12 hours, or more than 2000
+    steps once the repeats are expanded: the checks are arithmetic on the steps, never an expansion) is shown disabled with that
+    reason. A planned workout whose id matches a stored ride is marked "Done 18:04" with a check (the date too when it was
+    ridden on another day than it is planned for) and can still be ridden again. Local workout files and the bundled
+    workouts are unchanged.
 
 ## 6. Phase 3: Statistics and analysis
 
