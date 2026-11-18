@@ -1,0 +1,95 @@
+{
+  "generatedAt": "2026-11-18T18:00:00Z",
+  "hash": "b1add004e12d9617",
+  "name": "Sweet spot 3x10",
+  "routeKey": null,
+  "note": "Heart rate also moves from day to day with heat, sleep and caffeine, so look at the trend over several attempts, not at a single comparison.",
+  "definition": {
+    "powerTolerancePercent": 3,
+    "skipSeconds": 60,
+    "minStepSeconds": 120,
+    "minTrendAttempts": 3
+  },
+  "steps": [
+    {
+      "step": 2,
+      "label": "Sweet spot",
+      "durationSeconds": 600,
+      "targetFraction": 0.88
+    },
+    {
+      "step": 3,
+      "label": "Recover",
+      "durationSeconds": 300,
+      "targetFraction": 0.5
+    },
+    {
+      "step": 4,
+      "label": "Sweet spot",
+      "durationSeconds": 600,
+      "targetFraction": 0.88
+    },
+    {
+      "step": 5,
+      "label": "Recover",
+      "durationSeconds": 300,
+      "targetFraction": 0.5
+    },
+    {
+      "step": 6,
+      "label": "Sweet spot",
+      "durationSeconds": 600,
+      "targetFraction": 0.88
+    },
+    {
+      "step": 7,
+      "label": "Recover",
+      "durationSeconds": 300,
+      "targetFraction": 0.5
+    }
+  ],
+  "comparedSteps": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "attempts": [],
+  "trends": {
+    "heartRateAtPower": {
+      "unit": "bpm",
+      "betterWhen": "lower",
+      "attempts": 4,
+      "minAttempts": 3,
+      "direction": "improving",
+      "slopePerAttempt": -1.34,
+      "change": -4.02,
+      "steadyBelow": 2.0,
+      "reason": null
+    },
+    "driftPercent": {
+      "unit": "%",
+      "betterWhen": "lower",
+      "attempts": 3,
+      "minAttempts": 3,
+      "direction": "improving",
+      "slopePerAttempt": -0.75,
+      "change": -1.5,
+      "steadyBelow": 1.0,
+      "reason": null
+    },
+    "compliance": {
+      "unit": "%",
+      "betterWhen": "higher",
+      "attempts": 4,
+      "minAttempts": 3,
+      "direction": "steady",
+      "slopePerAttempt": 0.0,
+      "change": 0.0,
+      "steadyBelow": 5.0,
+      "reason": null
+    }
+  }
+}

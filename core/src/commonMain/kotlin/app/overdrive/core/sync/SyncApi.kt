@@ -62,6 +62,12 @@ public enum class ApiErrorCode(
     @SerialName("invalid_fit")
     INVALID_FIT(422),
 
+    @SerialName("unsupported_sport")
+    UNSUPPORTED_SPORT(422),
+
+    @SerialName("empty_activity")
+    EMPTY_ACTIVITY(422),
+
     @SerialName("ride_not_found")
     RIDE_NOT_FOUND(404),
 

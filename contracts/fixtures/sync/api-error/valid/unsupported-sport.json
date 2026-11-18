@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "unsupported_sport",
+    "message": "This FIT file is a running activity; only cycling is imported"
+  }
+}

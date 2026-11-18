@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive repeated sessions",
+  "description": "The service's answer to GET /v1/repeats (spec §11.7, §8.3, ADR 0026): the workouts the rider has ridden more than once, most recently ridden first. Two rides are the same session when the workouts they were played from have the same structure: the hash (16 lower-case hex characters) is taken over the workout's steps with repeats expanded, each step as its type, its duration in seconds and its targets in thousandths of FTP, and nothing else: names, ids, descriptions, labels and cadence targets are not in it, so a renamed copy matches (ADR 0026 says exactly what is in it). generatedAt is when the service computed the answer (UTC). A session has name (the workout's name at its latest attempt), routeKey (the hook for routes, stage v0.4.0: always null today), attempts (at least 2), firstDate and lastDate (the rider's local days of the first and last attempt), latest and previous (the last two attempts: ride id, local day and UTC start) and comparison: for three measures the figure of the latest attempt, the figure of the previous one and their difference (latest minus previous), or the reason there is none. heartRateAtPower is the average heart rate at the same power in bpm (lower at the same power is fitter): over the fixed-power steps in which the latest attempt has a figure, compared with the previous attempt's at the same steps and the same power; driftPercent is the aerobic drift in percent (spec §6.3, where the ride has one); compliance is the share of the planned time that was ridden, in percent. Rules a schema cannot state, checked by every implementation: dates are real; firstDate is not after lastDate; latest and previous are different rides and previous did not start after latest; lastDate is the local day of latest and firstDate is not after the day of previous; a change's difference is latest minus previous (to one decimal) exactly when both are numbers, and then it has no reason, and otherwise the difference is null and the reason says why; sessions are ordered by lastDate, newest first, then by hash, and hashes are unique.",
+  "type": "object",
+  "required": ["generatedAt", "repeats"],
+  "additionalProperties": false,
+  "properties": {
+    "generatedAt": { "$ref": "#/$defs/instant" },
+    "repeats": { "type": "array", "items": { "$ref": "#/$defs/repeat" } }
+  },
+  "$defs": {
+    "instant": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "rideId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "hash": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+    "attemptRef": {
+      "type": "object",
+      "required": ["rideId", "date", "startTime"],
+      "additionalProperties": false,
+      "properties": {
+        "rideId": { "$ref": "#/$defs/rideId" },
+        "date": { "$ref": "#/$defs/date" },
+        "startTime": { "$ref": "#/$defs/instant" }
+      }
+    },
+    "change": {
+      "type": "object",
+      "required": ["latest", "previous", "difference", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "latest": { "type": ["number", "null"] },
+        "previous": { "type": ["number", "null"] },
+        "difference": { "type": ["number", "null"] },
+        "reason": { "type": ["string", "null"], "minLength": 1, "maxLength": 300 }
+      }
+    },
+    "repeat": {
+      "type": "object",
+      "required": [
+        "hash",
+        "name",
+        "routeKey",
+        "attempts",
+        "firstDate",
+        "lastDate",
+        "latest",
+        "previous",
+        "comparison"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "hash": { "$ref": "#/$defs/hash" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "routeKey": { "type": ["string", "null"], "minLength": 1, "maxLength": 64 },
+        "attempts": { "type": "integer", "minimum": 2 },
+        "firstDate": { "$ref": "#/$defs/date" },
+        "lastDate": { "$ref": "#/$defs/date" },
+        "latest": { "$ref": "#/$defs/attemptRef" },
+        "previous": { "$ref": "#/$defs/attemptRef" },
+        "comparison": {
+          "type": "object",
+          "required": ["heartRateAtPower", "driftPercent", "compliance"],
+          "additionalProperties": false,
+          "properties": {
+            "heartRateAtPower": { "$ref": "#/$defs/change" },
+            "driftPercent": { "$ref": "#/$defs/change" },
+            "compliance": { "$ref": "#/$defs/change" }
+          }
+        }
+      }
+    }
+  }
+}

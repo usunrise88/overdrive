@@ -4,8 +4,10 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 // The sync API's request and response shapes (spec §8.3) live in their own files.
 export * from "./insights.ts";
 export * from "./metrics.ts";
+export * from "./outdoor.ts";
 export * from "./plan.ts";
 export * from "./profile.ts";
+export * from "./repeats.ts";
 export * from "./sync.ts";
 export * from "./wellness.ts";
 

@@ -1,0 +1,81 @@
+{
+  "generatedAt": "2026-11-18T18:00:00Z",
+  "repeats": [
+    {
+      "hash": "B1ADD004E12D9617",
+      "name": "Sweet spot 3x10",
+      "routeKey": null,
+      "attempts": 4,
+      "firstDate": "2026-10-07",
+      "lastDate": "2026-11-18",
+      "latest": {
+        "rideId": "ride-1795000000000",
+        "date": "2026-11-18",
+        "startTime": "2026-11-18T11:06:40Z"
+      },
+      "previous": {
+        "rideId": "ride-1794400000000",
+        "date": "2026-11-11",
+        "startTime": "2026-11-11T12:26:40Z"
+      },
+      "comparison": {
+        "heartRateAtPower": {
+          "latest": 147.5,
+          "previous": 150.2,
+          "difference": -2.7,
+          "reason": null
+        },
+        "driftPercent": {
+          "latest": 2.1,
+          "previous": 3.4,
+          "difference": -1.3,
+          "reason": null
+        },
+        "compliance": {
+          "latest": 100,
+          "previous": 96.5,
+          "difference": 3.5,
+          "reason": null
+        }
+      }
+    },
+    {
+      "hash": "4d491be812dc3f98",
+      "name": "Zone 2 hour",
+      "routeKey": null,
+      "attempts": 2,
+      "firstDate": "2026-10-29",
+      "lastDate": "2026-11-10",
+      "latest": {
+        "rideId": "ride-1794300000000",
+        "date": "2026-11-10",
+        "startTime": "2026-11-10T08:40:00Z"
+      },
+      "previous": {
+        "rideId": "ride-1793300000000",
+        "date": "2026-10-29",
+        "startTime": "2026-10-29T18:53:20Z"
+      },
+      "comparison": {
+        "heartRateAtPower": {
+          "latest": 131.0,
+          "previous": null,
+          "difference": null,
+          "reason": "the previous attempt had no step with 120 s at the target power"
+        },
+        "driftPercent": {
+          "latest": null,
+          "previous": null,
+          "difference": null,
+          "reason": "no steady stretch of 40 minutes in either attempt"
+        },
+        "compliance": {
+          "latest": 100,
+          "previous": 100,
+          "difference": 0.0,
+          "reason": null
+        }
+      }
+    }
+  ]
+}

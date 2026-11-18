@@ -1,0 +1,41 @@
+{
+  "id": "fit-3f9a0c1d2b7e4a65",
+  "kind": "activity",
+  "source": "fit",
+  "type": "cycling-outdoor",
+  "name": "Outdoor ride",
+  "start": "2027-03-14T09:02:11Z",
+  "end": "2027-03-14T11:07:41Z",
+  "startDate": "2027-03-14",
+  "durationSeconds": 7530,
+  "averageHeartRate": 138.4,
+  "maxHeartRate": 171,
+  "load": null,
+  "loadApproximate": false,
+  "countsTowardLoad": true,
+  "overlapsRideId": null,
+  "loadNote": "From heart rate, approximate: short hard efforts are under-counted, because heart rate lags behind them.",
+  "thresholdHr": null,
+  "maxHr": null,
+  "heartRate": {
+    "samples": 1506,
+    "medianGapSeconds": 5,
+    "maxGapSeconds": 25,
+    "coverage": 0.97
+  },
+  "series": [
+    {
+      "t": 0,
+      "heartRate": 96.5
+    },
+    {
+      "t": 300,
+      "heartRate": 131.2
+    },
+    {
+      "t": 600,
+      "heartRate": 142.0
+    }
+  ],
+  "generatedAt": "2027-03-14T12:00:00Z"
+}

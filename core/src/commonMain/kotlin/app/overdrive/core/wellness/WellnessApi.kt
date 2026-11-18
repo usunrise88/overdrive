@@ -674,7 +674,12 @@ public data class HeartRatePoint(
     }
 }
 
-/** The answer to `GET /v1/activities/{id}` (`activity.schema.json`); its first part is the row of a history list. */
+/**
+ * The answer to `GET /v1/activities/{id}` (`activity.schema.json`); its first part is the row of a history list. [source] is `watch`
+ * (a workout from Health Connect, id `watch-…`) or `fit` (an outdoor ride imported from a FIT file, id `fit-…`, type
+ * `cycling-outdoor`; spec §11.8). [distanceMeters] and [elevationGainMeters] are present only for an imported ride whose file says
+ * them (absent, never null, when not known).
+ */
 @Serializable
 public data class Activity(
     val id: String,
@@ -698,12 +703,17 @@ public data class Activity(
     val heartRate: HeartRateStats,
     val series: List<HeartRatePoint>,
     val generatedAt: String,
+    val distanceMeters: Double? = null,
+    val elevationGainMeters: Double? = null,
 ) {
     init {
-        require(WellnessChecks.activityId.matches(id)) { "id is not watch-<record id>" }
+        require(WellnessChecks.activityId.matches(id)) { "id is not watch-<record id> or fit-<16 hex>" }
         require(kind == "activity") { "kind must be activity" }
-        require(source == "watch") { "source must be watch" }
-        require(WellnessChecks.exerciseType.matches(type)) { "type is not a lower-case token" }
+        require(source == "watch" || source == "fit") { "source must be watch or fit" }
+        require(id.startsWith("$source-")) { "id must start with the source" }
+        require(WellnessChecks.activityType.matches(type)) { "type is not a lower-case token" }
+        require(distanceMeters == null || distanceMeters >= 0.0) { "distanceMeters is negative" }
+        require(elevationGainMeters == null || elevationGainMeters >= 0.0) { "elevationGainMeters is negative" }
         require(name.length in 1..WellnessChecks.MAX_TITLE) { "name must have 1 to 100 characters" }
         val from = WellnessChecks.instant(start, "start")
         val to = WellnessChecks.instant(end, "end")
@@ -764,7 +774,10 @@ internal object WellnessChecks {
 
     private val recordId = Regex("^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
     val exerciseType = Regex("^[a-z][a-z0-9_]{0,39}$")
-    val activityId = Regex("^watch-[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
+
+    /** An activity's type: an exercise type, or `cycling-outdoor` for an imported ride. */
+    val activityType = Regex("^[a-z][a-z0-9_-]{0,39}$")
+    val activityId = Regex("^(watch|fit)-[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
 
     fun instant(
         text: String,

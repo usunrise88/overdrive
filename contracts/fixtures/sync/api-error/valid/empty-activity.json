@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "empty_activity",
+    "message": "This FIT file holds no ride: it has no records with a time"
+  }
+}

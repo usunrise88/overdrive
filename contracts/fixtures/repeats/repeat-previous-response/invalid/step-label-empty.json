@@ -1,0 +1,48 @@
+{
+  "generatedAt": "2026-11-18T17:00:00Z",
+  "hash": "b1add004e12d9617",
+  "before": "ride-1795000000000",
+  "previous": {
+    "rideId": "ride-1794400000000",
+    "date": "2026-11-11",
+    "startTime": "2026-11-11T12:26:40Z",
+    "durationSeconds": 2100,
+    "ftp": 250,
+    "attempt": 3,
+    "heartRateAtPower": 131.2,
+    "steps": [
+      {
+        "step": 1,
+        "label": "",
+        "startSeconds": 0,
+        "endSeconds": 600,
+        "targetWatts": null,
+        "averageHeartRate": null
+      },
+      {
+        "step": 2,
+        "label": "Sweet spot",
+        "startSeconds": 600,
+        "endSeconds": 1200,
+        "targetWatts": 220.0,
+        "averageHeartRate": 143.4
+      },
+      {
+        "step": 3,
+        "label": "Recover",
+        "startSeconds": 1200,
+        "endSeconds": 1500,
+        "targetWatts": 125.0,
+        "averageHeartRate": 118.9
+      },
+      {
+        "step": 4,
+        "label": "Sweet spot",
+        "startSeconds": 1500,
+        "endSeconds": 2100,
+        "targetWatts": 220.0,
+        "averageHeartRate": null
+      }
+    ]
+  }
+}

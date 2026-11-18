@@ -1,0 +1,19 @@
+{
+  "status": "imported",
+  "id": "fit-3f9a0c1d2b7e4a65",
+  "kind": "activity",
+  "reason": null,
+  "summary": {
+    "name": "Outdoor ride",
+    "start": "2027-03-14T09:02:11Z",
+    "end": "2027-03-14T11:07:41Z",
+    "startDate": "2027-03-14",
+    "durationSeconds": 0,
+    "distanceMeters": 52310.5,
+    "elevationGainMeters": 612,
+    "averageHeartRate": 138.4,
+    "maxHeartRate": 171,
+    "load": 96.3,
+    "loadApproximate": true
+  }
+}
