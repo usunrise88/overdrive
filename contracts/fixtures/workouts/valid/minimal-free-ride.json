@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "id": "free-60",
+  "name": "Free ride, 60 minutes",
+  "steps": [
+    { "type": "free", "duration": 3600 }
+  ]
+}

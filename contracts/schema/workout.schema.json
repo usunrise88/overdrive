@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive workout, schema 1",
+  "description": "Native workout format (spec §8.1). Targets are fractions of FTP, durations are seconds. ZWO files and intervals.icu workouts are converted to this format on import.",
+  "type": "object",
+  "required": ["schema", "id", "name", "steps"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/step" }
+    }
+  },
+  "$defs": {
+    "step": {
+      "oneOf": [
+        { "$ref": "#/$defs/steady" },
+        { "$ref": "#/$defs/ramp" },
+        { "$ref": "#/$defs/free" },
+        { "$ref": "#/$defs/repeat" }
+      ]
+    },
+    "leafStep": {
+      "oneOf": [
+        { "$ref": "#/$defs/steady" },
+        { "$ref": "#/$defs/ramp" },
+        { "$ref": "#/$defs/free" }
+      ]
+    },
+    "duration": { "type": "integer", "minimum": 1, "description": "Seconds." },
+    "ftpFraction": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 3,
+      "description": "Fraction of FTP."
+    },
+    "label": { "type": "string" },
+    "cadence": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Target cadence in rpm. Shown only; never controls the trainer."
+    },
+    "steady": {
+      "type": "object",
+      "required": ["type", "duration", "target"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "steady" },
+        "duration": { "$ref": "#/$defs/duration" },
+        "target": { "$ref": "#/$defs/ftpFraction" },
+        "cadence": { "$ref": "#/$defs/cadence" },
+        "label": { "$ref": "#/$defs/label" }
+      }
+    },
+    "ramp": {
+      "type": "object",
+      "required": ["type", "duration", "from", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "ramp" },
+        "duration": { "$ref": "#/$defs/duration" },
+        "from": { "$ref": "#/$defs/ftpFraction" },
+        "to": { "$ref": "#/$defs/ftpFraction" },
+        "cadence": { "$ref": "#/$defs/cadence" },
+        "label": { "$ref": "#/$defs/label" }
+      }
+    },
+    "free": {
+      "type": "object",
+      "required": ["type", "duration"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "free" },
+        "duration": { "$ref": "#/$defs/duration" },
+        "cadence": { "$ref": "#/$defs/cadence" },
+        "label": { "$ref": "#/$defs/label" }
+      }
+    },
+    "repeat": {
+      "type": "object",
+      "required": ["type", "count", "steps"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "repeat" },
+        "count": { "type": "integer", "minimum": 1 },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/leafStep" },
+          "description": "Repeats do not nest in schema 1."
+        },
+        "label": { "$ref": "#/$defs/label" }
+      }
+    }
+  }
+}

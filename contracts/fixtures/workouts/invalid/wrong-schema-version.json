@@ -1,0 +1,8 @@
+{
+  "schema": 2,
+  "id": "future-version",
+  "name": "Schema from the future",
+  "steps": [
+    { "type": "free", "duration": 600 }
+  ]
+}

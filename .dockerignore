@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/build
+**/.gradle
+**/.kotlin
+.git
+android
+core
+design
+docs

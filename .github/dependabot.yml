@@ -1,0 +1,23 @@
+# Gradle is not listed: both Gradle builds share gradle/libs.versions.toml, which sits outside either
+# build's directory. Bump it by hand (or with Renovate) and run `make check android-check`.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /server
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly

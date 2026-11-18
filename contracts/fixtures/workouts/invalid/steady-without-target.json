@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "id": "no-target",
+  "name": "Steady step without a target",
+  "steps": [
+    { "type": "steady", "duration": 600 }
+  ]
+}

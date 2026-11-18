@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "id": "2026-11-22-cadence-builds",
+  "name": "Cadence builds",
+  "description": "Optional cadence targets are display-only.",
+  "steps": [
+    { "type": "steady", "duration": 300, "target": 0.55, "cadence": 90, "label": "Easy spin" },
+    { "type": "repeat", "count": 4, "label": "Builds", "steps": [
+      { "type": "ramp", "duration": 120, "from": 0.60, "to": 0.95, "cadence": 100 },
+      { "type": "steady", "duration": 120, "target": 0.50 }
+    ] },
+    { "type": "steady", "duration": 20, "target": 1.50, "label": "Sprint" }
+  ]
+}

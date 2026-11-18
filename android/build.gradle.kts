@@ -1,0 +1,20 @@
+plugins {
+    // Declared here so every module shares one plugin classloader. Applying the Compose compiler
+    // plugin also puts the matching Kotlin Gradle plugin on the classpath, which AGP's built-in
+    // Kotlin support then uses.
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.spotless)
+}
+
+spotless {
+    kotlin {
+        target("*/src/**/*.kt")
+        ktlint()
+    }
+    kotlinGradle {
+        target("*.gradle.kts", "*/*.gradle.kts")
+        ktlint()
+    }
+}

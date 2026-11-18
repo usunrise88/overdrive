@@ -1,0 +1,39 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Secrets and local config. Server secrets live in the server environment only (spec §7.2).
+.env
+.env.*
+!.env.example
+local.properties
+*.jks
+*.keystore
+secrets/
+
+# Node / pnpm
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Gradle / Kotlin / Android
+.gradle/
+.kotlin/
+build/
+captures/
+*.apk
+*.aab
+*.hprof
+
+# Local tool state
+.claude/settings.local.json
+
+# Generated ride artifacts used during manual testing
+*.fit
+!contracts/fixtures/**/*.fit

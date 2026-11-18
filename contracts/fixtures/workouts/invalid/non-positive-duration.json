@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "id": "bad-duration",
+  "name": "Zero duration",
+  "steps": [
+    { "type": "steady", "duration": 0, "target": 0.7 }
+  ]
+}

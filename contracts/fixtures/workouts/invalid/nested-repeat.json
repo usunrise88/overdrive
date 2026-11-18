@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "id": "nested",
+  "name": "Repeat inside repeat",
+  "steps": [
+    { "type": "repeat", "count": 2, "steps": [
+      { "type": "repeat", "count": 2, "steps": [
+        { "type": "steady", "duration": 60, "target": 0.9 }
+      ] }
+    ] }
+  ]
+}

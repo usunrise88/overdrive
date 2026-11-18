@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "id": "bad-step-type",
+  "name": "Unknown step type",
+  "steps": [
+    { "type": "sprint", "duration": 30, "target": 1.5 }
+  ]
+}

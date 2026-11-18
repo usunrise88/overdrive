@@ -1,0 +1,41 @@
+# Single version catalog shared by every Gradle build in the repo (core/ and android/).
+# Each build loads it with `from(files("../gradle/libs.versions.toml"))` in its settings file.
+# Entries a given build does not use are simply ignored.
+
+[versions]
+kotlin = "2.4.21"
+kotlinx-serialization = "1.13.0"
+spotless = "8.11.0"
+
+# Android. minSdk 31 (Android 12) gives the modern Bluetooth permission model; both target
+# devices (Lenovo Xiaoxin Pad Pro 2025, Xiaomi 14 Ultra) run newer releases. APKs are sideloaded,
+# so there is no Play target-SDK deadline: targetSdk moves when we have tested the new behaviour.
+agp = "9.5.1"
+compileSdk = "37"
+targetSdk = "36"
+minSdk = "31"
+compose-bom = "2026.09.00"
+activity-compose = "1.13.0"
+junit = "4.13.2"
+
+[libraries]
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+
+# The shared core, substituted by the composite build in android/settings.gradle.kts.
+overdrive-core = { module = "app.overdrive:overdrive-core" }
+
+androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
+androidx-compose-ui = { module = "androidx.compose.ui:ui" }
+androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
+junit = { module = "junit:junit", version.ref = "junit" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
+
+[plugins]
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
