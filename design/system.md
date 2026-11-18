@@ -604,3 +604,19 @@ New `ui-kit` components for the phone; their screens are in `design/companion.md
   40 dp rows, header in caption text 3.
 - **ProgressBar**: 4 dp track surface 3, fill text 1, radius 2; determinate only (first read, learning nights).
 
+### 13.1 Settled in stage P3-4a
+
+What the implementation added or fixed to build the components above (`android/ui-kit`, `docs/adr/0024-companion-app.md`):
+
+- **BottomSheet**: the sheet of §9 as one component (70% scrim, surface 1 panel, 12 dp top radius, grab handle, 200 ms in and 150 ms out, instant
+  without animations). `ValuesSheet` and the Set FTP sheet are made of it.
+- **StackedNotice**: a Notice whose buttons sit under the text (a phone is too narrow for them beside it); used for the FTP suggestion.
+- **LoadingBlock, ErrorBlock, EmptyBlock, PartialNote**: the states of companion.md §5 as components. Loading and error are placed at 40% of the screen's
+  height; the empty block is a heading and one sentence; none has an illustration.
+- **SegmentedControl** takes `segmentHeight` (44 dp on the phone, 40 dp on the tablet) and `equalWidth`; **Spinner** takes a `diameter` (16 dp in the header).
+- **ChartReadout**: the text of the readout is the polite live region; the **Today** pill is a separate control (24 dp visual, 48 dp hit area through a layout
+  that reports 24 dp) described to TalkBack as "Back to today". Two charts that share a selection each carry a pill.
+- **Charts**: the y gutter is 32 dp, 40 dp when a tick label has four digits; the free-ride steps of the ride plot are surface 3 (opaque); a series with a
+  missing reading is a gap, never a zero, and the readout says "—"; the stepped FTP line is drawn from daily points so a day can be selected on it.
+- **Touch**: a hold of 250 ms and a slide scrubs; a vertical scroll that starts without the hold scrolls the page. The haptic is `TextHandleMove`.
+

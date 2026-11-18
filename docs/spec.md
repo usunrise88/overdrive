@@ -541,6 +541,11 @@ Phase 3 turns the recorded data into answers: how fit, how tired, how recovered,
 - **Background job:** reads new Health Connect records once a day and on app open, and uploads them to the service.
 - **Screens:** today (recovery status, planned workout, latest insight), fitness (load and form over time, weekly load), power (power curve, FTP history), wellness (resting heart rate, sleep, respiratory rate trends), rides (history and detail).
 - Same design system as the ride app. The visual quality bar is the same.
+- **Settled in stage P3-4a** (ADR 0024, `design/companion.md`): the phone app reads only our service (`GET /v1/metrics` per range, `GET /v1/rides` by
+  cursor and `GET /v1/rides/{id}?series=true`, `GET /v1/workouts`, `GET` and `PATCH /v1/profile`, `POST /v1/ftp-suggestion/dismiss`), keeps the last good answer of each
+  on disk and shows it, with the time it was fetched, when the service cannot be reached. The five tabs, Fitness, Power, Rides, ride detail, Settings (address, token,
+  last sync, Sync now) and the first run's connect step are built; the watch data (Health Connect, Wellness, the recovery rating, notes, the heart-rate settings) is
+  stage P3-4b and is drawn as the design's learning and empty states until then. No Google Play Services and no Firebase.
 
 ### 6.2 Wellness sources
 
