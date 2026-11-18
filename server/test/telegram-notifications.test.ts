@@ -1,8 +1,6 @@
-import type { Workout } from "@overdrive/contracts";
 import type { FastifyInstance } from "fastify";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "../src/db.ts";
-import type { PlanEntry } from "../src/plan/store.ts";
 import { rideSummaryText, weeklySummaryText } from "../src/telegram/messages.ts";
 import type { RideBrief } from "../src/telegram/rides.ts";
 import { asRide, expectUpload, putFit, putRecord, rideFixture } from "./helpers/app.ts";
@@ -15,6 +13,7 @@ import {
   startFakeTelegram,
 } from "./helpers/fake-telegram.ts";
 import { buildFit } from "./helpers/fit.ts";
+import { plannedEvent, steady } from "./helpers/harness.ts";
 import {
   clearIntegrations,
   type IntegrationHarness,
@@ -240,6 +239,8 @@ describe("reminders", () => {
     expectUpload(await putFit(h.app, "early-bird", buildFit()), "early-bird", "stored");
     await until(() => expect(said()).toHaveLength(1));
     expect(said()[0]).toMatch(/^Ride saved: 5 min\./);
+    // The message is out; the pass that sent it marks it and ends a moment later.
+    await h.services.telegram?.idle();
     expect((await notifications()).map((n) => `${n.kind}:${n.state}`)).toEqual([
       "reminder-lead:dropped",
       "ride-summary:sent",
@@ -416,24 +417,9 @@ describe("the summary after a ride", () => {
   });
 });
 
-/** Plans (in the cache, as the refresher would have left them) a one-hour workout on `date`. */
-async function plan(h: IntegrationHarness, id: number, date: string, name: string): Promise<void> {
-  const workout: Workout = {
-    schema: 1,
-    id: `icu-${id}`,
-    name,
-    steps: [{ type: "steady", duration: 3600, target: 0.6 }],
-  };
-  const entry: PlanEntry = {
-    id: `icu-${id}`,
-    source: "intervals.icu",
-    externalId: String(id),
-    date,
-    name,
-    workout,
-    unsupportedReason: null,
-  };
-  await h.services.plan.upsert(entry);
+/** Plans a one-hour workout on `date` in the fake intervals.icu under a chosen event id (so the plan id is `icu-<id>`). */
+function planHour(id: number, date: string, name: string): void {
+  intervals.addEvent({ ...plannedEvent(date, name, [steady(3600, 60)]), id });
 }
 
 const weekly = (): string[] => said().filter((text) => text.startsWith("Week "));
@@ -458,38 +444,33 @@ async function ridesOfTheWeeks(): Promise<void> {
 }
 
 describe("the weekly summary", () => {
+  /**
+   * The week as it really goes: the plan is in intervals.icu and is read on Monday evening, the bot's history
+   * takes it in, and by Sunday the cache has dropped the days that passed (the refresher only reads from today on).
+   * Ends on Sunday 15 Nov, 11:00 in Paris.
+   */
   async function theWeek(config: IntegrationOptions["config"] = {}): Promise<IntegrationHarness> {
     await ridesOfTheWeeks();
+    planHour(1, "2026-11-09", "Intervals A");
+    planHour(2, "2026-11-11", "Tempo B");
+    planHour(3, "2026-11-13", "Endurance C");
+    planHour(4, "2026-11-14", "Recovery D");
+    planHour(5, "2026-11-15", "Long E");
     const h = await boot({
-      now: "2026-11-15T10:00:00Z",
+      now: "2026-11-09T18:00:00Z",
       config: { REMINDER_EVENING_TIME: "off", REMINDER_LEAD_MINUTES: 0, ...config },
     });
-    await plan(h, 1, "2026-11-09", "Intervals A");
-    await plan(h, 2, "2026-11-11", "Tempo B");
-    await plan(h, 3, "2026-11-13", "Endurance C");
-    await plan(h, 4, "2026-11-14", "Recovery D");
-    await plan(h, 5, "2026-11-15", "Long E");
-    await tick(h);
-    // D was skipped from the bot, and the plan cache has since dropped the days that passed.
+    expect(await db.query("SELECT plan_id FROM plan_history ORDER BY plan_id")).toMatchObject({
+      rows: [1, 2, 3, 4, 5].map((n) => ({ plan_id: `icu-${n}` })),
+    });
+    // D was skipped from the bot.
     await db.query("UPDATE plan_history SET status = 'skipped' WHERE plan_id = 'icu-4'");
-    await h.services.plan.mirror({ from: "2026-11-15", to: "2026-11-29" }, "intervals.icu", [
-      {
-        id: "icu-5",
-        source: "intervals.icu",
-        externalId: "5",
-        date: "2026-11-15",
-        name: "Long E",
-        workout: {
-          schema: 1,
-          id: "icu-5",
-          name: "Long E",
-          steps: [{ type: "steady", duration: 3600, target: 0.6 }],
-        },
-        unsupportedReason: null,
-      },
-    ]);
-    await tick(h);
+
+    h.clock.set("2026-11-15T10:00:00Z");
+    await h.services.refresher?.refresh();
+    await h.services.telegram?.idle();
     expect(await h.services.plan.get("icu-1")).toBeNull();
+    expect(await h.services.plan.get("icu-5")).not.toBeNull();
     return h;
   }
 
@@ -524,8 +505,8 @@ describe("the weekly summary", () => {
   });
 
   it("still sends the week that ended when the service was down at 18:00", async () => {
-    await theWeek();
-    const h = await boot({
+    // The service was off from Sunday morning until Monday 09:00 in Paris.
+    const h = await restart(await theWeek(), {
       now: "2026-11-16T08:00:00Z",
       config: { REMINDER_EVENING_TIME: "off", REMINDER_LEAD_MINUTES: 0 },
     });
