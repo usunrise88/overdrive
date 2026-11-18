@@ -1,5 +1,7 @@
 package app.overdrive.companion.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
@@ -72,7 +74,7 @@ fun FitnessView(
 ) {
     // One selection for the screen: both line charts and the week that holds the day (design/companion.md §3.5).
     var table by remember { mutableStateOf(initialSheet) }
-    androidx.compose.foundation.layout.Box(modifier) {
+    Box(modifier) {
         TabScreen(
             title = "Fitness",
             ui = ui,
@@ -100,6 +102,6 @@ fun FitnessView(
             ) { ColumnChartCard(content.weekly, selection, onValues = { table = content.weekly.table }) }
         }
         ValuesSheetFor(table, onDismiss = { table = null })
-        androidx.activity.compose.BackHandler(enabled = table != null) { table = null }
+        BackHandler(enabled = table != null) { table = null }
     }
 }

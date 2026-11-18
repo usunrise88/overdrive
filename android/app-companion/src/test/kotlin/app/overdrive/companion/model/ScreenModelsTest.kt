@@ -299,6 +299,26 @@ class ScreenModelsTest {
         assertNull(power(Samples.metrics("2026-05-25", withDrift = false)).content().drift)
     }
 
+    @Test
+    fun `a chart with a single point still builds, with one thing to select`() {
+        val full = Samples.metrics("2026-05-25")
+        val one =
+            full.copy(
+                drift = full.drift.take(1),
+                powerCurve =
+                    app.overdrive.core.metrics.PowerCurves(
+                        full.powerCurve.range.take(1),
+                        full.powerCurve.allTime.take(1),
+                    ),
+            )
+        val content = power(one).content()
+        assertEquals(1, content.drift!!.spec.snapXs.size)
+        assertEquals(1, content.curve!!.spec.snapXs.size)
+        assertEquals("no listed duration was ridden long enough", 0, content.bestEfforts.size)
+        assertEquals(content.drift!!.spec.snapXs[0], content.drift!!.spec.restX, 0.0)
+        assertEquals("1 s", content.curve!!.readoutAt(null).x)
+    }
+
     // region rides
 
     @Test
@@ -401,13 +421,13 @@ class ScreenModelsTest {
         assertNull(ride.plan)
         assertNull(ride.laps)
         assertEquals("—", ride.tiles[6].value ?: "—")
-        assertTrue(ride.chart.noHeartRate)
-        assertNull(ride.chart.spec.plan)
+        assertTrue(ride.chart!!.noHeartRate)
+        assertNull(ride.chart!!.spec.plan)
     }
 
     @Test
     fun `the ride readout rests on the whole ride and names the step of a selected second`() {
-        val chart = RideDetailUi.of(fresh(Samples.rideDetail()), words, host).content().chart
+        val chart = RideDetailUi.of(fresh(Samples.rideDetail()), words, host).content().chart!!
         val rest = chart.readoutAt(null)
         assertEquals("Whole ride", rest.x)
         assertEquals(listOf("Power avg", "Heart avg", "W′ lowest"), rest.entries.map { it.name })
@@ -416,6 +436,14 @@ class ScreenModelsTest {
         assertEquals("18:20", inEffort.x)
         assertTrue(inEffort.entries.last().value, inEffort.entries.last().value.startsWith("VO2 1 of 5 · Z5"))
         assertEquals(chart.spec.seconds.size, chart.table.rows.size)
+    }
+
+    @Test
+    fun `a ride with no samples has no chart and does not crash`() {
+        val bare = Samples.rideDetail().copy(series = emptyList(), laps = emptyList())
+        val ride = RideDetailUi.of(fresh(bare), words, host).content()
+        assertNull(ride.chart)
+        assertEquals(9, ride.tiles.size)
     }
 
     @Test

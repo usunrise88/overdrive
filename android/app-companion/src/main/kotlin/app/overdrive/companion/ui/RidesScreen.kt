@@ -56,6 +56,7 @@ import app.overdrive.uikit.OdCard
 import app.overdrive.uikit.OdIcon
 import app.overdrive.uikit.OdText
 import app.overdrive.uikit.OdType
+import app.overdrive.uikit.PartialNote
 import app.overdrive.uikit.ScreenHeader
 import app.overdrive.uikit.StatusLine
 import app.overdrive.uikit.chart.ChartCard
@@ -403,6 +404,13 @@ private fun LazyListScope.rideDetailItems(
     }
     item(key = "chart") {
         val chart = ride.chart
+        if (chart == null) {
+            OdCard(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OdText("Power, heart rate and W′ balance", style = OdType.label, color = OverdriveColors.textTertiary)
+                PartialNote("This ride is too short to draw.")
+            }
+            return@item
+        }
         val x = selection.x
         val readout = remember(chart, x) { chart.readoutAt(x) }
         ChartCard(chart.heading, onValues = { onValues(chart.table) }) {

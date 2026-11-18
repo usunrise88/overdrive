@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overdrive.companion.CompanionContainer
 import app.overdrive.companion.RefreshTarget
 import app.overdrive.companion.model.BestEffortUi
+import app.overdrive.companion.model.Body
 import app.overdrive.companion.model.FtpFacts
 import app.overdrive.companion.model.FtpUi
 import app.overdrive.companion.model.PowerContent
@@ -164,9 +165,7 @@ fun PowerView(
         ValuesSheetFor(table, onDismiss = { table = null })
         SetFtpSheet(
             setting,
-            ui.body.let {
-                (it as? app.overdrive.companion.model.Body.Content)?.value?.ftp?.estimate
-            },
+            (ui.body as? Body.Content)?.value?.ftp?.estimate,
             {
                 setting = false
             },

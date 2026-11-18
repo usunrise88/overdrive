@@ -162,7 +162,8 @@ class RideDetailContent(
     val whenLine: String,
     val tiles: List<TileUi>,
     val plan: PlanSummaryUi?,
-    val chart: RideChartUi,
+    /** Null when the ride has no samples (a few seconds): the card says so instead of drawing a chart. */
+    val chart: RideChartUi?,
     val zones: List<Int>,
     val laps: List<LapUi>?,
 )
@@ -214,7 +215,7 @@ object RideDetailUi {
             whenLine = words.rideWhen(ride.startTime, ride.endTime),
             tiles = tiles,
             plan = plan,
-            chart = chart(ride, words),
+            chart = if (ride.series.isNullOrEmpty()) null else chart(ride, words),
             zones = ride.secondsInZones,
             laps = laps(ride, words),
         )

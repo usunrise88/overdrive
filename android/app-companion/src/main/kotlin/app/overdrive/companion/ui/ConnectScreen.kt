@@ -23,6 +23,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.overdrive.companion.CompanionContainer
 import app.overdrive.companion.ConnectResult
+import app.overdrive.data.settings.AddressCheck
+import app.overdrive.data.settings.ServiceRules
 import app.overdrive.uikit.ButtonVariant
 import app.overdrive.uikit.InlineIconSize
 import app.overdrive.uikit.OdButton
@@ -122,6 +124,10 @@ fun ConnectView(
                 keyboardType = KeyboardType.Uri,
             )
             (result as? ConnectResult.AddressProblem)?.let { Cause(it.reason, it.hint) }
+            val typed = ServiceRules.checkAddress(address)
+            if (typed is AddressCheck.Valid && !typed.isEncrypted) {
+                Cause("Not encrypted: the token is sent as plain text", null)
+            }
             Spacer(Modifier.padding(top = 8.dp))
             OdText("Token", style = OdType.bodyStrong)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
