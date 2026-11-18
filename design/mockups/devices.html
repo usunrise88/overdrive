@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Devices and components</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="components.css">
+<style>
+  .dev {
+    min-height: var(--size-device-row);
+    padding: 14px 20px;
+  }
+  .map {
+    display: grid;
+    grid-template-columns: 112px 1fr 1fr;
+    gap: 16px;
+    align-items: center;
+    height: 48px;
+    border-top: 1px solid var(--color-border);
+    padding: 0 20px;
+  }
+  .spin {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid var(--color-surface3);
+    border-top-color: var(--color-text-secondary);
+  }
+  .sheet h2 {
+    font-size: var(--type-label-size);
+    font-weight: var(--type-label-weight);
+    color: #c9ced6;
+    margin-bottom: 12px;
+  }
+  .demo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+  }
+</style>
+</head>
+<body data-ready="false">
+
+<div class="frame tablet" id="pairing" style="display:flex;flex-direction:column">
+  <div class="topbar">
+    <span class="iconbtn" style="margin-left:-12px"><span data-icon="chevron-left"></span></span>
+    <span class="t-heading grow">Devices</span>
+  </div>
+  <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:24px;padding:24px">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="section-label">Paired devices connect on their own when the app starts.</div>
+      <div class="card list" data-rows="pairing"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="section-label">Click buttons</div>
+      <div class="card list">
+        <div class="map" style="border-top:0;height:40px">
+          <span class="t-caption c3">Button</span><span class="t-caption c3">Press</span><span class="t-caption c3">Hold</span>
+        </div>
+        <div class="map"><span class="t-strong">Plus</span><span class="t-label">Gear up</span><span class="t-label">Next interval</span></div>
+        <div class="map"><span class="t-strong">Button 2</span><span class="t-label">Gear down</span><span class="t-label">Previous interval</span></div>
+        <div class="map"><span class="t-strong">Button 3</span><span class="t-label">Play or pause media</span><span class="t-label">Pause or resume ride</span></div>
+        <div class="map"><span class="t-strong">Button 4</span><span class="t-label">Volume up</span><span class="t-label c2">Repeats</span></div>
+        <div class="map"><span class="t-strong">Button 5</span><span class="t-label">Volume down</span><span class="t-label c2">Repeats</span></div>
+        <div class="map" style="height:auto;padding:12px 20px;grid-template-columns:1fr">
+          <span class="t-label c2">In ERG steps the gear buttons change intensity by 5%.</span>
+        </div>
+      </div>
+      <span class="btn btn-secondary" style="align-self:flex-start">Change button mapping</span>
+    </div>
+  </div>
+</div>
+
+<div class="sheet frame" id="components">
+  <div>
+    <h2>Device row: not paired · searching · connected · connection lost · Click connected but locked</h2>
+    <div class="card list" style="width:640px" data-rows="states"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px">
+    <div>
+      <h2>Buttons: primary · secondary · ghost · pressed · disabled · focused · ride size (64 dp)</h2>
+      <div class="demo">
+        <span class="btn btn-primary">Start</span>
+        <span class="btn btn-secondary">Pair</span>
+        <span class="btn btn-ghost">Cancel</span>
+        <span class="btn btn-secondary pressed">Pair</span>
+        <span class="btn btn-secondary disabled">Pair</span>
+        <span class="btn btn-secondary focus">Pair</span>
+        <span class="btn btn-secondary btn-ride"><span data-icon="skip-forward"></span>Next</span>
+      </div>
+    </div>
+    <div>
+      <h2>Chips · zone chips · state chips</h2>
+      <div class="demo">
+        <span class="chip"><span class="dot"></span>Riding</span>
+        <span class="chip on"><span data-icon="pause" data-size="16"></span>Paused</span>
+        <span class="chip">ERG</span>
+        <span class="zchip z1">Z1</span><span class="zchip z2">Z2</span><span class="zchip z3">Z3</span><span class="zchip z4">Z4</span><span class="zchip z5">Z5</span><span class="zchip z6">Z6</span><span class="zchip z7">Z7</span>
+      </div>
+    </div>
+    <div>
+      <h2>Stat tiles: value · no signal · zone-coloured power (only on bg, surface1, overlay backing)</h2>
+      <div class="tiles" style="grid-template-columns:repeat(3,1fr)">
+        <div class="tile"><div class="lbl">Heart rate</div><div class="num t-num-s">148<span class="unit">bpm</span></div></div>
+        <div class="tile"><div class="lbl">Heart rate<span>No signal</span></div><div class="num t-num-s empty">—</div></div>
+        <div class="tile"><div class="lbl">Power<span class="c2">Z4</span></div><div class="num t-num-s zc z4">251<span class="unit">W</span></div></div>
+      </div>
+    </div>
+    <div>
+      <h2>Controls: segmented · stepper · switch · slider</h2>
+      <div class="demo">
+        <span class="seg"><span class="on">Compact</span><span>Detailed</span></span>
+        <span class="stepper"><span class="b"><span data-icon="minus"></span></span><span class="v num">250 W</span><span class="b"><span data-icon="plus"></span></span></span>
+        <span class="switch on"></span><span class="switch"></span>
+        <span class="slider" style="max-width:200px"><span class="fill" style="width:66%"></span><span class="thumb" style="left:66%"></span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { hydrateIcons, ic } from "./ui.js";
+
+const row = ({ icon, title, sub, end, dim, notice }) => `
+  <div class="row dev">
+    <span class="well${dim ? " dim" : ""}">${ic(icon)}</span>
+    <div class="main"><span class="t-strong">${title}</span><span class="t-label c2">${sub}</span></div>
+    <div class="end">${end}</div>
+  </div>${notice ?? ""}`;
+
+const connected = (extra = "") =>
+  `<span class="t-label c2" style="display:flex;gap:6px;align-items:center">${extra}${ic("check", "i-16")}Connected</span>`;
+const unlock = `
+  <div style="padding:0 20px 16px">
+    <div class="notice">
+      <span class="c1" style="margin-top:1px">${ic("info")}</span>
+      <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+        <span class="t-strong">Click is locked</span>
+        <span class="t-label c2">It is connected but sends no button presses. Unlock it once in the Zwift app, then check again. You can ride without it; every action is on screen.</span>
+      </div>
+      <span class="btn btn-secondary" style="height:40px">Check again</span>
+    </div>
+  </div>`;
+
+const devices = {
+  notPaired: { icon: "heart", title: "Heart rate", sub: "Not paired", dim: true, end: `<span class="btn btn-secondary">Pair</span>` },
+  searching: { icon: "heart", title: "Heart rate", sub: "Searching for heart-rate straps…", end: `<span class="spin"></span>` },
+  trainer: { icon: "bike", title: "Trainer", sub: "Van Rysel D500 · ERG and simulation", end: connected() },
+  lost: {
+    icon: "bike",
+    title: "Trainer",
+    sub: `<span class="c1" style="display:inline-flex;gap:6px;align-items:center">${ic("triangle-alert", "i-16")}Connection lost · retrying in 8 s</span>`,
+    end: `<span class="btn btn-secondary">Retry now</span>`,
+  },
+  click: {
+    icon: "gamepad-2",
+    title: "Click",
+    sub: "Zwift Click v2 · connected",
+    end: `<span class="t-label c1">No presses</span>`,
+    notice: unlock,
+  },
+  hr: { icon: "heart", title: "Heart rate", sub: "Coospo HR7 · battery 80%", end: connected() },
+};
+
+document.querySelector('[data-rows="pairing"]').innerHTML = [devices.trainer, devices.searching, devices.click]
+  .map(row)
+  .join("");
+document.querySelector('[data-rows="states"]').innerHTML = [devices.notPaired, devices.searching, devices.hr, devices.lost, devices.click]
+  .map(row)
+  .join("");
+hydrateIcons();
+document.body.dataset.ready = "true";
+</script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings mock-up</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="components.css">
+<style>
+  .set {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 64px;
+    padding: 10px 20px;
+    border-top: 1px solid var(--color-border);
+  }
+  .set:first-of-type {
+    border-top: 0;
+  }
+  .set .main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .group-title {
+    padding: 0 4px 8px;
+  }
+  .preview {
+    position: relative;
+    height: 200px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin: 0 20px 16px;
+  }
+</style>
+</head>
+<body data-ready="false">
+
+<div class="frame tablet" id="settings" style="display:flex;flex-direction:column">
+  <div class="topbar">
+    <span class="iconbtn" style="margin-left:-12px"><span data-icon="chevron-left"></span></span>
+    <span class="t-heading grow">Settings</span>
+  </div>
+  <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:24px;padding:24px;min-height:0">
+    <div>
+      <div class="section-label group-title">Overlay</div>
+      <div class="card" style="padding-top:16px">
+        <div class="preview bd-bright"><div id="ov-preview" style="left:16px;top:16px"></div></div>
+        <div class="set">
+          <div class="main"><span class="t-strong">Mode</span><span class="t-label c2">Tap the overlay to switch</span></div>
+          <span class="seg"><span class="on">Compact</span><span>Detailed</span></span>
+        </div>
+        <div class="set">
+          <div class="main" style="flex:none;width:200px"><span class="t-strong">Opacity</span><span class="t-label c2">85–100%</span></div>
+          <span class="slider"><span class="fill" style="width:66.6%"></span><span class="thumb" style="left:66.6%"></span></span>
+          <span class="num t-num-xs" style="width:48px;text-align:right">95%</span>
+        </div>
+        <div class="set">
+          <div class="main"><span class="t-strong">Blur the video behind</span><span class="t-label c2">Easier to read over busy video. Uses more battery.</span></div>
+          <span class="switch"></span>
+        </div>
+        <div class="set">
+          <div class="main"><span class="t-strong">Position</span><span class="t-label c2">Drag the overlay; it snaps to the nearest edge</span></div>
+          <span class="btn btn-ghost">Reset</span>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:24px">
+      <div>
+        <div class="section-label group-title">Rider and gears</div>
+        <div class="card">
+          <div class="set">
+            <div class="main"><span class="t-strong">FTP</span><span class="t-label c2">Sets power zones and workout targets</span></div>
+            <span class="stepper"><span class="b"><span data-icon="minus"></span></span><span class="v num">250 W</span><span class="b"><span data-icon="plus"></span></span></span>
+          </div>
+          <div class="set">
+            <div class="main"><span class="t-strong">Gears</span><span class="t-label c2">Gear 12 rides the flat</span></div>
+            <span class="stepper"><span class="b"><span data-icon="minus"></span></span><span class="v num">24</span><span class="b"><span data-icon="plus"></span></span></span>
+          </div>
+          <div class="set">
+            <div class="main"><span class="t-strong">Step per gear</span><span class="t-label c2">Grade added by each gear; total stays within 15%</span></div>
+            <span class="stepper"><span class="b"><span data-icon="minus"></span></span><span class="v num">1.0%</span><span class="b"><span data-icon="plus"></span></span></span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="section-label group-title">Physics for speed and distance</div>
+        <div class="card">
+          <div class="set">
+            <div class="main"><span class="t-strong">Rider and bike mass</span></div>
+            <span class="stepper"><span class="b"><span data-icon="minus"></span></span><span class="v num">82 kg</span><span class="b"><span data-icon="plus"></span></span></span>
+          </div>
+          <div class="set">
+            <div class="main"><span class="t-strong">Drag area (CdA)</span></div>
+            <span class="stepper"><span class="b"><span data-icon="minus"></span></span><span class="v num">0.32 m²</span><span class="b"><span data-icon="plus"></span></span></span>
+          </div>
+          <div class="set">
+            <div class="main"><span class="t-strong">Rolling resistance (Crr)</span></div>
+            <span class="stepper"><span class="b"><span data-icon="minus"></span></span><span class="v num">0.0040</span><span class="b"><span data-icon="plus"></span></span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { mountOverlay } from "./overlay.js";
+import { hydrateIcons } from "./ui.js";
+
+mountOverlay(document.getElementById("ov-preview"), {
+  power: 223, zone: 3, hr: 148, cad: 91, time: "32:17", target: 220, intensity: 100,
+});
+hydrateIcons();
+document.body.dataset.ready = "true";
+</script>
+</body>
+</html>

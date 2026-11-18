@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Companion mock-ups</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="components.css">
+<style>
+  .status {
+    height: 32px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+  }
+  .screen {
+    flex: 1;
+    min-height: 0;
+    padding: 12px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow: hidden;
+  }
+  .screen > * {
+    flex: none;
+  }
+  .screen > header {
+    padding: 8px 4px 4px;
+  }
+  .nav {
+    height: 80px;
+    flex: none;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    border-top: 1px solid var(--color-border);
+    padding-bottom: 16px;
+  }
+  .nav span.item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: var(--type-caption-size);
+    font-weight: var(--type-caption-weight);
+    color: var(--color-text-tertiary);
+  }
+  .nav span.item.on {
+    color: var(--color-text-primary);
+  }
+  .pad {
+    padding: 16px;
+  }
+  .meter {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    width: 96px;
+  }
+  .meter i {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--color-surface3);
+  }
+  .meter i.on {
+    background: var(--color-text-primary);
+  }
+  .kv {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 12px;
+    align-items: baseline;
+    padding: 10px 0;
+    border-top: 1px solid var(--color-border);
+  }
+  .month {
+    padding: 8px 4px 0;
+  }
+</style>
+</head>
+<body data-ready="false">
+
+<div class="frame phone" id="today"></div>
+<div class="frame phone" id="fitness"></div>
+<div class="frame phone" id="rides"></div>
+<div class="frame phone" id="power"></div>
+<div class="frame phone" id="wellness"></div>
+
+<script type="module">
+import { SWEET_SPOT, lines, profile, rng } from "./charts.js";
+import { ic } from "./ui.js";
+
+const nav = (active) =>
+  `<div class="nav">${[
+    ["house", "Today"],
+    ["activity", "Fitness"],
+    ["zap", "Power"],
+    ["moon", "Wellness"],
+    ["list", "Rides"],
+  ]
+    .map(([i, l]) => `<span class="item${l === active ? " on" : ""}">${ic(i, "i-24")}${l}</span>`)
+    .join("")}</div>`;
+const shell = (id, active, body) => {
+  document.getElementById(id).innerHTML =
+    `<div class="status"><span class="num">07:42</span><span>●●● 82%</span></div><div class="screen">${body}</div>${nav(active)}`;
+};
+const head = (title, sub = "") =>
+  `<header><div class="t-title">${title}</div>${sub ? `<div class="t-label c2">${sub}</div>` : ""}</header>`;
+const tile = (label, value, unit = "", sub = "") =>
+  `<div class="tile" style="padding:12px 16px"><div class="lbl">${label}</div><div class="num t-num-s">${value}${unit ? `<span class="unit">${unit}</span>` : ""}</div>${sub ? `<div class="sub num">${sub}</div>` : ""}</div>`;
+
+// ---------- Today ----------
+shell(
+  "today",
+  "Today",
+  `${head("Today", "Wednesday 18 November")}
+  <div class="card pad" style="display:flex;flex-direction:column;gap:4px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span class="t-label c3">Recovery</span>
+      <span class="meter"><i class="on"></i><i class="on"></i><i class="on"></i></span>
+    </div>
+    <div class="t-title">Ready</div>
+    <div class="t-label c2" style="margin-bottom:8px">All three signals are inside your usual range.</div>
+    <div class="kv"><span class="t-label">Resting heart rate</span><span class="num t-num-xs">52<span class="unit">bpm</span></span><span class="t-label c3 num" style="width:72px;text-align:right">usual 53</span></div>
+    <div class="kv"><span class="t-label">Sleep</span><span class="num t-num-xs">7:40</span><span class="t-label c3 num" style="width:72px;text-align:right">usual 7:15</span></div>
+    <div class="kv"><span class="t-label">Respiratory rate</span><span class="num t-num-xs">14.2</span><span class="t-label c3 num" style="width:72px;text-align:right">usual 14.0</span></div>
+  </div>
+  <div class="card pad" style="display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <span class="t-label c3">Planned</span><span class="t-label c2 num">18:00</span>
+    </div>
+    <div><div class="t-heading">Sweet spot 3×10</div><div class="t-label c2 num">1:05:00 · load 73 · hardest step 220 W</div></div>
+    <svg data-mini></svg>
+  </div>
+  <div class="card pad" style="display:flex;flex-direction:column;gap:6px">
+    <span class="t-label c3">Morning note</span>
+    <p class="t-body">You recovered well from Monday's threshold ride. Ride today's sweet spot as planned; keep cadence above 85 in the third effort, where your power faded last week.</p>
+  </div>`,
+);
+const mini = document.querySelector("[data-mini]");
+profile(mini, SWEET_SPOT, { width: 380 - 32, height: 44, gap: 1 });
+
+// ---------- Fitness ----------
+// Synthetic, smooth by construction: fitness climbs, fatigue swings around it weekly.
+const days = 90;
+const ctl = Array.from({ length: days }, (_, i) => 46 + 12 * (i / (days - 1)) ** 1.3);
+const jitter = rng(11);
+const atl = ctl.map(
+  (v, i) => v + 3 * Math.sin((i / 7) * Math.PI * 2 - 1.2) + (jitter() - 0.5) * 4 + (i > 80 ? (i - 80) * 0.7 : 0),
+);
+const form = ctl.map((v, i) => v - atl[i]);
+shell(
+  "fitness",
+  "Fitness",
+  `${head("Fitness", "Last 90 days")}
+  <div class="tiles" style="grid-template-columns:repeat(3,1fr)">
+    ${tile("Fitness", Math.round(ctl.at(-1)), "", "+6 in 4 weeks")}
+    ${tile("Fatigue", Math.round(atl.at(-1)))}
+    ${tile("Form", Math.round(form.at(-1)).toString().replace("-", "−"), "", "Training hard")}
+  </div>
+  <div class="card" style="padding:16px 8px 8px 0">
+    <div class="t-label c3" style="padding:0 0 4px 16px">Load</div>
+    <svg data-load></svg>
+  </div>
+  <div class="card" style="padding:16px 8px 8px 0">
+    <div class="t-label c3" style="padding:0 0 4px 16px">Form</div>
+    <svg data-form></svg>
+  </div>
+  <div class="card" style="padding:16px">
+    <div class="t-label c3" style="margin-bottom:8px">Weekly load</div>
+    <svg data-weekly></svg>
+  </div>`,
+);
+const months = [
+  { i: 0, text: "Aug 20", anchor: "start" },
+  { i: 42, text: "Oct 1" },
+  { i: 89, text: "Today", anchor: "end" },
+];
+lines(
+  document.querySelector("[data-load]"),
+  [
+    { values: atl, stroke: "var(--color-text-tertiary)", width: 1.5, label: "Fatigue", labelDy: -4 },
+    { values: ctl, stroke: "var(--color-text-primary)", width: 2, label: "Fitness", labelDy: 6 },
+  ],
+  { width: 372, height: 160, yMin: 38, yMax: 72, yTicks: [40, 50, 60, 70], xLabels: months, pad: { r: 64 } },
+);
+lines(
+  document.querySelector("[data-form]"),
+  [{ values: form, stroke: "var(--color-text-primary)", width: 2, label: Math.round(form.at(-1)).toString().replace("-", "−") }],
+  { width: 372, height: 100, yMin: -14, yMax: 12, yTicks: [-10, 0, 10], xLabels: [], pad: { r: 64, b: 8 } },
+);
+// weekly load columns (neutral; current week in primary)
+const weekly = [310, 360, 0, 405, 380, 420, 455, 300, 470, 490, 515, 262];
+const wsvg = document.querySelector("[data-weekly]");
+const W = 346;
+const H = 104;
+wsvg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+wsvg.setAttribute("width", W);
+wsvg.setAttribute("height", H);
+const bw = 20;
+const step = W / weekly.length;
+const maxW = 520;
+wsvg.innerHTML = weekly
+  .map((v, i) => {
+    const h = Math.max(v ? 2 : 0, (v / maxW) * (H - 36));
+    const x = i * step + (step - bw) / 2;
+    const y = H - 20 - h;
+    const last = i === weekly.length - 1;
+    const fill = last ? "var(--color-text-primary)" : "var(--color-surface3)";
+    const label = last
+      ? `<text x="${x + bw / 2}" y="${y - 6}" text-anchor="middle" class="axis axis-strong">${v}</text>`
+      : i === 10
+        ? `<text x="${x + bw / 2}" y="${y - 6}" text-anchor="middle" class="axis">${v}</text>`
+        : "";
+    return `<path d="M${x},${H - 20} V${y + 4} q0,-4 4,-4 h${bw - 8} q4,0 4,4 V${H - 20} Z" style="fill:${fill}"/>${label}`;
+  })
+  .join("")
+  .concat(
+    `<line x1="0" x2="${W}" y1="${H - 19.5}" y2="${H - 19.5}" style="stroke:var(--color-border-strong)"/><text x="0" y="${H - 4}" class="axis">12 weeks ago</text><text x="${W}" y="${H - 4}" text-anchor="end" class="axis">This week</text>`,
+  );
+
+// ---------- Rides ----------
+const rideRow = (name, when, dur, loadV, watts) => `
+  <div class="row">
+    <div class="main"><span class="t-strong">${name}</span><span class="t-label c2 num">${when} · ${dur}</span></div>
+    <div class="end"><span class="num t-num-xs">${loadV}</span><span class="t-caption c3 num">${watts} W</span></div>
+  </div>`;
+shell(
+  "rides",
+  "Rides",
+  `${head("Rides")}
+  <div class="month section-label" style="display:flex;justify-content:space-between"><span>November</span><span class="num">Load · avg power</span></div>
+  <div class="card list">
+    ${rideRow("Sweet spot 3×10", "Wed 18", "1:05:00", 73, 196)}
+    ${rideRow("Threshold 2×20", "Mon 16", "1:15:00", 96, 211)}
+    ${rideRow("Free ride", "Sat 14", "1:32:10", 81, 172)}
+    ${rideRow("VO2 5×3", "Thu 12", "0:56:00", 68, 189)}
+    ${rideRow("Endurance 90", "Tue 10", "1:30:00", 74, 165)}
+  </div>
+  <div class="month section-label">October</div>
+  <div class="card list">
+    ${rideRow("Sweet spot 3×10", "Fri 30", "1:05:00", 71, 194)}
+    ${rideRow("Free ride", "Wed 28", "0:48:22", 39, 158)}
+    ${rideRow("Threshold 2×20", "Mon 26", "1:15:00", 93, 209)}
+  </div>`,
+);
+
+// ---------- Power (lower fidelity) ----------
+shell(
+  "power",
+  "Power",
+  `${head("Power", "Best efforts")}
+  <div class="card pad" style="display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div><div class="t-label c3">FTP</div><div class="num t-num-m">250<span class="unit">W</span></div></div>
+      <div style="text-align:right"><div class="t-label c3">Estimated from recent rides</div><div class="num t-num-m c2">256<span class="unit">W</span></div></div>
+    </div>
+    <div class="t-label c2">Your rides suggest a higher FTP. Zones change only when you confirm.</div>
+    <span class="btn btn-secondary" style="align-self:flex-start">Use 256 W</span>
+  </div>
+  <div class="card" style="padding:16px 8px 8px 0">
+    <div style="display:flex;gap:16px;align-items:center;padding:0 0 4px 16px">
+      <span class="t-label c3" style="flex:1">Power curve</span>
+      <span class="t-caption c1" style="display:flex;gap:6px;align-items:center"><i style="width:16px;height:2px;background:var(--color-text-primary)"></i>90 days</span>
+      <span class="t-caption c2" style="display:flex;gap:6px;align-items:center"><i style="width:16px;height:2px;background:var(--color-text-tertiary)"></i>Best ever</span>
+    </div>
+    <svg data-curve></svg>
+  </div>
+  <div class="tiles" style="grid-template-columns:repeat(4,1fr)">
+    ${tile("5 s", 812)}${tile("1 min", 402)}${tile("5 min", 301)}${tile("20 min", 262)}
+  </div>`,
+);
+const durations = [5, 15, 30, 60, 120, 300, 600, 1200, 2400, 3600];
+const d90 = [812, 610, 520, 402, 345, 301, 279, 262, 241, 228];
+const dAll = [868, 668, 571, 446, 382, 331, 302, 281, 259, 246];
+const curve = lines(
+  document.querySelector("[data-curve]"),
+  [
+    { values: dAll, stroke: "var(--color-text-tertiary)", width: 1.5, label: "" },
+    { values: d90, stroke: "var(--color-text-primary)", width: 2, label: "" },
+  ],
+  {
+    width: 372,
+    height: 200,
+    yMin: 200,
+    yMax: 900,
+    yTicks: [200, 400, 600, 800],
+    xLabels: [
+      { i: 0, text: "5 s", anchor: "start" },
+      { i: 3, text: "1 min" },
+      { i: 5, text: "5 min" },
+      { i: 7, text: "20 min" },
+      { i: 9, text: "1 h", anchor: "end" },
+    ],
+    pad: { r: 16, l: 40 },
+  },
+);
+void durations;
+void curve;
+
+// ---------- Wellness (lower fidelity) ----------
+const spark = (vals, lo, hi) => {
+  const w = 120;
+  const h = 32;
+  const min = Math.min(...vals, lo);
+  const max = Math.max(...vals, hi);
+  const y = (v) => h - 2 - ((v - min) / (max - min)) * (h - 4);
+  const x = (i) => (i / (vals.length - 1)) * (w - 6);
+  const d = vals.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    <rect x="0" y="${y(hi)}" width="${w - 6}" height="${y(lo) - y(hi)}" style="fill:var(--color-surface3)"/>
+    <path d="${d}" fill="none" style="stroke:var(--color-text-secondary)" stroke-width="1.5" stroke-linejoin="round"/>
+    <circle cx="${x(vals.length - 1)}" cy="${y(vals.at(-1))}" r="3" style="fill:var(--color-text-primary)"/></svg>`;
+};
+const rw = rng(5);
+const series = (base, spread, n = 28) => Array.from({ length: n }, () => base + (rw() - 0.5) * spread);
+const wRow = (label, value, unit, usual, vals, lo, hi) => `
+  <div class="row" style="padding:14px 16px">
+    <div class="main"><span class="t-label c3">${label}</span><span class="num t-num-s">${value}<span class="unit">${unit}</span></span><span class="t-label c3 num">usual ${usual}</span></div>
+    ${spark(vals, lo, hi)}
+  </div>`;
+shell(
+  "wellness",
+  "Wellness",
+  `${head("Wellness", "Last 28 days · shaded band is your usual range")}
+  <div class="card list">
+    ${wRow("Resting heart rate", 52, "bpm", "50–56", series(53, 5), 50, 56)}
+    ${wRow("Sleep", "7:40", "", "6:50–7:50", series(7.3, 1.2), 6.8, 7.8)}
+    ${wRow("Respiratory rate", "14.2", "/min", "13.6–14.6", series(14.1, 0.9), 13.6, 14.6)}
+    ${wRow("Oxygen saturation", 97, "%", "95–98", series(96.5, 2), 95, 98)}
+  </div>`,
+);
+document.body.dataset.ready = "true";
+</script>
+</body>
+</html>
