@@ -1,6 +1,6 @@
 # Zwift Click v2 over BLE: protocol notes
 
-Status: research notes for the Click module (spec §4.7, §9, §10). Written from public sources only, in our own words, with a pointer for every fact. Nothing here was observed on the bench yet; the open questions at the end list what to verify with a real controller.
+Status: research notes for the Click module (spec §4.7, §9, §10). Written from public sources only, in our own words, with a pointer for every fact. Nothing here was observed on the bench yet; the open questions at the end list what to verify with a real controller. **Stage M4-1 (2026-11-18) implements the plain path of §7 in `core` and tests it against a fake written from these notes: §10 says what is implemented, which vector covers what and which option settles which question.** The encryption of §3.3 and the unlock of §6 are not implemented.
 
 ## Sources and tags
 
@@ -215,7 +215,7 @@ Partly.
 - The meaning of `FF 04 00`, of the RESET opcode, and of message type `0x3C` (sections 3.1, 4, 6.4).
 - Keep-alive or sleep behaviour toward the controller (section 5).
 
-The Click module can start with the plain path on the right puck and the bitmap in section 4. Unlock support should wait for the bench results.
+The Click module can start with the plain path on the right puck and the bitmap in section 4. Unlock support should wait for the bench results. (M4-1 did exactly that: section 10.)
 
 ## 8. Clean-room note
 
@@ -241,3 +241,39 @@ Equipment: one Click v2 (left and right puck, both if available), an Android pho
 14. **Right-puck state after a restart of the controller.** Power-cycle the puck and repeat items 2 and 5. Does a right puck need Zwift at all after it has once been paired?
 
 Each result should be written back into this file with the date, the firmware version and the snoop-log file name (kept out of the repository, because raw recordings must not be committed).
+
+## 10. What is implemented (stage M4-1), and what covers it
+
+The plain path on the right puck, in `core` (`app.overdrive.core.click`, `app.overdrive.core.ble.ClickUuids`), from sections 1 to 7 of these notes and nothing else; the decisions and the table of every flippable choice are in `docs/adr/0011-click-gestures-and-sync-stub.md`. **A green test proves consistency with these notes, not with a Click.**
+
+| Section | Implemented as | Not implemented |
+|---|---|---|
+| §1 recognising | `ClickAdvertisements.recognise` / `scanFilter`: service `FC82` (the older one as fallback), manufacturer `0x094A`, first byte `0x0A` right or `0x0B` left; never the name | |
+| §2 GATT layout | `ClickUuids`; discovery looks for the three characteristics in `FC82`, else in the older service | `00000006-…` (Play only); Device Information firmware (`0x2A26`) is read once and kept out of recordings |
+| §3.1 handshake | `ClickDevice` set-up: ASYNC notify, SYNC_TX indicate, `RideOn` without response, the reply, `FF 04 00` | |
+| §3.2, §3.3 encryption | not implemented; frames are read as plain bytes | the whole key agreement and cipher; an encrypted Click would show as a rejected reply or unrecognised frames |
+| §4 messages | `ClickCodec.parse`: `0x23`, `0x15`, `0x19`, `0xFE`, everything else (`0x3C` included) as `Unrecognised`; `ClickBits`; `ButtonEdges` | `0x37` (Click v1) and `0x07` (Play) are reported as unrecognised |
+| §5 keep-alive | none by default; `ClickOptions.keepAliveInterval` and `keepAliveFrame` (the neutral frame) | |
+| §6.1 locked means hidden | `ClickState.NeedsUnlock(SERVICE_HIDDEN)`; and `NeedsUnlock(NO_EVENTS)` for a controller that answers and then says nothing | the unlock itself (§6.3, §6.4), the RESET opcode and the left puck's restart workaround |
+
+**Vectors.** The ones the code is tested against are synthetic, derived by hand from the notes, never captured: **CK-V1** the neutral frame `23 08 FF FF FF FF 0F` (§4); **CK-V2 to CK-V7** one pressed button each, by the varint rule of the §4 table: A `EF FF FF FF 0F`, B `DF FF FF FF 0F`, Y `BF FF FF FF 0F`, Z `FF FE FF FF 0F`, Plus `FF DF FF FF 0F`, Plus's second bit `FF BF FF FF 0F` (each after `23 08`); **CK-V8** A and Plus together `EF DF FF FF 0F`; **CK-V9** battery `19 10 1F` = 31 % (§4); **CK-V10** heartbeat `15`; **CK-V11** `3C 01 02` unrecognised; **CK-V12** `FE`; **CK-V13** the handshake `52 69 64 65 4F 6E`; **CK-V14** the reply `RideOn 02 03`, with and without a 64-byte tail; **CK-V15** `FF 04 00` (all in `ClickCodecTest`). Beyond them: fields in another order and unknown fields skipped, a ten-byte varint, every wire type, every proper prefix, random bytes of every short length and an encode-and-decode round trip, none of which may throw.
+
+**Which option settles which question of section 9** (the names are `ClickOptions` unless noted):
+
+| Question | Option or constant |
+|---|---|
+| 1 advertising, which byte is which side | `rightSideByte`, `leftSideByte`, `acceptedSides` |
+| 2 plain handshake, the reply | `handshakeReply`, `handshakeTimeout`, `writeWithResponse` |
+| 3 a public key in the reply | `requestedMtu`; the length is in `ClickEvent.HandshakeAnswered` and in a recording (the key itself is zeroed, never written) |
+| 4 encryption | none: look at the rejected replies and `UnrecognisedFrame`/`MalformedFrame` events |
+| 5 bit meanings | `ClickBits`, `ignoredBits`; the app's *Learn buttons* (`ButtonLearner`) |
+| 6 `FF 04 00` | `sendPostHandshake` |
+| 7 keep-alive | `keepAliveInterval`, `keepAliveFrame`, `noEventTimeout` |
+| 8 unlock duration | none: observe `ClickState` over time |
+| 10 type `0x3C` | `ClickEvent.UnrecognisedFrame` (type and length) |
+| 11 battery | `ClickDevice.battery` |
+| 12 service visibility | `requireAdvertisedService`, `serviceHiddenMeansLocked`, `acceptLegacyService` |
+| 14 a right puck after a restart | `ClickState` after a power cycle; `silentMeansLocked` |
+| 9 RESET, 13 endianness and AAD | not implemented |
+
+**Recordings.** A Click session recorded through the existing decorator keeps no address and no unit identity: the firmware revision is `*`, and the tail after `RideOn` and the version bytes of a handshake reply becomes zeros of the same length (a key that never changes would name the unit; the length is what question 3 asks). Unknown vendor frames are written as they are, because question 10 needs them; keep recordings out of the repository.

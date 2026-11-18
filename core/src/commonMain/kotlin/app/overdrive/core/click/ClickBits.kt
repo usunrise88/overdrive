@@ -80,8 +80,8 @@ public object ClickBits {
         )
 
     /**
-     * The names of the bits set in [mask], lowest first, for logs and the learn screen: `A`, `PLUS`, and `0x4000` for a
-     * bit the notes do not name.
+     * The names of the bits set in [mask], for logs and the learn screen: the bits the notes name first, in the order of
+     * the table (`A`, `PLUS`), then each bit they do not name as hex (`0x4000`), lowest first.
      */
     public fun namesOf(mask: Int): List<String> {
         val result = ArrayList<String>()

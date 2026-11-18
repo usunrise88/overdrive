@@ -25,10 +25,13 @@ Currently implemented:
 | `record` | `RideRecord` (samples, laps, RR series, summary), `RideRecorder`, its JSON wire format, the crash-safe ride log | §4.2, §8.2 |
 | `fit` | `FitWriter`: a ride record as a FIT activity file | §4.8 |
 | `ble` | The Bluetooth boundary (`GattTransport`, scanner, environment), FTMS and Heart Rate codecs, the trainer and strap adapters, the reconnect supervisor, the session recorder, and a fake Bluetooth with replay | §4.1, §7.5 |
+| `click` | The Zwift Click v2: `ClickCodec` (pure, never throws), the bit table, edge detection, `ClickAdvertisements`, `ClickOptions`, `ClickDevice` and its `ClickState` | §4.7, §9 |
+| `control` | The handlebar: the ten `ClickAction`s, `GestureDetector` (500 ms hold, 150 ms volume repeat), `ButtonMapping` and `ButtonLearner`, `ActionRouter`, `HandlebarControls` | §4.7 |
+| `sync` | The sync stub: `SyncProvider`, `NoopSyncProvider`, `Outbox`, `InMemoryOutbox`, `SyncCoordinator` | §4.9 |
 
-Not yet: the Click codec and gesture detection (M4). The Android side of Bluetooth (the `GattTransport` on `BluetoothGatt`,
-scanning, permissions, remembered devices, pairing and the Devices screen) is in `android/` (M3-2, ADR 0010), and so are the
-storage, recovery and share buttons (M2b-2, ADR 0008).
+The Android side of Bluetooth (the `GattTransport` on `BluetoothGatt`, scanning, permissions, remembered devices, pairing and the
+Devices screen) is in `android/` (M3-2, ADR 0010), and so are the storage, recovery and share buttons (M2b-2, ADR 0008). The
+Click's wiring into the app, the outbox on disk and the settings are M4-2.
 
 The first section below is the real engine; the one after it is the UI's view of a session
 (`RideSession`, `RideSnapshot`), which the engine and the simulated session both provide.
@@ -134,6 +137,54 @@ val engine = RideEngine(scope, trainer, strap, workout, settings, recorder = rid
 - **Recordings and fixtures.** `BleSessionFormat.parse` and `write` read and write the file; `ReplayPeripheral(session)` plays
   one back on virtual time (failed connects and dropouts included). The files in `../contracts/fixtures/ble/` are generated
   (`./gradlew jvmTest -PregenerateBleFixtures=true`), never real recordings; a test fails when they go stale.
+
+### The Zwift Click and the handlebar (`app.overdrive.core.click`, `control`; ADR 0011)
+
+```kotlin
+// One Click, reconnecting by itself; the ride never depends on it (spec §4.7: "continue without the Click").
+val click = ClickDevice(scope, clickId, transports, environment, name = "Click", options = ClickOptions())
+click.start()                  // LinkControls like the other devices: start(), retryNow(), close(), status
+click.state                    // ClickState: Active, Waiting, NeedsUnlock(SERVICE_HIDDEN | NO_EVENTS), NotFound, BluetoothUnavailable, ...
+click.buttons                  // hot flow of ButtonChange(pressed, released, held, synthetic): collect before start()
+
+// Changes -> mapping -> gestures -> router -> the ride. media is a MediaKeys the Android side implements.
+val router = ActionRouter(engine, media)                  // or ActionRouter({ currentSession }, media)
+val controls = HandlebarControls(scope, click.buttons, { ButtonMapping.DEFAULT }, router::dispatch, nowMillis = ::clock)
+controls.start()
+```
+
+- **The codec is the notes' §3.1 and §4 as pure functions** (`ClickCodec.parse`, `handshake`, `postHandshake`, `neutralFrame`,
+  `parseHandshakeReply`): no input throws, a type it does not know is `ClickMessage.Unrecognised`, never an error. The
+  encryption of `docs/protocols/click-v2.md` §3.3 is **not implemented**, and nothing unlocks a controller. `ClickBits` is the bit
+  table, `ButtonEdges` the press and release edges from successive bitmaps. Vectors are derived by hand from the notes
+  (`ClickCodecTest`, CK-V1 to CK-V15).
+- **Set-up** (§3.1): discover, ASYNC notify, SYNC_TX indicate, `RideOn` written without response, the reply, optionally
+  `FF 04 00`, firmware and battery. **Everything the notes leave open is a `ClickOptions` field** with the bench question that
+  settles it (the table is in ADR 0011 §9): the device-type bytes, whether to write `FF 04 00`, how strict the reply check is,
+  the keep-alive (none by default) and its frame, the no-event timeout, what a hidden service means.
+- **Unlock handling** is a state, `ClickState.NeedsUnlock`, for a hidden service or a controller that answers and then sends no
+  frame at all. **A release lost in a drop never leaves a button held**: the adapter releases what was down with a synthetic
+  `ButtonChange`, and the gesture layer forgets those presses without firing anything.
+- **The gestures** (`GestureDetector`, pure, virtual-time tests): Plus, Button 2 and Button 3 fire their press **on release**
+  (under 500 ms) and their hold **once at 500 ms**; Button 4 and 5 fire a volume step **on press** and repeat from 500 ms every
+  150 ms. A hold needs the button alone, a late caller gets one step and never a burst, and the constants are
+  `GestureTiming.HOLD_THRESHOLD_MILLIS` and `VOLUME_REPEAT_MILLIS`. `HandlebarButton` is the table of what each button does.
+- **The mapping** (`ButtonMapping`, role to the Click's bits, stored as text with `serialize` and `parse`) has an ergonomic default
+  and is replaced by *Learn buttons*: feed `ButtonLearner` the `held` mask after each change; it asks for one press per role
+  and refuses a combo or a duplicate.
+- **The router** (`ActionRouter`) is the rule of the app's `RideActions` restated in `core`: in an ERG step the gear actions change
+  intensity by 5 points, the pause toggle works while riding or paused.
+- **The fake in your tests.** `FakeClick` (`world.add(id, FakeClick())`) answers `RideOn 02 03`, delivers frames, and can be
+  `lock = HIDDEN` or `SILENT`; `fake.script { tap(ClickBits.PLUS, at = 3.seconds); hold(...); drop(...); silence(...); unlock(...) }`.
+  See `ClickDeviceTest`, `ClickRideTest` (all ten actions through the real engine) and the sessions in
+  `../contracts/fixtures/ble/click-*.click.session.txt`.
+
+### The sync stub (`app.overdrive.core.sync`; ADR 0011, spec §4.9)
+
+`SyncCoordinator(scope, outbox, { provider }).start()`; when a ride is stored, `coordinator.rideFinished(OutboxEntry.of(record, now))`
+returns at once. `NoopSyncProvider` acknowledges nothing, so every ride stays in the outbox for Phase 2; a failing provider or outbox is a
+`SyncStatus`, never an exception, and never reaches the ride. `InMemoryOutbox` is the stage's stand-in; the on-disk one is the
+app's (M4-2). There is no network code and no payload format here.
 
 ### Workouts (`app.overdrive.core.workout`)
 

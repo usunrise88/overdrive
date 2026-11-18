@@ -34,7 +34,10 @@ ADR 0009 §6): a trainer and a strap file for each of two synthetic rides (`erg-
 format of ours and have no schema; they are **generated** by running a ride over the fake Bluetooth with the recorder on
 (`BleSessionFixturesTest`, regenerate with `cd core && ./gradlew jvmTest -PregenerateBleFixtures=true`, then review the
 diff), and the same test replays each pair through the real adapters and engine into the ride that produced it. They hold
-synthetic bytes, no addresses and no real person's heart rate. **Never add a real recording here:** the repository is public.
+synthetic bytes, no addresses and no real person's heart rate. Five more, `click-*.click.session.txt` (buttons, dropout, locked,
+unlock, silent), are sessions of a fake Zwift Click (`docs/protocols/click-v2.md`, ADR 0011) in the same format, generated and
+replayed the same way (`ClickSessionFixturesTest`); the firmware revision is `*` and the handshake key is zeroed, as for any
+recording. **Never add a real recording here:** the repository is public.
 
 ## Changing a format
 
