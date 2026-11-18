@@ -32,6 +32,10 @@ src/         @overdrive/contracts: the schema plus a validator for the TypeScrip
 | Watch activity (`GET /v1/activities/{id}`) | `schema/activity.schema.json` | §6.7, §8.3, ADR 0023 |
 | Written insights (`GET /v1/insights?from&to`) | `schema/insights-response.schema.json` | §6.5, §6.6, §8.3, ADR 0025 |
 | Discussion topic (inside a ride note; MCP `list_discussion_topics`) | `schema/discussion-topic.schema.json` | §12.3, ADR 0025 |
+| Repeated sessions (`GET /v1/repeats`) | `schema/repeats-response.schema.json` | §11.7, §8.3, ADR 0026 |
+| One repeated session (`GET /v1/repeats/{hash}`) | `schema/repeat-detail-response.schema.json` | §11.7, §8.3, ADR 0026 |
+| The attempt before a ride (`GET /v1/repeats/{hash}/previous`) | `schema/repeat-previous-response.schema.json` | §11.7, §8.3, ADR 0026 |
+| Outdoor ride import answer (`POST /v1/activities/fit`) | `schema/activity-import-response.schema.json` | §11.8, §8.3, ADR 0026 |
 
 The remaining sync API payloads and the MCP tool inputs (spec §8.3–§8.4) get schemas here as they are fixed during
 implementation. The sync outbox of the ride app (ADR 0012) is a local journal, not a wire format, and has no schema.
@@ -98,6 +102,30 @@ createdAt, status }`, status `open`, `discussed` or `expired`; spec §12.3), eac
 at most 366 days, unique ids, newest first, `rideId` set exactly for ride notes, a topic only on a ride note and naming the same ride) is in the schema's
 description and checked by `validateInsightsResponse` and `validateDiscussionTopic` here and by `InsightsApiJson` in Kotlin (`InsightsContractTest`),
 against the same files. Errors name a path and a rule, never the text of a note. All the text in the fixtures is synthetic.
+
+`fixtures/repeats/` holds the golden files of the repeat-session comparison (stage P3-7, ADR 0026): `repeats-response`
+(`GET /v1/repeats`: the workouts ridden more than once, each with its hash, name, attempts, first and last day, the latest and
+the previous attempt and a `comparison` of heart rate at the same power, aerobic drift and compliance, latest minus previous),
+`repeat-detail-response` (`GET /v1/repeats/{hash}`: every attempt side by side, with the fixed-power steps, the steps the overall
+figure is taken over, each step's heart rate at the same power and its reason when there is none, and a trend per measure with the
+minimum attempts stated) and `repeat-previous-response` (`GET /v1/repeats/{hash}/previous?before=`: the attempt before a ride with
+its step boundaries and per-step heart rate, for the tablet's overlay), each with `valid/` and `invalid/`. `workout-hash.json` holds
+the golden numbers of the **hash**: `workoutStructure` (the canonical text of a workout's steps with repeats expanded: type,
+duration, targets in thousandths of FTP; no id, name, labels or cadence) and `workoutHash` (16 hex of SHA-256 over the structure
+and a version line), the cases that must match (a renamed copy, other labels, cadence and float noise, a repeat written out step
+by step) and those that must not. What a schema cannot state (real dates, attempts in order, a figure and its reason exclusive,
+at least 120 counted seconds behind a step's figure, the trend's slope, change and direction agreeing, steps that do not
+overlap) is in each schema's description and checked by `validateRepeatsResponse` & co. here and by `RepeatsApiJson` in Kotlin
+(`RepeatsContractTest`), against the same files.
+
+`fixtures/outdoor/` holds the golden files of the outdoor-ride import (stage P3-7, ADR 0026): `activity-import-response` (the
+answer of `POST /v1/activities/fit`, which takes the FIT file's bytes as `application/vnd.ant.fit`, up to 16 MiB: `imported` with
+the ride's summary and heart-rate load, or `duplicate` with the id of the ride, activity or watch session that is the same ride and
+why), checked by `validateActivityImportResponse` here and `ActivityImportJson` in Kotlin (`ActivityImportContractTest`). The
+watch activity's schema (`wellness/activity`) now also covers an imported ride: `source` `fit`, id `fit-<16 hex>`, type
+`cycling-outdoor` and the optional `distanceMeters` and `elevationGainMeters`. The API error codes have two new ones,
+`unsupported_sport` and `empty_activity` (422), for a FIT file that is valid but not a cycling ride; their fixtures are under
+`sync/api-error/valid/`. All the fixtures are synthetic.
 
 `fixtures/fit/` holds two FIT files for the upload's tests: `fit-golden-3s.fit`, the 376 bytes `FitWriter` writes for
 `rides/valid/fit-golden-3s.json` (the worked example of `docs/protocols/fit.md`; Kotlin's `FitFixturesTest` regenerates it

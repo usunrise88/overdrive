@@ -79,6 +79,8 @@ public object WellnessApiJson {
             "coverage",
             "t",
             "heartRate",
+            "distanceMeters",
+            "elevationGainMeters",
         )
 
     /** kotlinx reads `"52"` as the number 52; the schemas do not. */

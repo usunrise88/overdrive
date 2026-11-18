@@ -194,7 +194,83 @@ export const HELP_TEXT = [
   "/help: this list",
   "",
   "I also send a reminder the evening before and shortly before a workout, a summary after each ride, and a summary of the week.",
+  "Send me a .fit file from your bike computer (up to 16 MB) and I add it as an outdoor ride.",
 ].join("\n");
+
+// ---- A FIT file from the bike computer (spec §11.8) -------------------------------------------------------------
+
+/** Why a document was not even tried. */
+export type FitDocumentRefusal = "unavailable" | "not-fit" | "too-large" | "download";
+
+export function fitDocumentRefusedText(why: FitDocumentRefusal): string {
+  switch (why) {
+    case "unavailable":
+      return "I cannot import rides here.";
+    case "not-fit":
+      return "That is not a FIT file. Send the .fit file your bike computer made (OnelapFit can share it).";
+    case "too-large":
+      return "That file is too large: I take FIT files up to 16 MB (Telegram lets bots download up to 20 MB).";
+    case "download":
+      return "I could not download that file from Telegram. Try sending it again.";
+  }
+}
+
+/** A file that is a FIT file and was refused: the reason is plain words, never a value. */
+export function fitNotImportedText(error: { code: string; message: string }): string {
+  switch (error.code) {
+    case "unsupported_sport":
+      return `Not imported: ${error.message}.`;
+    case "empty_activity":
+      return `Not imported: ${error.message}.`;
+    default:
+      return `Not imported: that is not a valid FIT file (${error.message}).`;
+  }
+}
+
+const KILOMETERS = (meters: number): string => `${(Math.round(meters / 100) / 10).toFixed(1)} km`;
+
+/** The answer to an imported ride: when, how long, how far, heart rate and load; or that it was there already. */
+export function fitImportedText(
+  answer: {
+    status: "imported" | "duplicate";
+    reason: "same-file" | "same-start-and-duration" | "overlap" | null;
+    summary: {
+      startDate: string;
+      durationSeconds: number;
+      distanceMeters: number | null;
+      elevationGainMeters: number | null;
+      averageHeartRate: number | null;
+      load: number | null;
+      loadApproximate: boolean;
+    };
+  },
+  _timezone: string,
+): string {
+  const { summary } = answer;
+  const parts = [shortDate(summary.startDate), formatDuration(summary.durationSeconds)];
+  if (summary.distanceMeters !== null) parts.push(KILOMETERS(summary.distanceMeters));
+  if (answer.status === "duplicate") {
+    const same =
+      answer.reason === "same-file"
+        ? "Already imported."
+        : answer.reason === "overlap"
+          ? "That ride overlaps one already in your history, so it counts once."
+          : "That ride is already in your history (same start and length).";
+    return `${same}\n${parts.join(", ")}.`;
+  }
+  const lines = [`Outdoor ride added: ${parts.join(", ")}.`];
+  if (summary.averageHeartRate !== null) {
+    lines.push(`Heart rate: ${Math.round(summary.averageHeartRate)} bpm average.`);
+  }
+  if (summary.load !== null) {
+    lines.push(
+      `Load: ${Math.round(summary.load)}${summary.loadApproximate ? " (approximate, from heart rate)" : ""}.`,
+    );
+  } else {
+    lines.push("Load: not worked out yet, because no maximum and threshold heart rate are known.");
+  }
+  return lines.join("\n");
+}
 
 export const NOT_CONNECTED =
   "The plan is not connected: INTERVALS_API_KEY is not set on the server, so there are no workouts to show or change.";

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive previous attempt of a session",
+  "description": "The service's answer to GET /v1/repeats/{hash}/previous[?before=rideId] (spec §11.7, §8.3, ADR 0026): the attempt before a ride, small enough for the tablet's overlay to carry (the live line itself is stage v0.4.0). before is the ride id as asked (null: the latest attempt is wanted). previous is null when there is no earlier attempt; otherwise it is the latest attempt that started before the ride named by before (or the latest attempt of all when before is null), with its ride id, local day, UTC start, length in seconds, the FTP it was ridden at, attempt (its 1-based number among the attempts), heartRateAtPower (its overall average heart rate at the same power over the steps below that have one, bpm, or null) and steps: one per workout step the attempt rode, in order, with step (1-based position in the flattened workout), label, startSeconds and endSeconds (seconds from the start of that ride, the step's first lap), targetWatts (the steady step's target at that ride's FTP, null for a ramp or a free step) and averageHeartRate (the step's average heart rate at the same power, bpm, null when the step has no figure under the rules of repeat-detail-response.schema.json). Rules a schema cannot state, checked by every implementation: real dates and instants; steps ascending by step, each ending after it starts, and the ride's steps not overlapping (a step starts no earlier than the one before ends); a step with an average heart rate has a target in watts.",
+  "type": "object",
+  "required": ["generatedAt", "hash", "before", "previous"],
+  "additionalProperties": false,
+  "properties": {
+    "generatedAt": { "$ref": "#/$defs/instant" },
+    "hash": { "$ref": "#/$defs/hash" },
+    "before": { "oneOf": [{ "$ref": "#/$defs/rideId" }, { "type": "null" }] },
+    "previous": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": [
+            "rideId",
+            "date",
+            "startTime",
+            "durationSeconds",
+            "ftp",
+            "attempt",
+            "heartRateAtPower",
+            "steps"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "rideId": { "$ref": "#/$defs/rideId" },
+            "date": { "$ref": "#/$defs/date" },
+            "startTime": { "$ref": "#/$defs/instant" },
+            "durationSeconds": { "type": "integer", "minimum": 0 },
+            "ftp": { "type": "integer", "minimum": 30, "maximum": 2000 },
+            "attempt": { "type": "integer", "minimum": 1 },
+            "heartRateAtPower": { "type": ["number", "null"], "minimum": 1, "maximum": 300 },
+            "steps": { "type": "array", "items": { "$ref": "#/$defs/step" } }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "instant": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "rideId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "hash": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+    "step": {
+      "type": "object",
+      "required": [
+        "step",
+        "label",
+        "startSeconds",
+        "endSeconds",
+        "targetWatts",
+        "averageHeartRate"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "step": { "type": "integer", "minimum": 1 },
+        "label": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "startSeconds": { "type": "integer", "minimum": 0 },
+        "endSeconds": { "type": "integer", "minimum": 1 },
+        "targetWatts": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "averageHeartRate": { "type": ["number", "null"], "minimum": 1, "maximum": 300 }
+      }
+    }
+  }
+}

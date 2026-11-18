@@ -121,6 +121,9 @@ public class ProfileRepository(
 
     private val running = Mutex()
     private val askAgain = MutableStateFlow(false)
+
+    /** A request of the rider is waiting for the one under way: a second press while it waits adds nothing. */
+    private val requestWaiting = MutableStateFlow(false)
     private val sendAgain = MutableStateFlow(false)
 
     /** The address and token of the last request that got an outcome (an answer or no answer); not one that was cancelled. */
@@ -199,6 +202,28 @@ public class ProfileRepository(
      * the instant between that request's last look and its letting go, is made by the holder or by whoever takes the lock next.
      */
     public suspend fun refresh(why: ProfileRefresh) {
+        if (why == ProfileRefresh.REQUESTED) {
+            // The rider asked (the refresh button): never dropped. It waits for the request under way, which may be stale or
+            // failing, and asks once more; presses meanwhile are one.
+            if (!requestWaiting.compareAndSet(false, true)) return
+            running.lock()
+            requestWaiting.value = false
+            try {
+                attempt(ProfileRefresh.REQUESTED)
+                while (true) {
+                    if (sendAgain.compareAndSet(true, false)) {
+                        attempt(ProfileRefresh.EDITED)
+                    } else if (askAgain.compareAndSet(true, false)) {
+                        attempt(ProfileRefresh.SETTINGS_CHANGED)
+                    } else {
+                        break
+                    }
+                }
+            } finally {
+                running.unlock()
+            }
+            return
+        }
         when (why) {
             ProfileRefresh.SETTINGS_CHANGED -> askAgain.value = true
             ProfileRefresh.EDITED -> sendAgain.value = true

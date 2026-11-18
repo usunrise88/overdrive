@@ -117,6 +117,16 @@ export function createTelegramBot(options: BotLoopOptions): TelegramBot {
         return;
       }
       const io = ioFor(chatId, null);
+      const document = update.message?.document ?? null;
+      if (document !== null) {
+        // A file (a FIT file from the bike computer, spec §11.8): handed over with the means to download it.
+        await commands.onDocument(
+          document,
+          (maxBytes) => client.downloadFile(document.fileId, maxBytes),
+          io,
+        );
+        return;
+      }
       await commands.onText(update.message?.text ?? "", io);
     } catch (error) {
       log.error(

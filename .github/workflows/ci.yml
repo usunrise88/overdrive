@@ -72,6 +72,16 @@ jobs:
           name: debug-apks
           path: android/app-*/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+      # What failed, when a test did: the HTML and XML reports of the unit tests (they carry the failure and its output).
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: android-test-reports
+          path: |
+            android/*/build/reports/tests/**
+            android/*/build/test-results/**/*.xml
+          if-no-files-found: ignore
+          retention-days: 7
 
   server-image:
     name: Server image

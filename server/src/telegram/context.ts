@@ -1,6 +1,7 @@
 import { addDaysToIsoDate } from "@overdrive/contracts";
 import type { IntervalsClient } from "../intervals/client.ts";
 import type { Logger } from "../log.ts";
+import type { OutdoorService } from "../outdoor/service.ts";
 import type { PlanRefresher } from "../plan/refresher.ts";
 import type { PlanEntry, PlanStore } from "../plan/store.ts";
 import { workoutDurationSeconds } from "../plan/workout-summary.ts";
@@ -19,6 +20,8 @@ export interface BotContext {
   intervals: IntervalsClient | null;
   /** null when no plan source is set up. */
   refresher: PlanRefresher | null;
+  /** Imports a FIT file sent to the bot as an outdoor ride (spec §11.8); null where the service has no such import (some tests). */
+  outdoor: OutdoorService | null;
   timezone: string;
   /** The time of day a workout starts (`GCAL_WORKOUT_START`). */
   workoutStart: Clock;

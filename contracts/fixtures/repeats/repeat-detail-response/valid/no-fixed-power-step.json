@@ -1,0 +1,106 @@
+{
+  "generatedAt": "2026-11-18T18:00:00Z",
+  "hash": "da2b6fdd397b6f36",
+  "name": "Free ride hour",
+  "routeKey": null,
+  "note": "Heart rate also moves from day to day with heat, sleep and caffeine, so look at the trend over several attempts, not at a single comparison.",
+  "definition": {
+    "powerTolerancePercent": 3,
+    "skipSeconds": 60,
+    "minStepSeconds": 120,
+    "minTrendAttempts": 3
+  },
+  "steps": [],
+  "comparedSteps": [],
+  "attempts": [
+    {
+      "rideId": "ride-1791500000000",
+      "number": 1,
+      "date": "2026-10-08",
+      "startTime": "2026-10-08T22:53:20Z",
+      "durationSeconds": 3600,
+      "ftp": 250,
+      "averagePower": 150.0,
+      "averageHeartRate": 130.0,
+      "effortRating": null,
+      "heartRateAtPower": {
+        "value": null,
+        "seconds": 0,
+        "reason": "the session has no fixed-power step"
+      },
+      "stepHeartRates": [],
+      "driftPercent": {
+        "value": null,
+        "reason": "no steady stretch of 40 minutes"
+      },
+      "compliance": {
+        "percent": null,
+        "stepsCompleted": 0,
+        "stepsPlanned": 1,
+        "powerDeltaPercent": null
+      }
+    },
+    {
+      "rideId": "ride-1794400000000",
+      "number": 2,
+      "date": "2026-11-11",
+      "startTime": "2026-11-11T12:26:40Z",
+      "durationSeconds": 3600,
+      "ftp": 250,
+      "averagePower": 150.0,
+      "averageHeartRate": 130.0,
+      "effortRating": null,
+      "heartRateAtPower": {
+        "value": null,
+        "seconds": 0,
+        "reason": "the session has no fixed-power step"
+      },
+      "stepHeartRates": [],
+      "driftPercent": {
+        "value": null,
+        "reason": "no steady stretch of 40 minutes"
+      },
+      "compliance": {
+        "percent": null,
+        "stepsCompleted": 0,
+        "stepsPlanned": 1,
+        "powerDeltaPercent": null
+      }
+    }
+  ],
+  "trends": {
+    "heartRateAtPower": {
+      "unit": "bpm",
+      "betterWhen": "lower",
+      "attempts": 0,
+      "minAttempts": 3,
+      "direction": "unknown",
+      "slopePerAttempt": null,
+      "change": null,
+      "steadyBelow": 2.0,
+      "reason": "needs at least 3 attempts with a figure"
+    },
+    "driftPercent": {
+      "unit": "%",
+      "betterWhen": "lower",
+      "attempts": 0,
+      "minAttempts": 3,
+      "direction": "unknown",
+      "slopePerAttempt": null,
+      "change": null,
+      "steadyBelow": 1.0,
+      "reason": "needs at least 3 attempts with a figure"
+    },
+    "compliance": {
+      "unit": "%",
+      "betterWhen": "higher",
+      "attempts": 0,
+      "minAttempts": 3,
+      "direction": "unknown",
+      "slopePerAttempt": null,
+      "change": null,
+      "steadyBelow": 5.0,
+      "reason": "needs at least 3 attempts with a figure"
+    }
+  }
+}

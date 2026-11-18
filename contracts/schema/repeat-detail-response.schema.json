@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive repeated session in detail",
+  "description": "The service's answer to GET /v1/repeats/{hash} (spec §11.7, §8.3, ADR 0026): every attempt at one session side by side. hash identifies the session (see repeats-response.schema.json); name is the workout's name at its latest attempt; routeKey is the hook for routes (stage v0.4.0), always null today. note is the standing caution, plain text: day-to-day heart rate also moves with heat, sleep and caffeine, so the trend over several attempts matters, not one comparison. definition states the rules the figures follow: a second counts toward a step's heart rate at the same power when the power is within powerTolerancePercent of the step's target and the ride was not paused, after the first skipSeconds of the step (counted again after every pause inside it); a step has a figure only with at least minStepSeconds such seconds; a trend needs at least minTrendAttempts attempts with a figure. steps are the session's fixed-power steps (the steady steps of the workout with repeats expanded; step is the 1-based position in the whole flattened workout), with label, length in seconds and target as a fraction of FTP. comparedSteps are the steps (ascending) whose heart rates make each attempt's overall figure: the steps in which the latest attempt that has any figure has one; an attempt's overall heartRateAtPower is the mean of its steps' heart rates over them, weighted by the steps' planned length, and is null (with a reason) when the attempt lacks a figure in one of them or its target power there differs from the reference by more than powerTolerancePercent (a changed FTP asks for other watts). attempts are in the order they were ridden, oldest first, number counting from 1; each has the ride, its local day and UTC start, duration, the FTP it was ridden at, average power and average heart rate over the seconds not paused, effortRating (reserved for the rider's rating, null today), heartRateAtPower {value, seconds (the seconds behind it), reason}, stepHeartRates (one entry per fixed-power step: the step's target in watts, the average power and heart rate over its counted seconds and how many, or null with a reason), driftPercent {value, reason} (spec §6.3) and compliance: percent of the planned time ridden, stepsCompleted of stepsPlanned and powerDeltaPercent (average power against plan over the steps with a target, null where not known). trends are one per measure: unit, betterWhen (lower or higher), attempts (how many had a figure), minAttempts, direction, slopePerAttempt (least-squares slope over the attempts that had a figure, in order, in units per attempt), change (the slope times attempts minus one: the fitted change from the first to the last of them), steadyBelow (a change smaller than this in size is steady) and reason (why the direction is unknown). Rules a schema cannot state, checked by every implementation: real dates and instants; at least 2 attempts, ridden in order of startTime with unique ride ids and numbers 1, 2, 3, …; steps ascending and unique and every comparedSteps entry one of them; every attempt lists exactly the session's steps in order in stepHeartRates; a figure and its reason are exclusive (a value has no reason, a null value has one); a step figure has at least definition.minStepSeconds seconds; an attempt's overall value has seconds greater than zero and is null exactly when it has a reason; direction is unknown exactly when attempts is below minAttempts, and then slope, change are null and the reason is set; otherwise change equals slopePerAttempt times attempts minus one (to 0.01) and the direction is steady when change is smaller than steadyBelow in size, else improving or worsening by betterWhen.",
+  "type": "object",
+  "required": [
+    "generatedAt",
+    "hash",
+    "name",
+    "routeKey",
+    "note",
+    "definition",
+    "steps",
+    "comparedSteps",
+    "attempts",
+    "trends"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "generatedAt": { "$ref": "#/$defs/instant" },
+    "hash": { "$ref": "#/$defs/hash" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "routeKey": { "type": ["string", "null"], "minLength": 1, "maxLength": 64 },
+    "note": { "type": "string", "minLength": 1, "maxLength": 400 },
+    "definition": {
+      "type": "object",
+      "required": ["powerTolerancePercent", "skipSeconds", "minStepSeconds", "minTrendAttempts"],
+      "additionalProperties": false,
+      "properties": {
+        "powerTolerancePercent": { "const": 3 },
+        "skipSeconds": { "const": 60 },
+        "minStepSeconds": { "const": 120 },
+        "minTrendAttempts": { "const": 3 }
+      }
+    },
+    "steps": { "type": "array", "items": { "$ref": "#/$defs/step" } },
+    "comparedSteps": { "type": "array", "items": { "type": "integer", "minimum": 1 } },
+    "attempts": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/attempt" } },
+    "trends": {
+      "type": "object",
+      "required": ["heartRateAtPower", "driftPercent", "compliance"],
+      "additionalProperties": false,
+      "properties": {
+        "heartRateAtPower": { "$ref": "#/$defs/trend" },
+        "driftPercent": { "$ref": "#/$defs/trend" },
+        "compliance": { "$ref": "#/$defs/trend" }
+      }
+    }
+  },
+  "$defs": {
+    "instant": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "rideId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "hash": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+    "reason": { "type": ["string", "null"], "minLength": 1, "maxLength": 300 },
+    "step": {
+      "type": "object",
+      "required": ["step", "label", "durationSeconds", "targetFraction"],
+      "additionalProperties": false,
+      "properties": {
+        "step": { "type": "integer", "minimum": 1 },
+        "label": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "durationSeconds": { "type": "integer", "minimum": 1 },
+        "targetFraction": { "type": "number", "exclusiveMinimum": 0, "maximum": 3 }
+      }
+    },
+    "figure": {
+      "type": "object",
+      "required": ["value", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "value": { "type": ["number", "null"] },
+        "reason": { "$ref": "#/$defs/reason" }
+      }
+    },
+    "stepHeartRate": {
+      "type": "object",
+      "required": ["step", "targetWatts", "averagePower", "averageHeartRate", "seconds", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "step": { "type": "integer", "minimum": 1 },
+        "targetWatts": { "type": "number", "exclusiveMinimum": 0 },
+        "averagePower": { "type": ["number", "null"], "minimum": 0 },
+        "averageHeartRate": { "type": ["number", "null"], "minimum": 1, "maximum": 300 },
+        "seconds": { "type": "integer", "minimum": 0 },
+        "reason": { "$ref": "#/$defs/reason" }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "required": [
+        "rideId",
+        "number",
+        "date",
+        "startTime",
+        "durationSeconds",
+        "ftp",
+        "averagePower",
+        "averageHeartRate",
+        "effortRating",
+        "heartRateAtPower",
+        "stepHeartRates",
+        "driftPercent",
+        "compliance"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "rideId": { "$ref": "#/$defs/rideId" },
+        "number": { "type": "integer", "minimum": 1 },
+        "date": { "$ref": "#/$defs/date" },
+        "startTime": { "$ref": "#/$defs/instant" },
+        "durationSeconds": { "type": "integer", "minimum": 0 },
+        "ftp": { "type": "integer", "minimum": 30, "maximum": 2000 },
+        "averagePower": { "type": ["number", "null"], "minimum": 0 },
+        "averageHeartRate": { "type": ["number", "null"], "minimum": 1, "maximum": 300 },
+        "effortRating": { "type": ["number", "null"], "minimum": 0, "maximum": 10 },
+        "heartRateAtPower": {
+          "type": "object",
+          "required": ["value", "seconds", "reason"],
+          "additionalProperties": false,
+          "properties": {
+            "value": { "type": ["number", "null"], "minimum": 1, "maximum": 300 },
+            "seconds": { "type": "integer", "minimum": 0 },
+            "reason": { "$ref": "#/$defs/reason" }
+          }
+        },
+        "stepHeartRates": { "type": "array", "items": { "$ref": "#/$defs/stepHeartRate" } },
+        "driftPercent": { "$ref": "#/$defs/figure" },
+        "compliance": {
+          "type": "object",
+          "required": ["percent", "stepsCompleted", "stepsPlanned", "powerDeltaPercent"],
+          "additionalProperties": false,
+          "properties": {
+            "percent": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+            "stepsCompleted": { "type": "integer", "minimum": 0 },
+            "stepsPlanned": { "type": "integer", "minimum": 0 },
+            "powerDeltaPercent": { "type": ["number", "null"] }
+          }
+        }
+      }
+    },
+    "trend": {
+      "type": "object",
+      "required": [
+        "unit",
+        "betterWhen",
+        "attempts",
+        "minAttempts",
+        "direction",
+        "slopePerAttempt",
+        "change",
+        "steadyBelow",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "unit": { "type": "string", "minLength": 1, "maxLength": 20 },
+        "betterWhen": { "enum": ["lower", "higher"] },
+        "attempts": { "type": "integer", "minimum": 0 },
+        "minAttempts": { "const": 3 },
+        "direction": { "enum": ["improving", "worsening", "steady", "unknown"] },
+        "slopePerAttempt": { "type": ["number", "null"] },
+        "change": { "type": ["number", "null"] },
+        "steadyBelow": { "type": "number", "exclusiveMinimum": 0 },
+        "reason": { "$ref": "#/$defs/reason" }
+      }
+    }
+  }
+}

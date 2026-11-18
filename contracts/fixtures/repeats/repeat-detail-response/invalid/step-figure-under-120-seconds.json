@@ -1,0 +1,400 @@
+{
+  "generatedAt": "2026-11-18T18:00:00Z",
+  "hash": "b1add004e12d9617",
+  "name": "Sweet spot 3x10",
+  "routeKey": null,
+  "note": "Heart rate also moves from day to day with heat, sleep and caffeine, so look at the trend over several attempts, not at a single comparison.",
+  "definition": {
+    "powerTolerancePercent": 3,
+    "skipSeconds": 60,
+    "minStepSeconds": 120,
+    "minTrendAttempts": 3
+  },
+  "steps": [
+    {
+      "step": 2,
+      "label": "Sweet spot",
+      "durationSeconds": 600,
+      "targetFraction": 0.88
+    },
+    {
+      "step": 3,
+      "label": "Recover",
+      "durationSeconds": 300,
+      "targetFraction": 0.5
+    },
+    {
+      "step": 4,
+      "label": "Sweet spot",
+      "durationSeconds": 600,
+      "targetFraction": 0.88
+    },
+    {
+      "step": 5,
+      "label": "Recover",
+      "durationSeconds": 300,
+      "targetFraction": 0.5
+    },
+    {
+      "step": 6,
+      "label": "Sweet spot",
+      "durationSeconds": 600,
+      "targetFraction": 0.88
+    },
+    {
+      "step": 7,
+      "label": "Recover",
+      "durationSeconds": 300,
+      "targetFraction": 0.5
+    }
+  ],
+  "comparedSteps": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "attempts": [
+    {
+      "rideId": "ride-1791500000000",
+      "number": 1,
+      "date": "2026-10-08",
+      "startTime": "2026-10-08T22:53:20Z",
+      "durationSeconds": 3600,
+      "ftp": 250,
+      "averagePower": 181.2,
+      "averageHeartRate": 139.8,
+      "effortRating": null,
+      "heartRateAtPower": {
+        "value": 142.7,
+        "seconds": 2160,
+        "reason": null
+      },
+      "stepHeartRates": [
+        {
+          "step": 2,
+          "targetWatts": 220.0,
+          "averagePower": 220.4,
+          "averageHeartRate": 148.0,
+          "seconds": 119,
+          "reason": null
+        },
+        {
+          "step": 3,
+          "targetWatts": 125.0,
+          "averagePower": 125.4,
+          "averageHeartRate": 121.0,
+          "seconds": 240,
+          "reason": null
+        },
+        {
+          "step": 4,
+          "targetWatts": 220.0,
+          "averagePower": 220.4,
+          "averageHeartRate": 152.0,
+          "seconds": 480,
+          "reason": null
+        },
+        {
+          "step": 5,
+          "targetWatts": 125.0,
+          "averagePower": 125.4,
+          "averageHeartRate": 124.0,
+          "seconds": 240,
+          "reason": null
+        },
+        {
+          "step": 6,
+          "targetWatts": 220.0,
+          "averagePower": 220.4,
+          "averageHeartRate": 156.0,
+          "seconds": 480,
+          "reason": null
+        },
+        {
+          "step": 7,
+          "targetWatts": 125.0,
+          "averagePower": 125.4,
+          "averageHeartRate": 127.0,
+          "seconds": 240,
+          "reason": null
+        }
+      ],
+      "driftPercent": {
+        "value": 3.6,
+        "reason": null
+      },
+      "compliance": {
+        "percent": 100.0,
+        "stepsCompleted": 9,
+        "stepsPlanned": 9,
+        "powerDeltaPercent": 0.4
+      }
+    },
+    {
+      "rideId": "ride-1792700000000",
+      "number": 2,
+      "date": "2026-10-22",
+      "startTime": "2026-10-22T20:13:20Z",
+      "durationSeconds": 3600,
+      "ftp": 250,
+      "averagePower": 181.2,
+      "averageHeartRate": 139.8,
+      "effortRating": null,
+      "heartRateAtPower": {
+        "value": 141.2,
+        "seconds": 2160,
+        "reason": null
+      },
+      "stepHeartRates": [
+        {
+          "step": 2,
+          "targetWatts": 220.0,
+          "averagePower": 220.4,
+          "averageHeartRate": 146.5,
+          "seconds": 480,
+          "reason": null
+        },
+        {
+          "step": 3,
+          "targetWatts": 125.0,
+          "averagePower": 125.4,
+          "averageHeartRate": 119.5,
+          "seconds": 240,
+          "reason": null
+        },
+        {
+          "step": 4,
+          "targetWatts": 220.0,
+          "averagePower": 220.4,
+          "averageHeartRate": 150.5,
+          "seconds": 480,
+          "reason": null
+        },
+        {
+          "step": 5,
+          "targetWatts": 125.0,
+          "averagePower": 125.4,
+          "averageHeartRate": 122.5,
+          "seconds": 240,
+          "reason": null
+        },
+        {
+          "step": 6,
+          "targetWatts": 220.0,
+          "averagePower": 220.4,
+          "averageHeartRate": 154.5,
+          "seconds": 480,
+          "reason": null
+        },
+        {
+          "step": 7,
+          "targetWatts": 125.0,
+          "averagePower": 125.4,
+          "averageHeartRate": 125.5,
+          "seconds": 240,
+          "reason": null
+        }
+      ],
+      "driftPercent": {
+        "value": 3.1,
+        "reason": null
+      },
+      "compliance": {
+        "percent": 100.0,
+        "stepsCompleted": 9,
+        "stepsPlanned": 9,
+        "powerDeltaPercent": 0.4
+      }
+    },
+    {
+      "rideId": "ride-1794400000000",
+      "number": 3,
+      "date": "2026-11-11",
+      "startTime": "2026-11-11T12:26:40Z",
+      "durationSeconds": 3600,
+      "ftp": 250,
+      "averagePower": 181.2,
+      "averageHeartRate": 139.8,
+      "effortRating": null,
+      "heartRateAtPower": {
+        "value": 140.1,
+        "seconds": 2160,
+        "reason": null
+      },
+      "stepHeartRates": [
+        {
+          "step": 2,
+          "targetWatts": 220.0,
+          "averagePower": 220.4,
+          "averageHeartRate": 145.4,
+          "seconds": 480,
+          "reason": null
+        },
+        {
+          "step": 3,
+          "targetWatts": 125.0,
+          "averagePower": 125.4,
+          "averageHeartRate": 118.4,
+          "seconds": 240,
+          "reason": null
+        },
+        {
+          "step": 4,
+          "targetWatts": 220.0,
+          "averagePower": 220.4,
+          "averageHeartRate": 149.4,
+          "seconds": 480,
+          "reason": null
+        },
+        {
+          "step": 5,
+          "targetWatts": 125.0,
+          "averagePower": 125.4,
+          "averageHeartRate": 121.4,
+          "seconds": 240,
+          "reason": null
+        },
+        {
+          "step": 6,
+          "targetWatts": 220.0,
+          "averagePower": 220.4,
+          "averageHeartRate": 153.4,
+          "seconds": 480,
+          "reason": null
+        },
+        {
+          "step": 7,
+          "targetWatts": 125.0,
+          "averagePower": 125.4,
+          "averageHeartRate": 124.4,
+          "seconds": 240,
+          "reason": null
+        }
+      ],
+      "driftPercent": {
+        "value": null,
+        "reason": "no steady stretch of 40 minutes"
+      },
+      "compliance": {
+        "percent": 100.0,
+        "stepsCompleted": 9,
+        "stepsPlanned": 9,
+        "powerDeltaPercent": 0.4
+      }
+    },
+    {
+      "rideId": "ride-1795000000000",
+      "number": 4,
+      "date": "2026-11-18",
+      "startTime": "2026-11-18T11:06:40Z",
+      "durationSeconds": 3600,
+      "ftp": 250,
+      "averagePower": 181.2,
+      "averageHeartRate": 139.8,
+      "effortRating": null,
+      "heartRateAtPower": {
+        "value": 138.6,
+        "seconds": 2160,
+        "reason": null
+      },
+      "stepHeartRates": [
+        {
+          "step": 2,
+          "targetWatts": 220.0,
+          "averagePower": 220.4,
+          "averageHeartRate": 143.9,
+          "seconds": 480,
+          "reason": null
+        },
+        {
+          "step": 3,
+          "targetWatts": 125.0,
+          "averagePower": 125.4,
+          "averageHeartRate": 116.9,
+          "seconds": 240,
+          "reason": null
+        },
+        {
+          "step": 4,
+          "targetWatts": 220.0,
+          "averagePower": 220.4,
+          "averageHeartRate": 147.9,
+          "seconds": 480,
+          "reason": null
+        },
+        {
+          "step": 5,
+          "targetWatts": 125.0,
+          "averagePower": 125.4,
+          "averageHeartRate": 119.9,
+          "seconds": 240,
+          "reason": null
+        },
+        {
+          "step": 6,
+          "targetWatts": 220.0,
+          "averagePower": 220.4,
+          "averageHeartRate": 151.9,
+          "seconds": 480,
+          "reason": null
+        },
+        {
+          "step": 7,
+          "targetWatts": 125.0,
+          "averagePower": 125.4,
+          "averageHeartRate": 122.9,
+          "seconds": 240,
+          "reason": null
+        }
+      ],
+      "driftPercent": {
+        "value": 2.1,
+        "reason": null
+      },
+      "compliance": {
+        "percent": 100.0,
+        "stepsCompleted": 9,
+        "stepsPlanned": 9,
+        "powerDeltaPercent": 0.4
+      }
+    }
+  ],
+  "trends": {
+    "heartRateAtPower": {
+      "unit": "bpm",
+      "betterWhen": "lower",
+      "attempts": 4,
+      "minAttempts": 3,
+      "direction": "improving",
+      "slopePerAttempt": -1.34,
+      "change": -4.02,
+      "steadyBelow": 2.0,
+      "reason": null
+    },
+    "driftPercent": {
+      "unit": "%",
+      "betterWhen": "lower",
+      "attempts": 3,
+      "minAttempts": 3,
+      "direction": "improving",
+      "slopePerAttempt": -0.75,
+      "change": -1.5,
+      "steadyBelow": 1.0,
+      "reason": null
+    },
+    "compliance": {
+      "unit": "%",
+      "betterWhen": "higher",
+      "attempts": 4,
+      "minAttempts": 3,
+      "direction": "steady",
+      "slopePerAttempt": 0.0,
+      "change": 0.0,
+      "steadyBelow": 5.0,
+      "reason": null
+    }
+  }
+}

@@ -58,8 +58,10 @@ public data class ResourceState<out T>(
  *
  * - **When.** [Refresh.START] and [Refresh.REQUESTED] always ask; [Refresh.SCREEN_OPENED] asks only when the last request was at
  *   least [minGapMillis] ago; [Refresh.SETTINGS_CHANGED] asks unless the last request was made with these very address and token.
- *   One request at a time: a refresh that arrives during one is dropped, except a settings change, which is asked again once the
- *   one under way is done (it was made with the old address or token).
+ *   One request at a time: a refresh of the app (start, screen opened) that arrives during one is dropped; a settings change is asked
+ *   again once the one under way is done (it was made with the old address or token); and **the rider's request waits its turn
+ *   and asks once more** (the one under way may have been started before the service was back), however many times it is pressed
+ *   meanwhile.
  * - **Offline.** A failed request keeps the last good answer and says why ([ResourceState.problem]); [load] reads the cache first,
  *   so the answer is there with no network and after a restart. A damaged cache reads as no cache, and so does a cache written
  *   for another address, or one that is not a valid answer of the contract.
@@ -110,6 +112,9 @@ public class RemoteResource<T : Any>(
     private val running = Mutex()
     private val askAgain = MutableStateFlow(false)
 
+    /** A request of the rider is waiting for the one under way: a second press while it waits adds nothing. */
+    private val requestWaiting = MutableStateFlow(false)
+
     /** The address and token of the last request that got an outcome (an answer or no answer); not one that was cancelled. */
     private val lastAsked = MutableStateFlow<SyncConfig?>(null)
 
@@ -140,6 +145,20 @@ public class RemoteResource<T : Any>(
      * lets go of the lock looks at it once more.
      */
     public suspend fun refresh(why: Refresh) {
+        if (why == Refresh.REQUESTED) {
+            // The rider asked: that is never dropped. It waits for the request under way (which may be stale, or failing) and
+            // then asks once more; presses meanwhile are one.
+            if (!requestWaiting.compareAndSet(false, true)) return
+            running.lock()
+            requestWaiting.value = false
+            try {
+                attempt(Refresh.REQUESTED)
+                while (askAgain.compareAndSet(true, false)) attempt(Refresh.SETTINGS_CHANGED)
+            } finally {
+                running.unlock()
+            }
+            return
+        }
         if (why == Refresh.SETTINGS_CHANGED) askAgain.value = true
         var pending: Refresh? = if (why == Refresh.SETTINGS_CHANGED) null else why
         while (true) {

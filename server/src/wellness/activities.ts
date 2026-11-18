@@ -5,7 +5,9 @@ import { localDate } from "../time.ts";
 import { roundTo } from "./metrics.ts";
 import type { Rec } from "./records.ts";
 import {
+  FIT_HOLD_CAP_SECONDS,
   type HeartRateSummary,
+  HOLD_CAP_SECONDS,
   type HrSample,
   MIN_COVERAGE,
   summarizeSamples,
@@ -34,16 +36,23 @@ export const LOAD_NOTE =
 
 export type ExerciseRec = Extract<Rec, { kind: "exerciseSession" }>;
 
+/** Where an activity comes from: a workout of the watch (Health Connect) or an outdoor ride imported from a FIT file (spec §11.8). */
+export type ActivitySource = "watch" | "fit";
+
 export interface ActivityRow {
   id: string;
   recordId: string;
+  source: ActivitySource;
   type: string;
   title: string | null;
   startMs: number;
   endMs: number;
   /** `[offset ms from start, bpm]`, in order; null without samples. */
   hr: [number, number][] | null;
-  hrSource: "session" | "heart-rate-records" | null;
+  hrSource: "session" | "heart-rate-records" | "fit" | null;
+  /** An imported ride's distance and climb, as the file says; null for a watch workout and when the file does not say. */
+  distanceMeters: number | null;
+  elevationGainMeters: number | null;
   samples: number;
   medianGapSeconds: number | null;
   maxGapSeconds: number | null;
@@ -59,6 +68,8 @@ export interface ActivityQuery {
   toMs?: number;
   /** Leave out the sessions that overlap a ride on the tablet (the same ride, seen by the watch). */
   excludeOverlapping?: boolean;
+  /** Only the watch's workouts or only the imported rides. */
+  source?: ActivitySource;
   limit: number;
   offset: number;
 }
@@ -78,6 +89,8 @@ export interface ActivityStore {
     now: Date,
   ): Promise<RebuildOutcome>;
   get(id: string): Promise<ActivityRow | null>;
+  /** The raw FIT file of an imported ride; null for anything else. */
+  fitBytes(id: string): Promise<Uint8Array | null>;
   /** Newest first. */
   list(query: ActivityQuery): Promise<{ total: number; rows: ActivityRow[] }>;
   /** Every activity that started in the range, with its heart-rate samples. */
@@ -100,24 +113,36 @@ export function clipSamples(
   return [...byTime.values()].sort((a, b) => a.tMs - b.tMs);
 }
 
-/** The ride overlap: a correlated subquery that names a tablet ride covering at least half of the activity. */
-const OVERLAPPING_RIDE = `(
+/**
+ * The overlap of an activity with another record of the same ride: a correlated subquery that names a tablet ride covering at
+ * least half of the activity and, for a watch workout, otherwise an imported outdoor ride that does (the watch and the bike
+ * computer both recorded it; the ride from the file is the one that counts, ADR 0026).
+ */
+const OVERLAPPING_RIDE = `COALESCE((
   SELECT r.id FROM rides r
    WHERE r.start_epoch_millis < a.end_ms
      AND COALESCE(r.end_epoch_millis, r.start_epoch_millis + 1000 * COALESCE((r.record->'summary'->>'durationSeconds')::bigint, 0)) > a.start_ms
      AND (LEAST(a.end_ms, COALESCE(r.end_epoch_millis, r.start_epoch_millis + 1000 * COALESCE((r.record->'summary'->>'durationSeconds')::bigint, 0)))
           - GREATEST(a.start_ms, r.start_epoch_millis)) * 2 >= (a.end_ms - a.start_ms)
-   ORDER BY r.start_epoch_millis LIMIT 1)`;
+   ORDER BY r.start_epoch_millis LIMIT 1),
+  CASE WHEN a.source = 'watch' THEN (
+    SELECT f.id FROM activities f
+     WHERE f.source = 'fit' AND f.start_ms < a.end_ms AND f.end_ms > a.start_ms
+       AND (LEAST(a.end_ms, f.end_ms) - GREATEST(a.start_ms, f.start_ms)) * 2 >= (a.end_ms - a.start_ms)
+     ORDER BY f.start_ms LIMIT 1) END)`;
 
 interface DbRow {
   id: string;
   record_id: string;
+  source: ActivitySource;
+  distance_m: number | null;
+  elevation_gain_m: number | null;
   type: string;
   title: string | null;
   start_ms: string;
   end_ms: string;
   hr: [number, number][] | null;
-  hr_source: "session" | "heart-rate-records" | null;
+  hr_source: "session" | "heart-rate-records" | "fit" | null;
   samples: number;
   median_gap_s: number | null;
   max_gap_s: number | null;
@@ -127,13 +152,17 @@ interface DbRow {
   overlaps_ride_id: string | null;
 }
 
-const COLUMNS = `a.id, a.record_id, a.type, a.title, a.start_ms::text AS start_ms, a.end_ms::text AS end_ms, a.hr, a.hr_source,
-  a.samples, a.median_gap_s, a.max_gap_s, a.coverage, a.avg_hr, a.max_hr, ${OVERLAPPING_RIDE} AS overlaps_ride_id`;
+const COLUMNS = `a.id, a.record_id, a.source, a.distance_m, a.elevation_gain_m, a.type, a.title, a.start_ms::text AS start_ms,
+  a.end_ms::text AS end_ms, a.hr, a.hr_source, a.samples, a.median_gap_s, a.max_gap_s, a.coverage, a.avg_hr, a.max_hr,
+  ${OVERLAPPING_RIDE} AS overlaps_ride_id`;
 
 function rowOf(row: DbRow): ActivityRow {
   return {
     id: row.id,
     recordId: row.record_id,
+    source: row.source,
+    distanceMeters: row.distance_m,
+    elevationGainMeters: row.elevation_gain_m,
     type: row.type,
     title: row.title,
     startMs: Number(row.start_ms),
@@ -226,6 +255,14 @@ export function createActivityStore(db: Db): ActivityStore {
       return row === undefined ? null : rowOf(row);
     },
 
+    async fitBytes(id) {
+      const result = await db.query<{ fit: Uint8Array | null }>(
+        "SELECT fit FROM activities WHERE id = $1 AND source = 'fit'",
+        [id],
+      );
+      return result.rows[0]?.fit ?? null;
+    },
+
     async list(query) {
       const conditions: string[] = [];
       const params: unknown[] = [];
@@ -238,6 +275,10 @@ export function createActivityStore(db: Db): ActivityStore {
         conditions.push(`a.start_ms < $${params.length}`);
       }
       if (query.excludeOverlapping === true) conditions.push(`${OVERLAPPING_RIDE} IS NULL`);
+      if (query.source !== undefined) {
+        params.push(query.source);
+        conditions.push(`a.source = $${params.length}`);
+      }
       const where = conditions.length === 0 ? "" : `WHERE ${conditions.join(" AND ")}`;
       const total = await db.query<{ n: string }>(
         `SELECT count(*)::text AS n FROM activities a ${where}`,
@@ -319,6 +360,11 @@ export interface ActivityLoad {
   maxHr: number | null;
 }
 
+/** How long a heart-rate sample of this activity holds at most: ADR 0023 for the watch, ADR 0026 for a ride from a FIT file. */
+export function holdCapOf(row: Pick<ActivityRow, "source">): number {
+  return row.source === "fit" ? FIT_HOLD_CAP_SECONDS : HOLD_CAP_SECONDS;
+}
+
 /** The heart-rate samples of an activity. */
 export function samplesOf(row: ActivityRow): HrSample[] {
   return (row.hr ?? []).map(([offset, bpm]) => ({ tMs: row.startMs + offset, bpm }));
@@ -341,11 +387,12 @@ export function activityLoad(
   const samples = samplesOf(row);
   if (samples.length === 0) return none;
   const rest = restHeartRate(resting, localDate(row.startMs, timezone));
-  const load = trimpLoad(samples, row.endMs, {
-    rest: rest.value,
-    max: limits.max,
-    threshold: limits.threshold,
-  });
+  const load = trimpLoad(
+    samples,
+    row.endMs,
+    { rest: rest.value, max: limits.max, threshold: limits.threshold },
+    holdCapOf(row),
+  );
   if (load === null) return none;
   return {
     load: roundTo(load, 1),
@@ -369,7 +416,7 @@ export function summaryOf(row: ActivityRow, load: ActivityLoad, timezone: string
   return {
     id: row.id,
     kind: "activity",
-    source: "watch",
+    source: row.source,
     type: row.type,
     name: nameOf(row),
     start: asInstant(row.startMs),
@@ -423,5 +470,9 @@ export function describeActivity(
     },
     series: seriesOf(row),
     generatedAt: asInstant(generatedAt.getTime()),
+    ...(row.distanceMeters === null ? {} : { distanceMeters: roundTo(row.distanceMeters, 1) }),
+    ...(row.elevationGainMeters === null
+      ? {}
+      : { elevationGainMeters: roundTo(row.elevationGainMeters, 1) }),
   };
 }

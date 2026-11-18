@@ -6,8 +6,10 @@ import { installErrorHandling, sendError } from "./errors.ts";
 import { insightsRoutes } from "./insights/routes.ts";
 import { type McpConfig, type McpTestOptions, mcpModule, mcpSettings } from "./mcp/index.ts";
 import { metricsRoutes } from "./metrics/routes.ts";
+import { outdoorRoutes } from "./outdoor/routes.ts";
 import { planRoutes } from "./plan/routes.ts";
 import { profileRoutes } from "./profile/routes.ts";
+import { repeatsRoutes } from "./repeats/routes.ts";
 import { DEFAULT_LIMITS, type Limits, ridesRoutes } from "./rides.ts";
 import { createServices, type Services, type ServicesConfig } from "./services.ts";
 import { wellnessRoutes } from "./wellness/routes.ts";
@@ -88,6 +90,8 @@ export function buildApp(options: AppOptions): FastifyInstance {
       v1.register(profileRoutes, { store: services.profile });
       v1.register(metricsRoutes, { metrics: services.metrics });
       v1.register(wellnessRoutes, { service: services.wellness });
+      v1.register(outdoorRoutes, { service: services.outdoor });
+      v1.register(repeatsRoutes, { service: services.repeats });
       v1.register(insightsRoutes, { insights: services.insights });
     },
     { prefix: "/v1" },

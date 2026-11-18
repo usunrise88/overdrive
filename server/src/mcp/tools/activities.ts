@@ -13,10 +13,11 @@ const MAX_LIMIT = 100;
 const TABLET_TYPE = "cycling";
 
 /**
- * `list_activities` and `get_activity` (spec §6.7, §8.4): the tablet's rides and the watch's workouts in one history, each with a
- * `type` (a ride on the tablet is `cycling`) and a `source`. They replace `list_rides` and `get_ride`, which stay for one release.
- * Only rides have power, laps and plan compliance; a watch workout has heart rate and a heart-rate load that counts toward fatigue
- * and recovery but never toward the power curve, FTP or aerobic drift.
+ * `list_activities` and `get_activity` (spec §6.7, §11.8, §8.4): the tablet's rides, the watch's workouts and the outdoor rides
+ * imported from FIT files in one history, each with a `type` (a ride on the tablet is `cycling`, an imported ride
+ * `cycling-outdoor`) and a `source` (`tablet`, `watch`, `fit`). They replace `list_rides` and `get_ride`, which stay for one release.
+ * Only rides have power, laps and plan compliance; a watch workout and an outdoor ride have heart rate and a heart-rate load that
+ * counts toward fatigue and recovery but never toward the power curve, FTP or aerobic drift.
  */
 export function registerActivityTools(server: McpServer, ctx: ToolContext, rides: RideTools): void {
   const { services, now } = ctx;
@@ -36,17 +37,21 @@ export function registerActivityTools(server: McpServer, ctx: ToolContext, rides
         "recorded on the watch (source watch; type as the watch names it, such as other_workout or biking; with average and maximum heart " +
         "rate, and load). A watch workout's load is worked out from heart rate against the rider's threshold heart rate on the same scale " +
         "as a ride's training stress score (one hour at threshold is 100); it is approximate (loadApproximate says when an estimate was " +
-        "used) and tends to under-count short hard efforts. A watch session that overlaps a ride on the tablet is the same ride " +
+        "used) and tends to under-count short hard efforts. An outdoor ride imported from a FIT file (source fit, type cycling-outdoor, " +
+        "from the rider's bike computer; with distance and climb) is counted the same way: from heart rate, and never toward the power curve, " +
+        "FTP or aerobic drift. A watch session that overlaps a ride on the tablet or an imported ride is the same ride " +
         "(countsTowardLoad false, overlapsRideId) and is not counted twice. Without dates: the last 30 days. Dates are the rider's local " +
         "days (YYYY-MM-DD), both included. At most 100 per call; total says how many match, offset pages through them. source narrows " +
-        "to tablet or watch. Use get_activity for one of them in detail.",
+        "to tablet, watch or fit. Use get_activity for one of them in detail.",
       input: {
         from: dateField.optional().describe("First day. Default: 29 days before to."),
         to: dateField.optional().describe("Last day, included. Default: today."),
         source: z
-          .enum(["all", "tablet", "watch"])
+          .enum(["all", "tablet", "watch", "fit"])
           .optional()
-          .describe("all (default), tablet rides only, or watch workouts only."),
+          .describe(
+            "all (default), tablet rides only, watch workouts only, or outdoor rides imported from FIT files only.",
+          ),
         limit: z.number().int().min(1).max(MAX_LIMIT).optional().describe("1 to 100. Default 20."),
         offset: z
           .number()
@@ -72,12 +77,18 @@ export function registerActivityTools(server: McpServer, ctx: ToolContext, rides
       const fromMs = dayStartMillis(start, timezone);
       const toMs = dayStartMillis(addDaysToIsoDate(end, 1), timezone);
       const [tablet, watch] = await Promise.all([
-        source === "watch"
+        source === "watch" || source === "fit"
           ? { total: 0, rides: [] }
           : services.rides.list({ fromMillis: fromMs, toMillis: toMs, limit: need, offset: 0 }),
         source === "tablet"
           ? { total: 0, items: [] }
-          : wellness.listActivities({ fromMs, toMs, limit: need, offset: 0 }),
+          : wellness.listActivities({
+              fromMs,
+              toMs,
+              limit: need,
+              offset: 0,
+              ...(source === "watch" || source === "fit" ? { source } : {}),
+            }),
       ]);
 
       // Both lists are newest first; the page is a slice of their merge.
@@ -101,7 +112,7 @@ export function registerActivityTools(server: McpServer, ctx: ToolContext, rides
           return {
             id: item.id,
             type: item.type,
-            source: "watch",
+            source: item.source,
             name: item.name,
             startTime: item.start,
             date: item.startDate,
@@ -136,7 +147,9 @@ export function registerActivityTools(server: McpServer, ctx: ToolContext, rides
       description:
         "One activity in detail, by the id list_activities gives. A ride on the tablet (an id like ride-1794996000000; type cycling) is " +
         "answered as get_ride does: power, heart-rate and cadence statistics, laps, compliance with the planned workout, and the time " +
-        "series on request. A workout from the watch (an id like watch-<record id>) has: type and name as the watch gave them, start, end " +
+        "series on request. An outdoor ride imported from a FIT file (an id like fit-<16 hex>; type cycling-outdoor, source fit) answers as a " +
+        "workout from the watch does, with its distance and climb in metres when the file says them. A workout from the watch (an id like " +
+        "watch-<record id>) has: type and name as the watch gave them, start, end " +
         "and duration, average and maximum heart rate, load (heart-rate load on the scale of the training stress score: one hour at " +
         "threshold heart rate is 100; null when the maximum and threshold heart rate are not known) with loadApproximate and loadNote, " +
         "the maximum and threshold heart rate used, how dense the heart-rate samples are (count, median and longest gap in seconds, " +
@@ -144,7 +157,7 @@ export function registerActivityTools(server: McpServer, ctx: ToolContext, rides
         "300 points. It counts toward fatigue, form and recovery and never toward the power curve, FTP or aerobic drift. Every number is " +
         "computed by code: quote it, do not recalculate it.",
       input: {
-        id: z.string().describe("An id from list_activities: a ride-… or a watch-…"),
+        id: z.string().describe("An id from list_activities: a ride-…, a watch-… or a fit-…"),
         series: z.boolean().optional().describe("Include the time series. Default false."),
         seriesStepSeconds: z
           .number()
@@ -156,7 +169,7 @@ export function registerActivityTools(server: McpServer, ctx: ToolContext, rides
       },
     },
     async ({ id, series, seriesStepSeconds }) => {
-      if (id.startsWith("watch-")) {
+      if (id.startsWith("watch-") || id.startsWith("fit-")) {
         const activity = await wellness.activity(id);
         if (activity === null) throw new ToolError(`there is no activity ${id}`);
         const { series: points, ...rest } = activity;

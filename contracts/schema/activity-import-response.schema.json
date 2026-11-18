@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive outdoor ride import answer",
+  "description": "The service's answer to POST /v1/activities/fit (spec §11.8, §8.3, ADR 0026): the FIT file of an outdoor ride, sent as application/vnd.ant.fit (up to 16 MiB) by the companion (shared from OnelapFit) or forwarded by the Telegram bot. HTTP 201 when this request stored the ride (status imported), 200 when the service already had it (status duplicate); the same answer, apart from status and the fields below, for the same file sent again. id is the stored activity (fit-<16 hex>) or, for a duplicate, the ride, activity or watch session that is the same ride; kind says what id is: activity (an imported ride or a workout from the watch, read with GET /v1/activities/{id}) or ride (a ride recorded on the tablet, GET /v1/rides/{id}). reason is null for imported and, for a duplicate, why it is the same ride: same-file (the very same bytes were imported before), same-start-and-duration (the start is within 60 seconds and the length within 2% of one already stored) or overlap (the file overlaps a ride on the tablet or a workout from the watch by half of its length or more). summary describes the ride in the file itself (also for a duplicate): name, start and end (UTC), startDate (the rider's local day of the start), durationSeconds (elapsed time from start to end), distanceMeters and elevationGainMeters (null when the file does not say), averageHeartRate (time-weighted) and maxHeartRate (null without heart rate), and, only for imported, load: the heart-rate load on the scale of the power-based score (one hour at threshold heart rate is 100; spec §6.7, §11.8), null when it cannot be worked out (no maximum or threshold heart rate known) and always null for a duplicate, with loadApproximate true when an estimated threshold, maximum or resting heart rate, or a thin heart-rate record, stood behind it (always false for a duplicate). The load feeds fatigue, form and recovery; an outdoor ride never feeds the power curve, the FTP estimate or aerobic drift. Rules a schema cannot state, checked by every implementation: start and end are real UTC instants, end after start, durationSeconds their difference in whole seconds (to a second), startDate a real date; status imported goes with kind activity, no reason and an id that starts fit-; status duplicate goes with a reason, no load and loadApproximate false.",
+  "type": "object",
+  "required": ["status", "id", "kind", "reason", "summary"],
+  "additionalProperties": false,
+  "properties": {
+    "status": { "enum": ["imported", "duplicate"] },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "kind": { "enum": ["activity", "ride"] },
+    "reason": { "enum": [null, "same-file", "same-start-and-duration", "overlap"] },
+    "summary": { "$ref": "#/$defs/summary" }
+  },
+  "$defs": {
+    "instant": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "name",
+        "start",
+        "end",
+        "startDate",
+        "durationSeconds",
+        "distanceMeters",
+        "elevationGainMeters",
+        "averageHeartRate",
+        "maxHeartRate",
+        "load",
+        "loadApproximate"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "start": { "$ref": "#/$defs/instant" },
+        "end": { "$ref": "#/$defs/instant" },
+        "startDate": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+        "durationSeconds": { "type": "integer", "minimum": 1 },
+        "distanceMeters": { "type": ["number", "null"], "minimum": 0 },
+        "elevationGainMeters": { "type": ["number", "null"], "minimum": 0 },
+        "averageHeartRate": { "type": ["number", "null"], "minimum": 1, "maximum": 300 },
+        "maxHeartRate": { "type": ["integer", "null"], "minimum": 1, "maximum": 300 },
+        "load": { "type": ["number", "null"], "minimum": 0 },
+        "loadApproximate": { "type": "boolean" }
+      }
+    }
+  }
+}

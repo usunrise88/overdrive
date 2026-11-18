@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Overdrive watch activity",
-  "description": "A workout recorded on the watch and read from Health Connect (spec §6.7, ADR 0023): the answer to GET /v1/activities/{id}, whose first part (the summary) is also the row of a history list next to the rides recorded on the tablet. id is watch-<Health Connect record id>. kind is always activity (a ride on the tablet has kind ride). type is the exercise type as the phone named it (biking, running, other_workout, ...); name is the title the watch gave it, or the type in words. start and end are UTC instants; durationSeconds is their difference. averageHeartRate (time-weighted) and maxHeartRate come from the heart-rate samples, null without any. load is the heart-rate load on the same scale as the power-based training stress score (one hour at threshold heart rate is 100), null when it cannot be worked out (no maximum or threshold heart rate known, no samples) or when the session is not counted; loadApproximate is true when a threshold, the maximum or the resting heart rate it used was an estimate, or the samples cover less than 80% of the session. countsTowardLoad is false when the session overlaps a ride recorded on the tablet (overlapsRideId says which: the watch recorded the same ride), so it is not counted twice. loadNote says in words that the figure is approximate and why. thresholdHr and maxHr are the heart rates the load used. heartRate describes how dense the samples are: how many, the median gap and the longest gap in seconds, and coverage, the share of the session within five minutes of a sample (0 to 1). series is the heart rate over the session, averaged into at most 300 points: t is seconds from the start. Rules a schema cannot state, checked by every implementation: end is after start and durationSeconds is their difference in whole seconds; startDate is the local day of start; an activity that does not count toward load has no load; the series is in order of t.",
+  "title": "Overdrive activity (watch or imported outdoor ride)",
+  "description": "A workout recorded on the watch and read from Health Connect (spec §6.7, ADR 0023), or an outdoor ride imported from a FIT file (spec §11.8, ADR 0026): the answer to GET /v1/activities/{id}, whose first part (the summary) is also the row of a history list next to the rides recorded on the tablet. id is watch-<Health Connect record id> for the watch (source watch) and fit-<16 hex> for an imported FIT file (source fit). kind is always activity (a ride on the tablet has kind ride). type is the exercise type as the phone named it (biking, running, other_workout, ...), or cycling-outdoor for an imported ride; name is the title the watch gave it, or the type in words (Outdoor ride for an imported file). start and end are UTC instants; durationSeconds is their difference. averageHeartRate (time-weighted) and maxHeartRate come from the heart-rate samples, null without any. load is the heart-rate load on the same scale as the power-based training stress score (one hour at threshold heart rate is 100), null when it cannot be worked out (no maximum or threshold heart rate known, no samples) or when the session is not counted; loadApproximate is true when a threshold, the maximum or the resting heart rate it used was an estimate, or the samples cover less than 80% of the session. countsTowardLoad is false when the session overlaps a ride recorded on the tablet, or, for a watch workout, an imported outdoor ride (overlapsRideId says which: the same ride was recorded twice), so it is not counted twice. loadNote says in words that the figure is approximate and why. thresholdHr and maxHr are the heart rates the load used. heartRate describes how dense the samples are: how many, the median gap and the longest gap in seconds, and coverage, the share of the session within five minutes of a sample (0 to 1). series is the heart rate over the session, averaged into at most 300 points: t is seconds from the start. distanceMeters and elevationGainMeters are optional: present only for an imported FIT file whose file says them (an absent key means not known; a reader also accepts null as not known, a writer leaves the key out), absent for a watch workout. Rules a schema cannot state, checked by every implementation: the id starts with the source (watch- for source watch, fit- for source fit); end is after start and durationSeconds is their difference in whole seconds; startDate is the local day of start; an activity that does not count toward load has no load; the series is in order of t.",
   "type": "object",
   "required": [
     "id",
@@ -30,8 +30,8 @@
   "properties": {
     "id": { "$ref": "#/$defs/activityId" },
     "kind": { "const": "activity" },
-    "source": { "const": "watch" },
-    "type": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,39}$" },
+    "source": { "enum": ["watch", "fit"] },
+    "type": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,39}$" },
     "name": { "type": "string", "minLength": 1, "maxLength": 100 },
     "start": { "$ref": "#/$defs/utcInstant" },
     "end": { "$ref": "#/$defs/utcInstant" },
@@ -60,13 +60,15 @@
         }
       }
     },
-    "generatedAt": { "$ref": "#/$defs/utcInstant" }
+    "generatedAt": { "$ref": "#/$defs/utcInstant" },
+    "distanceMeters": { "type": ["number", "null"], "minimum": 0 },
+    "elevationGainMeters": { "type": ["number", "null"], "minimum": 0 }
   },
   "$defs": {
     "activityId": {
-      "description": "watch- and the Health Connect record id: 1 to 128 characters from A-Z a-z 0-9 . _ -.",
+      "description": "watch- and the Health Connect record id, or fit- and 16 hex characters: 1 to 128 characters from A-Z a-z 0-9 . _ -.",
       "type": "string",
-      "pattern": "^watch-[A-Za-z0-9][A-Za-z0-9._-]{0,99}$"
+      "pattern": "^(watch|fit)-[A-Za-z0-9][A-Za-z0-9._-]{0,99}$"
     },
     "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
     "utcInstant": {

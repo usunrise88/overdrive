@@ -152,7 +152,10 @@ export function registerRideTools(server: McpServer, ctx: ToolContext): RideTool
         "aerobicDrift: for a steady stretch of at least 40 minutes with power and heart rate (the whole ride or one long steady step), the percent the efficiency " +
         "factor (normalised power over average heart rate) fell from the first half to the second, positive when heart rate rose against power; otherwise it says why there is none. " +
         "wPrimeBalance: the W′ balance model (Skiba 2012) with critical power taken as the FTP and W′ from the profile (20 kJ when unset): the lowest balance in kJ, when, and " +
-        "how much of W′ it used; below 0 means CP or W′ are set too low for this rider.",
+        "how much of W′ it used; below 0 means CP or W′ are set too low for this rider. " +
+        "repeatOf: when the ride was played from a workout that has been ridden more than once (same structure, whatever it is called), its attempt number among the " +
+        "attempts, how many there are, and the attempt before it with the difference in average heart rate at the same power (this ride minus that one, bpm: " +
+        "lower at the same power is fitter); null otherwise. Heart rate also moves with heat, sleep and caffeine: one comparison proves little, list_repeats and get_repeat give the trend.",
       input: {
         rideId: z.string().describe("The ride's id from list_rides, such as ride-1794996000000."),
         series: z.boolean().optional().describe("Include the time series. Default false."),
@@ -189,6 +192,7 @@ export function registerRideTools(server: McpServer, ctx: ToolContext): RideTool
             })();
 
       const computed = await services.metrics.rideMetrics(rideId, { wbal: true }, record);
+      const repeatOf = await services.repeats.repeatOf(rideId);
 
       const startedAt = record.ride.startEpochMillis;
       return {
@@ -229,6 +233,7 @@ export function registerRideTools(server: McpServer, ctx: ToolContext): RideTool
         powerCurve: computed?.powerCurve ?? [],
         aerobicDrift: computed?.drift ?? null,
         wPrimeBalance: computed?.wPrimeBalance ?? null,
+        repeatOf,
         ...(series === true ? { series: rideSeries(record.samples, seriesStepSeconds ?? 10) } : {}),
       };
     },

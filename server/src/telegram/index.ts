@@ -13,6 +13,7 @@ import type { EventBus } from "../events.ts";
 import type { IntervalsClient } from "../intervals/client.ts";
 import type { Logger } from "../log.ts";
 import type { NotificationSource } from "../notifications.ts";
+import type { OutdoorService } from "../outdoor/service.ts";
 import type { PlanRefresher } from "../plan/refresher.ts";
 import type { PlanStore } from "../plan/store.ts";
 import type { Timers } from "../timers.ts";
@@ -50,6 +51,8 @@ export interface TelegramDeps {
   history?: PlanHistory | undefined;
   /** Other modules' messages for the owner: the written insights and alerts (ADR 0025). */
   sources?: readonly NotificationSource[] | undefined;
+  /** Where a FIT file sent to the bot goes (spec §11.8, ADR 0026); without it the bot says it cannot import. */
+  outdoor?: OutdoorService | undefined;
 }
 
 const COMMANDS = [
@@ -110,6 +113,7 @@ export function createTelegram(deps: TelegramDeps): TelegramBot | null {
       rides: createRideQueries(deps.db),
       intervals: deps.intervals,
       refresher: deps.refresher,
+      outdoor: deps.outdoor ?? null,
       timezone: deps.timezone,
       workoutStart: clockOf(config.GCAL_WORKOUT_START, DEFAULT_WORKOUT_START),
       now,

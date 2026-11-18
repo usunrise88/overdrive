@@ -296,6 +296,24 @@ class RemoteResourceTest {
         }
 
     @Test
+    fun `the rider's request during a request waits its turn and asks once more, however often it is pressed`() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            val transport = ScriptedTransport(answer)
+            transport.beforeAnswer = { if (transport.gets.size == 1) gate.await() }
+            val resource = resource(transport)
+            val first = launch { resource.refresh(Refresh.START) }
+            yield()
+            val pressed = List(3) { launch { resource.refresh(Refresh.REQUESTED) } }
+            yield()
+            assertEquals(1, transport.gets.size, "nothing is asked while one is under way")
+            gate.complete(Unit)
+            first.join()
+            pressed.forEach { it.join() }
+            assertEquals(2, transport.gets.size, "one more request, not one for each press")
+        }
+
+    @Test
     fun `refreshing is on while a request is under way and off after`() =
         runTest {
             val gate = CompletableDeferred<Unit>()

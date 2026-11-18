@@ -340,6 +340,8 @@ stay in `.env`: you type them into the file on the host and never into a chat.
    `GCAL_WORKOUT_START` (the time a workout is assumed to start, shared with the calendar). Reminders and summaries are in
    `TIMEZONE`, so set that too.
 
+You can also **send the bot a `.fit` file** from your bike computer: it imports it as an outdoor ride and answers with a summary (section 18).
+
 Check: with a workout planned for tomorrow, the evening reminder arrives at `REMINDER_EVENING_TIME` with **Skip** and **Move**
 buttons. `/today` and `/week` need the plan source (`INTERVALS_API_KEY`); without it the bot says so.
 
@@ -504,6 +506,43 @@ the log says which ("a note was rejected", "model-server", "model-timeout"; coun
 
 What the alerts mean, and their thresholds: ADR 0025. Change them with `ALERT_*`. `INSIGHTS_ENABLED=false` switches the whole feature off.
 
+## 18. Outdoor rides from the bike computer
+
+From spring the ride you do outside, recorded on the Geoid CC600 with a speed sensor and the heart-rate strap, counts toward your fatigue and
+form (spec §11.8, ADR 0026). The service takes the ride as the **FIT file** the OnelapFit app exports, works out its **load from heart rate** (the same
+method as your watch's workouts: no power meter is needed), and sends the file to intervals.icu. **Nothing is sent to Strava.** It needs no setting of
+its own: the phone's device token (`DEVICE_TOKENS`, `companion`) and, for the load, your maximum and threshold heart rate (section 16: the companion's
+Settings, or `PATCH /v1/profile`; until you set them it uses estimates from your indoor rides, and with none it says it cannot work the load out yet).
+
+**Path A, the one to use: from OnelapFit to Overdrive.** Two ways to hand the file over; both end in the same place:
+
+1. *To the companion* (when it has the share target): in OnelapFit open the ride, **export or share the FIT file** (the share sheet of Android), and
+   choose the Overdrive companion. It uploads the file to `POST /v1/activities/fit` and shows the summary.
+2. *To the Telegram bot* (section 13): in OnelapFit export or share the FIT file, choose **Telegram**, and send it to your Overdrive bot (the chat you
+   made the owner). It answers within seconds: `Outdoor ride added: Sun 14 Mar, 2 h 05 min, 52.3 km` with the average heart rate and the load, or
+   `Already imported.` when it has the ride. Send it as a **file (document)**, not as a photo; Telegram lets a bot download up to 20 MB and the service takes up
+   to 16 MB (a ride of ten hours is about 1 MB). A file that is not a FIT file, is broken, is not cycling or has no ride in it gets a plain sentence.
+
+What the service does with it: reads the cycling ride out of the file (start, duration, distance, climb, heart rate; **power and position in the
+file are ignored**), stores the heart rate and the raw file, **recognises a ride it already has** (the same file; the same start within a minute and the same
+length within 2%; or an overlap of half of it or more with a ride from the tablet, a workout from the watch or another imported ride) and says so instead
+of counting it twice, and queues the file for intervals.icu (`INTERVALS_API_KEY`; without a key it waits in the queue). If intervals.icu already has the
+ride (it came through Strava, path B below), the server finds it by its start time and does not send a second. The ride is in the companion's history
+(`GET /v1/rides`, sport `cycling-outdoor`) and in the agent's `list_activities` and `get_activity` (source `fit`). It feeds fatigue, form and recovery and **not** the power
+curve, the FTP estimate or aerobic drift.
+
+**Path B, not built and needing nothing from us: OnelapFit to Strava, and intervals.icu imports from Strava.** Turn on OnelapFit's Strava sync and
+connect Strava in intervals.icu (Settings, Connections). It works, with less control: the ride arrives when Strava and intervals.icu get to it, it
+depends on Strava's API terms, and the service never sees the ride, so it has no heart-rate load for it in Overdrive's own fatigue and form (intervals.icu
+shows it in its own). Use one path per ride; if both deliver it, intervals.icu has it once (the server does not send it when it is already there).
+
+To see what has arrived (counts and states, not values): `docker compose exec db psql -U overdrive -d overdrive -c "SELECT id, state FROM activities a JOIN
+activity_destinations d ON d.activity_id = a.id WHERE a.source = 'fit'"`. A ride in `pending` is waiting for intervals.icu (no key, or it was
+unreachable: the log says which); `skipped` has its reason in `last_error` (the same ride was recorded on the tablet).
+
+**Repeated sessions** (spec §11.7) need nothing either: when you ride the same planned workout again (the same steps, whatever it is called) the
+service notices and the companion shows the attempts side by side; the agent reads them with `list_repeats`, `get_repeat` and `get_ride`.
+
 ## Troubleshooting
 
 - `Invalid configuration:` at start: the message names the variable. Fix it in `.env`, then `docker compose up -d server`.
@@ -525,5 +564,10 @@ What the alerts mean, and their thresholds: ADR 0025. Change them with `ALERT_*`
   in `.env`, and the server restarted with `docker compose up -d server`.
 - The log says `Strava upload stopped: it needs the owner`: the reason is in the line and in `last_error` of the waiting rides (a token
   or scope Strava refused, or an account that may not upload: section 15). Fix it and restart; nothing is lost.
+- A FIT file shared to the bot or the companion is answered `not a valid FIT file` or `422 invalid_fit`: the message says which rule failed (cut off,
+  wrong CRC, an unknown structure). Send the file OnelapFit exports, not a screenshot, a zip or a `.gpx`/`.tcx`; if the export really is a FIT file that this
+  service cannot read, keep the file (it is your data: do not post it anywhere public) and the decoder, which is small, can be extended to read it.
+- `unsupported_sport` on an outdoor ride: the file says its sport is not cycling (a run, a walk); `empty_activity`: it has no records. A ride the
+  device recorded as e-biking is read as cycling.
 - The log says `oauth refresh token reused`: a client used an old refresh token after its grace period, so that client's sign-in was
   ended; approve it again.

@@ -1,0 +1,24 @@
+{
+  "generatedAt": "2026-11-18T17:00:00Z",
+  "hash": "b1add004e12d9617",
+  "before": "ride-1795000000000",
+  "previous": {
+    "rideId": "ride-1794400000000",
+    "date": "2026-11-11",
+    "startTime": "2026-11-11T12:26:40Z",
+    "durationSeconds": 2100,
+    "ftp": 250,
+    "attempt": 3,
+    "heartRateAtPower": null,
+    "steps": [
+      {
+        "step": 1,
+        "label": "Warm-up",
+        "startSeconds": 0,
+        "endSeconds": 600,
+        "targetWatts": null,
+        "averageHeartRate": null
+      }
+    ]
+  }
+}

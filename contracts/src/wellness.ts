@@ -275,10 +275,12 @@ export interface HeartRateStats {
 
 /** The row of a history list: the first part of an {@link Activity}. */
 export interface ActivitySummary {
-  /** `watch-<record id>`. */
+  /** `watch-<record id>`, or `fit-<16 hex>` for an imported outdoor ride (spec §11.8). */
   id: string;
   kind: "activity";
-  source: "watch";
+  /** `watch`: a workout from Health Connect; `fit`: a FIT file imported by the companion or the Telegram bot. */
+  source: "watch" | "fit";
+  /** The exercise type as the phone named it, or `cycling-outdoor` for an imported ride. */
   type: string;
   name: string;
   start: string;
@@ -302,6 +304,9 @@ export interface Activity extends ActivitySummary {
   heartRate: HeartRateStats;
   series: { t: number; heartRate: number }[];
   generatedAt: string;
+  /** Only an imported FIT file whose file says them has them (an absent key, or null on read, is not known); a watch workout has neither. */
+  distanceMeters?: number | null;
+  elevationGainMeters?: number | null;
 }
 
 // ---- Validation -----------------------------------------------------------------------------------
@@ -695,6 +700,9 @@ export function activityConsistencyErrors(activity: Activity): string[] {
     }
   }
   if (!isIsoDate(activity.startDate)) errors.push("/startDate is not a real calendar date");
+  if (!activity.id.startsWith(`${activity.source}-`)) {
+    errors.push(`/id must start with ${activity.source}-`);
+  }
   if (!activity.countsTowardLoad && activity.load !== null) {
     errors.push("/load must be null when the activity does not count toward load");
   }

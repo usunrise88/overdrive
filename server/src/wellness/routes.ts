@@ -23,8 +23,8 @@ interface RangeQuery {
 /** How long `?refresh=true` waits for intervals.icu before answering with what it has. */
 const REFRESH_WAIT_MS = 10_000;
 const MAX_REPORTED_ERRORS = 5;
-/** Activity ids: `watch-` and a Health Connect record id. */
-const ACTIVITY_ID = /^watch-[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+/** Activity ids: `watch-` and a Health Connect record id, or `fit-` and 16 hex characters of an imported ride (ADR 0026). */
+const ACTIVITY_ID = /^(watch|fit)-[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
 
 function summarize(errors: readonly string[]): string {
   const shown = errors.slice(0, MAX_REPORTED_ERRORS).join("; ");
@@ -63,7 +63,7 @@ async function refreshFirst(service: WellnessService, query: unknown): Promise<v
  *   records or 4 MiB is `413 payload_too_large`. Answers counts only. Idempotent by record id.
  * - `GET /wellness?from&to[&refresh=true]`: the daily figures with the baselines in force each day (at most 186 days).
  * - `GET /recovery[?refresh=true]`: the state of this morning and the facts behind it.
- * - `GET /activities/{id}`: one workout from the watch.
+ * - `GET /activities/{id}`: one workout from the watch, or one outdoor ride imported from a FIT file.
  *
  * **Health data is private**: the body is parsed here so that a malformed one is answered without a snippet of it, and
  * nothing the routes log names a value.

@@ -26,6 +26,8 @@ export const API_ERROR_STATUS = {
   invalid_profile: 422,
   ride_id_mismatch: 422,
   invalid_fit: 422,
+  unsupported_sport: 422,
+  empty_activity: 422,
   ride_not_found: 404,
   ride_conflict: 409,
   start_time_conflict: 409,

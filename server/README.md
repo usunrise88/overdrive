@@ -7,7 +7,7 @@ integration (ADR 0016: rides are forwarded, the planned workouts are read, conve
 served to the tablet), the rider's profile (`GET`/`PATCH /v1/profile`), the MCP server with its
 OAuth server for AI clients (ADR 0018), the Google Calendar mirror and the Telegram bot (ADR 0019), the Strava upload (ADR 0020), the
 training metrics (ADR 0022), wellness, recovery and the watch's other activities (ADR 0023), the written insights, alerts and discussion
-topics (ADR 0025) and `GET /healthz`.
+topics (ADR 0025), the repeat-session comparison and the outdoor rides imported from FIT files (ADR 0026) and `GET /healthz`.
 
 ```bash
 pnpm --filter @overdrive/server dev      # node --watch src/main.ts, http://127.0.0.1:8080 (needs DATABASE_URL)
@@ -108,15 +108,20 @@ general 1 to 128 characters from `A-Z a-z 0-9 . _ -`, starting with a letter or 
 | `POST /v1/wellness` | A batch of Health Connect records, `application/json` (`wellness-upload.schema.json`, ADR 0023): `{ source: "healthconnect", device?, records }`, each record typed by `kind` (`restingHeartRate`, `heartRateSamples`, `sleepSession`, `respiratoryRate`, `oxygenSaturation`, `steps`, `exerciseSession`, `heartRateVariabilityRmssd`, `weight`); at most 2000 records and 4 MiB | `200` `{ accepted, duplicates, rejected, byType, generatedAt }`: counts only (`wellness-upload-response.schema.json`); idempotent by record id, a newer `lastModified` replaces · `422 invalid_record` one bad record refuses the whole batch, the message names its index and field and never the value · `413 payload_too_large` · `400 invalid_json` (without quoting the body) · `415` |
 | `GET /v1/wellness?from=YYYY-MM-DD&to=YYYY-MM-DD[&refresh=true]` | none | `200` the daily figures from `from` to `to` (at most 186 days) with each metric's value, source, usual range, deviation and streak, the usual bedtime and wake-up, `nightsLogged`, `stale` (`wellness-response.schema.json`) · `400 invalid_range` |
 | `GET /v1/recovery[?refresh=true]` | none | `200` today's state `ready`, `caution`, `rest`, `learning` or `noData`, the rule that decided, a one-sentence reason, guidance, 3 or 4 facts, `nightsLogged` of `nightsNeeded` (`recovery-response.schema.json`) |
-| `GET /v1/activities/{id}` | none | `200` a workout from the watch, `watch-<record id>`: summary, heart-rate load (`loadApproximate`, `loadNote`), how dense the samples are, the heart rate in at most 300 points (`activity.schema.json`) · `404 not_found` |
+| `GET /v1/activities/{id}` | none | `200` a workout from the watch, `watch-<record id>`, or an outdoor ride imported from a FIT file, `fit-<16 hex>` (with `distanceMeters` and `elevationGainMeters` when the file says them): summary, heart-rate load (`loadApproximate`, `loadNote`), how dense the samples are, the heart rate in at most 300 points (`activity.schema.json`) · `404 not_found` |
+| `POST /v1/activities/fit` | An outdoor ride's FIT file, `application/vnd.ant.fit`, at most 16 MiB (ADR 0026) | `201` `imported` / `200` `duplicate` with the id of what it duplicates and why (`activity-import-response.schema.json`): the ride's summary and heart-rate load · `422 invalid_fit` (framing, CRC, structure, not an activity file) · `422 unsupported_sport` (not cycling) · `422 empty_activity` · `413` · `415` |
+| `GET /v1/repeats` | none | `200` the workouts ridden more than once, most recently ridden first, each with its latest attempt against the previous (`repeats-response.schema.json`, ADR 0026) |
+| `GET /v1/repeats/{hash}` | none | `200` every attempt at one session side by side: heart rate at the same power per fixed-power step and overall, aerobic drift, compliance, and the trend of each, with the minimum attempts stated (`repeat-detail-response.schema.json`) · `404 not_found` a hash that is not a session ridden twice |
+| `GET /v1/repeats/{hash}/previous[?before=<rideId>]` | none | `200` the attempt before a ride with its step boundaries and per-step heart rate, for the tablet's overlay (`repeat-previous-response.schema.json`); `previous` is null when there is none · `404 ride_not_found` an unknown `before` that does not carry its start · `400 invalid_ride_id` |
 
 | `GET /v1/insights?from=YYYY-MM-DD&to=YYYY-MM-DD` | none | `200` the written notes created on those local days, at most 366, newest first, not cached (`insights-response.schema.json`, ADR 0025): `{ id, kind, createdAt, text, rideId, topic }` with `kind` `morning`, `ride`, `week`, `deviation` or `drift`, and, on a ride note, its discussion topic (`discussion-topic.schema.json`) · `400 invalid_range` |
 
 Also `401 unauthorized` everywhere, `404 not_found` for any other path or method, and `500
 internal_error` (the tablet retries those). "The same" means the same content: a record is compared
 by the SHA-256 of its canonical JSON (keys sorted, no whitespace), a file by the SHA-256 of its bytes. A stored
-ride is immutable. The FIT is checked for framing only (12- or 14-byte header, `.FIT`, data size
-equal to the body, header and file CRC-16), never parsed; chained FIT files are refused.
+ride is immutable. The FIT of a ride from the tablet is checked for framing only (12- or 14-byte header, `.FIT`, data size
+equal to the body, header and file CRC-16), never parsed; chained FIT files are refused. The FIT of an outdoor ride
+(`POST /v1/activities/fit`) is decoded as well (see below).
 
 ## Database
 
@@ -203,6 +208,32 @@ The watch's load is registered with the metrics service as its `other` load sour
 Failures and logs never name a measured value (`test/wellness-privacy.test.ts`). Without an intervals.icu key the upload and everything
 computed from it work; the pull and the forwarding are off. What it assumes about intervals.icu's wellness and `POST activities/manual`
 could not be checked without an account (ADR 0023, last section).
+
+## Repeat sessions and outdoor rides (ADR 0026)
+
+**Repeats** (spec §11.7). Two rides are the same session when the workouts they were played from have the same *structure*: `workoutHash` in
+`contracts/src/repeats.ts` is the first 16 hex of the SHA-256 of the steps with repeats expanded (`s600@880`, `r300@450-700`, `f300`: type, seconds,
+targets in thousandths of FTP; no name, label or cadence). The hash is stored with each ride's workout copy (`ride_workouts.workout_hash`) and worked
+out, idempotently, for the rides stored before it. The heart rate at the same power of each steady step, the compliance and the step boundaries are
+worked out once per ride (`ride_repeat_stats`); the comparison and the trend are pure (`src/repeats/compare.ts`).
+
+| Piece | Where |
+|---|---|
+| The rules of "heart rate at the same power" (3% of the target, not paused, after the first 60 s of each stretch, at least 120 s per step) | `src/repeats/figures.ts` (its header states them; every rule has a test) |
+| Overall figure over the compared steps, change of two figures, least-squares trend (at least 3 attempts) | `src/repeats/compare.ts` |
+| Hashes, per-ride figures | `src/repeats/store.ts`; the service `src/repeats/service.ts` (`services.repeats`: `list`, `detail`, `previous`, `repeatOf`); the routes `src/repeats/routes.ts` |
+| MCP | `src/mcp/tools/repeats.ts` (`list_repeats`, `get_repeat`) and `repeatOf` in `get_ride` |
+
+**Outdoor rides** (spec §11.8). `services.outdoor.importFit(bytes, device)` is the one import function: the HTTP route `POST /v1/activities/fit` and
+the Telegram bot's document handler both call it. `src/fit.ts` checks the framing and CRCs, **`src/fit-decode.ts` is our own decoder** (the messages an
+outdoor ride needs; developer fields skipped; Garmin's SDK is not used because its licence forbids redistribution, ADR 0026), `src/outdoor/fit-ride.ts`
+reads the cycling ride out of a decoded file, `src/outdoor/store.ts` stores it and applies the duplicate rule, `src/outdoor/service.ts` ties them together.
+The ride is a row of `activities` (`source = 'fit'`, `type = 'cycling-outdoor'`) with the heart rate thinned to 5 s and the raw bytes; its **load is
+heart-rate load of the `other` kind** (the watch's TRIMP, `src/wellness/trimp.ts`): it feeds fatigue, form and recovery and never the power curve, FTP
+or drift. The forwarder of the watch's workouts (`src/wellness/forward.ts`) sends the file as it is to intervals.icu (off without a key; nothing to
+Strava). A duplicate is the same bytes, the same start (±60 s) and length (±2%) as any stored ride, imported ride or watch session, or an overlap of half
+of the file or more with a ride, a watch session or another imported ride. Tests write their FIT files with a **test-side encoder**
+(`test/helpers/fit-encoder.ts`); every number in them is invented. Logs and error messages never name a measured value (`test/outdoor-privacy.test.ts`).
 
 ## Written insights, alerts and discussion topics (ADR 0025)
 
@@ -378,6 +409,8 @@ Other modules (the MCP tools, Telegram, Google Calendar, Strava) plug in without
 | Profile | `services.profile` (`src/profile/store.ts`) | `get()` the FTP, zones, availability, goals and physics; `update(patch)` (validated, atomic); a change emits `profile-changed` (`{ fields }`) |
 | Rides | `services.rides` (`src/ride-store.ts`), `services.rideWorkouts` | `list`, `getRecord` of the stored rides; the workout a ride was played from, copied when it was stored. `src/ride-stats.ts` has the pure statistics, series and compliance (`rideStatistics`, `rideSeries`, `rideCompliance`) a ride summary for Telegram can reuse |
 | Training metrics | `services.metrics` (`src/metrics/`, ADR 0022) | `metrics(from, to)`, `rideMetrics`, `rideList`, `rideDetail`, `ftpAdvice`, `dismissSuggestion`; `registerLoadSource({ name, entries(untilDate) })` feeds the daily load with other activities (`kind: "other"`: counts for fatigue and form, never for the power curve, eFTP or drift) and `registerActivitySource({ name, list({ beforeMillis, limit }) })` adds them to `GET /v1/rides`. The pure math (`power-curve.ts`, `load.ts`, `ftp.ts`, `drift.ts`, `wbal.ts`) knows nothing of the database. A listener on `ride-stored` computes a ride, one on `profile-changed` keeps the FTP history and marks a suggestion accepted |
+| Repeats | `services.repeats` (`src/repeats/`, ADR 0026) | `list()`, `detail(hash)`, `previous(hash, before)`, `repeatOf(rideId)`, `ensureHashes()`; `ride_workouts.workout_hash` is set when a ride's workout copy is saved |
+| Outdoor rides | `services.outdoor` (`src/outdoor/`, ADR 0026) | `importFit(bytes, device)` → `{ response, created }`, or throws `ImportError` (`invalid_fit`, `unsupported_sport`, `empty_activity`); stores an activity (`source = 'fit'`) and emits `activity-stored` |
 | Wellness | `services.wellness` (`src/wellness/`, ADR 0023) | `upload.ingest(batch, device)`, `wellness(from, to)`, `recovery()`, `activity(id)`, `listActivities(query)`, `otherLoadByDay(from, to)` (the watch's load per local day), `refresh()` (pulls intervals.icu, `null` without a key); the `activity-stored` event queues a forwarding |
 | Insights | `services.insights` (`src/insights/`, ADR 0025) | `list(from, to)` (the wire shape), `facts(request)`, `topics(statuses, limit)`, `markTopicDiscussed(id)`, `tick()`; `notifications` is a `NotificationSource` (`src/notifications.ts`) the bot sends; a stored note emits `insight-stored`, new wellness figures `wellness-updated`. The plan history (`createPlanHistory`, shared with the bot) keeps each planned workout with its length and planned load after the cache drops its day |
 | Plan entries | `src/plan/entries.ts` (`readPlanEvent`), `src/plan/summary.ts` | one reading of a calendar event as a plan entry; duration, estimated load and a one-line outline of a native workout |

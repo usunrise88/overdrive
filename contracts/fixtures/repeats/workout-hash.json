@@ -1,0 +1,503 @@
+{
+  "description": "Golden numbers for the structure of a workout and its hash (spec §11.7, ADR 0026): the canonical text workoutStructure() makes of a workout's steps and the 16 hex characters of SHA-256 over 'overdrive.workout-structure.v1\\n' and that text. same lists the cases that must have one hash, different the pairs that must not. Every workout here is synthetic.",
+  "version": 1,
+  "cases": [
+    {
+      "name": "sweet-spot",
+      "workout": {
+        "schema": 1,
+        "id": "2026-11-20-sweet-spot",
+        "name": "Sweet spot 3x10",
+        "description": "Three 10-minute efforts with 5-minute recoveries.",
+        "steps": [
+          {
+            "type": "ramp",
+            "duration": 600,
+            "from": 0.45,
+            "to": 0.7,
+            "label": "Warm-up"
+          },
+          {
+            "type": "repeat",
+            "count": 3,
+            "steps": [
+              {
+                "type": "steady",
+                "duration": 600,
+                "target": 0.88,
+                "label": "Sweet spot"
+              },
+              {
+                "type": "steady",
+                "duration": 300,
+                "target": 0.5,
+                "label": "Recover"
+              }
+            ]
+          },
+          {
+            "type": "free",
+            "duration": 300,
+            "label": "Free ride"
+          },
+          {
+            "type": "ramp",
+            "duration": 300,
+            "from": 0.55,
+            "to": 0.4,
+            "label": "Cool-down"
+          }
+        ]
+      },
+      "structure": "r600@450-700,s600@880,s300@500,s600@880,s300@500,s600@880,s300@500,f300,r300@550-400",
+      "hash": "b1add004e12d9617"
+    },
+    {
+      "name": "sweet-spot-renamed-with-cadence-and-float-noise",
+      "workout": {
+        "schema": 1,
+        "id": "icu-9981",
+        "name": "Threshold-ish blocks (copy)",
+        "steps": [
+          {
+            "type": "ramp",
+            "duration": 600,
+            "from": 0.45,
+            "to": 0.7,
+            "cadence": 90
+          },
+          {
+            "type": "repeat",
+            "count": 3,
+            "label": "Blocks",
+            "steps": [
+              {
+                "type": "steady",
+                "duration": 600,
+                "target": 0.8800000000000001,
+                "cadence": 95,
+                "label": "On"
+              },
+              {
+                "type": "steady",
+                "duration": 300,
+                "target": 0.5,
+                "label": "Off"
+              }
+            ]
+          },
+          {
+            "type": "free",
+            "duration": 300
+          },
+          {
+            "type": "ramp",
+            "duration": 300,
+            "from": 0.55,
+            "to": 0.4
+          }
+        ]
+      },
+      "structure": "r600@450-700,s600@880,s300@500,s600@880,s300@500,s600@880,s300@500,f300,r300@550-400",
+      "hash": "b1add004e12d9617"
+    },
+    {
+      "name": "sweet-spot-every-step-written-out",
+      "workout": {
+        "schema": 1,
+        "id": "icu-9982",
+        "name": "Sweet spot 3x10, every step written out",
+        "steps": [
+          {
+            "type": "ramp",
+            "duration": 600,
+            "from": 0.45,
+            "to": 0.7
+          },
+          {
+            "type": "steady",
+            "duration": 600,
+            "target": 0.88
+          },
+          {
+            "type": "steady",
+            "duration": 300,
+            "target": 0.5
+          },
+          {
+            "type": "steady",
+            "duration": 600,
+            "target": 0.88
+          },
+          {
+            "type": "steady",
+            "duration": 300,
+            "target": 0.5
+          },
+          {
+            "type": "steady",
+            "duration": 600,
+            "target": 0.88
+          },
+          {
+            "type": "steady",
+            "duration": 300,
+            "target": 0.5
+          },
+          {
+            "type": "free",
+            "duration": 300
+          },
+          {
+            "type": "ramp",
+            "duration": 300,
+            "from": 0.55,
+            "to": 0.4
+          }
+        ]
+      },
+      "structure": "r600@450-700,s600@880,s300@500,s600@880,s300@500,s600@880,s300@500,f300,r300@550-400",
+      "hash": "b1add004e12d9617"
+    },
+    {
+      "name": "sweet-spot-one-target-higher",
+      "workout": {
+        "schema": 1,
+        "id": "2026-11-20-sweet-spot",
+        "name": "Sweet spot 3x10",
+        "description": "Three 10-minute efforts with 5-minute recoveries.",
+        "steps": [
+          {
+            "type": "ramp",
+            "duration": 600,
+            "from": 0.45,
+            "to": 0.7,
+            "label": "Warm-up"
+          },
+          {
+            "type": "repeat",
+            "count": 3,
+            "steps": [
+              {
+                "type": "steady",
+                "duration": 600,
+                "target": 0.89,
+                "label": "Sweet spot"
+              },
+              {
+                "type": "steady",
+                "duration": 300,
+                "target": 0.5,
+                "label": "Recover"
+              }
+            ]
+          },
+          {
+            "type": "free",
+            "duration": 300,
+            "label": "Free ride"
+          },
+          {
+            "type": "ramp",
+            "duration": 300,
+            "from": 0.55,
+            "to": 0.4,
+            "label": "Cool-down"
+          }
+        ]
+      },
+      "structure": "r600@450-700,s600@890,s300@500,s600@890,s300@500,s600@890,s300@500,f300,r300@550-400",
+      "hash": "7f65cd0cc58b8b9c"
+    },
+    {
+      "name": "sweet-spot-one-step-a-second-longer",
+      "workout": {
+        "schema": 1,
+        "id": "2026-11-20-sweet-spot",
+        "name": "Sweet spot 3x10",
+        "description": "Three 10-minute efforts with 5-minute recoveries.",
+        "steps": [
+          {
+            "type": "ramp",
+            "duration": 600,
+            "from": 0.45,
+            "to": 0.7,
+            "label": "Warm-up"
+          },
+          {
+            "type": "repeat",
+            "count": 3,
+            "steps": [
+              {
+                "type": "steady",
+                "duration": 601,
+                "target": 0.88,
+                "label": "Sweet spot"
+              },
+              {
+                "type": "steady",
+                "duration": 300,
+                "target": 0.5,
+                "label": "Recover"
+              }
+            ]
+          },
+          {
+            "type": "free",
+            "duration": 300,
+            "label": "Free ride"
+          },
+          {
+            "type": "ramp",
+            "duration": 300,
+            "from": 0.55,
+            "to": 0.4,
+            "label": "Cool-down"
+          }
+        ]
+      },
+      "structure": "r600@450-700,s601@880,s300@500,s601@880,s300@500,s601@880,s300@500,f300,r300@550-400",
+      "hash": "8c3d92167accf64f"
+    },
+    {
+      "name": "sweet-spot-four-blocks",
+      "workout": {
+        "schema": 1,
+        "id": "2026-11-20-sweet-spot",
+        "name": "Sweet spot 3x10",
+        "description": "Three 10-minute efforts with 5-minute recoveries.",
+        "steps": [
+          {
+            "type": "ramp",
+            "duration": 600,
+            "from": 0.45,
+            "to": 0.7,
+            "label": "Warm-up"
+          },
+          {
+            "type": "repeat",
+            "count": 4,
+            "steps": [
+              {
+                "type": "steady",
+                "duration": 600,
+                "target": 0.88,
+                "label": "Sweet spot"
+              },
+              {
+                "type": "steady",
+                "duration": 300,
+                "target": 0.5,
+                "label": "Recover"
+              }
+            ]
+          },
+          {
+            "type": "free",
+            "duration": 300,
+            "label": "Free ride"
+          },
+          {
+            "type": "ramp",
+            "duration": 300,
+            "from": 0.55,
+            "to": 0.4,
+            "label": "Cool-down"
+          }
+        ]
+      },
+      "structure": "r600@450-700,s600@880,s300@500,s600@880,s300@500,s600@880,s300@500,s600@880,s300@500,f300,r300@550-400",
+      "hash": "9d04c7cf72643300"
+    },
+    {
+      "name": "sweet-spot-free-step-moved",
+      "workout": {
+        "schema": 1,
+        "id": "2026-11-20-sweet-spot",
+        "name": "Sweet spot 3x10",
+        "description": "Three 10-minute efforts with 5-minute recoveries.",
+        "steps": [
+          {
+            "type": "ramp",
+            "duration": 600,
+            "from": 0.45,
+            "to": 0.7,
+            "label": "Warm-up"
+          },
+          {
+            "type": "free",
+            "duration": 300,
+            "label": "Free ride"
+          },
+          {
+            "type": "repeat",
+            "count": 3,
+            "steps": [
+              {
+                "type": "steady",
+                "duration": 600,
+                "target": 0.88,
+                "label": "Sweet spot"
+              },
+              {
+                "type": "steady",
+                "duration": 300,
+                "target": 0.5,
+                "label": "Recover"
+              }
+            ]
+          },
+          {
+            "type": "ramp",
+            "duration": 300,
+            "from": 0.55,
+            "to": 0.4,
+            "label": "Cool-down"
+          }
+        ]
+      },
+      "structure": "r600@450-700,f300,s600@880,s300@500,s600@880,s300@500,s600@880,s300@500,r300@550-400",
+      "hash": "39c2e9dfeba69018"
+    },
+    {
+      "name": "sweet-spot-ramp-instead-of-steady",
+      "workout": {
+        "schema": 1,
+        "id": "2026-11-20-sweet-spot",
+        "name": "Sweet spot 3x10",
+        "description": "Three 10-minute efforts with 5-minute recoveries.",
+        "steps": [
+          {
+            "type": "ramp",
+            "duration": 600,
+            "from": 0.45,
+            "to": 0.7,
+            "label": "Warm-up"
+          },
+          {
+            "type": "repeat",
+            "count": 3,
+            "steps": [
+              {
+                "type": "ramp",
+                "duration": 600,
+                "from": 0.88,
+                "to": 0.88
+              },
+              {
+                "type": "steady",
+                "duration": 300,
+                "target": 0.5,
+                "label": "Recover"
+              }
+            ]
+          },
+          {
+            "type": "free",
+            "duration": 300,
+            "label": "Free ride"
+          },
+          {
+            "type": "ramp",
+            "duration": 300,
+            "from": 0.55,
+            "to": 0.4,
+            "label": "Cool-down"
+          }
+        ]
+      },
+      "structure": "r600@450-700,r600@880-880,s300@500,r600@880-880,s300@500,r600@880-880,s300@500,f300,r300@550-400",
+      "hash": "cbb6da744aa9155f"
+    },
+    {
+      "name": "zone-2-hour",
+      "workout": {
+        "schema": 1,
+        "id": "z2",
+        "name": "Zone 2 hour",
+        "steps": [
+          {
+            "type": "steady",
+            "duration": 3600,
+            "target": 0.65
+          }
+        ]
+      },
+      "structure": "s3600@650",
+      "hash": "4d491be812dc3f98"
+    },
+    {
+      "name": "zone-2-hour-renamed",
+      "workout": {
+        "schema": 1,
+        "id": "x",
+        "name": "Easy spin",
+        "steps": [
+          {
+            "type": "steady",
+            "duration": 3600,
+            "target": 0.65,
+            "label": "Easy",
+            "cadence": 85
+          }
+        ],
+        "description": "Something else"
+      },
+      "structure": "s3600@650",
+      "hash": "4d491be812dc3f98"
+    },
+    {
+      "name": "free-ride-hour",
+      "workout": {
+        "schema": 1,
+        "id": "f",
+        "name": "Free ride hour",
+        "steps": [
+          {
+            "type": "free",
+            "duration": 3600
+          }
+        ]
+      },
+      "structure": "f3600",
+      "hash": "da2b6fdd397b6f36"
+    }
+  ],
+  "same": [
+    [
+      "sweet-spot",
+      "sweet-spot-renamed-with-cadence-and-float-noise",
+      "sweet-spot-every-step-written-out"
+    ],
+    [
+      "zone-2-hour",
+      "zone-2-hour-renamed"
+    ]
+  ],
+  "different": [
+    [
+      "sweet-spot",
+      "sweet-spot-one-target-higher"
+    ],
+    [
+      "sweet-spot",
+      "sweet-spot-one-step-a-second-longer"
+    ],
+    [
+      "sweet-spot",
+      "sweet-spot-four-blocks"
+    ],
+    [
+      "sweet-spot",
+      "sweet-spot-free-step-moved"
+    ],
+    [
+      "sweet-spot",
+      "sweet-spot-ramp-instead-of-steady"
+    ],
+    [
+      "zone-2-hour",
+      "free-ride-hour"
+    ]
+  ]
+}

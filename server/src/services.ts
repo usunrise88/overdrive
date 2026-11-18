@@ -15,9 +15,11 @@ import {
 } from "./intervals/uploads.ts";
 import type { Logger } from "./log.ts";
 import { createMetricsService, type MetricsService } from "./metrics/service.ts";
+import { createOutdoor, type OutdoorService } from "./outdoor/service.ts";
 import { createPlanRefresher, type PlanRefresher } from "./plan/refresher.ts";
 import { createPlanStore, type PlanStore } from "./plan/store.ts";
 import { createProfileStore, type ProfileStore } from "./profile/store.ts";
+import { createRepeats, type RepeatsService } from "./repeats/service.ts";
 import { createRideStore, type RideStore } from "./ride-store.ts";
 import { createRideWorkoutResolver, type RideWorkoutResolver } from "./ride-workout.ts";
 import { createStrava, STRAVA_DESTINATION, type StravaUploads } from "./strava/index.ts";
@@ -83,6 +85,10 @@ export interface Services {
    * the forwarding of the watch's activities run only with one.
    */
   wellness: WellnessService;
+  /** Repeat-session comparison: the workouts ridden more than once, their attempts side by side and their trend (spec §11.7, ADR 0026). */
+  repeats: RepeatsService;
+  /** Outdoor rides from FIT files, shared by the companion and sent to the Telegram bot (spec §11.8, ADR 0026). */
+  outdoor: OutdoorService;
   /**
    * The written insights, the alerts and the discussion topics (ADR 0025). Always present: without a language model the notes are
    * written from templates. The Telegram bot sends what it stores.
@@ -174,6 +180,15 @@ export function createServices(options: ServicesOptions): Services {
     if (header?.workoutId != null) await rideWorkouts.resolve(header);
   });
 
+  const repeats = createRepeats({
+    db,
+    rides,
+    metrics,
+    timezone,
+    now: now ?? (() => new Date()),
+    log,
+  });
+
   const wellness = createWellness({
     db,
     bus,
@@ -199,6 +214,7 @@ export function createServices(options: ServicesOptions): Services {
         : { nightsNeeded: config.WELLNESS_NIGHTS_NEEDED }),
     },
   });
+  const outdoor = createOutdoor({ db, bus, wellness, timezone, log });
   const planHistory = createPlanHistory({
     db,
     plan,
@@ -253,6 +269,7 @@ export function createServices(options: ServicesOptions): Services {
     timers: options.timers,
     history: planHistory,
     sources: [insights.notifications],
+    outdoor,
   });
   let strava: StravaUploads | null = null;
   const stravaMode = stravaSettings(config);
@@ -295,6 +312,8 @@ export function createServices(options: ServicesOptions): Services {
     calendar,
     telegram,
     wellness,
+    repeats,
+    outdoor,
     insights,
     start() {
       void uploads?.start();
@@ -304,6 +323,7 @@ export function createServices(options: ServicesOptions): Services {
       telegram?.start();
       wellness.start();
       metrics.start();
+      repeats.start();
       insights.start();
     },
     async stop() {
@@ -315,6 +335,7 @@ export function createServices(options: ServicesOptions): Services {
         telegram?.stop(),
         wellness.stop(),
         metrics.stop(),
+        repeats.whenIdle(),
         insights.stop(),
       ]);
     },
