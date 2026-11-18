@@ -87,7 +87,9 @@ jobs:
           for app in ride companion; do
             apk="android/app-$app/build/outputs/apk/release/app-$app-release.apk"
             "$apksigner" verify --print-certs "$apk" | tee "$RUNNER_TEMP/certs-$app.txt"
-            actual="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/certs-$app.txt")"
+            # The label differs between apksigner versions ("Signer #1 ..." / "V2 Signer: ..."), the digest does not.
+            actual="$(grep -m1 'certificate SHA-256 digest' "$RUNNER_TEMP/certs-$app.txt" | sed 's/.*: //')"
+            [ -n "$actual" ] || { echo "::error::Could not read the signer digest of the $app APK"; exit 1; }
             [ "$actual" = "$expected" ] || { echo "::error::$app APK is not signed with the release key"; exit 1; }
             cp "$apk" "dist/overdrive-$app-${VERSION#v}.apk"
           done
