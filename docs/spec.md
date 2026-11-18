@@ -396,6 +396,16 @@ Phase 2 connects the ride app to a plan: an AI agent schedules workouts, they ap
 - The intervals.icu calendar is the source of truth for planned workouts. The service reads and writes it with a personal API key.
 - The service converts intervals.icu workouts to the native workout JSON and caches the next 14 days.
 - If intervals.icu is unreachable, the cache keeps the apps working. If the project ever leaves intervals.icu, only this adapter changes.
+- *Settled in stages P2-1c and P2-2a (ADR 0016, `server/src/intervals/`, `server/src/plan/`):* the service reads the calendar's WORKOUT
+  events for **today and the next 14 days** (today in the rider's `TIMEZONE`) at start and every `PLAN_REFRESH_MINUTES` (15), and
+  on demand, converts each to the native workout (`workout_doc` steps, else the text description, else the planned duration; steady,
+  ramp, repeat and free steps; % FTP, watts over the FTP it was resolved with, zones through the watts intervals.icu resolves them
+  to; a band becomes its middle; a heart-rate or pace step becomes a free step), and keeps them in the `planned_workouts` cache,
+  mirroring deletions. A workout the native format cannot hold (nested repeats, steps in distance, until the lap button, …) is not
+  served: it is logged once with the reason and kept with it in the cache. The native workout's id is `icu-<event id>`. With
+  intervals.icu unreachable the cache answers with `stale: true`; with no key set the integration is off and the answer says
+  `configured: false`. The calendar is written through `workoutToEventPayload` (the steps as intervals.icu's text syntax) for the MCP
+  tools of §5.2, which come later. What the real service must still confirm is listed in ADR 0016.
 
 ### 5.2 MCP server
 
@@ -427,6 +437,12 @@ Phase 2 connects the ride app to a plan: an AI agent schedules workouts, they ap
 - *Settled in stage P2-1 (ADR 0014):* the tablet uploads the ride record and the FIT as two idempotent requests (§8.3); the
   service identifies a ride by its id and by its start time, and a record whose start time is stored under another id is refused
   (`409`, naming the stored id) rather than stored twice. The push to intervals.icu and Strava is a separate step after intake.
+- *Settled in stage P2-1c (ADR 0016):* storing a ride's FIT queues it for intervals.icu in the same transaction (`ride_destinations`),
+  and a worker uploads the stored FIT (`POST /api/v1/athlete/{id}/activities`, the ride id as `external_id`), with backoff persisted
+  in the table: 1, 2, 4 … minutes up to 6 hours, given up after 20 failures or when intervals.icu refuses the file, never for a wrong
+  key. An activity intervals.icu already has counts as uploaded. The activity is paired with the planned workout of its day (the
+  ride's `workoutId`, or the only cycling workout planned that day, in the rider's `TIMEZONE`). A failure there never fails or delays
+  the tablet's upload. Strava will be another destination over the same queue.
 
 ### 5.6 Strava presentation
 
@@ -570,7 +586,8 @@ Keeping `core` free of Android code costs almost nothing now and leaves an iOS p
 Four contracts hold the system together: the workout file, the ride record, the sync API and the MCP tool set. Names and fields here are a first draft to be fixed during implementation.
 
 *Status at the end of Phase 1:* §8.1 (workout format) and §8.2 (ride record) are settled and live in `contracts/` with their
-fixtures, read and written by `core` and checked by the TypeScript side. §8.3 and §8.4 are Phase 2 and stay a first draft. The
+fixtures, read and written by `core` and checked by the TypeScript side. §8.3 and §8.4 are Phase 2: §8.3 is settled for the ride
+intake (P2-1a) and the planned workouts (P2-2a), the rest of it and §8.4 stay a first draft. The
 outbox entry of §4.9 is **not** a wire format (ride id, enqueue time, start time, duration, title); what an upload sends is
 Phase 2's to settle, here, with its schema in `contracts/`, before any client or service code.
 
@@ -651,7 +668,7 @@ path: everything is under `/v1`.
 |---|---|---|
 | `PUT /v1/rides/{rideId}` | Ride app | Upload the ride record (§8.2), the JSON body. **Settled** |
 | `PUT /v1/rides/{rideId}/fit` | Ride app | Upload the FIT file generated from that record (`application/vnd.ant.fit`). **Settled** |
-| `GET /v1/workouts?from&to` | Ride app | Planned workouts in native format |
+| `GET /v1/workouts?from&to` | Ride app | Planned workouts in native format. **Settled** (stage P2-2a, below) |
 | `GET /v1/rides`, `GET /v1/rides/{id}` | Companion | History and detail |
 | `POST /v1/wellness` | Companion | Batch of Health Connect records |
 | `GET /v1/metrics?from&to` | Companion | Load, form, recovery state, baselines |
@@ -676,6 +693,19 @@ path: everything is under `/v1`.
   tablet retries `5xx` and network errors, treats `401` as "token rejected" and other `4xx` as permanent (ADR 0014 section 6),
   except that `408` and `429` are retried and a `404 ride_not_found` for the FIT of a record it has just stored is retried too
   (section 8).
+
+**Settled in stage P2-2a (planned workouts; ADR 0016, `contracts/schema/workouts-response.schema.json`, Kotlin `PlanApiJson`):**
+
+- `GET /v1/workouts?from=YYYY-MM-DD&to=YYYY-MM-DD[&refresh=true]` answers
+  `{ "from", "to", "generatedAt", "stale", "configured", "workouts": [{ "id", "date", "name", "source": "intervals.icu", "workout" }] }`.
+  `workout` is the native workout (§8.1) and `workout.id` equals the entry's `id` (`icu-123`), so a ride started from it records that id
+  as `ride.workoutId` and the upload pairs by it. Dates are the rider's local days; both ends are included; at most **62 days**, otherwise
+  `400 invalid_range` (a new code of the closed list, also for a missing, malformed or reversed range). Ordered by date, then id.
+- The service serves its cache and does not wait for intervals.icu, unless `refresh=true` (it reads first and waits at most ten
+  seconds). `generatedAt` is when the plan was last read successfully (UTC), or `null`. `stale` is true when the last refresh failed (the
+  list is then the last known one) or none has finished yet. `configured: false` means no plan source is set up: the list is empty,
+  `stale` is false and `generatedAt` null. The cache holds today and the next 14 days, so a range beyond that comes back short.
+- Workouts the native format cannot hold are left out of the list (the service logs why); the answer does not mention them.
 
 ### 8.4 MCP tools
 
