@@ -45,11 +45,16 @@ Layout rationale: `docs/adr/0001-repository-layout-and-toolchain.md`.
 - **The repository is public.** Never commit secrets, keystores, tokens, personal data or raw
   recordings of the owner's body (heart rate, rides). Test data is synthetic or short and anonymised.
   Release signing material lives in GitHub Actions secrets only.
-- **Every stage ends with a release** (Phase 2 is the exception, by the owner's decision of 2026-11-18: its stages merge and the phase ends with one `v0.2.0`; alphas optional). Stages are the milestones inside a phase. Before tagging:
-  `make check` and `make android-check` are green, `docs/spec.md` and the ADRs reflect what was
-  built, and CI on the commit is green. Then tag `vX.Y.Z` (pre-releases `vX.Y.Z-alpha.N`) on that
-  commit. `.github/workflows/release.yml` builds, signs and publishes the APKs as a GitHub Release.
-  Write release notes for a human: what works, what to test on the bike, what is known broken.
+- **A phase ends with a release candidate, then the release.** (Owner's decision, 2026-11-18; it replaces "every stage ends
+  with a release".) When a phase is built: cut `vX.Y.Z-rc.N` at once (pre-release, same workflow as any tag) so the owner can
+  install and test it on the bike; **while the owner tests, the orchestrator runs the long checks itself** (full test suites on
+  real PostgreSQL, repeated runs of flaky-prone tests under load, CI on the commit, review of the agents' work) and fixes what
+  they find in the development branch. When the owner's testing and those checks are done, cut the final `vX.Y.Z` on a commit
+  with green CI. Stages inside a phase merge without a release. Before any tag: `make check` and `make android-check` are
+  green and `docs/spec.md` and the ADRs reflect what was built; before the final tag also CI on the commit is green.
+  `.github/workflows/release.yml` builds, signs and publishes the APKs as a GitHub Release (a tag with a hyphen is a
+  pre-release). Write release notes for a human: what works, what to test on the bike, what is known broken (the RC notes say
+  plainly which checks are still running).
 - **Signing secrets** (set by the owner, never printed or committed): `ANDROID_KEYSTORE_BASE64`,
   `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. The workflow's manual
   dry run (`workflow_dispatch`, default `dry_run: true`) verifies them without publishing.
