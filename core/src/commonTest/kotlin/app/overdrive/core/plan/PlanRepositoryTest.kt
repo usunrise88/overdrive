@@ -502,15 +502,20 @@ class PlanRepositoryTest {
             started.await()
             assertTrue(repository.state.value.refreshing)
 
-            repository.refresh(PlanRefresh.REQUESTED)
+            val requested = launch { repository.refresh(PlanRefresh.REQUESTED) }
             repository.refresh(PlanRefresh.SCREEN_OPENED)
-            assertEquals(1, transport.requests.size, "dropped: the one under way answers for them")
+            assertEquals(1, transport.requests.size, "nothing is asked while one is under way")
 
             config = SyncConfig(address, "tok-another-0123456789abcdef0123456789")
             repository.refresh(PlanRefresh.SETTINGS_CHANGED)
             release.complete(Unit)
             first.join()
-            assertEquals(2, transport.requests.size, "the change was made with the old token, so once more")
+            requested.join()
+            assertEquals(
+                3,
+                transport.requests.size,
+                "the change was made with the old token, so once more; and the rider's own request, which waited, once more",
+            )
             assertEquals("tok-another-0123456789abcdef0123456789", transport.requests.last().bearerToken)
             assertFalse(repository.state.value.refreshing)
         }
