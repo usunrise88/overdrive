@@ -22,13 +22,19 @@ import kotlinx.coroutines.flow.StateFlow
  * | Command | Does something when | Effect | No-op otherwise |
  * |---|---|---|---|
  * | [start] | `READY` | Becomes `RIDING`; the ride clock and the workout start from 0. | everything else |
- * | [pause] | `RIDING` | Becomes `PAUSED`; the ride clock and workout stop; power and cadence read 0. | everything else |
- * | [resume] | `PAUSED` | Becomes `RIDING`; the clock and workout continue where they stopped. | everything else |
+ * | [pause] | `RIDING` | Becomes `PAUSED` with [PauseReason.MANUAL]; the ride clock and workout stop. | everything else |
+ * | [resume] | `PAUSED` | Lifts a manual or automatic pause: becomes `RIDING`, and the clock and workout continue where they stopped. A ride that is paused because the trainer is gone stays `PAUSED` until it is back. | everything else |
  * | [finish] | `RIDING` or `PAUSED` | Becomes `FINISHED`. | `IDLE`, `READY`, `FINISHED` |
  * | [nextInterval] | `RIDING` or `PAUSED`, a workout, and not in the last step | Jumps to the start of the next step. | everything else |
  * | [previousInterval] | `RIDING` or `PAUSED` and a workout | Restarts the current step if more than 3 s into it, else jumps to the start of the previous step. In the first step it restarts that step. | everything else |
  * | [gearUp], [gearDown] | `READY`, `RIDING` or `PAUSED`, in a simulation step | Moves the gear by one, clamped to `1..gearCount`. | ERG steps, `IDLE`, `FINISHED`, and at the ends of the range |
  * | [intensityUp], [intensityDown] | `READY`, `RIDING` or `PAUSED`, in an ERG step | Moves the intensity by 5 points, clamped to 50..150. | simulation steps, `IDLE`, `FINISHED`, and at the ends of the range |
+ *
+ * **Pauses.** A ride is `PAUSED` for one or more reasons, reported as [RideSnapshot.pauseReason]: the rider paused it
+ * ([PauseReason.MANUAL]), the real engine paused it because the rider stopped pedalling ([PauseReason.AUTO], spec §4.2),
+ * or because the trainer's link is down ([PauseReason.TRAINER_DISCONNECTED]). While paused the sensors keep reporting what
+ * they measure: 0 W and 0 rpm for a rider who is not pedalling, null (no signal) for a trainer that is gone, and the heart
+ * rate as usual. The simulated session only ever pauses manually and its stopped rider reads 0 W.
  *
  * **Gears and intensity are separate commands.** On the handlebar the two gear buttons change the
  * intensity instead of the gear in ERG steps (spec §4.7); that routing belongs to the gesture layer,

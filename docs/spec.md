@@ -113,6 +113,9 @@ Phase 1 delivers a complete offline ride: connect the devices, ride free or play
 - A 1 Hz loop reads the latest sensor values, advances the ride state and writes one record.
 - States: idle, ready, riding, paused, finished.
 - **Auto-pause.** The ride pauses after 3 s of zero cadence and resumes when pedalling starts. Manual pause overrides it.
+- **Trainer link.** A trainer that disconnects pauses the ride at once and its reconnect resumes it, with nothing lost:
+  the seconds in between are still recorded, as paused samples with no power or cadence. The snapshot says why a ride
+  is paused (trainer, manual or auto). A heart-rate dropout never pauses or stops anything; it is a gap.
 - **Crash safety.** Records are appended to disk every second. An interrupted ride is recovered on the next launch.
 
 ### 4.3 Free ride on the flat
@@ -136,7 +139,8 @@ Phase 1 delivers a complete offline ride: connect the devices, ride free or play
 - Targets are a percentage of FTP. FTP is a manual setting in Phase 1.
 - Structured steps run in ERG mode. Free-ride steps run in simulation mode with gears.
 - Controls: pause, next interval, previous interval, intensity up and down in 5% steps between 50% and 150%.
-- After a pause, target power ramps back in over 3 s.
+- After a pause, target power ramps back in over 3 s. While paused the trainer holds 0 W in ERG steps, so the ramp
+  starts from there.
 
 ### 4.6 Overlay
 
@@ -406,6 +410,21 @@ Native JSON, version-tagged. Targets are fractions of FTP. Durations are seconds
 | Summary | duration, moving time, average and normalised power, average and max heart rate, work in kJ, load |
 
 The FIT file is generated from this record and can be regenerated at any time.
+
+**Settled in stage M2a** (`app.overdrive.core.record`, ADR 0004; the wire format is still to be fixed in `contracts/`):
+
+- *Ride*: `id`, `startEpochMillis`, `endEpochMillis`, `workoutId`, `ftp`, `devices` (names). Sync state belongs to
+  the outbox (§4.9), not the record.
+- *Sample*: one per second of the ride, pauses included, offsets 1, 2, 3, …. It holds the readings at the end of the
+  second and the target, gear and step that were in force during it. `power`, `heartRate` and `cadence` are null for a
+  gap; `speedKmh` and `distanceMeters` are virtual (§4.3); `gear` is set in free-ride steps, `targetPower` (the
+  workout's, without the ramp-in after a pause) in ERG steps; `stepIndex` indexes the flattened workout.
+- *RR series*: `timeOffsetSeconds` is the second of the notification that carried the interval, `intervalMs`.
+- *Lap*: one for each maximal run of samples in the same workout step; `stepIndex`, `startSeconds`, `endSeconds`,
+  `averagePower`, `averageHeartRate`. A ride without a workout is a single lap.
+- *Summary*: `durationSeconds` (pauses included), `movingSeconds`, `distanceMeters`, `averagePower`,
+  `normalizedPower`, `maxPower`, `averageHeartRate`, `maxHeartRate`, `workKilojoules`, `intensityFactor`, and the load as
+  `trainingStressScore`. Everything but the duration and distance is computed over the seconds that were not paused.
 
 ### 8.3 Sync API
 

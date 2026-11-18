@@ -424,6 +424,20 @@ class RideEngineTrainerTest {
         }
 
     @Test
+    fun `the last command of a finished ride is tried a few times and then given up on`() =
+        runTest {
+            val rig = EngineRig(this, workout = abcWorkout)
+            rig.start()
+            rig.followTrainer(3)
+            rig.trainer.failNextCommands(100)
+            rig.engine.finish()
+            rig.settle()
+            advanceSeconds(30)
+            assertEquals(RideState.FINISHED, rig.now.state)
+            assertEquals(3, rig.trainer.refusedCommands)
+        }
+
+    @Test
     fun `a workout that ends frees the trainer too`() =
         runTest {
             val workout = Workout(1, "short", "Short", steps = listOf(SteadyStep(duration = 5, target = 0.9)))

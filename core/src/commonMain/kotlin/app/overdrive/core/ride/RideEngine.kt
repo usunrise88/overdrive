@@ -38,8 +38,9 @@ import kotlin.time.Duration.Companion.seconds
  * **One loop, one thread of control.** Commands, device events and the 1 Hz tick all go through one queue and
  * are applied one at a time on a coroutine of [scope], so the engine needs no locks and, under a test dispatcher,
  * is fully deterministic. Commands to the trainer go out from a coroutine of their own, so a slow Bluetooth write
- * never delays the ride clock (spec §7.3). Give it a scope you cancel when the app stops; the engine ends its
- * own coroutines when the ride is finished.
+ * never delays the ride clock (spec §7.3). Give it a scope on a background dispatcher (`Dispatchers.Default`, never
+ * the main one: the engine runs off the main thread) that you cancel when the app stops; the engine ends its own
+ * coroutines when the ride is finished.
  *
  * **States** (spec §4.2, details in [RideSession]).
  * - `IDLE` until the trainer connects, then `READY`; `start` begins the ride. A strap is optional.
@@ -491,6 +492,7 @@ public class RideEngine(
     private suspend fun runTrainerSender() {
         var hasControl = false
         var sent: TrainerCommand? = null
+        var finalFailures = 0
         while (true) {
             wakeSender.receive()
             val wanted = order.value
@@ -518,7 +520,9 @@ public class RideEngine(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                // Start over with Request Control, whatever failed, in a moment.
+                // Start over with Request Control, whatever failed, in a moment; but give up on the last command of
+                // a ride that is over after a few tries.
+                if (wanted.last && ++finalFailures >= MAX_FINAL_ATTEMPTS) return
                 hasControl = false
                 sent = null
                 delay(COMMAND_RETRY_DELAY)
@@ -595,5 +599,6 @@ public class RideEngine(
     private companion object {
         const val KMH_PER_METER_PER_SECOND = 3.6
         val COMMAND_RETRY_DELAY = 1.seconds
+        const val MAX_FINAL_ATTEMPTS = 3
     }
 }
