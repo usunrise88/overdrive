@@ -159,6 +159,27 @@ internal class CoreGatt(
         }
     }
 
+    override fun writeWithoutResponse(
+        service: GattUuid,
+        characteristic: GattUuid,
+        value: ByteArray,
+    ): Start {
+        val info = find(service, characteristic) ?: return Start.NOT_FOUND
+        return operation {
+            when (val result = core.writeWithoutResponse(info, value)) {
+                is GattResult.Ok -> {
+                    PlatformEvent.CharacteristicWritten(characteristic, GattStatus.SUCCESS)
+                }
+
+                is GattResult.Failed -> {
+                    result
+                        .takeUnless { it.failure.kind == GattFailureKind.DISCONNECTED }
+                        ?.let { PlatformEvent.CharacteristicWritten(characteristic, it.failure.status) }
+                }
+            }
+        }
+    }
+
     override fun enable(
         service: GattUuid,
         characteristic: GattUuid,

@@ -229,6 +229,100 @@ class AndroidGattTransportTest {
             assertEquals(listOf<Byte>(1, 2, 3), (read.await() as GattResult.Ok).value.toList())
         }
 
+    // region write without response (the Click's handshake)
+
+    @Test
+    fun `a write without response reaches the platform as one, copies the bytes and completes on the write callback`() =
+        runTest {
+            val platform = ScriptedPlatform()
+            val transport = connected(platform)
+            val bytes = byteArrayOf(0x52, 0x69)
+            val write = async { transport.writeWithoutResponse(CLICK_SYNC_RX_INFO, bytes) }
+            runCurrent()
+            bytes[0] = 0
+            assertEquals(
+                "no `write` (with response) call: the platform got the other one",
+                listOf("writenr 0003 5269"),
+                platform.gatt.calls.filter { it.startsWith("write") },
+            )
+            assertFalse(write.isCompleted)
+            platform.emit(PlatformEvent.CharacteristicWritten(CLICK_SYNC_RX, 0))
+            runCurrent()
+            assertEquals(GattResult.Ok(Unit), write.await())
+        }
+
+    @Test
+    fun `a write without response takes the one operation slot like any write`() =
+        runTest {
+            val platform = ScriptedPlatform()
+            val transport = connected(platform)
+            val first = async { transport.writeWithoutResponse(CLICK_SYNC_RX_INFO, byteArrayOf(1)) }
+            runCurrent()
+            val second = async { transport.write(CONTROL_POINT_INFO, byteArrayOf(2)) }
+            runCurrent()
+            assertEquals(GattFailureKind.BUSY, failure(second.await()).kind)
+            platform.emit(PlatformEvent.CharacteristicWritten(CLICK_SYNC_RX, 0))
+            runCurrent()
+            assertEquals(GattResult.Ok(Unit), first.await())
+            // The slot is free again.
+            val third = async { transport.write(CONTROL_POINT_INFO, byteArrayOf(3)) }
+            runCurrent()
+            platform.emit(PlatformEvent.CharacteristicWritten(CONTROL_POINT, 0))
+            runCurrent()
+            assertEquals(GattResult.Ok(Unit), third.await())
+        }
+
+    @Test
+    fun `a characteristic that does not offer write without response is refused before the platform is asked`() =
+        runTest {
+            val platform = ScriptedPlatform()
+            val transport = connected(platform)
+            val before = platform.gatt.calls.size
+            // The fake radio says "write not permitted" (3); so does this, instead of a command nothing will answer.
+            assertEquals(
+                GattFailure(GattFailureKind.STATUS, 3),
+                failure(transport.writeWithoutResponse(INDOOR_BIKE_INFO, byteArrayOf(1))),
+            )
+            assertEquals(before, platform.gatt.calls.size)
+            assertTrue(log.toString(), log.any { it.contains("does not offer write without response") })
+        }
+
+    @Test
+    fun `a write without response that the platform refuses, or that fails with a status, says so`() =
+        runTest {
+            val platform = ScriptedPlatform()
+            val transport = connected(platform)
+            platform.gatt.answer = Start.BUSY
+            assertEquals(
+                GattFailureKind.BUSY,
+                failure(transport.writeWithoutResponse(CLICK_SYNC_RX_INFO, byteArrayOf(1))).kind,
+            )
+            platform.gatt.answer = Start.PERMISSION
+            assertEquals(
+                GattFailureKind.UNAVAILABLE,
+                failure(transport.writeWithoutResponse(CLICK_SYNC_RX_INFO, byteArrayOf(1))).kind,
+            )
+            val write = async { transport.writeWithoutResponse(CLICK_SYNC_RX_INFO, byteArrayOf(1)) }
+            runCurrent()
+            platform.emit(PlatformEvent.CharacteristicWritten(CLICK_SYNC_RX, 133))
+            runCurrent()
+            assertEquals(GattFailure(GattFailureKind.STATUS, 133), failure(write.await()))
+        }
+
+    @Test
+    fun `a drop while a write without response waits answers it with DISCONNECTED`() =
+        runTest {
+            val platform = ScriptedPlatform()
+            val transport = connected(platform)
+            val write = async { transport.writeWithoutResponse(CLICK_SYNC_RX_INFO, byteArrayOf(1)) }
+            runCurrent()
+            platform.dropped(status = 8)
+            runCurrent()
+            assertEquals(GattFailure(GattFailureKind.DISCONNECTED, 8), failure(write.await()))
+        }
+
+    // endregion
+
     @Test
     fun `an operation while another is outstanding is answered with BUSY and does not disturb it`() =
         runTest {

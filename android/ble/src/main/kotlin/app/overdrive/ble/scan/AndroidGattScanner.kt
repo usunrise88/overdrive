@@ -6,6 +6,7 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.os.ParcelUuid
+import android.util.SparseArray
 import app.overdrive.ble.gatt.BleLog
 import app.overdrive.ble.gatt.logName
 import app.overdrive.ble.gatt.toGattUuid
@@ -15,6 +16,7 @@ import app.overdrive.core.ble.BleAvailability
 import app.overdrive.core.ble.BleEnvironment
 import app.overdrive.core.ble.DeviceId
 import app.overdrive.core.ble.GattScanner
+import app.overdrive.core.ble.ManufacturerData
 import app.overdrive.core.ble.ScanEvent
 import app.overdrive.core.ble.ScanFailure
 import app.overdrive.core.ble.ScanFilter
@@ -38,6 +40,7 @@ internal object ScanMapping {
         name: String?,
         services: List<UUID>?,
         rssi: Int,
+        manufacturer: List<ManufacturerData> = emptyList(),
     ): Advertisement? {
         if (address.isNullOrBlank()) return null
         return Advertisement(
@@ -45,7 +48,22 @@ internal object ScanMapping {
             name = name?.trim()?.takeIf { it.isNotEmpty() },
             serviceUuids = services.orEmpty().mapNotNull { it.toGattUuid() }.toSet(),
             rssi = rssi,
+            manufacturerData = manufacturer,
         )
+    }
+
+    /**
+     * The manufacturer-specific data of a scan record (`ScanRecord.getManufacturerSpecificData`: the 16-bit company
+     * identifier, little-endian in the air and already decoded by the platform, mapped to the bytes after it). The Zwift
+     * Click is recognised by company `0x094A` and the first byte of its payload (docs/protocols/click-v2.md §1), never by
+     * name, so without this the Click could not be told from any other device. Ordered by company identifier; a null or
+     * empty record is no data. Nothing here is printed: the payload may carry a unit's own identifier.
+     */
+    fun manufacturerData(records: SparseArray<ByteArray>?): List<ManufacturerData> {
+        if (records == null) return emptyList()
+        return (0 until records.size()).map { index ->
+            ManufacturerData(records.keyAt(index), records.valueAt(index) ?: ByteArray(0))
+        }
     }
 
     /**
@@ -69,8 +87,10 @@ internal object ScanMapping {
  * is the only collector, collects while it is open and for 30 seconds at most, and the scan stops when the collector
  * goes (the screen was left, the time ran out, the rider picked something).
  *
- * The scan filters by the services in [ScanFilter.serviceUuids] (the Fitness Machine and Heart Rate services): a
- * peripheral that advertises neither is not listed (unverified for the D500 and the HR7, ADR 0010). It relies on
+ * The scan filters by the services in [ScanFilter.serviceUuids] (the Fitness Machine, Heart Rate and Zwift Click
+ * services; an empty set scans everything, which the Devices screen asks for when the Click's service is not required):
+ * a peripheral that advertises none of them is not listed (unverified for the D500, the HR7 and the Click, ADR 0010, ADR
+ * 0012). Each result carries its manufacturer-specific data, which is how a Click is told from any other device. It relies on
  * `neverForLocation` in the manifest, so no location permission is asked; Android may then drop some beacon
  * advertisements from the results, which does not matter for a trainer or a strap.
  *
@@ -125,6 +145,10 @@ public class AndroidGattScanner internal constructor(
                                 name = result.scanRecord?.deviceName,
                                 services = result.scanRecord?.serviceUuids?.map { it.uuid },
                                 rssi = result.rssi,
+                                manufacturer =
+                                    ScanMapping.manufacturerData(
+                                        result.scanRecord?.manufacturerSpecificData,
+                                    ),
                             ) ?: return
                         trySend(ScanEvent.Found(advertisement))
                     }
