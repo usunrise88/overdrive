@@ -164,6 +164,39 @@ class SettingsTest {
         }
 
     @Test
+    fun theDevicesAreBluetoothByDefaultAndTheLogsAreRecorded() {
+        val defaults = AppSettings()
+        assertEquals(DeviceSource.Bluetooth, defaults.deviceSource)
+        assertTrue(defaults.recordBleSessions)
+        // A fresh install reads the same defaults from an empty store.
+        runTest {
+            val (repository, _) = repository("fresh")
+            assertEquals(DeviceSource.Bluetooth, repository.settings.first().deviceSource)
+            assertTrue(repository.settings.first().recordBleSessions)
+        }
+    }
+
+    @Test
+    fun theDeviceSourceAndTheRecordingSwitchSurviveARestartAndBadValuesFallBack() =
+        runTest {
+            val (repository, store) = repository()
+            repository.update { it.copy(deviceSource = DeviceSource.Simulated, recordBleSessions = false) }
+            assertEquals(DeviceSource.Simulated, repository.settings.first().deviceSource)
+            assertFalse(repository.settings.first().recordBleSessions)
+
+            // An enum name from a future version is the default, never a crash and never the simulation.
+            store.edit { it[stringPreferencesKey("dev_device_source")] = "Satellite" }
+            assertEquals(DeviceSource.Bluetooth, repository.settings.first().deviceSource)
+        }
+
+    @Test
+    fun onlyTheDeviceSourceOfTheBluetoothSettingsRebuildsARide() {
+        val base = AppSettings()
+        assertTrue(base.rideInputs() != base.copy(deviceSource = DeviceSource.Simulated).rideInputs())
+        assertEquals(base.rideInputs(), base.copy(recordBleSessions = false).rideInputs())
+    }
+
+    @Test
     fun resettingThePositionForgetsIt() =
         runTest {
             val (repository, _) = repository()

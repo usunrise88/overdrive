@@ -10,6 +10,7 @@ import app.overdrive.ride.host.DevicesUi
 import app.overdrive.ride.host.RadioIssue
 import app.overdrive.ride.settings.SimulatedClick
 import app.overdrive.uikit.DeviceStatus
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -122,6 +123,7 @@ object BleDeviceRows {
  *
  * @param click the Click row is the simulated one until M4.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class BleDevicesModel(
     private val devices: PairedDevices,
     private val environment: BleEnvironment,

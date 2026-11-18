@@ -172,7 +172,7 @@ fun rememberBluetoothFix(
                 }
 
                 RadioIssue.Unsupported, null -> {
-                    Unit
+                    // Nothing to ask for and nothing to open.
                 }
             }
         }

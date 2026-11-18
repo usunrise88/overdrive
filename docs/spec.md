@@ -131,6 +131,25 @@ Phase 1 delivers a complete offline ride: connect the devices, ride free or play
   (`contracts/fixtures/ble/`) are generated, never real recordings.
   **Open until the bench:** which flag bit carries cadence, the units of distance, the contact bits and RR of the HR7, response
   timing, whether Start is needed; each is a named constant or option (ADR 0009 §8).
+- *Settled in stage M3-2* (`android/ble`, `android/app-ride`, ADR 0010; **nothing run on a radio yet**). The four interfaces
+  are implemented on the platform (`BluetoothGatt` behind a thin shim, `BluetoothLeScanner`, the adapter-state broadcast and
+  the permission check). **Pairing** is on the **Devices** screen, not a separate setup screen: **Scan for devices** lists
+  trainers and straps apart by advertised name with the signal as a word ("Strong · −58 dBm"), a tap pairs; one trainer and one
+  strap are remembered (`DeviceStore`), a new pairing replaces the old one, **Forget** removes it, and neither is offered while
+  a ride is live. The Click row stays the simulated placeholder until M4. **Remembered devices are owned by the app container,
+  not by a ride**: they connect when the app starts with no user action, keep their links between rides and reconnect with the
+  backoff above, and a ride session only uses them. A Devices row reads Connected, Connecting, "Connection lost · retrying in
+  N s", "Not found · retrying in N s", Bluetooth off, needs Nearby devices, or Not paired; **Retry now** cuts a wait. Bluetooth
+  that cannot be used is **one notice with one action** ("Allow nearby devices" with **Allow**, then **Open settings** once
+  refused; "Bluetooth is off" with **Turn on**), re-read on every resume. The manifest asks for `BLUETOOTH_SCAN`
+  (`neverForLocation`) and `BLUETOOTH_CONNECT` only: **no location, no network**. **A ride with no trainer paired does not
+  start** and says so ("No trainer is paired." with **Pair a trainer**); the simulation is a Developer choice (Settings,
+  Developer, **Devices**: Bluetooth, the default, or Simulated), never a fallback. The overlay's foreground service is
+  `connectedDevice|specialUse`, passing `connectedDevice` only while `BLUETOOTH_CONNECT` is granted (Android 14 refuses a
+  type whose permission is missing). **Every connection is recorded** to `filesDir/ble-logs/` (a file per session named by date
+  and role, redacted, 2 MB a file, 60 files, 20 MB; Developer setting, on in the early builds) and **Share Bluetooth logs**
+  in Settings hands them to another app on the owner's explicit action only; they hold heart-rate values and are never
+  uploaded. **Open until the bench:** every platform assumption of ADR 0010 section 10.
 
 ### 4.2 Ride engine
 
@@ -624,8 +643,10 @@ live spec document.
   `intervals-mcp-server` is GPL-3.0. BikeControl is GPL-3.0 up to tag `gpl3` and under a
   Non-Commercial licence after it, so nothing from later versions may be copied. See
   `docs/references-licences.md`.
-- **§4.6, overlay service type.** Phase 1 declares the foreground service as `specialUse` (the simulated ride has no
-  Bluetooth); M3 adds `connectedDevice` and `BLUETOOTH_CONNECT` with the BLE adapters. Opening the app from the overlay's long
+- **§4.6, overlay service type.** The foreground service was `specialUse` while the ride was simulated; M3-2 declares
+  `connectedDevice|specialUse` with `FOREGROUND_SERVICE_CONNECTED_DEVICE` and the Bluetooth permissions, and passes
+  `connectedDevice` only while `BLUETOOTH_CONNECT` is granted, so the overlay never depends on Bluetooth (ADR 0006, ADR 0010
+  section 5). Opening the app from the overlay's long
   press depends on Android's background-activity-start exemptions for a visible window and `SYSTEM_ALERT_WINDOW`;
   that it works on the tablet is unverified, and the notification's tap is the fallback. See ADR 0006.
 - **§4.1, Feature bits.** Settled in M3-1 as a report, not a precondition: the missing-feature check of `docs/protocols/ftms-hr.md`

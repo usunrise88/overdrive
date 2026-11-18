@@ -100,16 +100,17 @@ class OverlayService :
      * check and the call), it starts again with `specialUse` alone, so the overlay never depends on Bluetooth.
      */
     private fun enterForeground(notification: Notification) {
-        val sdk = Build.VERSION.SDK_INT
         val granted = checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
-        val types = ForegroundServiceTypes.choose(sdk, granted)
-        try {
-            startForegroundOf(notification, types)
-        } catch (error: SecurityException) {
-            val fallback = ForegroundServiceTypes.fallback(sdk, types) ?: throw error
-            Log.w(TAG, "Foreground service type refused (${error.javaClass.simpleName}); starting with specialUse only")
-            startForegroundOf(notification, fallback)
-        }
+        ForegroundServiceTypes.enter(
+            Build.VERSION.SDK_INT,
+            granted,
+            onFallback = {
+                Log.w(
+                    TAG,
+                    "Foreground service type refused (${it.javaClass.simpleName}); using specialUse only",
+                )
+            },
+        ) { types -> startForegroundOf(notification, types) }
     }
 
     private fun startForegroundOf(

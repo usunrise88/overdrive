@@ -50,9 +50,13 @@ background-start limits).
 `specialUse` in M1, with the required `android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE` property and the permissions
 `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_SPECIAL_USE`. The notes recommended `connectedDevice`, but that type
 needs a Bluetooth runtime permission at the moment the service starts and the simulated ride in M1 has no Bluetooth.
-`specialUse` asks Play Console for a justification, which does not apply to a sideloaded app. **M3 moves to
-`connectedDevice|specialUse`** with `FOREGROUND_SERVICE_CONNECTED_DEVICE` and `BLUETOOTH_CONNECT` when the BLE adapters
-exist; the overlay part keeps `specialUse` because drawing is not a connected device. The Android 15 time limit
+`specialUse` asks Play Console for a justification, which does not apply to a sideloaded app. **M3-2 moved to
+`connectedDevice|specialUse`** (ADR 0010 section 5): the manifest declares both, with `FOREGROUND_SERVICE_CONNECTED_DEVICE`,
+the Bluetooth permissions and the subtype text rewritten for what the service now does; the overlay part keeps `specialUse`
+because drawing is not a connected device. **On Android 14 and later `startForeground` throws if a passed type's prerequisite
+is not held**, so the service passes `connectedDevice` only while `BLUETOOTH_CONNECT` is granted and `specialUse` always (before
+Android 14 it passes no type and the manifest's apply); if the system still refuses the pair, it starts again with
+`specialUse` alone. A missing Bluetooth permission therefore never stops the overlay. The Android 15 time limit
 (6 hours in 24) applies only to `dataSync` and `mediaProcessing` `[documented]`, so a long ride is not cut off.
 
 ### Notification
@@ -148,7 +152,8 @@ the service's own bookkeeping are the only main-thread work; the ride and the BL
 ### Permission onboarding
 
 - Manifest: `SYSTEM_ALERT_WINDOW`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE` (with the subtype property),
-  `POST_NOTIFICATIONS`. No network permission, no Google Play Services.
+  `POST_NOTIFICATIONS`; from M3-2 also `FOREGROUND_SERVICE_CONNECTED_DEVICE` and the Bluetooth permissions (ADR 0010). No
+  network permission, no Google Play Services.
 - **Ready screen:** while "Display over other apps" is missing, a ui-kit `Notice` above the workout says
   "Show numbers over other apps. Allow “Display over other apps” so the overlay stays on screen while you watch video." with
   one button, **Allow**. On Android 13 and later it first shows the system notification question and, whatever the answer,
@@ -191,8 +196,8 @@ ZUI keeps the service alive, the window context's bounds and cutouts, split scre
 
 The release build is shrunk by R8. The service survives without a rule of our own: AAPT generates
 `-keep class app.overdrive.ride.overlay.OverlayService { <init>(); }` from the manifest, which was checked in the release
-build's `aapt_rules.txt` and `mapping.txt`, and the manifest of the release APK carries the service, its `specialUse` type and
-the subtype property. `ic_ride_notification` is referenced from code, so resource shrinking keeps it.
+build's `aapt_rules.txt` and `mapping.txt`, and the manifest of the release APK carries the service, its type (from M3-2
+`connectedDevice|specialUse`) and the subtype property. `ic_ride_notification` is referenced from code, so resource shrinking keeps it.
 
 ## Consequences
 
@@ -203,7 +208,8 @@ the subtype property. `ic_ride_notification` is referenced from code, so resourc
 - The window is positioned in the display's full bounds with a 16 dp margin; display cutouts are not subtracted.
 - The overlay is not usable with TalkBack; it is a read-only instrument panel next to video, and the ride screen carries
   every control.
-- M3 changes the service type declaration and adds the Bluetooth permission; the window, gestures and lifecycle do not change.
+- M3-2 changed the service type declaration to `connectedDevice|specialUse` and added the Bluetooth permissions (ADR 0010);
+  the window, gestures and lifecycle did not change.
 
 ## Unverified on hardware
 
@@ -216,6 +222,7 @@ the subtype property. `ic_ride_notification` is referenced from code, so resourc
 | Dragging drops no frames at 60, 90 and 120 Hz, and makes no binder call per move | bench 2.5, 2.6 |
 | The overlay is drawn over DRM video and appears (or not) in screen recordings | bench 2.2 |
 | ZUI keeps the specialUse service alive for an hour with the screen off | bench 2.8, 2.9, 2.10 |
+| `connectedDevice` plus `specialUse` starts with "Nearby devices" allowed, and `specialUse` alone starts without it (Android 14+) | bench 3.16 |
 | Blur behind the window looks right and does not cost frames | bench 2.14 |
 | The bottom-edge resize shows no visible jump | bench 2.7 |
 | Battery overhead is under 3% an hour (spec §7.3) | bench 2.11 |

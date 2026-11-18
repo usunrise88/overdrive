@@ -24,6 +24,20 @@ the long press brings the app to the front from a video app, frame time while dr
 recordings, blur, battery (spec §7.3) and the service surviving an hour. All of them are in `docs/bench-checklist.md`
 (items 1.3 to 1.5 and 2.1 to 2.17) and in the "Unverified on hardware" table of `docs/adr/0006-overlay-service.md`.
 
+## What the Bluetooth stage (M3-2) proves without hardware, and what it leaves for the bench
+
+Automatic, in `make android-check` (criteria 2 and 4 on the Android side; ADR 0010): the Android GATT transport against core's
+strict fake radio and a hand-scripted platform (contract, ordering, late and missing callbacks, busy, release), the real device
+adapters and supervisor over that transport reproducing core's scenarios (ERG workout, trainer dropout and status 133, strap
+dropout, RR); the radio and permission mapping; the remembered devices (replace, forget, survive a restart, damaged file);
+**devices owned by the container and outliving every ride session**; the ride host over real devices (an ERG workout, a trainer
+dropout that pauses and resumes the ride, a strap dropout that is only a gap, **no trainer means no ride and nothing
+simulated**, a ride that has started is never replaced, pairing refused while riding); the Developer switch; every Devices
+state and the Ready notice as screenshots and taps; the foreground-service type decision for a missing Bluetooth permission;
+raw session recording (redacted, capped, non-blocking) and the share intent. Owner on the tablet and the bike: everything in
+the table of `docs/adr/0010-android-ble-and-pairing.md` section 10, in `docs/bench-checklist.md` items 1.7 and 3.1 to 3.17
+and 4.1 to 4.6. The owner's first recorded ride (3.17) is the evidence for the open FTMS and heart-rate guesses (FT 1 to FT 12).
+
 ## Release gate for `v0.1.0`
 
 All "Auto" checks are green and the release notes list every "Owner" check as not yet run on hardware

@@ -1,5 +1,6 @@
 package app.overdrive.ride.overlay
 
+import android.Manifest
 import android.app.Application
 import android.content.ComponentName
 import android.content.Context
@@ -69,6 +70,33 @@ class OverlayServiceTest {
             shadowOf(notification.contentIntent).savedIntent.component,
         )
         assertEquals(0, views().size)
+    }
+
+    @Test
+    fun theServiceTypeIncludesConnectedDeviceWhileNearbyDevicesIsAllowed() {
+        shadowOf(app as Application).grantPermissions(Manifest.permission.BLUETOOTH_CONNECT)
+        val service = startService().get()
+        assertEquals(
+            ForegroundServiceTypes.SPECIAL_USE or ForegroundServiceTypes.CONNECTED_DEVICE,
+            service.foregroundServiceType,
+        )
+    }
+
+    @Test
+    fun withoutNearbyDevicesTheServiceStartsAsSpecialUseOnlySoTheOverlayNeverNeedsBluetooth() {
+        shadowOf(app as Application).denyPermissions(Manifest.permission.BLUETOOTH_CONNECT)
+        val service = startService().get()
+        assertEquals(ForegroundServiceTypes.SPECIAL_USE, service.foregroundServiceType)
+        assertNotNull("and it is in the foreground", shadowOf(service).lastForegroundNotification)
+    }
+
+    @Test
+    @Config(sdk = [33])
+    fun beforeAndroid14TheCallHasNoTypeAndTheManifestsTypesApply() {
+        shadowOf(app as Application).grantPermissions(Manifest.permission.BLUETOOTH_CONNECT)
+        val service = startService().get()
+        assertEquals(0, service.foregroundServiceType)
+        assertNotNull(shadowOf(service).lastForegroundNotification)
     }
 
     @Test

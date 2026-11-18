@@ -124,7 +124,8 @@ Sentence case everywhere. No all-caps labels.
   VectorDrawable for Android. Sizes 20 dp (default), 24 dp (bottom nav), 16 dp (inline in
   chips and status text). Icons take the text colour of their context. An icon is used only
   where it replaces or disambiguates a word (play, pause, volume, device type, alert); never
-  as decoration next to a heading.
+  as decoration next to a heading. `bluetooth` and `bluetooth-off` (M3-2) lead the Bluetooth Notices and the **Pair a trainer**
+  button.
 
 ## 5. Overlay
 
@@ -216,6 +217,13 @@ chip, then right-aligned: device status icons (16 dp, see §7.7), overlay button
   step, Mode; label over numS); the profile (§8.1, height 168 dp, FTP line, 10-minute ticks);
   a step table (zone chip, name, duration, % FTP, watts); primary **Start** button 64 dp tall,
   240 dp wide, with the hint "Or start pedalling. The ride begins on the first pedal stroke."
+- **Devices on the Ready screen (stage M3-2).** While **Start** is off, one sentence in body, text 2, sits beside it and says
+  why: "No trainer is paired." (with a secondary **Pair a trainer** button with the `bluetooth` icon, which opens Devices),
+  "Waiting for Bluetooth.", or "Waiting for the trainer to connect."; the chip beside the title says "No trainer" or "Waiting
+  for trainer". **Nothing simulated ever takes a missing trainer's place.** Bluetooth that cannot be used is one Notice (§7.6)
+  at the top of the right column, above the overlay-permission Notice: "Allow nearby devices" with **Allow** (**Open settings**
+  once refused), "Bluetooth is off" with **Turn on**, or "No Bluetooth on this tablet"; it is re-read on every resume and goes
+  by itself.
 - **Rides on disk (stage M2b-2).** At the top of the right column, above the title, in this order, each only when it
   applies: a Notice for an interrupted ride ("An interrupted ride was found", the start and length of the ride, **Save** and
   **Discard**; while it is stored "Saving the ride…" with no buttons; after a failure "The ride could not be saved" with
@@ -283,6 +291,25 @@ Two columns. Left: hint "Paired devices connect on their own when the app starts
 device rows (§7.7) for Trainer, Heart rate, Click. Right: "Click buttons" card with the
 press/hold mapping table and the ERG note, and "Change button mapping" (secondary).
 
+**Pairing and Bluetooth (stage M3-2).** Under the hint, in this order, **one** of the following blocks applies:
+
+- **Bluetooth cannot be used:** one Notice (§7.6) with its one action, above the rows; the rows say it too ("D500 · Bluetooth
+  is off") and **Pair** on a row does the notice's action; no scan panel.
+- **A ride is live:** a line (label, text 3) under the rows, "Devices cannot be changed during a ride."; no **Forget**, no scan.
+- **Otherwise the scan panel**, under the rows card: a **Scan for devices** primary button (**Scan again**, secondary, once a
+  scan has run); while scanning, a secondary **Stop**, the spinner ring and "Looking for devices…". Results are one card of
+  selection rows (§7.5, no dividers inside a section): a section label ("Trainers", "Heart-rate straps", label, text 3), then
+  the advertised name (bodyStrong) over the signal as a word and a number ("Strong · −58 dBm", "Good", "Weak": thresholds
+  −60 and −75 dBm; "Paired · " first on the paired one, which carries the selected row's `surface2` fill and check). A tap
+  pairs that device and replaces the old one of its role. Nothing found, or a refused scan, is a Notice without an action
+  ("Nothing found: switch the trainer or strap on and wake it ... then scan again" or "Scanning was refused ... wait half a
+  minute").
+- **Simulated devices (Developer setting):** the hint says "These are simulated devices. Switch to Bluetooth under Settings,
+  Developer, Devices."; no pairing, no **Forget**.
+
+A row that has a paired device ends with a ghost **Forget** (40 dp) after its status. The Click row stays the labelled
+placeholder until M4.
+
 ### 6.6 Settings (`settings--settings.png`)
 
 Two columns of grouped cards; group label (label, text 3) above each card; setting rows 64 dp
@@ -294,6 +321,11 @@ Two columns of grouped cards; group label (label, text 3) above each card; setti
 - **Rider and gears:** FTP (stepper, ±5 W, long-press repeats), Gears (stepper, 10–30), Step per
   gear (stepper, ±0.1%, 0.5–2.0%; caption says the total stays within 15%).
 - **Physics for speed and distance:** mass (kg, ±1), CdA (m², ±0.01), Crr (±0.0005).
+- **Developer** (stage M3-2), after the overlay card in the left column: **Devices** (segmented **Bluetooth** / **Simulated**;
+  Bluetooth is the default and a ride never falls back to the simulation), **Record Bluetooth sessions** (switch, on in the
+  early builds), **Share Bluetooth logs** (the row says "4 files · 120 KB" or "No logs yet", or what the last share could not
+  do; a secondary 40 dp **Share** button with `share-2`, off while there are no logs), then the simulated-ride rows (Demo speed,
+  Scripted dropouts, Simulated Click). The logs hold heart-rate values: they leave the tablet only through **Share**.
 - Later groups (Click mapping, Sync URL and token, About) use the same row.
 
 ## 7. Components
@@ -357,11 +389,15 @@ found. No colour, no border.
 | Not paired | icon text 3 | "Not paired" | **Pair** (secondary) |
 | Searching | icon text 1 | "Searching for heart-rate straps…" | 20 dp spinner ring (2 dp, track surface3, arc text 2, 1000 ms per turn) |
 | Connected | icon text 1 | "Coospo HR7 · battery 80%" | `check` 16 dp + "Connected" (label, text 2) |
-| Connection lost | icon text 1 | `triangle-alert` 16 dp + "Connection lost · retrying in 8 s" in text 1 | **Retry now** (secondary) |
+| Connection lost | icon text 1 | `triangle-alert` 16 dp + "Connection lost · retrying in 8 s" ("Not found · …", "Could not connect · …", "Not a trainer · check the pairing") in text 1; the seconds count down once a second, only while it waits | **Retry now** (secondary) |
+| Blocked (stage M3-2) | icon text 1 | `triangle-alert` 16 dp + "D500 · Bluetooth is off" or "· needs Nearby devices" in text 1 | none: the Notice above the rows holds the one action |
 | Click locked | icon text 1 | "Zwift Click v2 · connected" | "No presses" (label, text 1) + the notice below the row: title "Click is locked", text "It is connected but sends no button presses. Unlock it once in the Zwift app, then check again. You can ride without it; every action is on screen.", button **Check again** |
 
+A row that has a paired device (stage M3-2) ends with a ghost **Forget** button, 40 dp, after the status. Searching reads
+"Connecting to <name>…".
+
 **Top-bar device status:** three 16 dp icons in the same order, text 2 when connected, text 3
-when not paired, text 1 + `triangle-alert` when lost or locked. Tapping opens Devices.
+when not paired, text 1 + `triangle-alert` when lost, blocked or locked. Tapping opens Devices.
 
 ### 7.8 Inputs
 
@@ -471,7 +507,8 @@ The recovery state uses no colour: "Ready", "Caution" and "Rest" differ by word 
   overlay uses "Heart" for width; the ride screen uses "Heart rate").
 - Sentence case. No trailing colons. No exclamation marks.
 - Buttons say what happens: Start, Pause, Resume, Finish ride, Pair, Retry now, Check again,
-  Share FIT file, Done.
+  Share FIT file, Done; for Bluetooth: Scan for devices, Scan again, Stop, Forget, Pair a trainer, Allow, Open settings,
+  Turn on, Share.
 - Problems say what happened and what to do, in two short sentences, without apology.
 - "·" (middle dot with spaces) separates facts in one line; "–" (en dash) for ranges; "×" for
   repeats ("3×10").

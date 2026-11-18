@@ -26,8 +26,9 @@ Currently implemented:
 | `fit` | `FitWriter`: a ride record as a FIT activity file | §4.8 |
 | `ble` | The Bluetooth boundary (`GattTransport`, scanner, environment), FTMS and Heart Rate codecs, the trainer and strap adapters, the reconnect supervisor, the session recorder, and a fake Bluetooth with replay | §4.1, §7.5 |
 
-Not yet: the Android side of Bluetooth (M3-2: the `GattTransport` on `BluetoothGatt`, scanning, permissions, the device store and the Devices
-screen), the Click codec and gesture detection (M4). The Android storage, recovery and share buttons are in `android/` (M2b-2, ADR 0008).
+Not yet: the Click codec and gesture detection (M4). The Android side of Bluetooth (the `GattTransport` on `BluetoothGatt`,
+scanning, permissions, remembered devices, pairing and the Devices screen) is in `android/` (M3-2, ADR 0010), and so are the
+storage, recovery and share buttons (M2b-2, ADR 0008).
 
 The first section below is the real engine; the one after it is the UI's view of a session
 (`RideSession`, `RideSnapshot`), which the engine and the simulated session both provide.
@@ -100,7 +101,7 @@ the owner's trainer or strap yet**, and every guess is a named constant or optio
 | `ble.fake` | `FakeBle` (radio, factory, scanner, environment), `FakeFtmsTrainer`, `FakeHeartRateStrap`, `ReplayPeripheral` (plays a recording), scripted failures. Strict like Android: it records any contract violation |
 | `device.RrIntervals` | The domain rule for RR in milliseconds (1/1024 s, halves round up) |
 
-What M3-2 implements, and what it gets:
+What M3-2 implemented (`android/ble`, ADR 0010), and what it gets:
 
 ```kotlin
 // Android implements these four (the only place an address or a BluetoothGatt exists):

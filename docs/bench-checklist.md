@@ -112,6 +112,15 @@ the session number and the log file name. Do not change the expected result to m
   option names differ by ROM). Expect: the setting is saved. Optional check:
   `adb shell dumpsys deviceidle whitelist` (unverified; the research notes list it as unverified).
   Settles: OV 8.1 and the battery-exemption fallback in spec §9 (ZUI background limits).
+- [ ] **1.7 Nearby devices permission (M3-2).** Open **Devices** on a fresh install. Expect: one notice, "Allow nearby
+  devices", with one button, **Allow**, above the rows, and no scan button. Tap **Allow**: Android asks once ("Nearby
+  devices"); answer **Allow**. Expect: the notice is gone and **Scan for devices** is there, without restarting the app.
+  Repeat on another fresh install, answering **Don't allow** (twice if Android asks twice): the notice must then say
+  "It is switched off for Overdrive" and its button must say **Open settings**, which opens the app's settings page; grant
+  the permission there, come back, and the notice goes by itself (the app re-reads the permission on every resume).
+  The Ready screen shows the same notice while the trainer cannot be reached for this reason. Write down what the system
+  question looked like on this ROM, how many times it asked, and whether "Open settings" really opened the page. Nothing
+  asks for location. Settles: ADR 0010 table, rows P1 to P3.
 
 ---
 
@@ -237,10 +246,16 @@ a workout's steps without waiting.
 Close Zwift and any other app that connects to the D500 first (spec §2). The D500 accepts one client.
 Turn the HCI snoop log on for this whole session.
 
-- [ ] **3.1 Pairing.** Open the setup screen, scan, and pick the D500. Expect: it appears in the list and
-  pairs. Close the app and relaunch: the trainer should connect without any action (spec §4.1). Write the
-  trainer's name and the time to connect. Do not write its MAC address into any file that might be shared
-  (ftms-hr §7.1).
+- [ ] **3.1 Pairing.** Open **Devices** (the bike icon in the top bar, or **Pair a trainer** on the Ready screen), tap
+  **Scan for devices** (or **Pair** on the Trainer row). Expect: under "Trainers" the D500 appears, with its name and a
+  signal like "Strong · −58 dBm"; tap it. Expect: the Trainer row goes to "Connecting to ..." with a spinner, then
+  "Connected", the "Paired" mark shows on the list entry, and the Ready screen enables **Start**. Write down the time from
+  the tap to "Connected", the name as shown, and the signal words you saw at 1 m and at 3 m. If the D500 does not appear
+  although it is on and no other app holds it, write that down: the scan filters on the Fitness Machine service in the
+  advertisement (ADR 0010 row S1), and a D500 that does not advertise it needs the filter widened. Close the app (swipe it
+  away) and relaunch: the trainer must connect **without any tap** (spec §4.1) and the Ready screen must reach Start
+  by itself. Write the trainer's name and the time to connect. Do not write its MAC address into any file that might be
+  shared (ftms-hr §7.1). Settles: spec §4.1 pairing, ADR 0010 rows S1, S2, C1.
 - [ ] **3.2 Feature and status.** The app reads the Fitness Machine Feature and Status characteristics
   (spec §4.1). Check the logs for the feature bits. Expect: the bits needed for ERG and simulation are
   set (ftms-hr §10 asks for these bit checks before ERG and gears). Write down the eight bytes of the Feature
@@ -321,22 +336,61 @@ Turn the HCI snoop log on for this whole session.
   30 s between attempts (each +/-20 %), starts again from 1 s after a link that held 30 s, and gives an attempt 45 s to
   finish (`LinkSupervisor.DEFAULT_ESTABLISH_TIMEOUT`). Also write down how long one attempt against the switched-off
   trainer takes to fail (`S connecting` to `S disconnected` and its status; 133 is expected) and whether any attempt
-  ended only because of the 45 s backstop. If the Devices screen has a **Retry** button (M3-2), press it during a wait:
-  the next attempt should start at once. Settles: spec §4.1 (reconnect with backoff); the guesses to tune are
+  ended only because of the 45 s backstop. On the Devices screen the Trainer row says "Not found · retrying in N s" and
+  counts down once a second: check that it does, and that nothing else on the screen ticks. Press **Retry now** during a
+  wait: the next attempt should start at once. Settles: spec §4.1 (reconnect with backoff); the guesses to tune are
   `BackoffPolicy` (initial, factor, cap, jitter, stable time) and the establish timeout.
 - [ ] **3.13 Bluetooth switched off, and the permission.** During a ride, switch the tablet's Bluetooth off from the
-  quick settings. Expect: the ride pauses (the trainer link is gone), the Devices screen says Bluetooth is off
-  (`LinkStatus.BluetoothUnavailable`) and nothing is retried. Switch it on: the trainer and the strap reconnect at
-  once, without waiting for a backoff step. Repeat by revoking "Nearby devices" in the app's permissions (spec §4.1,
-  Android 12 and later): expect the same state with a different reason. Write down how long the reconnect took after
-  Bluetooth came back. Settles: spec §4.1 (reconnect), ADR 0009 §5.
+  quick settings. Expect: the ride pauses (the trainer link is gone), the Devices screen shows the notice "Bluetooth is
+  off" with **Turn on**, both device rows say "<name> · Bluetooth is off", and nothing is retried
+  (`LinkStatus.BluetoothUnavailable`). Switch it on, from the quick settings or with **Turn on** (which opens the system's
+  Bluetooth settings): the trainer and the strap reconnect at once, without waiting for a backoff step, and the notice
+  goes by itself. Repeat by revoking "Nearby devices" in the app's permissions (spec §4.1, Android 12 and later): expect
+  the notice "Allow nearby devices" and the rows "<name> · needs Nearby devices". Write down how long the reconnect took
+  after Bluetooth came back, and whether the foreground service and the overlay kept running while the permission was
+  revoked (they must: the service falls back to `specialUse` alone, ADR 0010 row F1). Settles: spec §4.1 (reconnect),
+  ADR 0009 §5, ADR 0010 rows R1, F1.
+- [ ] **3.14 Power-cycle the trainer while the app is idle (M3-2).** With the trainer connected and the Ready screen
+  showing, switch the D500 off. Expect: the Trainer row goes to "Connection lost · retrying in N s", the Ready screen's
+  **Start** greys out with "Waiting for the trainer to connect." and the top bar says "Waiting for trainer". Switch the D500
+  on: within one backoff step (at most 30 s, or press **Retry now**) the row says "Connected" and **Start** is back, with no
+  tap on **Scan** and without restarting the app. Do this three times in a row, and once with the app in the background (open
+  another app for a minute, switch the trainer off and on, come back). Write down the reconnect times. Settles: ADR 0010
+  rows C2, C3 and the "ride after a reconnect" row of ADR 0009.
+- [ ] **3.15 No trainer, no ride (M3-2).** Tap **Forget** on the Trainer row. Expect: the row says "Not paired" with
+  **Pair**; the Ready screen says "No trainer is paired." with **Pair a trainer**, **Start** is off and the top bar says
+  "No trainer"; no simulated numbers appear anywhere. Then Settings, Developer, **Devices**: **Simulated**. Expect: Start is
+  on, the Devices screen says "These are simulated devices", and the ride is the old simulation. Switch back to
+  **Bluetooth** and pair the D500 again: the ride must be rebuilt by itself (Start comes back when the trainer connects).
+  Also check that **Forget** and **Scan** are not offered during a ride ("Devices cannot be changed during a ride."). Settles:
+  ADR 0010 section 7.
+- [ ] **3.16 Foreground service types (M3-2).** Start a ride with "Nearby devices" allowed. In a PC shell:
+  `adb shell dumpsys activity services app.overdrive.ride` and read `foregroundServiceType` of the overlay service
+  (unverified output format; expect both `connectedDevice` and `specialUse`, `0x10 | 0x40000000` as hex). Finish the
+  ride, revoke "Nearby devices", start a ride in **Simulated** mode and look again: the service must start and show only
+  `specialUse` (a missing permission must never stop the overlay on Android 14 and later). Write down both outputs.
+  Settles: ADR 0010 row F1, ADR 0006 "Unverified on hardware".
+- [ ] **3.17 Record a first ride and share the logs (M3-2).** Settings, Developer: **Record Bluetooth sessions** is on
+  (the default of the early builds). Ride 10 minutes with the trainer and the strap, ERG then simulation, and
+  put the trainer in a dropout once (3.11). Then Settings, Developer, **Share Bluetooth logs**: the row says how many
+  files and how big ("4 files · 120 KB"); tap **Share** and send them to yourself through any app. Expect: files named
+  `ble-<date>T<time>Z-trainer.txt` and `...-strap.txt`, a new file per connection session, readable text starting with
+  `# overdrive-ble-session 1`, with no device address and no device name other than a cleaned model line. **They do
+  contain your heart rate**: keep them out of the repository and share them only with whoever is fixing the codecs.
+  Replay one with `BleSessionFormat` to confirm the notes' guesses (FT 1 to FT 12 above). Write down the file sizes after
+  the ride (the cap is 2 MB a file, 20 MB and 60 files together) and whether **Share** offered every file to the app
+  you chose. Settles: ADR 0010 section 8, row L1, and gives the evidence for FT 1 to FT 12.
 
 ---
 
 ## Session 4: heart-rate strap (HR7)
 
-- [ ] **4.1 Pairing and first value.** Put the strap on with the electrodes damp. Pair it in the setup screen.
-  Expect: a heart-rate value shows on the overlay. Write down the time to the first value.
+- [ ] **4.1 Pairing and first value.** Put the strap on with the electrodes damp. On **Devices**, tap **Scan for devices**
+  (or **Pair** on the Heart rate row). Expect: under "Heart-rate straps" the HR7 appears with a signal in words; tap it. The
+  Heart rate row goes to "Connecting to ..." and then "Connected". Expect: a heart-rate value shows on the Ready screen's
+  top bar and, in a ride, on the overlay. Write down the time to the first value. Close the app, relaunch: the strap must
+  connect by itself, as the trainer does (3.1). Only one strap and one trainer can be paired: pairing another strap
+  replaces the first (check that the old one disappears from the "Paired" mark and that no second link is opened).
 - [ ] **4.2 RR intervals.** Check the snoop log or the M3 raw recorder (see the M3 release notes) for the
   Heart Rate Measurement flags. Expect: unknown: spec §9 lists RR intervals from the Coospo strap as an
   open check. Write down whether RR bit is set, how many RR values come per notification, and whether they
@@ -506,7 +560,7 @@ the firmware version from the Companion app and the Zwift app version before eac
 | 1. 60-minute free ride, video full screen, overlay visible | 60 min over a real video app | 2.1, 2.8, 2.9, 2.10, 2.13, 1.6 |
 | 2. ERG holds target through steady, ramp and interval steps | Same workout on the D500 | 3.3, 3.3b, 3.5, 3.10 |
 | 3. All ten Click actions work from the right controller in the background | Each action with the video app in front | 5.5, 5.6, 5.7 |
-| 4. Trainer power pulled mid-ride pauses; resumes with no data lost | Unplug the trainer | 3.11, 3.12, 3.13 |
+| 4. Trainer power pulled mid-ride pauses; resumes with no data lost | Unplug the trainer | 3.11, 3.12, 3.13, 3.14 |
 | 5. Force-stop mid-ride, relaunch recovers the ride | Force-stop, relaunch | 6.1, 6.2, 6.3 |
 | 6. FIT opens in intervals.icu with power, HR, cadence and laps | Import into intervals.icu | 7.1 to 7.4 |
 | 7. Overlay drag drops no frames at the tablet's refresh rate | `dumpsys gfxinfo` while dragging | 2.5, 2.6, 2.14 |
@@ -541,6 +595,7 @@ Fill this in on the bench. A criterion counts as confirmed only after its owner 
 | 1.4 Overlay permission | | | |
 | 1.5 Notification permission | | | |
 | 1.6 Battery optimisation | | | |
+| 1.7 Nearby devices permission | | | |
 | 2.1 Overlay over video | | | |
 | 2.2 Protected video | | | |
 | 2.3 Legibility | | | |
@@ -571,6 +626,10 @@ Fill this in on the bench. A criterion counts as confirmed only after its owner 
 | 3.11 Trainer dropout (AC 4) | | | |
 | 3.12 Reconnect | | | |
 | 3.13 Bluetooth off and permission | | | |
+| 3.14 Power-cycle while idle | | | |
+| 3.15 No trainer, no ride | | | |
+| 3.16 Foreground service types | | | |
+| 3.17 First recorded ride, share logs | | | |
 | 4.1 HR pairing | | | |
 | 4.2 RR intervals | | | |
 | 4.3 Contact | | | |

@@ -42,4 +42,25 @@ internal object ForegroundServiceTypes {
         sdk: Int,
         tried: Int,
     ): Int? = choose(sdk, bluetoothConnectGranted = false).takeIf { it != tried }
+
+    /**
+     * Calls [startForeground] with [choose]'s types. If the system refuses them with a `SecurityException` (the permission
+     * was revoked between the check and the call) it calls again with [fallback]'s, and tells [onFallback]; a refusal of
+     * the weakest types is rethrown.
+     */
+    inline fun enter(
+        sdk: Int,
+        bluetoothConnectGranted: Boolean,
+        onFallback: (SecurityException) -> Unit,
+        startForeground: (types: Int) -> Unit,
+    ) {
+        val types = choose(sdk, bluetoothConnectGranted)
+        try {
+            startForeground(types)
+        } catch (error: SecurityException) {
+            val weaker = fallback(sdk, types) ?: throw error
+            onFallback(error)
+            startForeground(weaker)
+        }
+    }
 }

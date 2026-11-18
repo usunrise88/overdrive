@@ -94,8 +94,14 @@ fun DevicesScreen(
                 )
                 val radio = devices.radio.takeIf { !devices.simulated }
                 if (radio != null) BluetoothNotice(radio, bluetooth)
-                // With Bluetooth unusable **Pair** does the notice's one action: a scan would find nothing.
-                val pair = if (radio != null) bluetooth.run else actions.onScan
+                // With Bluetooth unusable **Pair** does the notice's one action: a scan would find nothing. Where
+                // nothing can be paired (simulated devices, a live ride) there is no scan panel to show one, so it does nothing.
+                val pair: () -> Unit =
+                    when {
+                        radio != null -> bluetooth.run
+                        devices.simulated || !devices.canChange -> ({})
+                        else -> actions.onScan
+                    }
                 OdCard(padding = PaddingValues(0.dp)) {
                     DeviceRow(
                         OverdriveIcons.Bike,

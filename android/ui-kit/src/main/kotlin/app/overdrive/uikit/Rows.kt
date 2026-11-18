@@ -177,7 +177,7 @@ fun DeviceRow(
                 }
 
                 DeviceStatus.Blocked -> {
-                    Unit
+                    // No button: the notice above the rows holds the one action.
                 }
             }
             if (onForget != null) OdButton("Forget", onForget, variant = ButtonVariant.Ghost, height = 40.dp)
