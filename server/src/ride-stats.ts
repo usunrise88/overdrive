@@ -1,0 +1,353 @@
+import {
+  type LeafStep,
+  powerZoneOf,
+  type RideRecord,
+  type RideSample,
+  type Workout,
+} from "@overdrive/contracts";
+
+/**
+ * What `get_ride` says about a stored ride (spec §8.4), computed here from the record and never by
+ * a model (CLAUDE.md). The definitions are the ride app's (`SummaryAccumulator` in core): power
+ * statistics are over the seconds that were not paused, normalised power is the fourth-power mean
+ * of 30-sample rolling averages of the powers that were measured. A test checks that the
+ * numbers agree with the summary the tablet recorded.
+ */
+
+const round = (value: number, digits: number): number => {
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+};
+
+const mean = (values: number[]): number | null =>
+  values.length === 0 ? null : values.reduce((a, b) => a + b, 0) / values.length;
+
+const NP_WINDOW = 30;
+/** The best efforts reported, in seconds: 5 s, 1 min, 5 min, 20 min. */
+export const BEST_EFFORT_SECONDS = [5, 60, 300, 1200] as const;
+
+export interface PowerStatistics {
+  averageWatts: number | null;
+  normalizedWatts: number | null;
+  maxWatts: number | null;
+  minWatts: number | null;
+  /** Normalised over average power. */
+  variabilityIndex: number | null;
+  /** Normalised power over the FTP of the ride. */
+  intensityFactor: number | null;
+  /** Training stress score, from the ride's own FTP. */
+  load: number | null;
+  workKilojoules: number;
+  /** Seconds in zones 1 to 7 by the ride's FTP and the profile's zone bounds. */
+  secondsInZone: number[];
+  /** The best average power over each duration, where the ride is long enough; a pause or a gap counts as 0 W. */
+  bestEfforts: { seconds: number; watts: number }[];
+}
+
+export interface HeartRateStatistics {
+  averageBpm: number | null;
+  maxBpm: number | null;
+  minBpm: number | null;
+}
+
+export interface CadenceStatistics {
+  /** Over the seconds spent pedalling (above 0 rpm). */
+  averageRpm: number | null;
+  maxRpm: number | null;
+}
+
+export interface RideStatistics {
+  durationSeconds: number;
+  movingSeconds: number;
+  pausedSeconds: number;
+  distanceKilometers: number;
+  power: PowerStatistics;
+  heartRate: HeartRateStatistics;
+  cadence: CadenceStatistics;
+}
+
+function powerStatistics(record: RideRecord, zoneUpperPercent: readonly number[]): PowerStatistics {
+  const { ftp } = record.ride;
+  const powers: number[] = [];
+  const secondsInZone = new Array<number>(zoneUpperPercent.length + 1).fill(0);
+  for (const sample of record.samples) {
+    if (sample.paused === true || sample.power === undefined || sample.power === null) continue;
+    powers.push(sample.power);
+    const zone = powerZoneOf(sample.power, ftp, zoneUpperPercent);
+    secondsInZone[zone - 1] = (secondsInZone[zone - 1] ?? 0) + 1;
+  }
+
+  // Normalised power over a window of the last 30 measured powers, as the tablet does.
+  let windowSum = 0;
+  let fourthPowers = 0;
+  let windows = 0;
+  for (const [index, power] of powers.entries()) {
+    windowSum += power;
+    if (index >= NP_WINDOW) windowSum -= powers[index - NP_WINDOW] as number;
+    if (index >= NP_WINDOW - 1) {
+      const average = windowSum / NP_WINDOW;
+      fourthPowers += average ** 4;
+      windows++;
+    }
+  }
+  const sum = powers.reduce((a, b) => a + b, 0);
+  const average = powers.length === 0 ? null : sum / powers.length;
+  const normalized = windows === 0 ? null : (fourthPowers / windows) ** 0.25;
+  const intensity = normalized === null ? null : normalized / ftp;
+
+  // Best efforts over the whole timeline, with a pause or a missing reading as 0 W.
+  const timeline = record.samples.map((s) =>
+    s.paused === true || s.power === undefined || s.power === null ? 0 : s.power,
+  );
+  const prefix = [0];
+  for (const watts of timeline) prefix.push((prefix[prefix.length - 1] as number) + watts);
+  const bestEfforts: { seconds: number; watts: number }[] = [];
+  for (const seconds of BEST_EFFORT_SECONDS) {
+    // A ride with no power measured at all has no best efforts, not zeros.
+    if (timeline.length < seconds || powers.length === 0) continue;
+    let best = 0;
+    for (let end = seconds; end <= timeline.length; end++) {
+      best = Math.max(best, (prefix[end] as number) - (prefix[end - seconds] as number));
+    }
+    bestEfforts.push({ seconds, watts: round(best / seconds, 1) });
+  }
+
+  return {
+    averageWatts: average === null ? null : round(average, 1),
+    normalizedWatts: normalized === null ? null : round(normalized, 1),
+    maxWatts: powers.length === 0 ? null : Math.max(...powers),
+    minWatts: powers.length === 0 ? null : Math.min(...powers),
+    variabilityIndex:
+      normalized === null || average === null || average === 0
+        ? null
+        : round(normalized / average, 2),
+    intensityFactor: intensity === null ? null : round(intensity, 2),
+    load:
+      normalized === null || intensity === null
+        ? null
+        : round(((powers.length * normalized * intensity) / (ftp * 3600)) * 100, 1),
+    workKilojoules: round(sum / 1000, 1),
+    secondsInZone,
+    bestEfforts,
+  };
+}
+
+/** Power, heart-rate and cadence statistics of a ride, from its samples. */
+export function rideStatistics(
+  record: RideRecord,
+  zoneUpperPercent: readonly number[],
+): RideStatistics {
+  const moving = record.samples.filter((s) => s.paused !== true);
+  const heartRates = moving.flatMap((s) => (s.heartRate == null ? [] : [s.heartRate]));
+  const pedalling = moving.flatMap((s) => (s.cadence != null && s.cadence > 0 ? [s.cadence] : []));
+  const last = record.samples[record.samples.length - 1];
+  const average = mean(heartRates);
+  const cadence = mean(pedalling);
+  return {
+    durationSeconds: record.samples.length,
+    movingSeconds: moving.length,
+    pausedSeconds: record.samples.length - moving.length,
+    distanceKilometers: round((last?.distanceMeters ?? 0) / 1000, 2),
+    power: powerStatistics(record, zoneUpperPercent),
+    heartRate: {
+      averageBpm: average === null ? null : round(average, 1),
+      maxBpm: heartRates.length === 0 ? null : Math.max(...heartRates),
+      minBpm: heartRates.length === 0 ? null : Math.min(...heartRates),
+    },
+    cadence: {
+      averageRpm: cadence === null ? null : round(cadence, 1),
+      maxRpm: pedalling.length === 0 ? null : Math.max(...pedalling),
+    },
+  };
+}
+
+// ---- Series ----------------------------------------------------------------------------------
+
+export interface RideSeries {
+  /** Each value is the mean of this many seconds; the first covers seconds 1 to `stepSeconds`. */
+  stepSeconds: number;
+  /** Whole watts; null where nothing was measured in the whole step. */
+  power: (number | null)[];
+  heartRate: (number | null)[];
+  cadence: (number | null)[];
+  /** The workout's target power, null in free steps and without a workout. */
+  targetPower: (number | null)[];
+}
+
+/** The most points a series has: a longer ride gets a longer step. */
+export const MAX_SERIES_POINTS = 1200;
+
+/** Averages the samples in steps of `stepSeconds` (raised if the ride would give more than {@link MAX_SERIES_POINTS} points). */
+export function rideSeries(samples: RideSample[], requestedStepSeconds: number): RideSeries {
+  const stepSeconds = Math.max(
+    requestedStepSeconds,
+    Math.ceil(samples.length / MAX_SERIES_POINTS),
+    1,
+  );
+  const series: RideSeries = {
+    stepSeconds,
+    power: [],
+    heartRate: [],
+    cadence: [],
+    targetPower: [],
+  };
+  const pick = (chunk: RideSample[], key: "power" | "heartRate" | "cadence" | "targetPower") => {
+    const values = chunk.flatMap((s) => (s[key] == null ? [] : [s[key] as number]));
+    const average = mean(values);
+    return average === null ? null : Math.round(average);
+  };
+  for (let start = 0; start < samples.length; start += stepSeconds) {
+    const chunk = samples.slice(start, start + stepSeconds);
+    series.power.push(pick(chunk, "power"));
+    series.heartRate.push(pick(chunk, "heartRate"));
+    series.cadence.push(pick(chunk, "cadence"));
+    series.targetPower.push(pick(chunk, "targetPower"));
+  }
+  return series;
+}
+
+// ---- Compliance with the plan ----------------------------------------------------------------
+
+/** One step of a workout with its repeats expanded, as the ride app's `flatSteps` makes them. */
+export interface FlatStep {
+  index: number;
+  label: string;
+  type: "steady" | "ramp" | "free";
+  durationSeconds: number;
+  /** Fraction of FTP at the start and end of the step; null in a free step. */
+  fromFraction: number | null;
+  toFraction: number | null;
+}
+
+const DEFAULT_LABEL = { steady: "Steady", ramp: "Ramp", free: "Free ride" } as const;
+
+export function flattenWorkout(workout: Workout): FlatStep[] {
+  const flat: FlatStep[] = [];
+  const add = (step: LeafStep, outer?: string): void => {
+    flat.push({
+      index: flat.length,
+      label: step.label ?? outer ?? DEFAULT_LABEL[step.type],
+      type: step.type,
+      durationSeconds: step.duration,
+      fromFraction: step.type === "steady" ? step.target : step.type === "ramp" ? step.from : null,
+      toFraction: step.type === "steady" ? step.target : step.type === "ramp" ? step.to : null,
+    });
+  };
+  for (const step of workout.steps) {
+    if (step.type === "repeat") {
+      for (let i = 0; i < step.count; i++) for (const inner of step.steps) add(inner, step.label);
+    } else {
+      add(step);
+    }
+  }
+  return flat;
+}
+
+export interface StepCompliance {
+  step: number;
+  label: string;
+  type: "steady" | "ramp" | "free";
+  plannedSeconds: number;
+  /** Seconds the ride spent in this step, not counting pauses. */
+  actualSeconds: number;
+  /** The planned average power in watts, from the target and the ride's FTP; null in a free step. */
+  plannedWatts: number | null;
+  actualWatts: number | null;
+  deltaWatts: number | null;
+  deltaPercent: number | null;
+}
+
+export interface Compliance {
+  workout: { id: string; name: string };
+  plannedSeconds: number;
+  /** Seconds spent in steps of the workout, not counting pauses. */
+  actualSeconds: number;
+  stepsPlanned: number;
+  /** Steps the ride stayed in for their whole planned time. */
+  stepsCompleted: number;
+  /** Over the steps with a power target: what was planned, and what was ridden in those steps. */
+  targetSteps: {
+    plannedWatts: number | null;
+    actualWatts: number | null;
+    deltaPercent: number | null;
+  };
+  steps: StepCompliance[];
+}
+
+/**
+ * The ride against the workout it was played from. Returns the reason instead when they cannot be
+ * compared: the ride has no steps, or steps the workout does not have.
+ */
+export function rideCompliance(
+  record: RideRecord,
+  workout: Workout,
+): Compliance | { problem: string } {
+  const flat = flattenWorkout(workout);
+  const { ftp } = record.ride;
+  const bySteps = new Map<number, RideSample[]>();
+  for (const sample of record.samples) {
+    if (sample.stepIndex == null) continue;
+    if (sample.stepIndex >= flat.length) {
+      return {
+        problem: `the ride has a step ${sample.stepIndex + 1} and the workout has only ${flat.length}`,
+      };
+    }
+    const list = bySteps.get(sample.stepIndex) ?? [];
+    list.push(sample);
+    bySteps.set(sample.stepIndex, list);
+  }
+  if (bySteps.size === 0) return { problem: "the ride recorded no workout step" };
+
+  const steps: StepCompliance[] = flat.map((step) => {
+    const samples = (bySteps.get(step.index) ?? []).filter((s) => s.paused !== true);
+    const watts = mean(samples.flatMap((s) => (s.power == null ? [] : [s.power])));
+    const planned =
+      step.fromFraction === null || step.toFraction === null
+        ? null
+        : ((step.fromFraction + step.toFraction) / 2) * ftp;
+    return {
+      step: step.index + 1,
+      label: step.label,
+      type: step.type,
+      plannedSeconds: step.durationSeconds,
+      actualSeconds: samples.length,
+      plannedWatts: planned === null ? null : round(planned, 1),
+      actualWatts: watts === null ? null : round(watts, 1),
+      deltaWatts: planned === null || watts === null ? null : round(watts - planned, 1),
+      deltaPercent:
+        planned === null || watts === null || planned === 0
+          ? null
+          : round(((watts - planned) / planned) * 100, 1),
+    };
+  });
+
+  const targeted = flat.filter((s) => s.type !== "free");
+  const plannedTotal = targeted.reduce((a, s) => a + s.durationSeconds, 0);
+  const plannedWeighted = targeted.reduce(
+    (a, s) =>
+      a + (((s.fromFraction as number) + (s.toFraction as number)) / 2) * ftp * s.durationSeconds,
+    0,
+  );
+  const targetSamples = targeted.flatMap((s) =>
+    (bySteps.get(s.index) ?? []).filter((x) => x.paused !== true && x.power != null),
+  );
+  const actualTargetWatts = mean(targetSamples.map((s) => s.power as number));
+  const plannedTargetWatts = plannedTotal === 0 ? null : plannedWeighted / plannedTotal;
+
+  return {
+    workout: { id: workout.id, name: workout.name },
+    plannedSeconds: flat.reduce((a, s) => a + s.durationSeconds, 0),
+    actualSeconds: steps.reduce((a, s) => a + s.actualSeconds, 0),
+    stepsPlanned: flat.length,
+    stepsCompleted: steps.filter((s) => s.actualSeconds >= s.plannedSeconds).length,
+    targetSteps: {
+      plannedWatts: plannedTargetWatts === null ? null : round(plannedTargetWatts, 1),
+      actualWatts: actualTargetWatts === null ? null : round(actualTargetWatts, 1),
+      deltaPercent:
+        plannedTargetWatts === null || actualTargetWatts === null || plannedTargetWatts === 0
+          ? null
+          : round(((actualTargetWatts - plannedTargetWatts) / plannedTargetWatts) * 100, 1),
+    },
+    steps,
+  };
+}

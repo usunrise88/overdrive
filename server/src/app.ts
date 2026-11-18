@@ -3,7 +3,9 @@ import { bearerAuth } from "./auth.ts";
 import type { Config } from "./config.ts";
 import type { Db } from "./db.ts";
 import { installErrorHandling, sendError } from "./errors.ts";
+import { type McpConfig, type McpTestOptions, mcpModule, mcpSettings } from "./mcp/index.ts";
 import { planRoutes } from "./plan/routes.ts";
+import { profileRoutes } from "./profile/routes.ts";
 import { DEFAULT_LIMITS, type Limits, ridesRoutes } from "./rides.ts";
 import { createServices, type Services, type ServicesConfig } from "./services.ts";
 
@@ -15,7 +17,7 @@ declare module "fastify" {
 }
 
 export interface AppOptions {
-  config: Pick<Config, "LOG_LEVEL" | "DEVICE_TOKENS"> & ServicesConfig;
+  config: Pick<Config, "LOG_LEVEL" | "DEVICE_TOKENS"> & ServicesConfig & McpConfig;
   db: Db;
   /** Body size limits; the defaults are the API's (ADR 0014). Tests shrink them. */
   limits?: Partial<Limits>;
@@ -27,6 +29,8 @@ export interface AppOptions {
    * `app.services.start()` does, and closing the app stops them.
    */
   services?: Services;
+  /** For the tests: the clock and the limits of the OAuth server (ADR 0018). */
+  mcp?: McpTestOptions;
 }
 
 /**
@@ -78,9 +82,29 @@ export function buildApp(options: AppOptions): FastifyInstance {
         destinations: services.destinations,
       });
       v1.register(planRoutes, { store: services.plan, refresher: services.refresher });
+      v1.register(profileRoutes, { store: services.profile });
     },
     { prefix: "/v1" },
   );
+
+  // The MCP server and its OAuth server (ADR 0018) exist only when they are configured; otherwise their
+  // paths are plain 404s.
+  const mcp = mcpSettings(config);
+  if ("off" in mcp) {
+    app.log.info(`MCP server is off: ${mcp.off} (see docs/deploy.md to turn it on)`);
+  } else {
+    app.register(mcpModule, {
+      settings: mcp.on,
+      services,
+      db,
+      log: app.log,
+      ...(options.mcp === undefined ? {} : { test: options.mcp }),
+    });
+    app.log.info(
+      { endpoint: `${mcp.on.baseUrl}/mcp`, staticTokens: mcp.on.staticTokens.length },
+      "MCP server is on",
+    );
+  }
 
   return app;
 }

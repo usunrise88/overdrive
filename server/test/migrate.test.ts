@@ -36,13 +36,18 @@ const migration = (version: number, sql: string): Migration => ({
 });
 
 describe("the real migrations", () => {
-  it("create the ride tables and the plan tables", async () => {
+  it("create the ride, plan, profile, ride workout and OAuth tables", async () => {
     const applied = await migrate(db);
-    expect(applied).toEqual([1, 2]);
+    expect(applied).toEqual([1, 2, 3]);
     expect(await tables()).toEqual([
+      "oauth_clients",
+      "oauth_codes",
+      "oauth_tokens",
       "plan_sync_state",
       "planned_workouts",
+      "profile",
       "ride_destinations",
+      "ride_workouts",
       "rides",
       "schema_migrations",
     ]);
@@ -63,7 +68,7 @@ describe("the real migrations", () => {
       "INSERT INTO ride_destinations (ride_id, destination, state) VALUES ('with-fit', 'strava', 'done')",
     );
 
-    expect(await migrate(db, all)).toEqual([2]);
+    expect(await migrate(db, all.slice(0, 2))).toEqual([2]);
     const rows = await db.query<{ ride_id: string; destination: string; state: string }>(
       "SELECT ride_id, destination, state FROM ride_destinations ORDER BY destination",
     );
@@ -102,14 +107,14 @@ describe("the real migrations", () => {
     expect(await migrate(db)).toEqual([]);
     expect(await migrate(db)).toEqual([]);
     const rows = await db.query<{ version: number }>("SELECT version FROM schema_migrations");
-    expect(rows.rows).toEqual([{ version: 1 }, { version: 2 }]);
+    expect(rows.rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
     const rides = await db.query("SELECT id FROM rides");
     expect(rides.rows).toHaveLength(1);
   });
 
   it("run together once each when two starts race", async () => {
     const results = await Promise.all([migrate(db), migrate(db)]);
-    expect(results.flat()).toEqual([1, 2]);
+    expect(results.flat()).toEqual([1, 2, 3]);
   });
 
   it("make a table the data constraints hold", async () => {

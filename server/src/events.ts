@@ -1,8 +1,8 @@
 /**
  * The service's in-process events (ADR 0016): how one module tells the others that something
  * happened without importing them. The intake announces a stored ride; the plan store announces a
- * changed plan. The upload worker, and later the MCP, Telegram, Google Calendar and Strava modules,
- * subscribe. Delivery is synchronous in order of subscription and never fails the emitter: a
+ * changed plan; the profile store announces a changed profile. The upload worker, and later the
+ * Telegram, Google Calendar and Strava modules, subscribe. Delivery is synchronous in order of subscription and never fails the emitter: a
  * listener that throws (or returns a promise that rejects) is reported to `onError` and the others
  * still run.
  */
@@ -20,9 +20,15 @@ export interface PlanChangedEvent {
   removed: string[];
 }
 
+/** The parts of the profile that changed: `ftp`, `zones`, `weeklyAvailability`, `goals`, `physics`. Never empty. */
+export interface ProfileChangedEvent {
+  fields: string[];
+}
+
 export interface AppEvents {
   "ride-stored": RideStoredEvent;
   "plan-changed": PlanChangedEvent;
+  "profile-changed": ProfileChangedEvent;
 }
 
 export type AppEventName = keyof AppEvents;

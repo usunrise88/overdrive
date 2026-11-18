@@ -61,6 +61,12 @@ const workoutSchema: object = JSON.parse(
   readFileSync(new URL("../schema/workout.schema.json", import.meta.url), "utf8"),
 );
 
+/** The native workout's JSON Schema, for tools that advertise the format (the MCP tools describe it to a model). */
+export const workoutJsonSchema: Readonly<Record<string, unknown>> = workoutSchema as Record<
+  string,
+  unknown
+>;
+
 const ajv = new Ajv2020({ allErrors: true });
 const checkWorkout = ajv.compile<Workout>(workoutSchema);
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parsePassphraseHash } from "./oauth/passphrase.ts";
 import { isTimeZone } from "./time.ts";
 
 /** A device allowed to call the API: its name (for logs and `rides.uploaded_by`) and its secret. */
@@ -15,19 +16,20 @@ const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/;
 const TOKEN = /^[A-Za-z0-9+/=._~-]+$/;
 
 /**
- * Parses `DEVICE_TOKENS`: comma-separated `name:token` entries, for example `tablet:…,companion:…`.
- * Every token has at least {@link MIN_TOKEN_LENGTH} characters and names and tokens are unique.
- * An empty value means no device is allowed (every `/v1` request is then 401). The errors name
- * the entry by position and never repeat a token.
+ * Parses `DEVICE_TOKENS` (or `MCP_STATIC_TOKENS`, which has the same form): comma-separated
+ * `name:token` entries, for example `tablet:…,companion:…`. Every token has at least
+ * {@link MIN_TOKEN_LENGTH} characters and names and tokens are unique. An empty value means no token
+ * is allowed (for `DEVICE_TOKENS` every `/v1` request is then 401). The errors name the entry by
+ * position and never repeat a token.
  */
-export function parseDeviceTokens(raw: string): DeviceToken[] {
+export function parseDeviceTokens(raw: string, variable = "DEVICE_TOKENS"): DeviceToken[] {
   const devices: DeviceToken[] = [];
   const entries = raw
     .split(",")
     .map((entry) => entry.trim())
     .filter((entry) => entry !== "");
   for (const [index, entry] of entries.entries()) {
-    const at = `DEVICE_TOKENS entry ${index + 1}`;
+    const at = `${variable} entry ${index + 1}`;
     const colon = entry.indexOf(":");
     if (colon < 0) throw new Error(`${at} is not name:token`);
     const name = entry.slice(0, colon);
@@ -66,6 +68,29 @@ const ATHLETE_ID = /^[A-Za-z0-9_-]{1,32}$/;
 // Visible ASCII, no spaces: the key goes into an Authorization header.
 const API_KEY = /^[\x21-\x7e]{1,256}$/;
 
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/**
+ * Why `raw` cannot be the service's public address, or null when it can: https (http only on this
+ * machine, for development and the tests), just an origin, nothing that could carry a secret.
+ */
+function baseUrlProblem(raw: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return "must be an address such as https://overdrive.example.com";
+  }
+  const local = url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname);
+  if (url.protocol !== "https:" && !local) {
+    return "must start with https:// (http only for localhost)";
+  }
+  if (url.username !== "" || url.password !== "") return "must not contain credentials";
+  if (url.search !== "" || url.hash !== "") return "must not have a query or a fragment";
+  if (url.pathname !== "/") return "must be the address alone, with no path";
+  return null;
+}
+
 const schema = z.object({
   HOST: z.string().default("127.0.0.1"),
   PORT: z.coerce.number().int().min(1).max(65535).default(8080),
@@ -81,6 +106,51 @@ const schema = z.object({
     .transform((raw, ctx): DeviceToken[] => {
       try {
         return parseDeviceTokens(raw);
+      } catch (err) {
+        ctx.addIssue({ code: "custom", message: err instanceof Error ? err.message : String(err) });
+        return z.NEVER;
+      }
+    }),
+  // The MCP server and its OAuth server (ADR 0018): off unless both PUBLIC_BASE_URL and
+  // OWNER_PASSPHRASE_HASH are set. Messages never repeat a value.
+  PUBLIC_BASE_URL: z.preprocess(
+    blankIsUnset,
+    z
+      .string()
+      .trim()
+      .transform((raw, ctx): string => {
+        const reason = baseUrlProblem(raw);
+        if (reason === null) return new URL(raw).origin;
+        ctx.addIssue({ code: "custom", message: `PUBLIC_BASE_URL ${reason}` });
+        return z.NEVER;
+      })
+      .optional(),
+  ),
+  OWNER_PASSPHRASE_HASH: z.preprocess(
+    blankIsUnset,
+    z
+      .string()
+      .trim()
+      .transform((raw, ctx): string => {
+        try {
+          parsePassphraseHash(raw);
+          return raw;
+        } catch (err) {
+          ctx.addIssue({
+            code: "custom",
+            message: `OWNER_PASSPHRASE_HASH ${err instanceof Error ? err.message : "is invalid"}`,
+          });
+          return z.NEVER;
+        }
+      })
+      .optional(),
+  ),
+  MCP_STATIC_TOKENS: z
+    .string()
+    .default("")
+    .transform((raw, ctx): DeviceToken[] => {
+      try {
+        return parseDeviceTokens(raw, "MCP_STATIC_TOKENS");
       } catch (err) {
         ctx.addIssue({ code: "custom", message: err instanceof Error ? err.message : String(err) });
         return z.NEVER;

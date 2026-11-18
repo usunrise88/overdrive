@@ -8,6 +8,7 @@
     "dev": "node --conditions=source --watch src/main.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
+    "hash-passphrase": "node src/hash-passphrase.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
