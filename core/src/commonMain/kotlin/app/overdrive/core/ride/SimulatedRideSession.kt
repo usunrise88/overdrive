@@ -9,13 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.exp
-import kotlin.math.ln
 import kotlin.math.roundToInt
-import kotlin.math.sqrt
-import kotlin.random.Random
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -41,7 +35,8 @@ import kotlin.time.Duration.Companion.seconds
  *   the neutral one adds or removes [SimulationScenario.powerPerGear] of that power.
  * - Cadence settles around the step's cadence target, else [SimulationScenario.cadenceRpm], with noise.
  * - Heart rate follows power through a first-order lag with a time constant of 25 s.
- * - Speed and distance come from the [speedModel], a placeholder until the real physics model in stage M2.
+ * - Speed and distance come from the [speedModel]: the placeholder by default, or pass
+ *   `FlatPhysicsSpeedModel()` for the real physics (spec §4.3), which [RideEngine] uses.
  * - Paused: power, cadence and speed are 0 and the heart rate relaxes towards its resting value.
  *
  * Before the ride starts, and after it, the sensor values are null. A ride with a workout finishes by
@@ -85,9 +80,7 @@ public class SimulatedRideSession(
     // Everything below is touched only by the coroutine that drains `commands`, one command at a time.
     private val steps: List<FlatStep> = workout?.flatSteps().orEmpty()
     private val totalSeconds = steps.totalDurationSeconds()
-    private val random = Random(seed)
-    private val powerLagPerTick = 1.0 - exp(-1.0 / POWER_LAG_SECONDS)
-    private val heartRateLagPerTick = 1.0 - exp(-1.0 / HEART_RATE_LAG_SECONDS)
+    private val rider = SimulatedRider(ftp, scenario, seed)
 
     private var state = if (startConnected) RideState.READY else RideState.IDLE
     private var elapsed = 0
@@ -97,10 +90,6 @@ public class SimulatedRideSession(
     private var gear = scenario.neutralGear
     private var intensity = RideSnapshot.DEFAULT_INTENSITY_PERCENT
 
-    private var riderPower = 0.0
-    private var riderCadence = scenario.cadenceRpm
-    private var riderHeartRate = scenario.restingHeartRate.toDouble()
-    private var drift = 0.0
     private var speedKmh = 0.0
     private var distanceMeters = 0.0
 
@@ -231,13 +220,13 @@ public class SimulatedRideSession(
         state = RideState.RIDING
         powerReading = 0
         cadenceReading = 0
-        heartRateReading = riderHeartRate.roundToInt()
+        heartRateReading = rider.heartRate.roundToInt()
     }
 
     private fun pauseRide() {
         if (state != RideState.RIDING) return
         state = RideState.PAUSED
-        riderPower = 0.0
+        rider.power = 0.0
         speedKmh = 0.0
         powerReading = reading(SimulatedSignal.POWER, 0)
         cadenceReading = reading(SimulatedSignal.CADENCE, 0)
@@ -254,7 +243,7 @@ public class SimulatedRideSession(
 
     private fun endRide() {
         state = RideState.FINISHED
-        riderPower = 0.0
+        rider.power = 0.0
         speedKmh = 0.0
         powerReading = null
         cadenceReading = null
@@ -279,12 +268,8 @@ public class SimulatedRideSession(
 
     private fun tick() {
         sensorSecond++
-        // Always draw the same four values in the same order, so dropouts and pauses never shift the noise.
-        val noise = scenario.noise
-        val powerNoise = noise * POWER_NOISE * gaussian()
-        val cadenceNoise = noise * CADENCE_NOISE * gaussian()
-        val heartRateNoise = noise * HEART_RATE_NOISE * gaussian()
-        drift = DRIFT_DECAY * drift + noise * DRIFT_STEP * gaussian()
+        // Always draws the same four values in the same order, so dropouts and pauses never shift the noise.
+        rider.drawNoise()
 
         if (state == RideState.RIDING) {
             elapsed++
@@ -299,37 +284,25 @@ public class SimulatedRideSession(
         }
 
         val riding = state == RideState.RIDING
-        riderPower += ((if (riding) riderTargetPower() else 0.0) - riderPower) * powerLagPerTick
-        val cadenceBase = currentStep()?.cadence ?: scenario.cadenceRpm
-        riderCadence =
-            (riderCadence + CADENCE_PULL * (cadenceBase - riderCadence) + cadenceNoise).coerceIn(
-                MIN_CADENCE,
-                MAX_CADENCE,
-            )
-        val heartRateTarget =
-            (scenario.restingHeartRate + (scenario.heartRateAtFtp - scenario.restingHeartRate) * riderPower / ftp)
-                .coerceAtMost(MAX_HEART_RATE)
-        riderHeartRate += (heartRateTarget - riderHeartRate) * heartRateLagPerTick
+        rider.advance(
+            riding = riding,
+            ergWatts = currentErgWatts(),
+            gearFactor = (1.0 + scenario.powerPerGear * (gear - scenario.neutralGear)).coerceAtLeast(MIN_GEAR_FACTOR),
+            cadenceBase = currentStep()?.cadence ?: scenario.cadenceRpm,
+        )
 
-        speedKmh = speedModel.speedKmh(riderPower)
+        speedKmh = speedModel.speedKmh(rider.power)
         if (riding) distanceMeters += speedKmh / KMH_PER_METER_PER_SECOND
 
-        powerReading =
-            reading(
-                SimulatedSignal.POWER,
-                if (riding) (riderPower * (1.0 + powerNoise)).roundToInt().coerceAtLeast(0) else 0,
-            )
-        cadenceReading = reading(SimulatedSignal.CADENCE, if (riding) riderCadence.roundToInt() else 0)
-        heartRateReading = reading(SimulatedSignal.HEART_RATE, (riderHeartRate + heartRateNoise).roundToInt())
+        powerReading = reading(SimulatedSignal.POWER, rider.powerReading(riding))
+        cadenceReading = reading(SimulatedSignal.CADENCE, rider.cadenceReading(riding))
+        heartRateReading = reading(SimulatedSignal.HEART_RATE, rider.heartRateReading())
     }
 
-    /** What the rider tries to hold in watts at the current workout position, before lag and noise. */
-    private fun riderTargetPower(): Double {
+    /** What an ERG step asks the rider to hold in watts at the current workout position, null in a simulation step. */
+    private fun currentErgWatts(): Double? {
         val step = currentStep()
-        val ergFraction = step?.targetFractionAt(position - step.startSeconds)
-        if (ergFraction != null) return ergWatts(ergFraction)
-        val gearFactor = (1.0 + scenario.powerPerGear * (gear - scenario.neutralGear)).coerceAtLeast(MIN_GEAR_FACTOR)
-        return scenario.freeRideFtpFraction * ftp * gearFactor * (1.0 + drift)
+        return step?.targetFractionAt(position - step.startSeconds)?.let(::ergWatts)
     }
 
     /** Watts asked for by an ERG target given as a fraction of FTP, after the rider's intensity setting. */
@@ -339,12 +312,6 @@ public class SimulatedRideSession(
         signal: SimulatedSignal,
         value: Int,
     ): Int? = if (scenario.dropouts.any { it.covers(sensorSecond, signal) }) null else value
-
-    private fun gaussian(): Double {
-        val u1 = 1.0 - random.nextDouble()
-        val u2 = random.nextDouble()
-        return sqrt(-2.0 * ln(u1)) * cos(2.0 * PI * u2)
-    }
 
     private fun snapshot(): RideSnapshot {
         val finished = state == RideState.FINISHED
@@ -368,6 +335,7 @@ public class SimulatedRideSession(
             intensityPercent = intensity,
             zone = powerReading?.let { PowerZone.of(it, ftp) },
             workout = progress(),
+            pauseReason = if (state == RideState.PAUSED) PauseReason.MANUAL else null,
         )
     }
 
@@ -392,17 +360,6 @@ public class SimulatedRideSession(
     }
 }
 
-private const val POWER_LAG_SECONDS = 2.0
-private const val HEART_RATE_LAG_SECONDS = 25.0
-private const val POWER_NOISE = 0.02
-private const val CADENCE_NOISE = 1.2
-private const val CADENCE_PULL = 0.3
-private const val HEART_RATE_NOISE = 0.8
-private const val DRIFT_DECAY = 0.95
-private const val DRIFT_STEP = 0.02
-private const val MIN_CADENCE = 40.0
-private const val MAX_CADENCE = 140.0
-private const val MAX_HEART_RATE = 200.0
 private const val MIN_GEAR_FACTOR = 0.1
 private const val PERCENT = 100.0
 private const val KMH_PER_METER_PER_SECOND = 3.6

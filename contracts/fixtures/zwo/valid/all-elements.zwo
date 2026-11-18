@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Hand-written and synthetic. Exercises every supported element and the reader's tolerance. -->
+<workout_file>
+  <author>Overdrive &amp; friends</author>
+  <name>All &lt;elements&gt;</name>
+  <description><![CDATA[Steady, ramps, intervals & a free ride.]]></description>
+  <sportType>bike</sportType>
+  <tags><tag name="TEST"/></tags>
+  <workout>
+    <Warmup Duration="300" PowerLow="0.40" PowerHigh="0.65" Cadence="85"/>
+    <SteadyState Duration="180" Power="0.75" Cadence="90">
+      <textevent timeoffset="10" message="Settle in &amp; breathe"/>
+      <textevent timeoffset="120" message="Halfway"/>
+    </SteadyState>
+    <Ramp Duration="240" PowerLow="0.65" PowerHigh="1.05"/>
+    <IntervalsT Repeat="4" OnDuration="30" OnPower="1.20" OffDuration="90" OffPower="0.50" Cadence="100" CadenceResting="80"/>
+    <FreeRide Duration="120" FlatRoad="1"/>
+    <MaxEffort Duration="20"/>
+    <SteadyState duration='60.0' power='0.60'></SteadyState>
+    <Cooldown Duration="300" PowerLow="0.70" PowerHigh="0.35"/>
+  </workout>
+</workout_file>

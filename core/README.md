@@ -15,15 +15,95 @@ consumes it with `includeBuild("../core")`.
 
 Currently implemented:
 
-- the native workout model (`app.overdrive.core.workout`), checked against the shared fixtures in
-  `../contracts`;
-- the ride-session model and a simulated session (`app.overdrive.core.ride`), described below.
+| Package (`app.overdrive.core.`) | What | Spec |
+|---|---|---|
+| `workout` | Native workout model, ZWO import, the pure `WorkoutPlayer` | §4.5, §8.1 |
+| `ride` | `RideSession` and `RideSnapshot` (what the UI reads), `RideEngine` (the real engine), `SimulatedRideSession` (M1 UI stand-in), `PowerZone` | §4.2, §4.6 |
+| `device` | `TrainerDevice` and `HeartRateDevice` (FTMS-shaped), simulated devices, `SimulatedBike` | §4.1, §7.5 |
+| `physics` | `FlatPhysicsSpeedModel`: virtual speed and distance on the flat | §4.3 |
+| `gear` | `GearSettings`: virtual gears as clamped grade offsets | §4.4 |
+| `record` | `RideRecord` (samples, laps, RR series, summary), `RideRecorder` | §8.2 |
+
+Not yet: the BLE codecs (M3), the FIT writer and persistence (M2b), gesture detection (M4).
+
+The first section below is the real engine; the one after it is the UI's view of a session
+(`RideSession`, `RideSnapshot`), which the engine and the simulated session both provide.
+
+## Ride engine (`app.overdrive.core.ride`)
+
+`RideEngine` is the real thing behind `RideSession` (spec §4.2): a 1 Hz loop over a `TrainerDevice`, an
+optional `HeartRateDevice` and the `WorkoutPlayer`. Decisions and reasons: `docs/adr/0004-ride-engine.md`.
+
+```kotlin
+val recorder = InMemoryRideRecorder()        // or the persistent recorder of M2b
+val engine: RideSession = RideEngine(
+    scope = rideScope,                       // background dispatcher, cancelled when the app stops
+    trainer = trainer,                       // BLE adapter on the tablet, SimulatedTrainerDevice in tests
+    heartRate = strap,                       // optional
+    workout = WorkoutImport.parse(fileText), // native JSON or Zwift ZWO; null for a free ride
+    settings = RideSettings(ftp = 250, physics = PhysicsSettings(systemMassKg = 82.0)),
+    recorder = recorder,
+)
+engine.start()                               // once snapshots.value.state == READY
+```
+
+- **States.** `IDLE` until the trainer connects, `READY`, then `RIDING` and `PAUSED`, `FINISHED` at the end.
+  A pause has a reason, `RideSnapshot.pauseReason`: `MANUAL` (only `resume()` ends it), `AUTO` (3 s of zero
+  cadence, pedalling again ends it, `RideSettings.autoPause` turns it off) or `TRAINER_DISCONNECTED` (pauses at
+  once, the reconnect resumes). Nothing is lost: every second is still recorded, the outage as paused samples
+  with null power and cadence.
+- **Gaps.** A strap that drops, reads 0 bpm or goes silent for 5 s makes `heartRate` null; it never pauses or
+  stops the ride. A trainer that is silent for 3 s makes power and cadence null.
+- **What the trainer is told.** ERG step: the target (ramps interpolated, times the intensity). Free step: simulation
+  parameters from the gear and the physics settings. While paused: 0 W in ERG steps, ramped back in over 3 s on
+  resume. After the ride: simulation on the flat. After every reconnect: `requestControl()` first. Commands go out
+  from their own coroutine and only the latest matters.
+- **Clocks.** `elapsedSeconds` and the workout position count moving seconds only. The record has one sample for
+  every second of the ride, pauses included, so `samples.size` is the ride's duration.
+- **Speed and distance** come from `FlatPhysicsSpeedModel` (`PhysicsSettings`: system mass, CdA, Crr, air density,
+  drivetrain efficiency); the trainer's own speed is ignored.
+
+### Devices (`app.overdrive.core.device`)
+
+`TrainerDevice` and `HeartRateDevice` are what the BLE adapters of M3 implement: a `connection` state flow, a hot
+`data` flow of decoded notifications, and for the trainer `requestControl()`, `setTargetPower(watts)` and
+`setSimulation(SimulationParameters(gradePercent, crr, windResistance))`. The simulated devices are fakes you drive
+by hand (`connect()`, `disconnect()`, `powerOff()`, `emit(...)`, and for the trainer `received` and `failNextCommands`);
+`SimulatedTrainerDevice` is strict like FTMS, it refuses a target before `requestControl()` and anything while
+disconnected. `SimulatedBike` puts a simulated rider on both, reacting to the trainer's commands, with scenario
+events: `DeviceDisconnect` (a null duration is a power-off), `DeviceSilence`, `RiderStop`, and the existing
+`SignalDropout`s.
+
+```kotlin
+val bike = SimulatedBike(scope, ftp = 250, seed = 1, events = listOf(DeviceDisconnect(SimulatedDevice.TRAINER, 800, 30)))
+val engine = RideEngine(scope, bike.trainer, bike.heartRate, workout, RideSettings(ftp = 250), recorder = recorder)
+bike.start()
+engine.start()
+```
+
+### Workouts (`app.overdrive.core.workout`)
+
+`WorkoutImport.parse(text)` reads native JSON or ZWO (`SteadyState`, `Warmup`, `Cooldown`, `Ramp`, `IntervalsT`,
+`FreeRide`, `MaxEffort`; `textevent` is ignored; anything else is an error). `WorkoutPlayer` is pure and
+deterministic: give it `Workout.flatSteps()` and call `advance()` once per second of riding; it answers with the
+step, the ERG target (`PlayerTarget.Erg`) or `PlayerTarget.Free`, handles intensity, next and previous interval,
+and the 3 s ramp-in (`beginRampIn()`). Golden ZWO files are in `../contracts/fixtures/zwo`.
+
+### Record (`app.overdrive.core.record`)
+
+`RideRecorder` receives `onRideStarted`, a `RideSample` per second, `onRrIntervals` and `onRideFinished`.
+`InMemoryRideRecorder.record` is the `RideRecord` (header, samples, RR series, laps, summary) at any moment;
+`RideRecordBuilder.recover(header, samples, rr)` rebuilds one from samples read back from disk. Gaps are null
+fields, never zeros. A lap is one stretch in one workout step. The summary has duration, moving time, average and
+normalised power (Coggan: 30 s rolling mean, fourth-power mean), work in kJ, intensity factor, TSS, heart-rate
+average and maximum, all over the seconds that were not paused (`RideSummary.of(samples, ftp)` computes it).
 
 ## Ride session (`app.overdrive.core.ride`)
 
 What the overlay and the ride screen are built on (spec §4.2, §4.5 to §4.7). The UI depends only on
-`RideSession` and `RideSnapshot`. `SimulatedRideSession` implements it with a simulated rider and
-sensors for stage M1; the real engine on top of BLE replaces it in M2 and M3 without touching the UI.
+`RideSession` and `RideSnapshot`. `RideEngine` implements it over real or simulated devices;
+`SimulatedRideSession` implements it with a built-in simulated rider and sensors, for building the UI without
+any device layer (stage M1). Both share the rider's signal model; swapping one for the other does not touch the UI.
 
 ```kotlin
 val session: RideSession = SimulatedRideSession(
@@ -48,7 +128,7 @@ that changes something.
 | `state` | `IDLE` (no devices), `READY`, `RIDING`, `PAUSED`, `FINISHED` (terminal) |
 | `elapsedSeconds` | ride time; stops while paused |
 | `power`, `heartRate`, `cadence` | `Int?`. **null means no signal, draw a gap, not 0.** Also null before the start and after the end. A rider who is not pedalling reads 0 |
-| `speedKmh`, `distanceMeters` | virtual, from the speed model (a placeholder until M2) |
+| `speedKmh`, `distanceMeters` | virtual, from the speed model (`FlatPhysicsSpeedModel` in `RideEngine`; a placeholder in `SimulatedRideSession` unless given the real one) |
 | `mode` | `ERG` or `SIMULATION`: how the current step drives the trainer. `SIMULATION` without a workout |
 | `targetPower` | watts in an ERG step, already scaled by `intensityPercent`; null in a free step |
 | `gear`, `neutralGear`, `gearCount` | `gear` is **1-based** (1 easiest, `gearCount` hardest, default 24 with neutral 12) and null in an ERG step. Compact overlay: show `targetPower` when `mode == ERG`, else `gear` |
@@ -79,8 +159,10 @@ state checks. They are queued and applied in order on the session's coroutine, s
   clamped at its ends. **The Click's rule "in ERG steps the gear buttons change intensity" (spec §4.7) belongs
   to the gesture layer**: it reads `snapshot.mode` and calls `intensityUp()` instead of `gearUp()` in ERG.
 - A ride with a workout finishes by itself after the workout's last second; a free ride ends with `finish`.
-- After a pause the ERG target ramps back in over 3 s (spec §4.5): in the simulation that comes from the
-  power lag, the real engine in M2 sets the commanded target itself.
+- After a pause the ERG target ramps back in over 3 s (spec §4.5): `RideEngine` commands the ramp itself; in
+  `SimulatedRideSession` it only shows as the simulated rider's power lag.
+- A snapshot's `pauseReason` says why a ride is `PAUSED` (`MANUAL`, `AUTO`, `TRAINER_DISCONNECTED`). Only the
+  engine pauses on its own; `SimulatedRideSession` only ever pauses manually.
 
 **Simulated session.** Each tick advances the ride by one second; with the default `tickInterval` that is
 real time, and a shorter interval fast-forwards a long workout while you try the UI. Power follows the ERG

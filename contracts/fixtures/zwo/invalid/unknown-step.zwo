@@ -1,0 +1,7 @@
+<workout_file>
+  <name>Unknown step</name>
+  <workout>
+    <SteadyState Duration="60" Power="0.5"/>
+    <Teleport Duration="60"/>
+  </workout>
+</workout_file>

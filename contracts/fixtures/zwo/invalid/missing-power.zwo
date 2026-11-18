@@ -1,0 +1,6 @@
+<workout_file>
+  <name>Missing power</name>
+  <workout>
+    <SteadyState Duration="60"/>
+  </workout>
+</workout_file>

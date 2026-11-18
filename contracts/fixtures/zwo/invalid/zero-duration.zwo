@@ -1,0 +1,6 @@
+<workout_file>
+  <name>Zero duration</name>
+  <workout>
+    <SteadyState Duration="0" Power="0.5"/>
+  </workout>
+</workout_file>

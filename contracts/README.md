@@ -18,6 +18,10 @@ src/         @overdrive/contracts: the schema plus a validator for the TypeScrip
 The ride record, sync API payloads and MCP tool inputs (spec §8.2–§8.4) get schemas here as they are
 fixed during implementation.
 
+`fixtures/zwo/` holds golden files for the Zwift ZWO import (spec §4.5, §8.1): each `valid/*.zwo` has a
+`*.expected.json` beside it, the native workout it must convert to, and every `invalid/*.zwo` must be
+rejected. Kotlin's `ZwoFixturesTest` checks them; any other ZWO importer (the web service, later) should too.
+
 ## Changing a format
 
 1. Edit the schema and add fixtures: a valid one for anything newly allowed, an invalid one for
