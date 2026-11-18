@@ -22,4 +22,7 @@ android {
 
 dependencies {
     api(libs.overdrive.core)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
