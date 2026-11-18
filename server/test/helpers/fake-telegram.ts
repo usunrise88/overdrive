@@ -16,6 +16,8 @@ export interface SentMessage {
   chatId: number;
   text: string;
   buttons: { text: string; data: string }[][];
+  /** The monospace spans of the message (`entities` of sendMessage), as sent. */
+  entities: { type: string; offset: number; length: number }[];
 }
 
 export interface Edit {
@@ -221,6 +223,7 @@ export async function startFakeTelegram(): Promise<FakeTelegram> {
           chatId: Number(body.chat_id),
           text: String(body.text),
           buttons: toButtons(body.reply_markup),
+          entities: (body.entities ?? []) as SentMessage["entities"],
         };
         state.sent.push(message);
         return send(response, 200, { ok: true, result: { message_id: message.id } });

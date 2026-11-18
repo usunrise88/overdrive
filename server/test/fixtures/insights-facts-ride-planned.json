@@ -1,0 +1,644 @@
+{
+  "schema": 1,
+  "kind": "ride",
+  "date": "2026-11-17",
+  "weekday": "Tuesday",
+  "ride": {
+    "id": "ride-1794984000000",
+    "name": "Sweet spot 3x10",
+    "startClock": "18:05",
+    "minutes": 60,
+    "movingMinutes": 60,
+    "averagePower": 175,
+    "normalizedPower": 191,
+    "intensityFactor": 0.76,
+    "load": 58,
+    "averageHeartRate": 140,
+    "maxHeartRate": 158,
+    "workKilojoules": 629,
+    "ftp": 250
+  },
+  "plan": {
+    "workoutName": "Sweet spot 3x10",
+    "plannedMinutes": 60,
+    "plannedLoad": 51,
+    "plannedIntensityFactor": 0.75,
+    "riddenMinutes": 60,
+    "completionPercent": 100,
+    "loadVsPlanPercent": 14,
+    "stepsPlanned": 8,
+    "stepsCompleted": 8,
+    "targetWatts": 181,
+    "riddenWatts": 181,
+    "deltaPercent": 0,
+    "onTargetTolerancePercent": 5,
+    "stepsCompared": 7,
+    "stepsOnTarget": 7,
+    "stepsAboveTarget": 0,
+    "stepsBelowTarget": 0,
+    "steps": [
+      {
+        "step": 1,
+        "label": "Warm-up",
+        "minutes": 10,
+        "plannedWatts": 150,
+        "actualWatts": 150,
+        "deltaPercent": 0
+      },
+      {
+        "step": 2,
+        "label": "Sweet spot",
+        "minutes": 10,
+        "plannedWatts": 220,
+        "actualWatts": 220,
+        "deltaPercent": 0
+      },
+      {
+        "step": 3,
+        "label": "Recover",
+        "minutes": 5,
+        "plannedWatts": 125,
+        "actualWatts": 125,
+        "deltaPercent": 0
+      },
+      {
+        "step": 4,
+        "label": "Sweet spot",
+        "minutes": 10,
+        "plannedWatts": 220,
+        "actualWatts": 220,
+        "deltaPercent": 0
+      },
+      {
+        "step": 5,
+        "label": "Recover",
+        "minutes": 5,
+        "plannedWatts": 125,
+        "actualWatts": 125,
+        "deltaPercent": 0
+      },
+      {
+        "step": 6,
+        "label": "Sweet spot",
+        "minutes": 10,
+        "plannedWatts": 220,
+        "actualWatts": 220,
+        "deltaPercent": 0
+      },
+      {
+        "step": 7,
+        "label": "Recover",
+        "minutes": 5,
+        "plannedWatts": 125,
+        "actualWatts": 125,
+        "deltaPercent": 0
+      }
+    ],
+    "comparisonProblem": null
+  },
+  "efforts": [
+    {
+      "duration": "5 s",
+      "durationSec": 5,
+      "power": 300,
+      "previousBest": 640,
+      "previousBestDate": "2026-10-20",
+      "priorRides": 9,
+      "newBest": false,
+      "improvementWatts": null
+    },
+    {
+      "duration": "1 min",
+      "durationSec": 60,
+      "power": 260,
+      "previousBest": 410,
+      "previousBestDate": "2026-10-27",
+      "priorRides": 9,
+      "newBest": false,
+      "improvementWatts": null
+    },
+    {
+      "duration": "5 min",
+      "durationSec": 300,
+      "power": 235,
+      "previousBest": 290,
+      "previousBestDate": "2026-11-03",
+      "priorRides": 9,
+      "newBest": false,
+      "improvementWatts": null
+    },
+    {
+      "duration": "20 min",
+      "durationSec": 1200,
+      "power": 214,
+      "previousBest": 235,
+      "previousBestDate": "2026-11-03",
+      "priorRides": 8,
+      "newBest": false,
+      "improvementWatts": null
+    }
+  ],
+  "drift": null,
+  "wPrime": {
+    "capacityKj": 20,
+    "lowestKj": 14.6,
+    "lowestPercentOfCapacity": 73,
+    "atMinute": 31,
+    "low": false
+  },
+  "form": {
+    "date": "2026-11-17",
+    "fitness": 60,
+    "fatigue": 70,
+    "form": -9,
+    "formWord": "neutral",
+    "fitnessChange7Days": 3
+  },
+  "quotable": [
+    {
+      "label": "ride: length",
+      "value": 60,
+      "unit": "min"
+    },
+    {
+      "label": "ride: length (hours part)",
+      "value": 1,
+      "unit": "h"
+    },
+    {
+      "label": "ride: length (minutes part)",
+      "value": 0,
+      "unit": "min"
+    },
+    {
+      "label": "ride: length (in hours)",
+      "value": 1,
+      "unit": "h"
+    },
+    {
+      "label": "ride: moving time",
+      "value": 60,
+      "unit": "min"
+    },
+    {
+      "label": "ride: moving time (hours part)",
+      "value": 1,
+      "unit": "h"
+    },
+    {
+      "label": "ride: moving time (minutes part)",
+      "value": 0,
+      "unit": "min"
+    },
+    {
+      "label": "ride: moving time (in hours)",
+      "value": 1,
+      "unit": "h"
+    },
+    {
+      "label": "ride: average power",
+      "value": 175,
+      "unit": "W"
+    },
+    {
+      "label": "ride: normalised power",
+      "value": 191,
+      "unit": "W"
+    },
+    {
+      "label": "ride: intensity factor",
+      "value": 0.76,
+      "unit": "IF"
+    },
+    {
+      "label": "ride: load (training stress)",
+      "value": 58,
+      "unit": "load"
+    },
+    {
+      "label": "ride: average heart rate",
+      "value": 140,
+      "unit": "bpm"
+    },
+    {
+      "label": "ride: maximum heart rate",
+      "value": 158,
+      "unit": "bpm"
+    },
+    {
+      "label": "ride: work",
+      "value": 629,
+      "unit": "kJ"
+    },
+    {
+      "label": "FTP when ridden",
+      "value": 250,
+      "unit": "W"
+    },
+    {
+      "label": "plan step number",
+      "value": 1,
+      "unit": "step"
+    },
+    {
+      "label": "plan step 1: planned length",
+      "value": 10,
+      "unit": "min"
+    },
+    {
+      "label": "plan step 1: planned power",
+      "value": 150,
+      "unit": "W"
+    },
+    {
+      "label": "plan step 1: ridden power",
+      "value": 150,
+      "unit": "W"
+    },
+    {
+      "label": "plan step 1: ridden against planned",
+      "value": 0,
+      "unit": "%"
+    },
+    {
+      "label": "plan step number",
+      "value": 2,
+      "unit": "step"
+    },
+    {
+      "label": "plan step 2: planned length",
+      "value": 10,
+      "unit": "min"
+    },
+    {
+      "label": "plan step 2: planned power",
+      "value": 220,
+      "unit": "W"
+    },
+    {
+      "label": "plan step 2: ridden power",
+      "value": 220,
+      "unit": "W"
+    },
+    {
+      "label": "plan step 2: ridden against planned",
+      "value": 0,
+      "unit": "%"
+    },
+    {
+      "label": "plan step number",
+      "value": 3,
+      "unit": "step"
+    },
+    {
+      "label": "plan step 3: planned length",
+      "value": 5,
+      "unit": "min"
+    },
+    {
+      "label": "plan step 3: planned power",
+      "value": 125,
+      "unit": "W"
+    },
+    {
+      "label": "plan step 3: ridden power",
+      "value": 125,
+      "unit": "W"
+    },
+    {
+      "label": "plan step 3: ridden against planned",
+      "value": 0,
+      "unit": "%"
+    },
+    {
+      "label": "plan step number",
+      "value": 4,
+      "unit": "step"
+    },
+    {
+      "label": "plan step 4: planned length",
+      "value": 10,
+      "unit": "min"
+    },
+    {
+      "label": "plan step 4: planned power",
+      "value": 220,
+      "unit": "W"
+    },
+    {
+      "label": "plan step 4: ridden power",
+      "value": 220,
+      "unit": "W"
+    },
+    {
+      "label": "plan step 4: ridden against planned",
+      "value": 0,
+      "unit": "%"
+    },
+    {
+      "label": "plan step number",
+      "value": 5,
+      "unit": "step"
+    },
+    {
+      "label": "plan step 5: planned length",
+      "value": 5,
+      "unit": "min"
+    },
+    {
+      "label": "plan step 5: planned power",
+      "value": 125,
+      "unit": "W"
+    },
+    {
+      "label": "plan step 5: ridden power",
+      "value": 125,
+      "unit": "W"
+    },
+    {
+      "label": "plan step 5: ridden against planned",
+      "value": 0,
+      "unit": "%"
+    },
+    {
+      "label": "plan step number",
+      "value": 6,
+      "unit": "step"
+    },
+    {
+      "label": "plan step 6: planned length",
+      "value": 10,
+      "unit": "min"
+    },
+    {
+      "label": "plan step 6: planned power",
+      "value": 220,
+      "unit": "W"
+    },
+    {
+      "label": "plan step 6: ridden power",
+      "value": 220,
+      "unit": "W"
+    },
+    {
+      "label": "plan step 6: ridden against planned",
+      "value": 0,
+      "unit": "%"
+    },
+    {
+      "label": "plan step number",
+      "value": 7,
+      "unit": "step"
+    },
+    {
+      "label": "plan step 7: planned length",
+      "value": 5,
+      "unit": "min"
+    },
+    {
+      "label": "plan step 7: planned power",
+      "value": 125,
+      "unit": "W"
+    },
+    {
+      "label": "plan step 7: ridden power",
+      "value": 125,
+      "unit": "W"
+    },
+    {
+      "label": "plan step 7: ridden against planned",
+      "value": 0,
+      "unit": "%"
+    },
+    {
+      "label": "plan: planned length",
+      "value": 60,
+      "unit": "min"
+    },
+    {
+      "label": "plan: planned length (hours part)",
+      "value": 1,
+      "unit": "h"
+    },
+    {
+      "label": "plan: planned length (minutes part)",
+      "value": 0,
+      "unit": "min"
+    },
+    {
+      "label": "plan: planned length (in hours)",
+      "value": 1,
+      "unit": "h"
+    },
+    {
+      "label": "plan: planned load",
+      "value": 51,
+      "unit": "load"
+    },
+    {
+      "label": "plan: planned intensity factor",
+      "value": 0.75,
+      "unit": "IF"
+    },
+    {
+      "label": "plan: minutes of the workout ridden",
+      "value": 60,
+      "unit": "min"
+    },
+    {
+      "label": "plan: minutes of the workout ridden (hours part)",
+      "value": 1,
+      "unit": "h"
+    },
+    {
+      "label": "plan: minutes of the workout ridden (minutes part)",
+      "value": 0,
+      "unit": "min"
+    },
+    {
+      "label": "plan: minutes of the workout ridden (in hours)",
+      "value": 1,
+      "unit": "h"
+    },
+    {
+      "label": "plan: share of the planned length ridden",
+      "value": 100,
+      "unit": "%"
+    },
+    {
+      "label": "plan: ride load against planned load",
+      "value": 14,
+      "unit": "%"
+    },
+    {
+      "label": "plan: steps planned",
+      "value": 8,
+      "unit": "steps"
+    },
+    {
+      "label": "plan: steps completed in full",
+      "value": 8,
+      "unit": "steps"
+    },
+    {
+      "label": "plan: planned average power over the steps with a target",
+      "value": 181,
+      "unit": "W"
+    },
+    {
+      "label": "plan: ridden average power over those steps",
+      "value": 181,
+      "unit": "W"
+    },
+    {
+      "label": "plan: ridden against planned power over those steps",
+      "value": 0,
+      "unit": "%"
+    },
+    {
+      "label": "plan: a step is on target within",
+      "value": 5,
+      "unit": "%"
+    },
+    {
+      "label": "plan: steps compared with their target",
+      "value": 7,
+      "unit": "steps"
+    },
+    {
+      "label": "plan: steps within 5% of target",
+      "value": 7,
+      "unit": "steps"
+    },
+    {
+      "label": "plan: steps more than 5% above target",
+      "value": 0,
+      "unit": "steps"
+    },
+    {
+      "label": "plan: steps more than 5% below target",
+      "value": 0,
+      "unit": "steps"
+    },
+    {
+      "label": "best 5 s power in this ride",
+      "value": 300,
+      "unit": "W"
+    },
+    {
+      "label": "5 s effort: duration in seconds",
+      "value": 5,
+      "unit": "s"
+    },
+    {
+      "label": "best 5 s power in earlier rides",
+      "value": 640,
+      "unit": "W"
+    },
+    {
+      "label": "earlier rides with a best 5 s power",
+      "value": 9,
+      "unit": "rides"
+    },
+    {
+      "label": "best 1 min power in this ride",
+      "value": 260,
+      "unit": "W"
+    },
+    {
+      "label": "1 min effort: duration in seconds",
+      "value": 60,
+      "unit": "s"
+    },
+    {
+      "label": "best 1 min power in earlier rides",
+      "value": 410,
+      "unit": "W"
+    },
+    {
+      "label": "earlier rides with a best 1 min power",
+      "value": 9,
+      "unit": "rides"
+    },
+    {
+      "label": "best 5 min power in this ride",
+      "value": 235,
+      "unit": "W"
+    },
+    {
+      "label": "5 min effort: duration in seconds",
+      "value": 300,
+      "unit": "s"
+    },
+    {
+      "label": "best 5 min power in earlier rides",
+      "value": 290,
+      "unit": "W"
+    },
+    {
+      "label": "earlier rides with a best 5 min power",
+      "value": 9,
+      "unit": "rides"
+    },
+    {
+      "label": "best 20 min power in this ride",
+      "value": 214,
+      "unit": "W"
+    },
+    {
+      "label": "20 min effort: duration in seconds",
+      "value": 1200,
+      "unit": "s"
+    },
+    {
+      "label": "best 20 min power in earlier rides",
+      "value": 235,
+      "unit": "W"
+    },
+    {
+      "label": "earlier rides with a best 20 min power",
+      "value": 8,
+      "unit": "rides"
+    },
+    {
+      "label": "W' (the anaerobic reserve)",
+      "value": 20,
+      "unit": "kJ"
+    },
+    {
+      "label": "W' balance, lowest point",
+      "value": 14.6,
+      "unit": "kJ"
+    },
+    {
+      "label": "W' balance, lowest point as a share of W'",
+      "value": 73,
+      "unit": "%"
+    },
+    {
+      "label": "W' balance, minute of the lowest point",
+      "value": 31,
+      "unit": "min"
+    },
+    {
+      "label": "fitness (the 42-day average of the daily load)",
+      "value": 60,
+      "unit": "load"
+    },
+    {
+      "label": "fatigue (the 7-day average of the daily load)",
+      "value": 70,
+      "unit": "load"
+    },
+    {
+      "label": "form (fitness minus fatigue)",
+      "value": -9,
+      "unit": "load"
+    },
+    {
+      "label": "change in fitness over 7 days",
+      "value": 3,
+      "unit": "load"
+    }
+  ]
+}

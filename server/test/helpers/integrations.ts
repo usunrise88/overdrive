@@ -73,6 +73,8 @@ export function startIntegrationHarness(
   const sleeping = recordedSleep();
   const timers = manualTimers();
   const config: ServicesConfig = {
+    // The written insights have their own tests (insights-*.test.ts, which turn them on); the others must not hear their notes.
+    INSIGHTS_ENABLED: false,
     TIMEZONE: options.timezone ?? "Europe/Paris",
     ...(options.intervals === undefined
       ? {}

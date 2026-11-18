@@ -1,10 +1,12 @@
 import type { Config } from "./config.ts";
 import { DEFAULT_INTERVALS_BASE_URL } from "./config.ts";
+import type { InsightsSettings } from "./config-insights.ts";
 import type { IntegrationsSettings } from "./config-integrations.ts";
 import { type StravaConfig, stravaSettings } from "./config-strava.ts";
 import type { Db } from "./db.ts";
 import { createEventBus, type EventBus } from "./events.ts";
 import { type CalendarMirror, createCalendar } from "./gcal/index.ts";
+import { createInsights, type InsightsService } from "./insights/service.ts";
 import { createIntervalsClient, type IntervalsClient } from "./intervals/client.ts";
 import {
   createUploadWorker,
@@ -19,6 +21,7 @@ import { createProfileStore, type ProfileStore } from "./profile/store.ts";
 import { createRideStore, type RideStore } from "./ride-store.ts";
 import { createRideWorkoutResolver, type RideWorkoutResolver } from "./ride-workout.ts";
 import { createStrava, STRAVA_DESTINATION, type StravaUploads } from "./strava/index.ts";
+import { createPlanHistory } from "./telegram/history.ts";
 import { createTelegram, type TelegramBot } from "./telegram/index.ts";
 import type { Timers } from "./timers.ts";
 import { createRideHeartRateIndex } from "./wellness/heart-rate-index.ts";
@@ -40,6 +43,7 @@ export type ServicesConfig = Partial<
   >
 > &
   IntegrationsSettings &
+  InsightsSettings &
   StravaConfig;
 
 /**
@@ -79,7 +83,12 @@ export interface Services {
    * the forwarding of the watch's activities run only with one.
    */
   wellness: WellnessService;
-  /** Starts the refresher, the upload worker, the calendar mirror, the bot, the wellness pull and its forwarding. */
+  /**
+   * The written insights, the alerts and the discussion topics (ADR 0025). Always present: without a language model the notes are
+   * written from templates. The Telegram bot sends what it stores.
+   */
+  insights: InsightsService;
+  /** Starts the refresher, the upload worker, the calendar mirror, the bot, the wellness pull and its forwarding, the insights. */
   start(): void;
   /** Stops them and waits for what is in flight. */
   stop(): Promise<void>;
@@ -165,6 +174,56 @@ export function createServices(options: ServicesOptions): Services {
     if (header?.workoutId != null) await rideWorkouts.resolve(header);
   });
 
+  const wellness = createWellness({
+    db,
+    bus,
+    profile,
+    rides,
+    intervals,
+    timezone,
+    log,
+    heartRates,
+    metrics,
+    ...(now === undefined ? {} : { now }),
+    ...(options.timers === undefined ? {} : { timers: options.timers }),
+    ...(config.WELLNESS_SOURCE_ORDER === undefined
+      ? {}
+      : { sourceOrder: config.WELLNESS_SOURCE_ORDER }),
+    ...(config.WELLNESS_PULL_HOURS === undefined ? {} : { pullHours: config.WELLNESS_PULL_HOURS }),
+    settings: {
+      ...(config.WELLNESS_BASELINE_DAYS === undefined
+        ? {}
+        : { baselineDays: config.WELLNESS_BASELINE_DAYS }),
+      ...(config.WELLNESS_NIGHTS_NEEDED === undefined
+        ? {}
+        : { nightsNeeded: config.WELLNESS_NIGHTS_NEEDED }),
+    },
+  });
+  const planHistory = createPlanHistory({
+    db,
+    plan,
+    timezone,
+    now: now ?? (() => new Date()),
+  });
+  const insights = createInsights({
+    config,
+    db,
+    bus,
+    log,
+    timezone,
+    plan,
+    history: planHistory,
+    rides,
+    rideWorkouts,
+    metrics,
+    wellness,
+    profile,
+    now,
+    fetch: options.fetch,
+    sleep: options.sleep,
+    timers: options.timers,
+  });
+
   const planSource = refresher !== null;
   const calendar = createCalendar({
     config,
@@ -192,31 +251,8 @@ export function createServices(options: ServicesOptions): Services {
     fetch: options.fetch,
     sleep: options.sleep,
     timers: options.timers,
-  });
-  const wellness = createWellness({
-    db,
-    bus,
-    profile,
-    rides,
-    intervals,
-    timezone,
-    log,
-    heartRates,
-    metrics,
-    ...(now === undefined ? {} : { now }),
-    ...(options.timers === undefined ? {} : { timers: options.timers }),
-    ...(config.WELLNESS_SOURCE_ORDER === undefined
-      ? {}
-      : { sourceOrder: config.WELLNESS_SOURCE_ORDER }),
-    ...(config.WELLNESS_PULL_HOURS === undefined ? {} : { pullHours: config.WELLNESS_PULL_HOURS }),
-    settings: {
-      ...(config.WELLNESS_BASELINE_DAYS === undefined
-        ? {}
-        : { baselineDays: config.WELLNESS_BASELINE_DAYS }),
-      ...(config.WELLNESS_NIGHTS_NEEDED === undefined
-        ? {}
-        : { nightsNeeded: config.WELLNESS_NIGHTS_NEEDED }),
-    },
+    history: planHistory,
+    sources: [insights.notifications],
   });
   let strava: StravaUploads | null = null;
   const stravaMode = stravaSettings(config);
@@ -259,6 +295,7 @@ export function createServices(options: ServicesOptions): Services {
     calendar,
     telegram,
     wellness,
+    insights,
     start() {
       void uploads?.start();
       void strava?.start();
@@ -267,6 +304,7 @@ export function createServices(options: ServicesOptions): Services {
       telegram?.start();
       wellness.start();
       metrics.start();
+      insights.start();
     },
     async stop() {
       await Promise.all([
@@ -277,6 +315,7 @@ export function createServices(options: ServicesOptions): Services {
         telegram?.stop(),
         wellness.stop(),
         metrics.stop(),
+        insights.stop(),
       ]);
     },
   };

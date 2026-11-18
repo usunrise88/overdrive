@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { type Logger, silentLogger } from "../log.ts";
+import type { MessageEntity } from "../notifications.ts";
 
 /**
  * A small client of the Telegram Bot API (ADR 0019), written from its public reference with no bot to
@@ -80,7 +81,16 @@ export interface TelegramClient {
     timeoutSeconds: number;
     signal?: AbortSignal;
   }): Promise<IncomingUpdate[]>;
-  sendMessage(chatId: number | string, text: string, buttons?: InlineButton[][]): Promise<void>;
+  /**
+   * Sends plain text. `entities` mark spans as monospace (`pre`, a block the reader can tap to copy): with them there is no
+   * parse mode and so nothing to escape.
+   */
+  sendMessage(
+    chatId: number | string,
+    text: string,
+    buttons?: InlineButton[][],
+    entities?: readonly MessageEntity[],
+  ): Promise<void>;
   /** Replaces a message's text and buttons (no buttons: they are removed). */
   editMessage(
     chatId: number | string,
@@ -331,11 +341,17 @@ export function createTelegramClient(options: TelegramClientOptions): TelegramCl
       return updates;
     },
 
-    async sendMessage(chatId, text, buttons) {
+    async sendMessage(chatId, text, buttons, entities) {
       const markup = keyboard(buttons);
+      const sent = clip(text);
+      // A span cut off by the clip would be refused: leave out what no longer fits.
+      const spans = (entities ?? []).filter((e) => e.offset + e.length <= sent.length);
       await send("sendMessage", {
         chat_id: chatId,
-        text: clip(text),
+        text: sent,
+        ...(spans.length === 0
+          ? {}
+          : { entities: spans.map((e) => ({ type: e.type, offset: e.offset, length: e.length })) }),
         // Plain text: names of workouts contain `_` and `*`, which Markdown would swallow.
         disable_web_page_preview: true,
         ...(markup === undefined ? {} : { reply_markup: markup }),

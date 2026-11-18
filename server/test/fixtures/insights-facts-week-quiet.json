@@ -1,0 +1,266 @@
+{
+  "schema": 1,
+  "kind": "week",
+  "date": "2026-11-09",
+  "weekday": "Monday",
+  "week": {
+    "from": "2026-11-09",
+    "to": "2026-11-15"
+  },
+  "sessions": {
+    "planned": 4,
+    "done": 3,
+    "skipped": 0,
+    "missed": [
+      {
+        "name": "Endurance 90",
+        "date": "2026-11-14"
+      }
+    ],
+    "rides": 0,
+    "minutes": 299
+  },
+  "load": {
+    "week": 212,
+    "rides": 212,
+    "otherActivities": 0,
+    "previousWeek": 189,
+    "changeVsPreviousWeek": 23,
+    "changePercent": 12,
+    "planned": 240
+  },
+  "form": {
+    "date": "2026-11-15",
+    "fitness": 59,
+    "fatigue": 67,
+    "form": -8,
+    "formWord": "neutral",
+    "fitnessChange7Days": 3
+  },
+  "fitnessChangeOverWeek": 3,
+  "recoveryDays": {
+    "ready": 4,
+    "caution": 2,
+    "rest": 0,
+    "noVerdict": 1
+  },
+  "wellness": [
+    {
+      "name": "resting heart rate",
+      "unit": "bpm",
+      "weekAverage": 53,
+      "previousWeekAverage": 52,
+      "daysOutsideUsualRange": 2,
+      "daysWithReading": 7,
+      "position": "above"
+    },
+    {
+      "name": "sleep",
+      "unit": "h",
+      "weekAverage": 7.1,
+      "previousWeekAverage": 7.4,
+      "daysOutsideUsualRange": 0,
+      "daysWithReading": 7,
+      "position": null
+    }
+  ],
+  "newBests": [
+    {
+      "duration": "20 min",
+      "power": 241,
+      "previous": 235,
+      "date": "2026-11-12"
+    }
+  ],
+  "nextWeek": {
+    "sessions": 4,
+    "plannedLoad": 237
+  },
+  "quotable": [
+    {
+      "label": "fitness (the 42-day average of the daily load)",
+      "value": 59,
+      "unit": "load"
+    },
+    {
+      "label": "fatigue (the 7-day average of the daily load)",
+      "value": 67,
+      "unit": "load"
+    },
+    {
+      "label": "form (fitness minus fatigue)",
+      "value": -8,
+      "unit": "load"
+    },
+    {
+      "label": "change in fitness over 7 days",
+      "value": 3,
+      "unit": "load"
+    },
+    {
+      "label": "sessions planned this week",
+      "value": 4,
+      "unit": "sessions"
+    },
+    {
+      "label": "planned sessions done",
+      "value": 3,
+      "unit": "sessions"
+    },
+    {
+      "label": "sessions skipped by the rider",
+      "value": 0,
+      "unit": "sessions"
+    },
+    {
+      "label": "rides this week",
+      "value": 0,
+      "unit": "rides"
+    },
+    {
+      "label": "time ridden this week",
+      "value": 299,
+      "unit": "min"
+    },
+    {
+      "label": "time ridden this week (hours part)",
+      "value": 4,
+      "unit": "h"
+    },
+    {
+      "label": "time ridden this week (minutes part)",
+      "value": 59,
+      "unit": "min"
+    },
+    {
+      "label": "time ridden this week (in hours)",
+      "value": 5,
+      "unit": "h"
+    },
+    {
+      "label": "sessions missed",
+      "value": 1,
+      "unit": "sessions"
+    },
+    {
+      "label": "load this week",
+      "value": 212,
+      "unit": "load"
+    },
+    {
+      "label": "load this week, rides",
+      "value": 212,
+      "unit": "load"
+    },
+    {
+      "label": "load this week, other activities from the watch",
+      "value": 0,
+      "unit": "load"
+    },
+    {
+      "label": "load the week before, up to the same weekday",
+      "value": 189,
+      "unit": "load"
+    },
+    {
+      "label": "change in load against the week before",
+      "value": 23,
+      "unit": "load"
+    },
+    {
+      "label": "change in load against the week before, percent",
+      "value": 12,
+      "unit": "%"
+    },
+    {
+      "label": "load planned for the days of this week",
+      "value": 240,
+      "unit": "load"
+    },
+    {
+      "label": "resting heart rate: average this week",
+      "value": 53,
+      "unit": "bpm"
+    },
+    {
+      "label": "resting heart rate: average the week before",
+      "value": 52,
+      "unit": "bpm"
+    },
+    {
+      "label": "resting heart rate: days outside the usual range",
+      "value": 2,
+      "unit": "days"
+    },
+    {
+      "label": "resting heart rate: days with a reading",
+      "value": 7,
+      "unit": "days"
+    },
+    {
+      "label": "sleep: average this week",
+      "value": 7.1,
+      "unit": "h"
+    },
+    {
+      "label": "sleep: average the week before",
+      "value": 7.4,
+      "unit": "h"
+    },
+    {
+      "label": "sleep: days outside the usual range",
+      "value": 0,
+      "unit": "days"
+    },
+    {
+      "label": "sleep: days with a reading",
+      "value": 7,
+      "unit": "days"
+    },
+    {
+      "label": "change in fitness over the week",
+      "value": 3,
+      "unit": "load"
+    },
+    {
+      "label": "mornings rated ready",
+      "value": 4,
+      "unit": "days"
+    },
+    {
+      "label": "mornings rated caution",
+      "value": 2,
+      "unit": "days"
+    },
+    {
+      "label": "mornings rated rest",
+      "value": 0,
+      "unit": "days"
+    },
+    {
+      "label": "mornings with no recovery rating",
+      "value": 1,
+      "unit": "days"
+    },
+    {
+      "label": "new best 20 min power",
+      "value": 241,
+      "unit": "W"
+    },
+    {
+      "label": "previous best 20 min power",
+      "value": 235,
+      "unit": "W"
+    },
+    {
+      "label": "sessions planned for the next 7 days",
+      "value": 4,
+      "unit": "sessions"
+    },
+    {
+      "label": "load planned for the next 7 days",
+      "value": 237,
+      "unit": "load"
+    }
+  ]
+}

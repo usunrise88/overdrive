@@ -30,7 +30,7 @@ import { type ActivityForwarder, createActivityForwarder } from "./forward.ts";
 import { createRideHeartRateIndex, type RideHeartRateIndex } from "./heart-rate-index.ts";
 import { DEFAULT_WELLNESS_SETTINGS, type WellnessSettings } from "./metrics.ts";
 import { createWellnessPuller, type PullResult, type WellnessPuller } from "./puller.ts";
-import { evaluateRecovery } from "./recovery.ts";
+import { evaluateRecovery, type RecoveryOutcome } from "./recovery.ts";
 import { buildDays, nightsLogged, STREAK_LOOKBACK_DAYS } from "./series.ts";
 import {
   createIntervalsWellnessSource,
@@ -77,6 +77,11 @@ export interface WellnessService {
   wellness(from: string, to: string): Promise<WellnessResponse>;
   /** The state of this morning (or yesterday's while this morning's data has not arrived). */
   recovery(): Promise<RecoveryResponse>;
+  /**
+   * The recovery outcome of each day from `from` to `to` as that morning would have seen it (the weekly review counts them):
+   * `outcome.date` is the morning the state is for, which is an earlier day when that day had no reading.
+   */
+  recoveryDays(from: string, to: string): Promise<{ date: string; outcome: RecoveryOutcome }[]>;
   /** A watch activity, or null. */
   activity(id: string): Promise<Activity | null>;
   /** Watch activities newest first, as list rows. */
@@ -144,6 +149,7 @@ export function createWellness(options: WellnessOptions): WellnessService {
           timezone,
           now,
           log,
+          onStored: () => bus.emit("wellness-updated", { source: "intervals" }),
           ...(options.timers === undefined ? {} : { timers: options.timers }),
         });
   const forwarder =
@@ -177,7 +183,10 @@ export function createWellness(options: WellnessOptions): WellnessService {
       try {
         const at = now();
         const outcome = await store.ingest(batch.records, device, at.getTime());
-        if (outcome.dates.length > 0) await store.deriveDates(outcome.dates);
+        if (outcome.dates.length > 0) {
+          await store.deriveDates(outcome.dates);
+          bus.emit("wellness-updated", { source: "healthconnect" });
+        }
 
         // Exercise sessions that were stored or changed, and those whose heart-rate records just arrived.
         const sessionIds = new Set(outcome.exerciseIds);
@@ -241,6 +250,15 @@ export function createWellness(options: WellnessOptions): WellnessService {
         generatedAt: now().toISOString(),
         stale: await isStale(),
       };
+    },
+
+    async recoveryDays(from, to) {
+      const table = await store.dailyTable(addDaysToIsoDate(from, -lookbackDays), to, order);
+      const days: { date: string; outcome: RecoveryOutcome }[] = [];
+      for (let date = from; date <= to; date = addDaysToIsoDate(date, 1)) {
+        days.push({ date, outcome: evaluateRecovery(table, date, settings) });
+      }
+      return days;
     },
 
     async activity(id) {

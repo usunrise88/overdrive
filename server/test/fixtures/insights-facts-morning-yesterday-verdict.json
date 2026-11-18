@@ -1,0 +1,288 @@
+{
+  "schema": 1,
+  "kind": "morning",
+  "date": "2026-11-18",
+  "weekday": "Wednesday",
+  "recovery": {
+    "state": "ready",
+    "forToday": false,
+    "date": "2026-11-17",
+    "reason": "All four signals are in your usual range.",
+    "guidance": "Train as planned.",
+    "rule": "OK",
+    "ruleMeaning": "no rule for caution or rest applies",
+    "nightsLogged": 58,
+    "nightsNeeded": 14,
+    "signals": [
+      {
+        "metric": "restingHr",
+        "name": "Resting heart rate",
+        "value": 52,
+        "unit": "bpm",
+        "clock": null,
+        "usualLow": 50,
+        "usualHigh": 54,
+        "usualClock": null,
+        "position": "inside",
+        "daysOutsideInARow": 0
+      },
+      {
+        "metric": "sleepSeconds",
+        "name": "Sleep",
+        "value": 7.5,
+        "unit": "h",
+        "clock": null,
+        "usualLow": 7,
+        "usualHigh": 8,
+        "usualClock": null,
+        "position": "inside",
+        "daysOutsideInARow": 0
+      },
+      {
+        "metric": "respiratoryRate",
+        "name": "Respiratory rate",
+        "value": 14.2,
+        "unit": "/min",
+        "clock": null,
+        "usualLow": 13.8,
+        "usualHigh": 14.6,
+        "usualClock": null,
+        "position": "inside",
+        "daysOutsideInARow": 0
+      },
+      {
+        "metric": "sleepingHr",
+        "name": "Heart rate in sleep",
+        "value": 48,
+        "unit": "bpm",
+        "clock": null,
+        "usualLow": 46,
+        "usualHigh": 50,
+        "usualClock": null,
+        "position": "inside",
+        "daysOutsideInARow": 0
+      }
+    ]
+  },
+  "adjustment": "none",
+  "today": {
+    "ftp": 250,
+    "planned": [
+      {
+        "name": "Sweet spot 3x10",
+        "minutes": 60,
+        "plannedLoad": 51,
+        "intensityFactor": 0.75,
+        "topStepWatts": 220,
+        "outline": "10m 60%, 3×(10m 88% + 5m 50%), 5m free",
+        "done": false
+      }
+    ]
+  },
+  "form": {
+    "date": "2026-11-18",
+    "fitness": 62,
+    "fatigue": 70,
+    "form": -9,
+    "formWord": "neutral",
+    "fitnessChange7Days": 3
+  },
+  "lastRide": {
+    "name": "Endurance",
+    "date": "2026-11-16",
+    "daysAgo": 2,
+    "minutes": 65,
+    "load": 54,
+    "averagePower": 168
+  },
+  "notes": [
+    "This morning's watch data has not arrived: the state shown is from the morning before."
+  ],
+  "quotable": [
+    {
+      "label": "Resting heart rate",
+      "value": 52,
+      "unit": "bpm"
+    },
+    {
+      "label": "Resting heart rate (usual range, low end)",
+      "value": 50,
+      "unit": "bpm"
+    },
+    {
+      "label": "Resting heart rate (usual range, high end)",
+      "value": 54,
+      "unit": "bpm"
+    },
+    {
+      "label": "Resting heart rate: days outside the usual range in a row",
+      "value": 0,
+      "unit": "days"
+    },
+    {
+      "label": "Sleep",
+      "value": 7.5,
+      "unit": "h"
+    },
+    {
+      "label": "Sleep (usual range, low end)",
+      "value": 7,
+      "unit": "h"
+    },
+    {
+      "label": "Sleep (usual range, high end)",
+      "value": 8,
+      "unit": "h"
+    },
+    {
+      "label": "Sleep: days outside the usual range in a row",
+      "value": 0,
+      "unit": "days"
+    },
+    {
+      "label": "Respiratory rate",
+      "value": 14.2,
+      "unit": "/min"
+    },
+    {
+      "label": "Respiratory rate (usual range, low end)",
+      "value": 13.8,
+      "unit": "/min"
+    },
+    {
+      "label": "Respiratory rate (usual range, high end)",
+      "value": 14.6,
+      "unit": "/min"
+    },
+    {
+      "label": "Respiratory rate: days outside the usual range in a row",
+      "value": 0,
+      "unit": "days"
+    },
+    {
+      "label": "Heart rate in sleep",
+      "value": 48,
+      "unit": "bpm"
+    },
+    {
+      "label": "Heart rate in sleep (usual range, low end)",
+      "value": 46,
+      "unit": "bpm"
+    },
+    {
+      "label": "Heart rate in sleep (usual range, high end)",
+      "value": 50,
+      "unit": "bpm"
+    },
+    {
+      "label": "Heart rate in sleep: days outside the usual range in a row",
+      "value": 0,
+      "unit": "days"
+    },
+    {
+      "label": "nights with the watch so far",
+      "value": 58,
+      "unit": "nights"
+    },
+    {
+      "label": "nights needed before recovery is rated",
+      "value": 14,
+      "unit": "nights"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": length",
+      "value": 60,
+      "unit": "min"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": length (hours part)",
+      "value": 1,
+      "unit": "h"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": length (minutes part)",
+      "value": 0,
+      "unit": "min"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": length (in hours)",
+      "value": 1,
+      "unit": "h"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": planned load if ridden as planned",
+      "value": 51,
+      "unit": "load"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": intensity factor",
+      "value": 0.75,
+      "unit": "IF"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": hardest step target",
+      "value": 220,
+      "unit": "W"
+    },
+    {
+      "label": "FTP",
+      "value": 250,
+      "unit": "W"
+    },
+    {
+      "label": "days since the last ride",
+      "value": 2,
+      "unit": "days"
+    },
+    {
+      "label": "last ride: length",
+      "value": 65,
+      "unit": "min"
+    },
+    {
+      "label": "last ride: length (hours part)",
+      "value": 1,
+      "unit": "h"
+    },
+    {
+      "label": "last ride: length (minutes part)",
+      "value": 5,
+      "unit": "min"
+    },
+    {
+      "label": "last ride: length (in hours)",
+      "value": 1.1,
+      "unit": "h"
+    },
+    {
+      "label": "last ride: load",
+      "value": 54,
+      "unit": "load"
+    },
+    {
+      "label": "last ride: average power",
+      "value": 168,
+      "unit": "W"
+    },
+    {
+      "label": "fitness (the 42-day average of the daily load)",
+      "value": 62,
+      "unit": "load"
+    },
+    {
+      "label": "fatigue (the 7-day average of the daily load)",
+      "value": 70,
+      "unit": "load"
+    },
+    {
+      "label": "form (fitness minus fatigue)",
+      "value": -9,
+      "unit": "load"
+    },
+    {
+      "label": "change in fitness over 7 days",
+      "value": 3,
+      "unit": "load"
+    }
+  ]
+}

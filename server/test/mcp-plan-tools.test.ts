@@ -108,14 +108,18 @@ describe("the tools and what they say about themselves", () => {
       "create_workout",
       "delete_workout",
       "get_activity",
+      "get_facts",
       "get_fitness",
       "get_profile",
       "get_recovery",
       "get_ride",
       "get_wellness",
       "list_activities",
+      "list_discussion_topics",
+      "list_insights",
       "list_planned_workouts",
       "list_rides",
+      "mark_discussion_topic",
       "update_profile",
       "update_workout",
     ]);
@@ -136,9 +140,15 @@ describe("the tools and what they say about themselves", () => {
       "get_wellness",
       "get_recovery",
       "get_fitness",
+      "get_facts",
+      "list_insights",
+      "list_discussion_topics",
     ]) {
       expect(by[name]?.annotations?.readOnlyHint, name).toBe(true);
     }
+    // Marking a topic changes only its status: a write, and not a destructive one.
+    expect(by.mark_discussion_topic?.annotations?.readOnlyHint).toBe(false);
+    expect(by.mark_discussion_topic?.annotations?.destructiveHint).toBe(false);
     // The ride tools stay for one release and say they are replaced.
     expect(by.list_rides?.description).toMatch(/^DEPRECATED.*list_activities/);
     expect(by.get_ride?.description).toMatch(/^DEPRECATED.*get_activity/);

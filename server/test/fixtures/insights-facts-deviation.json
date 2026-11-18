@@ -1,0 +1,133 @@
+{
+  "schema": 1,
+  "kind": "deviation",
+  "date": "2026-11-18",
+  "weekday": "Wednesday",
+  "thresholdDays": 3,
+  "signals": [
+    {
+      "metric": "restingHr",
+      "name": "Resting heart rate",
+      "value": 58,
+      "unit": "bpm",
+      "clock": null,
+      "usualLow": 50,
+      "usualHigh": 54,
+      "usualClock": null,
+      "position": "above",
+      "daysOutsideInARow": 3,
+      "reading": "A resting heart rate above your usual range for days in a row usually goes with accumulated fatigue or stress, and hard sessions tend to feel heavier.",
+      "trainingHint": "Keep the next day or two easy and leave the hardest session until it comes back into range."
+    },
+    {
+      "metric": "sleepSeconds",
+      "name": "Sleep",
+      "value": 6,
+      "unit": "h",
+      "clock": null,
+      "usualLow": 7,
+      "usualHigh": 8,
+      "usualClock": null,
+      "position": "below",
+      "daysOutsideInARow": 4,
+      "reading": "Several short nights in a row usually mean recovery is lagging, so hard sessions are less productive and feel harder.",
+      "trainingHint": "Protect sleep first; ride easy until the nights are back to your usual length."
+    }
+  ],
+  "recoveryState": "caution",
+  "today": {
+    "planned": [
+      {
+        "name": "Sweet spot 3x10",
+        "minutes": 60,
+        "plannedLoad": 51,
+        "intensityFactor": 0.75,
+        "topStepWatts": 220,
+        "outline": "10m 60%, 3×(10m 88% + 5m 50%), 5m free",
+        "done": false
+      }
+    ]
+  },
+  "quotable": [
+    {
+      "label": "Resting heart rate",
+      "value": 58,
+      "unit": "bpm"
+    },
+    {
+      "label": "Resting heart rate (usual range, low end)",
+      "value": 50,
+      "unit": "bpm"
+    },
+    {
+      "label": "Resting heart rate (usual range, high end)",
+      "value": 54,
+      "unit": "bpm"
+    },
+    {
+      "label": "Resting heart rate: days outside the usual range in a row",
+      "value": 3,
+      "unit": "days"
+    },
+    {
+      "label": "Sleep",
+      "value": 6,
+      "unit": "h"
+    },
+    {
+      "label": "Sleep (usual range, low end)",
+      "value": 7,
+      "unit": "h"
+    },
+    {
+      "label": "Sleep (usual range, high end)",
+      "value": 8,
+      "unit": "h"
+    },
+    {
+      "label": "Sleep: days outside the usual range in a row",
+      "value": 4,
+      "unit": "days"
+    },
+    {
+      "label": "days in a row that make an alert",
+      "value": 3,
+      "unit": "days"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": length",
+      "value": 60,
+      "unit": "min"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": length (hours part)",
+      "value": 1,
+      "unit": "h"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": length (minutes part)",
+      "value": 0,
+      "unit": "min"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": length (in hours)",
+      "value": 1,
+      "unit": "h"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": planned load if ridden as planned",
+      "value": 51,
+      "unit": "load"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": intensity factor",
+      "value": 0.75,
+      "unit": "IF"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": hardest step target",
+      "value": 220,
+      "unit": "W"
+    }
+  ]
+}

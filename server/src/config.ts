@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { insightsConfigShape } from "./config-insights.ts";
 import { integrationsShape } from "./config-integrations.ts";
 import { stravaConfigShape } from "./config-strava.ts";
 import { wellnessConfigShape } from "./config-wellness.ts";
@@ -213,6 +214,7 @@ const schema = z.object({
   ),
   ...stravaConfigShape, // Strava upload (ADR 0020): config-strava.ts
   ...wellnessConfigShape, // Wellness and recovery (ADR 0023): config-wellness.ts
+  ...insightsConfigShape, // Insights, alerts and the language-model endpoint (ADR 0025): config-insights.ts
   // The rider's time zone: which day "today" is for the plan, and which day a ride belongs to.
   TIMEZONE: z.preprocess(
     blankIsUnset,

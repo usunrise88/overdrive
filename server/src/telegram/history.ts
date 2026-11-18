@@ -1,6 +1,7 @@
 import { addDaysToIsoDate } from "@overdrive/contracts";
 import type { Db } from "../db.ts";
 import type { PlanEntry, PlanStore } from "../plan/store.ts";
+import { plannedLoad } from "../plan/summary.ts";
 import { workoutDurationSeconds } from "../plan/workout-summary.ts";
 import { localDate } from "../time.ts";
 
@@ -12,6 +13,12 @@ export interface HistoryRow {
   name: string;
   /** null for a workout the tablet cannot play. */
   plannedSeconds: number | null;
+  /**
+   * The training stress the workout gives if ridden as planned (spec §6.3's score, from the steps), kept so that load against plan
+   * (plan drift, ADR 0025) can be told for days the plan cache has dropped. null for a workout the tablet cannot play, and for rows
+   * written before the column existed.
+   */
+  plannedLoad: number | null;
   /** skipped: the owner skipped it from the bot. */
   status: "planned" | "skipped";
 }
@@ -38,21 +45,27 @@ interface Row {
   plan_date: string;
   name: string;
   planned_seconds: number | null;
+  planned_load: number | null;
   status: "planned" | "skipped";
 }
 
-const COLUMNS = "plan_id, plan_date::text AS plan_date, name, planned_seconds, status";
+const COLUMNS =
+  "plan_id, plan_date::text AS plan_date, name, planned_seconds, planned_load, status";
 
 const toRow = (row: Row): HistoryRow => ({
   id: row.plan_id,
   date: row.plan_date,
   name: row.name,
   plannedSeconds: row.planned_seconds,
+  plannedLoad: row.planned_load,
   status: row.status,
 });
 
 const secondsOf = (entry: Pick<PlanEntry, "workout">): number | null =>
   entry.workout === null ? null : workoutDurationSeconds(entry.workout);
+
+const loadOf = (entry: Pick<PlanEntry, "workout">): number | null =>
+  entry.workout === null ? null : plannedLoad(entry.workout).estimatedTss;
 
 export function createPlanHistory(options: {
   db: Db;
@@ -72,12 +85,13 @@ export function createPlanHistory(options: {
       for (const entry of entries) {
         // A skipped workout stays skipped even if a refresh that began before the delete brings it back.
         await tx.query(
-          `INSERT INTO plan_history (plan_id, plan_date, name, planned_seconds)
-           VALUES ($1, $2::date, $3, $4)
+          `INSERT INTO plan_history (plan_id, plan_date, name, planned_seconds, planned_load)
+           VALUES ($1, $2::date, $3, $4, $5)
            ON CONFLICT (plan_id) DO UPDATE SET
              plan_date = EXCLUDED.plan_date, name = EXCLUDED.name,
-             planned_seconds = EXCLUDED.planned_seconds, updated_at = now()`,
-          [entry.id, entry.date, entry.name, secondsOf(entry)],
+             planned_seconds = EXCLUDED.planned_seconds, planned_load = EXCLUDED.planned_load,
+             updated_at = now()`,
+          [entry.id, entry.date, entry.name, secondsOf(entry), loadOf(entry)],
         );
       }
       await tx.query(
@@ -111,10 +125,10 @@ export function createPlanHistory(options: {
 
     async markSkipped(entry) {
       await db.query(
-        `INSERT INTO plan_history (plan_id, plan_date, name, planned_seconds, status)
-         VALUES ($1, $2::date, $3, $4, 'skipped')
+        `INSERT INTO plan_history (plan_id, plan_date, name, planned_seconds, planned_load, status)
+         VALUES ($1, $2::date, $3, $4, $5, 'skipped')
          ON CONFLICT (plan_id) DO UPDATE SET status = 'skipped', updated_at = now()`,
-        [entry.id, entry.date, entry.name, secondsOf(entry)],
+        [entry.id, entry.date, entry.name, secondsOf(entry), loadOf(entry)],
       );
     },
 

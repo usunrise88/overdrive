@@ -29,6 +29,8 @@ export interface WellnessPullerOptions {
   now?: () => Date;
   log: Logger;
   timers?: Timers;
+  /** Called after a pull has stored the daily figures (the insights look again at what changed). */
+  onStored?: () => void;
 }
 
 /**
@@ -73,6 +75,7 @@ export function createWellnessPuller(options: WellnessPullerOptions): WellnessPu
       return { ok: false, error: "the wellness could not be stored" };
     }
     log.info({ source: source.id, days: observations.length }, "wellness pulled");
+    options.onStored?.();
     return { ok: true, days: observations.length };
   }
 

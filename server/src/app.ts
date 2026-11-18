@@ -3,6 +3,7 @@ import { bearerAuth } from "./auth.ts";
 import type { Config } from "./config.ts";
 import type { Db } from "./db.ts";
 import { installErrorHandling, sendError } from "./errors.ts";
+import { insightsRoutes } from "./insights/routes.ts";
 import { type McpConfig, type McpTestOptions, mcpModule, mcpSettings } from "./mcp/index.ts";
 import { metricsRoutes } from "./metrics/routes.ts";
 import { planRoutes } from "./plan/routes.ts";
@@ -87,6 +88,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       v1.register(profileRoutes, { store: services.profile });
       v1.register(metricsRoutes, { metrics: services.metrics });
       v1.register(wellnessRoutes, { service: services.wellness });
+      v1.register(insightsRoutes, { insights: services.insights });
     },
     { prefix: "/v1" },
   );

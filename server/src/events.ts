@@ -33,11 +33,24 @@ export interface ActivityStoredEvent {
   activityId: string;
 }
 
+/** New wellness figures arrived: a Health Connect upload that stored something, or a pull from intervals.icu (ADR 0023). */
+export interface WellnessUpdatedEvent {
+  source: "healthconnect" | "intervals";
+}
+
+/** A written note (or an alert) was stored (ADR 0025): the Telegram bot sends it. */
+export interface InsightStoredEvent {
+  insightId: number;
+  kind: "morning" | "ride" | "week" | "deviation" | "drift";
+}
+
 export interface AppEvents {
   "ride-stored": RideStoredEvent;
   "plan-changed": PlanChangedEvent;
   "profile-changed": ProfileChangedEvent;
   "activity-stored": ActivityStoredEvent;
+  "wellness-updated": WellnessUpdatedEvent;
+  "insight-stored": InsightStoredEvent;
 }
 
 export type AppEventName = keyof AppEvents;

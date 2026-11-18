@@ -1,0 +1,115 @@
+{
+  "schema": 1,
+  "kind": "morning",
+  "date": "2026-11-18",
+  "weekday": "Wednesday",
+  "recovery": {
+    "state": "noData",
+    "forToday": true,
+    "date": "2026-11-18",
+    "reason": "No reading from last night. Wear the watch to sleep, then open Overdrive in the morning.",
+    "guidance": null,
+    "rule": null,
+    "ruleMeaning": null,
+    "nightsLogged": 58,
+    "nightsNeeded": 14,
+    "signals": []
+  },
+  "adjustment": "none",
+  "today": {
+    "ftp": 250,
+    "planned": []
+  },
+  "form": {
+    "date": "2026-11-18",
+    "fitness": 62,
+    "fatigue": 70,
+    "form": -9,
+    "formWord": "neutral",
+    "fitnessChange7Days": 3
+  },
+  "lastRide": {
+    "name": "Endurance",
+    "date": "2026-11-16",
+    "daysAgo": 2,
+    "minutes": 65,
+    "load": 54,
+    "averagePower": 168
+  },
+  "notes": [
+    "There is no reading from last night, so recovery is not rated this morning.",
+    "Nothing is planned for today."
+  ],
+  "quotable": [
+    {
+      "label": "nights with the watch so far",
+      "value": 58,
+      "unit": "nights"
+    },
+    {
+      "label": "nights needed before recovery is rated",
+      "value": 14,
+      "unit": "nights"
+    },
+    {
+      "label": "FTP",
+      "value": 250,
+      "unit": "W"
+    },
+    {
+      "label": "days since the last ride",
+      "value": 2,
+      "unit": "days"
+    },
+    {
+      "label": "last ride: length",
+      "value": 65,
+      "unit": "min"
+    },
+    {
+      "label": "last ride: length (hours part)",
+      "value": 1,
+      "unit": "h"
+    },
+    {
+      "label": "last ride: length (minutes part)",
+      "value": 5,
+      "unit": "min"
+    },
+    {
+      "label": "last ride: length (in hours)",
+      "value": 1.1,
+      "unit": "h"
+    },
+    {
+      "label": "last ride: load",
+      "value": 54,
+      "unit": "load"
+    },
+    {
+      "label": "last ride: average power",
+      "value": 168,
+      "unit": "W"
+    },
+    {
+      "label": "fitness (the 42-day average of the daily load)",
+      "value": 62,
+      "unit": "load"
+    },
+    {
+      "label": "fatigue (the 7-day average of the daily load)",
+      "value": 70,
+      "unit": "load"
+    },
+    {
+      "label": "form (fitness minus fatigue)",
+      "value": -9,
+      "unit": "load"
+    },
+    {
+      "label": "change in fitness over 7 days",
+      "value": 3,
+      "unit": "load"
+    }
+  ]
+}

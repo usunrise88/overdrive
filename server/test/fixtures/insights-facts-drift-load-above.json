@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "kind": "drift",
+  "date": "2026-11-18",
+  "weekday": "Wednesday",
+  "windowDays": 7,
+  "reasons": [
+    "load-above"
+  ],
+  "missed": null,
+  "load": {
+    "planned": 240,
+    "ridden": 119,
+    "differencePercent": -51
+  },
+  "thresholds": {
+    "missedSessions": 2,
+    "loadAbovePercent": 30,
+    "loadBelowPercent": 40
+  },
+  "nextWeek": {
+    "sessions": 4,
+    "plannedLoad": 237
+  },
+  "quotable": [
+    {
+      "label": "days looked at",
+      "value": 7,
+      "unit": "days"
+    },
+    {
+      "label": "load planned for the window",
+      "value": 240,
+      "unit": "load"
+    },
+    {
+      "label": "load ridden in the window",
+      "value": 119,
+      "unit": "load"
+    },
+    {
+      "label": "load ridden against planned, in percent (negative: below the plan)",
+      "value": -51,
+      "unit": "%"
+    },
+    {
+      "label": "missed sessions that make an alert",
+      "value": 2,
+      "unit": "sessions"
+    },
+    {
+      "label": "load above plan that makes an alert",
+      "value": 30,
+      "unit": "%"
+    },
+    {
+      "label": "load below plan that makes an alert",
+      "value": 40,
+      "unit": "%"
+    },
+    {
+      "label": "sessions planned for the next 7 days",
+      "value": 4,
+      "unit": "sessions"
+    },
+    {
+      "label": "load planned for the next 7 days",
+      "value": 237,
+      "unit": "load"
+    }
+  ]
+}

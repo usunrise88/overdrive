@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "./tool.ts";
 import { registerActivityTools } from "./tools/activities.ts";
 import { registerFitnessTools } from "./tools/fitness.ts";
+import { registerInsightTools } from "./tools/insights.ts";
 import { registerPlanTools } from "./tools/plan.ts";
 import { registerProfileTools } from "./tools/profile.ts";
 import { registerRideTools } from "./tools/rides.ts";
@@ -9,7 +10,7 @@ import { registerWellnessTools } from "./tools/wellness.ts";
 
 /** What the server tells a client about itself; not the release tag. */
 export const MCP_SERVER_NAME = "overdrive";
-export const MCP_SERVER_VERSION = "0.2.0";
+export const MCP_SERVER_VERSION = "0.3.0";
 
 const INSTRUCTIONS =
   "Overdrive plans and reviews the indoor cycling of one rider. A workout is a list of steps; a step's power target is a fraction of " +
@@ -19,8 +20,10 @@ const INSTRUCTIONS =
   "the rider's real calendar and profile: use them only when asked. get_fitness gives load, fitness, fatigue, form, the power curve and the FTP; " +
   "an FTP it suggests is only a suggestion, never change the FTP without the rider's say-so. For how the rider is today use get_recovery (a " +
   "state and the facts behind it) and get_wellness (the daily figures with the rider's own usual ranges): they are facts about training load " +
-  "and recovery, never a diagnosis. list_activities and get_activity cover the tablet's rides and the watch's workouts. Results are compact " +
-  "by default; ask for detail only when needed.";
+  "and recovery, never a diagnosis. list_activities and get_activity cover the tablet's rides and the watch's workouts. list_insights shows the " +
+  "notes the rider has already been written (read them before advising); get_facts gives the computed facts behind a note, to reason over. " +
+  "When the rider opens a chat, list_discussion_topics holds what the post-ride analysis found worth discussing: start from the latest open one " +
+  "and mark it discussed with mark_discussion_topic when it has been talked through. Results are compact by default; ask for detail only when needed.";
 
 /**
  * A server with the tools of spec §8.4: planned workouts (list, create, update, delete), activities (list, get; `list_rides` and
@@ -38,5 +41,6 @@ export function createMcpServer(ctx: ToolContext): McpServer {
   registerActivityTools(server, ctx, rides);
   registerFitnessTools(server, ctx);
   registerWellnessTools(server, ctx);
+  registerInsightTools(server, ctx);
   return server;
 }

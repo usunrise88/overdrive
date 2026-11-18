@@ -1,6 +1,7 @@
 import { addDaysToIsoDate } from "@overdrive/contracts";
 import type { Db } from "../db.ts";
 import type { EventBus } from "../events.ts";
+import type { MessageEntity, NotificationSource } from "../notifications.ts";
 import { localDate } from "../time.ts";
 import { realTimers, type Timers } from "../timers.ts";
 import { type Clock, isoWeekday, mondayOf, zonedInstant } from "../zoned.ts";
@@ -44,8 +45,17 @@ export interface NotifierOptions {
   db: Db;
   bus: EventBus;
   /** Sends one message to the owner; throws {@link TelegramError} when it cannot. */
-  deliver(text: string, buttons?: InlineButton[][]): Promise<void>;
+  deliver(
+    text: string,
+    buttons?: InlineButton[][],
+    entities?: readonly MessageEntity[],
+  ): Promise<void>;
   config: NotifierConfig;
+  /**
+   * Other modules' messages for the owner (the written insights and alerts, ADR 0025): each candidate they offer is claimed, built and
+   * sent once like the bot's own, through the same `bot_notifications` table and to the same one chat.
+   */
+  sources?: readonly NotificationSource[];
   /** How often the loop looks for what is due (default 30 s). */
   pollMs?: number;
   /** Failed tries after which a message is given up (default 10). */
@@ -70,10 +80,11 @@ export interface Notifier {
 interface Message {
   text: string;
   buttons?: InlineButton[][];
+  entities?: readonly MessageEntity[];
 }
 
 interface Candidate {
-  kind: "reminder-evening" | "reminder-lead" | "ride-summary" | "week-summary";
+  kind: string;
   key: string;
   /** Epoch milliseconds from which it may be sent, and until which it is still worth sending. */
   dueAt: number;
@@ -98,6 +109,7 @@ function retryDelayMs(attempts: number): number {
 
 export function createNotifier(options: NotifierOptions): Notifier {
   const { ctx, db, bus, config, deliver } = options;
+  const sources = options.sources ?? [];
   const { log } = ctx;
   const timers = options.timers ?? realTimers;
   const pollMs = options.pollMs ?? 30_000;
@@ -370,7 +382,7 @@ export function createNotifier(options: NotifierOptions): Notifier {
       return undefined;
     }
     try {
-      await deliver(message.text, message.buttons);
+      await deliver(message.text, message.buttons, message.entities);
     } catch (error) {
       summary[await failed(candidate, attempts, error)]++;
       // A refused token fails the same way for everything else: leave them for the next tick.
@@ -399,6 +411,17 @@ export function createNotifier(options: NotifierOptions): Notifier {
       ...(await rideCandidates(nowMs)),
       ...weeklyCandidates(today),
     ];
+    for (const source of sources) {
+      try {
+        candidates.push(...(await source.candidates(nowMs)));
+      } catch (error) {
+        const code = (error as { code?: unknown } | null)?.code;
+        log.error(
+          { code: typeof code === "string" ? code : undefined },
+          "a source of Telegram messages failed; the others are still sent",
+        );
+      }
+    }
     for (const candidate of candidates) {
       if (nowMs < candidate.dueAt || nowMs >= candidate.expiresAt) continue;
       if ((await handle(candidate, summary)) === "stop") break;
@@ -441,6 +464,8 @@ export function createNotifier(options: NotifierOptions): Notifier {
           dirty = true;
           kick();
         }),
+        // A written note or alert was stored: send it now rather than at the next poll.
+        bus.on("insight-stored", () => kick()),
       );
       stopTicking = timers.every(pollMs, kick);
       // A few rows a day: a quarter of a year is more history than anything reads.

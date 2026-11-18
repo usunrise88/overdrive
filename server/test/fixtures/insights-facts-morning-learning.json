@@ -1,0 +1,180 @@
+{
+  "schema": 1,
+  "kind": "morning",
+  "date": "2026-11-18",
+  "weekday": "Wednesday",
+  "recovery": {
+    "state": "learning",
+    "forToday": true,
+    "date": "2026-11-18",
+    "reason": "Overdrive rates recovery after 14 nights with the watch. 9 nights so far.",
+    "guidance": null,
+    "rule": null,
+    "ruleMeaning": null,
+    "nightsLogged": 9,
+    "nightsNeeded": 14,
+    "signals": [
+      {
+        "metric": "restingHr",
+        "name": "Resting heart rate",
+        "value": 52,
+        "unit": "bpm",
+        "clock": null,
+        "usualLow": null,
+        "usualHigh": null,
+        "usualClock": null,
+        "position": null,
+        "daysOutsideInARow": 0
+      }
+    ]
+  },
+  "adjustment": "none",
+  "today": {
+    "ftp": 250,
+    "planned": [
+      {
+        "name": "Sweet spot 3x10",
+        "minutes": 60,
+        "plannedLoad": 51,
+        "intensityFactor": 0.75,
+        "topStepWatts": 220,
+        "outline": "10m 60%, 3×(10m 88% + 5m 50%), 5m free",
+        "done": false
+      }
+    ]
+  },
+  "form": {
+    "date": "2026-11-18",
+    "fitness": 62,
+    "fatigue": 70,
+    "form": -9,
+    "formWord": "neutral",
+    "fitnessChange7Days": 3
+  },
+  "lastRide": {
+    "name": "Endurance",
+    "date": "2026-11-16",
+    "daysAgo": 2,
+    "minutes": 65,
+    "load": 54,
+    "averagePower": 168
+  },
+  "notes": [],
+  "quotable": [
+    {
+      "label": "Resting heart rate",
+      "value": 52,
+      "unit": "bpm"
+    },
+    {
+      "label": "Resting heart rate: days outside the usual range in a row",
+      "value": 0,
+      "unit": "days"
+    },
+    {
+      "label": "nights with the watch so far",
+      "value": 9,
+      "unit": "nights"
+    },
+    {
+      "label": "nights needed before recovery is rated",
+      "value": 14,
+      "unit": "nights"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": length",
+      "value": 60,
+      "unit": "min"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": length (hours part)",
+      "value": 1,
+      "unit": "h"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": length (minutes part)",
+      "value": 0,
+      "unit": "min"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": length (in hours)",
+      "value": 1,
+      "unit": "h"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": planned load if ridden as planned",
+      "value": 51,
+      "unit": "load"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": intensity factor",
+      "value": 0.75,
+      "unit": "IF"
+    },
+    {
+      "label": "planned workout \"Sweet spot 3x10\": hardest step target",
+      "value": 220,
+      "unit": "W"
+    },
+    {
+      "label": "FTP",
+      "value": 250,
+      "unit": "W"
+    },
+    {
+      "label": "days since the last ride",
+      "value": 2,
+      "unit": "days"
+    },
+    {
+      "label": "last ride: length",
+      "value": 65,
+      "unit": "min"
+    },
+    {
+      "label": "last ride: length (hours part)",
+      "value": 1,
+      "unit": "h"
+    },
+    {
+      "label": "last ride: length (minutes part)",
+      "value": 5,
+      "unit": "min"
+    },
+    {
+      "label": "last ride: length (in hours)",
+      "value": 1.1,
+      "unit": "h"
+    },
+    {
+      "label": "last ride: load",
+      "value": 54,
+      "unit": "load"
+    },
+    {
+      "label": "last ride: average power",
+      "value": 168,
+      "unit": "W"
+    },
+    {
+      "label": "fitness (the 42-day average of the daily load)",
+      "value": 62,
+      "unit": "load"
+    },
+    {
+      "label": "fatigue (the 7-day average of the daily load)",
+      "value": 70,
+      "unit": "load"
+    },
+    {
+      "label": "form (fitness minus fatigue)",
+      "value": -9,
+      "unit": "load"
+    },
+    {
+      "label": "change in fitness over 7 days",
+      "value": 3,
+      "unit": "load"
+    }
+  ]
+}

@@ -50,6 +50,8 @@ export function startHarness(db: Db, fake: FakeIntervals, options: HarnessOption
   const sleeping = recordedSleep();
   const services = createServices({
     config: {
+      // The written insights have their own tests; these harnesses test other things and must not hear their notes.
+      INSIGHTS_ENABLED: false,
       ...(options.configured === false ? {} : { INTERVALS_API_KEY: FAKE_API_KEY }),
       INTERVALS_ATHLETE_ID: FAKE_ATHLETE_ID,
       INTERVALS_BASE_URL: fake.url,

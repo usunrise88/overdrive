@@ -12,6 +12,7 @@ import type { Db } from "../db.ts";
 import type { EventBus } from "../events.ts";
 import type { IntervalsClient } from "../intervals/client.ts";
 import type { Logger } from "../log.ts";
+import type { NotificationSource } from "../notifications.ts";
 import type { PlanRefresher } from "../plan/refresher.ts";
 import type { PlanStore } from "../plan/store.ts";
 import type { Timers } from "../timers.ts";
@@ -20,7 +21,7 @@ import { createTelegramBot, type TelegramBot } from "./bot.ts";
 import { createTelegramClient } from "./client.ts";
 import { type Commands, createCommands } from "./commands.ts";
 import type { BotContext } from "./context.ts";
-import { createPlanHistory } from "./history.ts";
+import { createPlanHistory, type PlanHistory } from "./history.ts";
 import { createNotifier, type Notifier } from "./notifier.ts";
 import { createRideQueries } from "./rides.ts";
 
@@ -45,6 +46,10 @@ export interface TelegramDeps {
   timers?: Timers | undefined;
   /** Seconds each long poll waits; the tests use a short one. */
   pollSeconds?: number | undefined;
+  /** The plan history, when the service shares one with the insights (ADR 0025); otherwise the bot keeps its own. */
+  history?: PlanHistory | undefined;
+  /** Other modules' messages for the owner: the written insights and alerts (ADR 0025). */
+  sources?: readonly NotificationSource[] | undefined;
 }
 
 const COMMANDS = [
@@ -91,12 +96,14 @@ export function createTelegram(deps: TelegramDeps): TelegramBot | null {
   let commands: Commands | null = null;
   let notifier: Notifier | null = null;
   if (ownerChatId !== undefined) {
-    const history = createPlanHistory({
-      db: deps.db,
-      plan: deps.plan,
-      timezone: deps.timezone,
-      now,
-    });
+    const history =
+      deps.history ??
+      createPlanHistory({
+        db: deps.db,
+        plan: deps.plan,
+        timezone: deps.timezone,
+        now,
+      });
     const ctx: BotContext = {
       plan: deps.plan,
       history,
@@ -115,7 +122,9 @@ export function createTelegram(deps: TelegramDeps): TelegramBot | null {
       ctx,
       db: deps.db,
       bus: deps.bus,
-      deliver: (text, buttons) => client.sendMessage(ownerChatId, text, buttons),
+      deliver: (text, buttons, entities) =>
+        client.sendMessage(ownerChatId, text, buttons, entities),
+      ...(deps.sources === undefined ? {} : { sources: deps.sources }),
       config: {
         eveningTime: evening === "off" ? null : clockOf(evening, DEFAULT_REMINDER_EVENING_TIME),
         leadMinutes: config.REMINDER_LEAD_MINUTES ?? DEFAULT_REMINDER_LEAD_MINUTES,
