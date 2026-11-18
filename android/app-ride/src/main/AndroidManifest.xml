@@ -1,13 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- No permissions in this build: the ride app works fully offline (spec §4). The overlay service of the next
+         stage adds the overlay and foreground-service permissions. -->
+
     <application
+        android:name=".OverdriveApp"
         android:allowBackup="false"
         android:label="Overdrive"
-        android:theme="@android:style/Theme.Material.NoActionBar">
+        android:theme="@style/Theme.Overdrive">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:screenOrientation="sensorLandscape">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

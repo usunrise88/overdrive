@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Same value as OverdriveColors.bg, generated from design/tokens.json. -->
+    <color name="overdrive_bg">#090C11</color>
+</resources>

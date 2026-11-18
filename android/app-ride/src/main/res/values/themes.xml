@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The window behind the first frame is the app background (design/tokens.json color.neutral.bg), so a cold start
+         does not flash white. Everything after that is Compose. -->
+    <style name="Theme.Overdrive" parent="android:Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/overdrive_bg</item>
+        <item name="android:colorBackground">@color/overdrive_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+</resources>

@@ -1,0 +1,132 @@
+package app.overdrive.ride.host
+
+import androidx.compose.runtime.Immutable
+import app.overdrive.core.record.RideRecord
+import app.overdrive.core.record.RideSummary
+import app.overdrive.core.ride.FlatStep
+import app.overdrive.core.ride.PowerZone
+import app.overdrive.core.ride.RideSnapshot
+import app.overdrive.core.ride.RideState
+import app.overdrive.core.workout.Workout
+import app.overdrive.uikit.DeviceStatus
+import app.overdrive.uikit.chart.ProfileData
+import app.overdrive.uikit.chart.TracePoint
+import kotlin.math.roundToInt
+
+/** What the rider chose to ride on the Ready screen. */
+sealed interface RideChoice {
+    val title: String
+
+    /** Simulation on the flat with virtual gears and no end. */
+    data object Free : RideChoice {
+        override val title: String = "Free ride"
+    }
+
+    /** A workout, played step by step. */
+    data class Planned(
+        val workout: Workout,
+    ) : RideChoice {
+        override val title: String get() = workout.name
+    }
+
+    val workoutOrNull: Workout? get() = (this as? Planned)?.workout
+}
+
+/** One lap row of the finished ride's table. */
+@Immutable
+data class LapRow(
+    val number: Int,
+    val name: String,
+    val durationSeconds: Int,
+    val averagePower: Int?,
+    val averageHeartRate: Int?,
+)
+
+/** The finished ride's summary screen (design/system.md §6.4), computed once from the engine's record. */
+@Immutable
+data class FinishedRide(
+    val title: String,
+    val startEpochMillis: Long,
+    val endEpochMillis: Long?,
+    val summary: RideSummary,
+    val laps: List<LapRow>,
+    /** Seconds in Z1 to Z7 over the seconds that were not paused and had a power reading. */
+    val zoneSeconds: List<Int>,
+) {
+    companion object {
+        /** Builds the summary from [record]; [steps] name the laps (empty for a free ride, whose single lap is the ride). */
+        fun from(
+            record: RideRecord,
+            title: String,
+            steps: List<FlatStep>,
+        ): FinishedRide {
+            val zones = IntArray(7)
+            for (sample in record.samples) {
+                val power = sample.power
+                if (!sample.paused && power != null) zones[PowerZone.of(power, record.ride.ftp).number - 1]++
+            }
+            return FinishedRide(
+                title = title,
+                startEpochMillis = record.ride.startEpochMillis,
+                endEpochMillis = record.ride.endEpochMillis,
+                summary = record.summary,
+                laps =
+                    record.laps.mapIndexed { index, lap ->
+                        LapRow(
+                            number = index + 1,
+                            name = lap.stepIndex?.let { steps.getOrNull(it)?.label } ?: title,
+                            durationSeconds = lap.durationSeconds,
+                            averagePower = lap.averagePower?.roundToInt(),
+                            averageHeartRate = lap.averageHeartRate?.roundToInt(),
+                        )
+                    },
+                zoneSeconds = zones.toList(),
+            )
+        }
+    }
+}
+
+/**
+ * Everything the ride screens show, in one value: the engine's snapshot plus what the screens add to it
+ * (averages, the power trace, the finished summary). Republished with every snapshot.
+ */
+data class RideUi(
+    val snapshot: RideSnapshot,
+    val choice: RideChoice,
+    /** The workout's steps for the profile chart, one instance per ride; null for a free ride. */
+    val profile: ProfileData?,
+    /** Mean power over the riding seconds so far, or null before there is any. */
+    val averagePower: Int?,
+    /** Mean power since the current workout step began. */
+    val lapAveragePower: Int?,
+    /** The rider's power over the workout, one point per 10 s, refreshed once per 10 s. */
+    val trace: List<TracePoint>,
+    /** Set once the ride is [RideState.FINISHED]. */
+    val finished: FinishedRide?,
+    /** 1, 2, 3, … per ride in this process; changes when a new ride is prepared. */
+    val rideNumber: Int,
+)
+
+/** One row of the Devices screen. */
+@Immutable
+data class DeviceRowUi(
+    val status: DeviceStatus,
+    val subtitle: String,
+)
+
+/** The three device rows of the Devices screen and top bar: trainer, heart-rate strap, Click. */
+@Immutable
+data class DevicesUi(
+    val trainer: DeviceRowUi,
+    val heartRate: DeviceRowUi,
+    val click: DeviceRowUi,
+) {
+    companion object {
+        val Unknown =
+            DevicesUi(
+                DeviceRowUi(DeviceStatus.Searching, "Connecting…"),
+                DeviceRowUi(DeviceStatus.NotPaired, "Not paired"),
+                DeviceRowUi(DeviceStatus.NotPaired, "Not paired"),
+            )
+    }
+}
