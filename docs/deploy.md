@@ -182,6 +182,14 @@ Values in `.env` are never in the repository.
 |---|---|---|
 | `POSTGRES_PASSWORD` | required | Password of the `overdrive` database user. URL-safe (`openssl rand -hex 24`). Compose builds `DATABASE_URL` from it |
 | `DEVICE_TOKENS` | empty | `name:token,name:token`: the devices allowed to call `/v1`. Empty means every `/v1` request is `401`. Tokens are at least 32 characters |
+| `INTERVALS_API_KEY` | unset | Personal API key of intervals.icu (Settings, Developer Settings). Unset or empty: **the integration is off** (rides are queued, no plan is read, the MCP plan tools say so). ADR 0016 |
+| `INTERVALS_ATHLETE_ID` | `0` | `i12345`; `0` is the athlete the key belongs to |
+| `INTERVALS_BASE_URL` | `https://intervals.icu` | Only to go through a proxy |
+| `PLAN_REFRESH_MINUTES` | `15` | 1 to 1440: how often the plan (today and 14 days) is read |
+| `TIMEZONE` | `UTC` | The rider's IANA time zone, for example `Europe/Paris`: which day is "today" for the plan, which day a ride belongs to, the default ranges of the MCP tools |
+| `PUBLIC_BASE_URL` | unset | `https://overdrive.llmto.day`: the service's public address (https, no path). **With `OWNER_PASSPHRASE_HASH`, turns the MCP server on.** ADR 0018 |
+| `OWNER_PASSPHRASE_HASH` | unset | The hash of the owner's passphrase, `scrypt:…` (section 12). **With `PUBLIC_BASE_URL`, turns the MCP server on.** The plain passphrase is never configured |
+| `MCP_STATIC_TOKENS` | empty | `name:token,name:token`: fixed bearer tokens for an MCP client that cannot do OAuth; at least 32 characters each; open `/mcp` only |
 | `SERVER_PORT` | `8080` | Host loopback port for the server. Here `27180`; the Caddy site file must match |
 | `POSTGRES_PORT` | `5432` | Host loopback port for the database. Here `27181` |
 | `LOG_LEVEL` | `info` | `fatal`, `error`, `warn`, `info`, `debug`, `trace` or `silent` |
@@ -192,6 +200,8 @@ Values in `.env` are never in the repository.
 |---|---|---|
 | `DATABASE_URL` | built from `POSTGRES_PASSWORD` | `postgres://overdrive:…@db:5432/overdrive` |
 | `DEVICE_TOKENS` | from `.env` | As above |
+| `INTERVALS_*`, `PLAN_REFRESH_MINUTES`, `TIMEZONE` | from `.env` | As above; empty means the default |
+| `PUBLIC_BASE_URL`, `OWNER_PASSPHRASE_HASH`, `MCP_STATIC_TOKENS` | from `.env` | As above; empty means unset |
 | `LOG_LEVEL` | from `.env` | As above |
 
 ### Set by the image (`server/Dockerfile`)
@@ -206,11 +216,56 @@ Values in `.env` are never in the repository.
 
 | Variable | Added by stage | Meaning |
 |---|---|---|
-| `INTERVALS_API_KEY`, `INTERVALS_ATHLETE_ID` | planned: P2-1, the intervals.icu upload | intervals.icu access (ADR 0014, section 5) |
 | `TELEGRAM_*` (names not fixed) | planned: P2-4, the Telegram bot | Telegram bot token and chat settings (spec §5.4) |
 | `GOOGLE_*` (names not fixed) | planned: P2-4, Google Calendar | Google OAuth client for the calendar (spec §5.3) |
 | `STRAVA_*` (names not fixed) | planned: P2-5, Strava upload | Strava access; write-only (spec §5.5) |
 | LLM endpoint (name not fixed) | planned: insights, not yet in the roadmap | Endpoint and key of the model that writes insight text (spec §7.2) |
+
+## 12. The MCP server
+
+The service can also be an MCP server for AI clients (Claude's apps and others), at `https://overdrive.llmto.day/mcp`, behind an
+OAuth server for which **you** are the only user (ADR 0018). It stays off until you give it an address and a passphrase. Caddy needs no
+change: the site file proxies everything, including `/mcp`, `/.well-known/…` and `/oauth/…`.
+
+1. Make the hash of a passphrase you will remember (a few random words, at least 12 characters). On the host, from the image:
+
+   ```bash
+   docker compose run --rm --no-deps server node dist/hash-passphrase.js
+   ```
+
+   It asks twice without showing what you type and prints one line, `OWNER_PASSPHRASE_HASH=scrypt:32768:8:1:…`. (Any machine with the
+   repository can run `pnpm --filter @overdrive/server run hash-passphrase` instead.)
+2. Put that line and the address into `.env`, without printing them anywhere else:
+
+   ```bash
+   # paste the line the command printed:
+   #   OWNER_PASSPHRASE_HASH=scrypt:32768:8:1:…
+   #   PUBLIC_BASE_URL=https://overdrive.llmto.day
+   docker compose up -d server
+   docker compose logs --tail 20 server        # "MCP server is on", with the address
+   ```
+
+   The hash has colons and no dollar sign on purpose: compose would read a `$` in `.env` as a variable.
+3. Check that the front door answers (both documents are public):
+
+   ```bash
+   curl -fsS https://overdrive.llmto.day/.well-known/oauth-protected-resource
+   curl -fsS https://overdrive.llmto.day/.well-known/oauth-authorization-server
+   curl -sS -o /dev/null -w '%{http_code}\n' -X POST https://overdrive.llmto.day/mcp     # 401: a token is needed
+   ```
+4. In the AI client, add a custom connector (a remote MCP server) with the address `https://overdrive.llmto.day/mcp`. The client opens a
+   page of the service in the browser, **Connect to Overdrive**: type the passphrase and press Approve. Five wrong passphrases lock
+   that page for 15 minutes, then 30, and so on up to a day (tokens already issued keep working).
+5. For a client that cannot do OAuth but can send a fixed header, add `MCP_STATIC_TOKENS=name:<openssl rand -base64 36>` to `.env`
+   and `docker compose up -d server`; give the client `Authorization: Bearer <that>`.
+
+To end every client's access at once (they must ask for approval again), run in the database:
+`DELETE FROM oauth_tokens;` (`docker compose exec db psql -U overdrive -d overdrive`). To change the passphrase, make a new hash and
+put it in `.env` (grants already issued stay; delete them as above if you want them gone). To turn the MCP server off, empty
+`PUBLIC_BASE_URL` or `OWNER_PASSPHRASE_HASH` and `docker compose up -d server`: its routes disappear.
+
+The plan tools (`create_workout` and the others) need `INTERVALS_API_KEY`; without it they answer `plan source not configured` and
+the profile and ride tools still work.
 
 ## Troubleshooting
 
@@ -219,3 +274,10 @@ Values in `.env` are never in the repository.
   database keeps the password it was made with. Put the old value back in `.env`, or change the password inside the
   database to match (`docker compose exec db psql -U overdrive -d overdrive`, then `ALTER USER overdrive PASSWORD '…';`).
 - The tablet says the token is rejected: check section 5, then the token in the tablet's Settings, Sync.
+- The log says `MCP server is off: … is not set`: `PUBLIC_BASE_URL` and `OWNER_PASSPHRASE_HASH` must both be in `.env`, and the
+  server restarted with `docker compose up -d server` (not `restart`).
+- `Invalid configuration:` naming `OWNER_PASSPHRASE_HASH`: the value is not a hash from `hash-passphrase` (a plain passphrase, a
+  line cut in the middle, quotes around it that were not meant). `PUBLIC_BASE_URL` must be `https://` and only the address.
+- The page says `Too many wrong passphrases`: wait for the time it names. The lock is for the whole service, not for one browser.
+- The log says `oauth refresh token reused`: a client used an old refresh token after its grace period, so that client's sign-in was
+  ended; approve it again.

@@ -412,6 +412,16 @@ Phase 2 connects the ride app to a plan: an AI agent schedules workouts, they ap
 - Remote MCP server over HTTP with OAuth, hosted on the user's own domain, usable from desktop and mobile AI clients.
 - Tools cover three jobs: plan (create, move, edit, delete workouts), review (rides, load, wellness, insights), and profile (FTP, zones, availability). The tool list is in section 8.
 - Write tools validate the workout against the native schema before saving and return the stored result.
+- *Settled in stage P2-3 (ADR 0018, `server/src/mcp/`, `server/src/oauth/`):* the server is Streamable HTTP at `<PUBLIC_BASE_URL>/mcp`
+  (stateless, answers in JSON, the official SDK) behind an **OAuth 2.1 authorization server written for one owner**: protected
+  resource and authorization server metadata, dynamic client registration, authorization code with PKCE `S256` only, rotating
+  refresh tokens (access token 1 hour, refresh token 30 days, code 5 minutes, a code or refresh token reused later revokes its
+  family), revocation, tokens bound to the MCP endpoint as their audience, stored only as digests. The owner approves each client on a
+  page of the service by typing a passphrase, checked against a scrypt hash in `OWNER_PASSPHRASE_HASH` (never the passphrase itself),
+  with lockout after five failures. Redirect addresses must be `https` or loopback. `MCP_STATIC_TOKENS` is a fixed-header escape
+  for clients that cannot do OAuth. **The whole feature is off, its routes absent, unless `PUBLIC_BASE_URL` and the hash are set.**
+  Eight tools exist (§8.4); `get_fitness`, `get_wellness` and `get_recovery` are Phase 3. What only a real client settles (which
+  clients register dynamically, their redirect addresses, refresh behaviour) is listed in the ADR.
 
 ### 5.3 Google Calendar
 
@@ -587,7 +597,8 @@ Four contracts hold the system together: the workout file, the ride record, the 
 
 *Status at the end of Phase 1:* §8.1 (workout format) and §8.2 (ride record) are settled and live in `contracts/` with their
 fixtures, read and written by `core` and checked by the TypeScript side. §8.3 and §8.4 are Phase 2: §8.3 is settled for the ride
-intake (P2-1a) and the planned workouts (P2-2a), the rest of it and §8.4 stay a first draft. The
+intake (P2-1a), the planned workouts (P2-2a) and the profile (P2-3); §8.4 is settled for its Phase 2 tools (P2-3); the rest of §8.3 and
+the Phase 3 tools stay a first draft. The
 outbox entry of §4.9 is **not** a wire format (ride id, enqueue time, start time, duration, title); what an upload sends is
 Phase 2's to settle, here, with its schema in `contracts/`, before any client or service code.
 
@@ -673,7 +684,7 @@ path: everything is under `/v1`.
 | `POST /v1/wellness` | Companion | Batch of Health Connect records |
 | `GET /v1/metrics?from&to` | Companion | Load, form, recovery state, baselines |
 | `GET /v1/insights?from&to` | Companion | Written notes |
-| `GET /v1/profile`, `PATCH /v1/profile` | Both | FTP, zones, physics settings |
+| `GET /v1/profile`, `PATCH /v1/profile` | Both | FTP, zones, physics settings. **Settled** (stage P2-3, below) |
 
 **Settled in stage P2-1a (ride intake; ADR 0014, `server/README.md`, schemas in `contracts/`):**
 
@@ -689,7 +700,7 @@ path: everything is under `/v1`.
   message names the stored id (§5.5). A FIT before its record is `404` `ride_not_found`.
 - **Failure**: `{ "error": { "code", "message" } }` with a stable `code` from a closed list (`api-error.schema.json`): `400`
   `invalid_json`, `invalid_ride_id`; `401` `unauthorized`; `404` `not_found`; `413` `payload_too_large` (16 MiB record, 8 MiB
-  FIT); `415` `unsupported_media_type`; `422` `invalid_record`, `ride_id_mismatch`, `invalid_fit`; `500` `internal_error`. The
+  FIT); `415` `unsupported_media_type`; `422` `invalid_record`, `ride_id_mismatch`, `invalid_fit` (and, from P2-3, `invalid_profile`); `500` `internal_error`. The
   tablet retries `5xx` and network errors, treats `401` as "token rejected" and other `4xx` as permanent (ADR 0014 section 6),
   except that `408` and `429` are retried and a `404 ride_not_found` for the FIT of a record it has just stored is retried too
   (section 8).
@@ -706,6 +717,23 @@ path: everything is under `/v1`.
   list is then the last known one) or none has finished yet. `configured: false` means no plan source is set up: the list is empty,
   `stale` is false and `generatedAt` null. The cache holds today and the next 14 days, so a range beyond that comes back short.
 - Workouts the native format cannot hold are left out of the list (the service logs why); the answer does not mention them.
+
+**Settled in stage P2-3 (the profile; ADR 0018, `contracts/schema/profile.schema.json`, `profile-patch.schema.json`, Kotlin `ProfileApiJson`):**
+
+- `GET /v1/profile` answers `{ "ftp", "zones", "weeklyAvailability", "goals", "physics", "updatedAt" }`, every key always present.
+  `ftp` is watts (30 to 2000) or `null` while the owner has not set one (a default would be a guess; the tablet then keeps its own).
+  `zones.upperPercentOfFtp` are the six inclusive upper bounds of zones 1 to 6 in whole percent of FTP, strictly increasing, **Coggan's
+  `55 75 90 105 120 150` by default** and overridable; the watts of each zone are derived from the FTP (`powerZoneRanges` in TypeScript,
+  `PowerZones.ranges` in Kotlin, same ranges as `PowerZone.of`) and are not on the wire. `weeklyAvailability` is minutes (0 to 1440)
+  for `mon` to `sun`, `null` where unknown. `goals` are at most 10 short lines. `physics` is `systemMassKg`, `cdA`, `crr`,
+  `airDensity`, `drivetrainEfficiency`: the names and defaults of the ride engine's `PhysicsSettings` (§4.3; one mass for rider, bike
+  and kit). `updatedAt` is UTC, `null` while it is the defaults.
+- `PATCH /v1/profile` takes a partial update in the manner of a JSON merge patch (`application/json` or `application/merge-patch+json`):
+  a key that is absent changes nothing; `ftp` is replaced or cleared with `null`; `zones` is replaced as a whole or reset with
+  `null`; `weeklyAvailability` changes the weekdays it names (`null` forgets one); `goals` is replaced as a whole; `physics` changes the
+  constants it names. It answers the whole profile. A change that would not make a valid profile changes nothing and is
+  `422 invalid_profile` (a new code of the closed list); a body that is not JSON is `400 invalid_json`. A change emits the
+  `profile-changed` event inside the service.
 
 ### 8.4 MCP tools
 
@@ -724,6 +752,23 @@ path: everything is under `/v1`.
 | `update_profile` | Write | FTP, availability, goals |
 
 Read tools return compact summaries by default and full series only on request, to keep agent context small.
+
+**Settled in stage P2-3 (ADR 0018):** the Phase 2 tools are `list_planned_workouts`, `create_workout`, `update_workout`,
+`delete_workout`, `list_rides`, `get_ride`, `get_profile` and `update_profile`.
+
+- The plan is read and written through intervals.icu (§5.1): `create_workout` takes `date` and a native workout (§8.1; the model need
+  not send `schema` or `id`, the calendar entry names the workout `icu-<n>`), validates it with the contract's own validator and says
+  where it fails (`workout does not validate: /steps/0/duration must be integer`), writes the calendar, updates the plan cache,
+  emits `plan-changed` and returns the workout as stored (with `warnings` where intervals.icu has it differently). `update_workout`
+  changes `name`, `date` or `steps` (only workouts, sending only what changed); `delete_workout` removes one (a workout already
+  gone succeeds). `list_planned_workouts` answers from the 15-day plan cache and reads intervals.icu directly for a range beyond it.
+- `list_rides` gives the summaries the tablet recorded; `get_ride` recomputes statistics from the stored record (the ride app's
+  definitions of average, normalised power and load, best 5 s, 1, 5 and 20 minutes, seconds in the seven zones, heart rate, cadence),
+  gives the laps, and compares the ride with the **workout as it was when the ride was stored** (kept per ride) step by step, planned
+  against actual length and average power; the time series come only on request. **Every number is computed by code, never by a model.**
+- `get_profile` and `update_profile` are the profile of §8.3, with the zones in watts worked out.
+- Results are compact JSON; failures are tool errors in plain words (`plan source not configured: …`). Without an intervals.icu key
+  the plan tools say so and the others work.
 
 ## 9. Risks and open checks
 

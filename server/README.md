@@ -4,7 +4,8 @@ The self-hosted web service (spec §7.2): sync API, MCP server, scheduler, integ
 bot, insights. One deployable with internal modules. Today it has the ride intake (ADR 0014:
 the tablet's rides arrive here and are stored), the PostgreSQL schema behind it, the intervals.icu
 integration (ADR 0016: rides are forwarded, the planned workouts are read, converted, cached and
-served to the tablet) and `GET /healthz`.
+served to the tablet), the rider's profile (`GET`/`PATCH /v1/profile`), the MCP server with its
+OAuth server for AI clients (ADR 0018) and `GET /healthz`.
 
 ```bash
 pnpm --filter @overdrive/server dev      # node --watch src/main.ts, http://127.0.0.1:8080 (needs DATABASE_URL)
@@ -34,6 +35,9 @@ and names the variable, never its value):
 | `INTERVALS_BASE_URL` | `https://intervals.icu` | Another http(s) address (a proxy, a bench); no credentials or query. The tests point it at a fake |
 | `PLAN_REFRESH_MINUTES` | `15` | 1 to 1440: how often the plan is read |
 | `TIMEZONE` | `UTC` | The rider's IANA time zone (`Europe/Paris`): which day is "today" for the plan and which day a ride belongs to |
+| `PUBLIC_BASE_URL` | unset | The service's public address, `https://overdrive.llmto.day` (http only for `localhost`): the OAuth issuer and the origin of the MCP endpoint's addresses. **With `OWNER_PASSPHRASE_HASH`, turns the MCP server on** |
+| `OWNER_PASSPHRASE_HASH` | unset | The owner's passphrase as a scrypt hash, `scrypt:…`, made by `hash-passphrase` (below). **With `PUBLIC_BASE_URL`, turns the MCP server on.** The plain passphrase is never configured |
+| `MCP_STATIC_TOKENS` | empty | `name:token,name:token`: fixed bearer tokens for MCP clients that cannot do OAuth, at least 32 characters each. Open `/mcp` only. Ignored while the MCP server is off |
 
 Empty values mean the defaults (compose passes `${VAR:-}`). Secrets for intervals.icu, Strava,
 Google, Telegram and the LLM endpoint live in the server environment only, never in the repo; a
@@ -66,6 +70,8 @@ general 1 to 128 characters from `A-Z a-z 0-9 . _ -`, starting with a letter or 
 | `PUT /v1/rides/{rideId}/fit` | The FIT file, `application/vnd.ant.fit`, at most 8 MiB | `201` stored · `200` the identical file was stored before · `404 ride_not_found` the record is not stored yet · `409 fit_conflict` another file is stored · `422 invalid_fit` · `400 invalid_ride_id` · `413` · `415` |
 
 | `GET /v1/workouts?from=YYYY-MM-DD&to=YYYY-MM-DD[&refresh=true]` | none | `200` the planned workouts of those days in the native format (`workouts-response.schema.json`) · `400 invalid_range` a missing, malformed or reversed range, or more than 62 days |
+| `GET /v1/profile` | none | `200` the rider's profile (`profile.schema.json`): FTP or null, the six zone bounds (Coggan's by default), minutes per weekday, goals, the physics constants of the ride engine, `updatedAt` |
+| `PATCH /v1/profile` | A partial update, `application/json` or `application/merge-patch+json` (`profile-patch.schema.json`) | `200` the whole profile after the change · `422 invalid_profile` the change does not make a valid profile (nothing changed) · `400 invalid_json` · `415` |
 
 Also `401 unauthorized` everywhere, `404 not_found` for any other path or method, and `500
 internal_error` (the tablet retries those). "The same" means the same content: a record is compared
@@ -84,7 +90,10 @@ applied at start, each in its own transaction under an advisory lock, and record
 time (spec §5.5); `ride_destinations` is the queue for the integrations that come after intake
 (ADR 0014 section 5): a row per ride and destination, written in the transaction that stores the
 FIT, drained by the upload worker below. `planned_workouts` is the plan cache and `plan_sync_state`
-says how the last refreshes went (migration 0002, ADR 0016).
+says how the last refreshes went (migration 0002, ADR 0016). Migration 0003 (ADR 0018) adds `profile`
+(one row), `ride_workouts` (the workout each ride was played from, kept when the ride is stored) and the
+OAuth tables `oauth_clients`, `oauth_codes` and `oauth_tokens`, in which codes, tokens and client secrets
+are only ever digests.
 
 Tests run on PGlite and need nothing installed. To run them on a real PostgreSQL as well (CI does),
 set `TEST_DATABASE_URL`: **the `public` schema of that database is dropped**, so point it at a scratch one.
@@ -121,6 +130,56 @@ The tests never touch the real intervals.icu: `test/helpers/fake-intervals.ts` i
 port; every payload in it and in `test/fixtures/intervals/` is invented). What it assumes about the real API, and what only an
 account can confirm, is listed in ADR 0016.
 
+## MCP server (ADR 0018)
+
+A remote MCP server for AI clients (Claude's apps and others), in this same service: Streamable HTTP at
+`https://overdrive.llmto.day/mcp`, behind an OAuth 2.1 authorization server built for one owner. It is **off**
+(its routes do not exist, and the log says `MCP server is off: … is not set`) until both `PUBLIC_BASE_URL` and
+`OWNER_PASSPHRASE_HASH` are set.
+
+**Turn it on.** Make the hash on any machine with the repository (it reads the passphrase without echoing it and
+asks twice; use a few random words, at least 12 characters):
+
+```bash
+pnpm --filter @overdrive/server run hash-passphrase      # prints OWNER_PASSPHRASE_HASH=scrypt:32768:8:1:…
+# on the host, from the image:  docker compose run --rm --no-deps server node dist/hash-passphrase.js
+```
+
+(pnpm adds a `$ node …` line above the result; the one that starts with `OWNER_PASSPHRASE_HASH=` is the one to copy.)
+
+Copy the `OWNER_PASSPHRASE_HASH=…` line into `.env` (the hash contains colons and no dollar sign, so compose keeps it as it is),
+set `PUBLIC_BASE_URL=https://overdrive.llmto.day`, and `docker compose up -d server`. The log then says `MCP server is on`. The
+passphrase itself is never stored: remember it, it is what you type to approve each client. To change it, make a new hash.
+
+**Connect a client.** Add a custom connector (a remote MCP server) in the client with the address
+`https://overdrive.llmto.day/mcp`. The client finds the rest by itself (`/.well-known/oauth-protected-resource`,
+`/.well-known/oauth-authorization-server`), registers (`POST /oauth/register`) and opens a page of ours in the browser:
+**Connect to Overdrive**, naming the client and where the browser goes back to. Type the passphrase and press Approve. Five wrong
+passphrases lock the page for 15 minutes (doubling each time, a day at most); tokens already issued keep working. Access tokens last an hour, the
+client renews them with a refresh token that lasts 30 days from its last use and changes at every renewal.
+A client that cannot do OAuth and can send a fixed header (`Authorization: Bearer …`) can use a token from `MCP_STATIC_TOKENS`
+instead: `openssl rand -base64 36`, `MCP_STATIC_TOKENS=claude:<that>`, restart.
+
+**The tools** (spec §8.4, Phase 2): `list_planned_workouts`, `create_workout`, `update_workout`, `delete_workout` (the calendar in
+intervals.icu, through the same client the plan refresher uses, then the plan cache and the `plan-changed` event), `list_rides`,
+`get_ride` (statistics, laps and compliance with the plan, computed here from the stored record), `get_profile`, `update_profile`.
+Results are compact JSON, failures are tool errors in plain words (`plan source not configured: …`, `workout does not validate: /steps/0/duration must
+be integer`); without `INTERVALS_API_KEY` the plan tools say so and the rest work.
+
+**Revoking.** A client revokes its own grant (`POST /oauth/revoke`). To end every grant at once:
+
+```sql
+DELETE FROM oauth_tokens;               -- every client must ask for approval again
+-- DELETE FROM oauth_clients;           -- and forget the clients too
+```
+
+(run with `docker compose exec db psql -U overdrive -d overdrive`). A static token is revoked by removing it from `.env` and
+`docker compose up -d server`. Changing `OWNER_PASSPHRASE_HASH` does not end grants already issued.
+
+**Seeing what happens.** The log names the client at registration, approval and denial, a wrong passphrase (never its value), a code
+used twice and a refresh token reused (a family revoked), and each write tool (`workout planned through the MCP`, …). Tokens,
+codes, secrets, the passphrase and its hash are never logged.
+
 ## Modules (for the next ones)
 
 Other modules (the MCP tools, Telegram, Google Calendar, Strava) plug in without touching these; they get what they need from
@@ -133,6 +192,9 @@ Other modules (the MCP tools, Telegram, Google Calendar, Strava) plug in without
 | Refresh now | `services.refresher?.refresh()` | after a write to the calendar; never throws, joins a refresh already running |
 | intervals.icu | `services.intervals` | `createEvent`, `updateEvent`, `deleteEvent`, `listEvents`; `null` when the key is not set. `workoutToEventPayload(workout, date)` in `src/intervals/workout-convert.ts` makes the payload from a native workout |
 | Destinations | `services.destinations` | the destinations a stored ride is queued for; a new one (Strava) adds its name and runs its own worker over `ride_destinations` like `src/intervals/uploads.ts` |
+| Profile | `services.profile` (`src/profile/store.ts`) | `get()` the FTP, zones, availability, goals and physics; `update(patch)` (validated, atomic); a change emits `profile-changed` (`{ fields }`) |
+| Rides | `services.rides` (`src/ride-store.ts`), `services.rideWorkouts` | `list`, `getRecord` of the stored rides; the workout a ride was played from, copied when it was stored. `src/ride-stats.ts` has the pure statistics, series and compliance (`rideStatistics`, `rideSeries`, `rideCompliance`) a ride summary for Telegram can reuse |
+| Plan entries | `src/plan/entries.ts` (`readPlanEvent`), `src/plan/summary.ts` | one reading of a calendar event as a plan entry; duration, estimated load and a one-line outline of a native workout |
 
 ## Deployment
 

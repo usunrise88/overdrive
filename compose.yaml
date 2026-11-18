@@ -22,6 +22,10 @@ services:
       PLAN_REFRESH_MINUTES: ${PLAN_REFRESH_MINUTES:-}
       # The rider's time zone (IANA name): which day is "today" for the plan and for a ride.
       TIMEZONE: ${TIMEZONE:-}
+      # The MCP server and its OAuth server (ADR 0018): on only when both of the first two are set.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      OWNER_PASSPHRASE_HASH: ${OWNER_PASSPHRASE_HASH:-}
+      MCP_STATIC_TOKENS: ${MCP_STATIC_TOKENS:-}
     ports:
       - "127.0.0.1:${SERVER_PORT:-8080}:8080"
 
