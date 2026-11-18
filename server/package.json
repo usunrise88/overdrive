@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "catalog:",
     "@overdrive/contracts": "workspace:*",
     "fastify": "^5.12.8",
     "pg": "^8.23.1",

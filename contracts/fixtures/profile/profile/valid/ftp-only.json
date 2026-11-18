@@ -1,0 +1,31 @@
+{
+  "ftp": 215,
+  "zones": {
+    "upperPercentOfFtp": [
+      55,
+      75,
+      90,
+      105,
+      120,
+      150
+    ]
+  },
+  "weeklyAvailability": {
+    "mon": null,
+    "tue": null,
+    "wed": null,
+    "thu": null,
+    "fri": null,
+    "sat": null,
+    "sun": null
+  },
+  "goals": [],
+  "physics": {
+    "systemMassKg": 80,
+    "cdA": 0.35,
+    "crr": 0.004,
+    "airDensity": 1.225,
+    "drivetrainEfficiency": 1
+  },
+  "updatedAt": "2026-11-18T09:30:00.123Z"
+}

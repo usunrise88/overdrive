@@ -50,6 +50,9 @@ public enum class ApiErrorCode(
     @SerialName("invalid_record")
     INVALID_RECORD(422),
 
+    @SerialName("invalid_profile")
+    INVALID_PROFILE(422),
+
     @SerialName("ride_id_mismatch")
     RIDE_ID_MISMATCH(422),
 

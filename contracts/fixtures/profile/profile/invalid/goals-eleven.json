@@ -1,0 +1,43 @@
+{
+  "ftp": 250,
+  "zones": {
+    "upperPercentOfFtp": [
+      50,
+      70,
+      88,
+      100,
+      115,
+      140
+    ]
+  },
+  "weeklyAvailability": {
+    "mon": 0,
+    "tue": 60,
+    "wed": 45,
+    "thu": 60,
+    "fri": 0,
+    "sat": 120,
+    "sun": 180
+  },
+  "goals": [
+    "goal 0",
+    "goal 1",
+    "goal 2",
+    "goal 3",
+    "goal 4",
+    "goal 5",
+    "goal 6",
+    "goal 7",
+    "goal 8",
+    "goal 9",
+    "goal 10"
+  ],
+  "physics": {
+    "systemMassKg": 78.5,
+    "cdA": 0.32,
+    "crr": 0.0035,
+    "airDensity": 1.2,
+    "drivetrainEfficiency": 0.975
+  },
+  "updatedAt": "2026-11-18T09:30:00Z"
+}

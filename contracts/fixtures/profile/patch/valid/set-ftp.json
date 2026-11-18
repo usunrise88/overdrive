@@ -1,0 +1,68 @@
+{
+  "description": "A number replaces the FTP.",
+  "before": {
+    "ftp": null,
+    "zones": {
+      "upperPercentOfFtp": [
+        55,
+        75,
+        90,
+        105,
+        120,
+        150
+      ]
+    },
+    "weeklyAvailability": {
+      "mon": null,
+      "tue": null,
+      "wed": null,
+      "thu": null,
+      "fri": null,
+      "sat": null,
+      "sun": null
+    },
+    "goals": [],
+    "physics": {
+      "systemMassKg": 80,
+      "cdA": 0.35,
+      "crr": 0.004,
+      "airDensity": 1.225,
+      "drivetrainEfficiency": 1
+    },
+    "updatedAt": null
+  },
+  "patch": {
+    "ftp": 260
+  },
+  "after": {
+    "ftp": 260,
+    "zones": {
+      "upperPercentOfFtp": [
+        55,
+        75,
+        90,
+        105,
+        120,
+        150
+      ]
+    },
+    "weeklyAvailability": {
+      "mon": null,
+      "tue": null,
+      "wed": null,
+      "thu": null,
+      "fri": null,
+      "sat": null,
+      "sun": null
+    },
+    "goals": [],
+    "physics": {
+      "systemMassKg": 80,
+      "cdA": 0.35,
+      "crr": 0.004,
+      "airDensity": 1.225,
+      "drivetrainEfficiency": 1
+    },
+    "updatedAt": null
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive profile",
+  "description": "The rider's profile: the answer to GET /v1/profile and the body PATCH /v1/profile returns (spec §8.3, ADR 0018). One profile per service. ftp is in watts, or null when the owner has not set one (the tablet then keeps its own). zones.upperPercentOfFtp are the inclusive upper bounds of zones 1 to 6 as whole percentages of FTP (zone 7 has none); the default is Coggan's, 55 75 90 105 120 150, the same as the ride app's PowerZone, and the watts of each zone are derived from the FTP by code, never stored. weeklyAvailability is the minutes the rider can train on each weekday, null where unknown (0 is a rest day). goals are short free-text lines, at most 10. physics mirrors the ride engine's PhysicsSettings, same names and units. updatedAt is when the profile last changed (UTC), null while it is still the defaults. Rules a schema cannot state, checked by every implementation: the six zone bounds strictly increase, and no goal is blank.",
+  "type": "object",
+  "required": ["ftp", "zones", "weeklyAvailability", "goals", "physics", "updatedAt"],
+  "additionalProperties": false,
+  "properties": {
+    "ftp": {
+      "description": "Functional threshold power in watts, or null when not set.",
+      "type": ["integer", "null"],
+      "minimum": 30,
+      "maximum": 2000
+    },
+    "zones": { "$ref": "#/$defs/zones" },
+    "weeklyAvailability": {
+      "description": "Minutes available per weekday (mon to sun); null where unknown.",
+      "type": "object",
+      "required": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+      "additionalProperties": false,
+      "properties": {
+        "mon": { "$ref": "#/$defs/minutes" },
+        "tue": { "$ref": "#/$defs/minutes" },
+        "wed": { "$ref": "#/$defs/minutes" },
+        "thu": { "$ref": "#/$defs/minutes" },
+        "fri": { "$ref": "#/$defs/minutes" },
+        "sat": { "$ref": "#/$defs/minutes" },
+        "sun": { "$ref": "#/$defs/minutes" }
+      }
+    },
+    "goals": { "$ref": "#/$defs/goals" },
+    "physics": {
+      "description": "The constants of the virtual-speed model (spec §4.3), as the ride engine's PhysicsSettings.",
+      "type": "object",
+      "required": ["systemMassKg", "cdA", "crr", "airDensity", "drivetrainEfficiency"],
+      "additionalProperties": false,
+      "properties": {
+        "systemMassKg": { "$ref": "#/$defs/systemMassKg" },
+        "cdA": { "$ref": "#/$defs/cdA" },
+        "crr": { "$ref": "#/$defs/crr" },
+        "airDensity": { "$ref": "#/$defs/airDensity" },
+        "drivetrainEfficiency": { "$ref": "#/$defs/drivetrainEfficiency" }
+      }
+    },
+    "updatedAt": {
+      "description": "When the profile last changed (UTC, ISO-8601 with a Z), or null while it is the defaults.",
+      "type": ["string", "null"],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    }
+  },
+  "$defs": {
+    "zones": {
+      "description": "Power zones as shares of FTP.",
+      "type": "object",
+      "required": ["upperPercentOfFtp"],
+      "additionalProperties": false,
+      "properties": {
+        "upperPercentOfFtp": {
+          "description": "Inclusive upper bound of zones 1 to 6 in whole percent of FTP, strictly increasing. Zone 1 is up to the first bound, zone 2 above it up to the second, and so on; zone 7 is everything above the sixth.",
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": { "type": "integer", "minimum": 1, "maximum": 300 }
+        }
+      }
+    },
+    "minutes": { "type": ["integer", "null"], "minimum": 0, "maximum": 1440 },
+    "goals": {
+      "description": "Short free-text goals, in the rider's words.",
+      "type": "array",
+      "maxItems": 10,
+      "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+    },
+    "systemMassKg": {
+      "description": "Rider, bike and kit together, in kilograms.",
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 500
+    },
+    "cdA": {
+      "description": "Drag area in square metres.",
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 2
+    },
+    "crr": {
+      "description": "Rolling resistance coefficient.",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.1
+    },
+    "airDensity": {
+      "description": "Air density in kg/m³.",
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 2
+    },
+    "drivetrainEfficiency": {
+      "description": "Share of the measured power that reaches the wheel, in (0, 1].",
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1
+    }
+  }
+}
