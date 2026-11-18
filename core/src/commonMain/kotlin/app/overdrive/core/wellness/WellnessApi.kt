@@ -267,6 +267,23 @@ public data class HeartRateVariabilityRmssdRecord(
     }
 }
 
+/** `WeightRecord` (spec §12.5): body weight in kilograms (above 0, at most 1000) at a time. */
+@Serializable
+@SerialName("weight")
+public data class WeightRecord(
+    override val id: String,
+    val time: String,
+    val kg: Double,
+    override val lastModified: String? = null,
+    override val zoneOffsetSeconds: Int? = null,
+) : WellnessRecord {
+    init {
+        WellnessChecks.common(id, lastModified, zoneOffsetSeconds)
+        WellnessChecks.instant(time, "time")
+        require(kg > 0.0 && kg <= WellnessChecks.MAX_KG) { "kg is not within (0, 1000]" }
+    }
+}
+
 /**
  * The body of `POST /v1/wellness`: at most [WellnessApiJson.MAX_RECORDS] records, each id used once. [device] names the
  * phone for the service's logs.
@@ -398,12 +415,18 @@ public data class WellnessDay(
     val sleepEnd: String?,
     val steps: Int?,
     val hrvSdnn: Double?,
+    /** The day's body weight in kilograms (spec §12.5). */
+    val weightKg: Double?,
+    /** The mean of the daily weights of the seven days up to and including this one; null with no weighing in them. */
+    val weightKg7d: Double?,
 ) {
     init {
         require(WellnessTime.isDate(date)) { "date is not a real calendar date" }
         require(sleepStart == null || WellnessTime.isUtcInstant(sleepStart)) { "sleepStart is not a UTC instant" }
         require(sleepEnd == null || WellnessTime.isUtcInstant(sleepEnd)) { "sleepEnd is not a UTC instant" }
         require(steps == null || steps >= 0) { "steps is negative" }
+        require(weightKg == null || weightKg > 0.0) { "weightKg is not above 0" }
+        require(weightKg7d == null || weightKg7d > 0.0) { "weightKg7d is not above 0" }
     }
 }
 
@@ -722,6 +745,7 @@ internal object WellnessChecks {
     const val MAX_RATE = 1000.0
     const val MAX_PERCENT = 100.0
     const val MAX_HRV = 1000.0
+    const val MAX_KG = 1000.0
     const val MAX_STEPS = 1_000_000
     const val MAX_RECORD_SAMPLES = 20_000
     const val MAX_SESSION_SAMPLES = 50_000

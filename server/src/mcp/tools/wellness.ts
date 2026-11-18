@@ -79,7 +79,7 @@ export function registerWellnessTools(server: McpServer, ctx: ToolContext): void
         "The rider's daily wellness figures from the watch (Health Connect) and intervals.icu, for the days between two dates, with the " +
         "personal baseline of each metric. Per day: restingHr (bpm), sleepHours (the night that ended that morning, asleep time), bedtime " +
         "and wake (local clock times), respiratoryRate (breaths per minute), spo2 (percent), sleepingHr (mean bpm during sleep, only when " +
-        "the watch recorded enough samples), hrvRmssd (ms, only where a source writes it), steps, and outsideUsualRange: the metrics outside " +
+        "the watch recorded enough samples), hrvRmssd (ms, only where a source writes it), steps, weightKg (body weight that day) and weightKg7d (the mean of the daily weights of the 7 days up to that day: the trend; it changes nothing in the rider's settings), and outsideUsualRange: the metrics outside " +
         "their usual range that day, on which side and for how many days in a row. The usual range of a metric is its mean over the 42 days " +
         "before, minus and plus one standard deviation, and exists only after 14 readings (baselinesAsOfLastDay holds the latest). Dates are " +
         "the rider's local days (YYYY-MM-DD); a night belongs to the morning it ends. Without dates: the last 14 days. At most 186 days. " +
@@ -143,6 +143,8 @@ export function registerWellnessTools(server: McpServer, ctx: ToolContext): void
           spo2: METRIC_SPECS.spo2.unit,
           sleepingHr: METRIC_SPECS.sleepingHr.unit,
           hrvRmssd: METRIC_SPECS.hrvRmssd.unit,
+          weightKg: "kg",
+          weightKg7d: "kg",
         },
         baselinesAsOfLastDay: {
           restingHr: baselines.restingHr,
@@ -180,6 +182,8 @@ export function registerWellnessTools(server: McpServer, ctx: ToolContext): void
           sleepingHr: day.sleepingHr.value,
           hrvRmssd: day.hrvRmssd.value,
           steps: day.steps,
+          weightKg: day.weightKg,
+          weightKg7d: day.weightKg7d,
           outsideUsualRange: outside(day),
         })),
       };

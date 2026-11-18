@@ -7,6 +7,7 @@ import type { IntervalsClient, IntervalsWellness } from "../intervals/client.ts"
 import {
   isPlausible,
   METRIC_KEYS,
+  PLAUSIBLE_WEIGHT_KG,
   SOURCE_IDS,
   STORED_METRICS,
   type StoredMetric,
@@ -89,7 +90,7 @@ export function parseSourceOrder(text: string): SourceOrder {
     const metric = override.slice(0, equals).trim();
     if (!(STORED_METRICS as readonly string[]).includes(metric)) {
       throw new Error(
-        `WELLNESS_SOURCE_ORDER: ${JSON.stringify(metric)} is not a metric (${METRIC_KEYS.join(", ")}, steps, hrvSdnn)`,
+        `WELLNESS_SOURCE_ORDER: ${JSON.stringify(metric)} is not a metric (${METRIC_KEYS.join(", ")}, steps, hrvSdnn, weightKg)`,
       );
     }
     perMetric.set(
@@ -117,6 +118,7 @@ export function observationFromIntervals(day: IntervalsWellness): DailyObservati
   take("restingHr", day.restingHR, (n) => isPlausible("restingHr", n));
   take("hrvRmssd", day.hrv, (n) => isPlausible("hrvRmssd", n));
   take("hrvSdnn", day.hrvSDNN, (n) => n > 0 && n <= 500);
+  take("weightKg", day.weight, (n) => n >= PLAUSIBLE_WEIGHT_KG[0] && n <= PLAUSIBLE_WEIGHT_KG[1]);
   take("sleepSeconds", day.sleepSecs, (n) => isPlausible("sleepSeconds", n));
   take("spo2", day.spO2, (n) => isPlausible("spo2", n));
   take("respiratoryRate", day.respiration, (n) => isPlausible("respiratoryRate", n));

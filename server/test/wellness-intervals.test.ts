@@ -105,6 +105,7 @@ describe("pulling the wellness from intervals.icu", () => {
       respiration: 14.1,
       steps: 8123,
       avgSleepingHR: 47.5,
+      weight: 78.1,
       comments: "ignored",
     };
     const { app, services } = boot();
@@ -130,6 +131,7 @@ describe("pulling the wellness from intervals.icu", () => {
     expect(day.hrvRmssd).toMatchObject({ value: 61.5, source: "intervals" });
     expect(day.hrvSdnn).toBe(70.2);
     expect(day.steps).toBe(8123);
+    expect(day.weightKg).toBe(78.1);
     // intervals.icu has no bedtime: that comes from the watch only.
     expect(day.bedtimeMinutes.value).toBeNull();
   });
@@ -260,6 +262,7 @@ describe("pulling the wellness from intervals.icu", () => {
         respiration: 13.5,
         steps: 5000,
         avgSleepingHR: 46,
+        weight: 78.1,
       }),
     ).toEqual({
       date: "2026-11-17",
@@ -272,6 +275,7 @@ describe("pulling the wellness from intervals.icu", () => {
         respiratoryRate: 13.5,
         steps: 5000,
         sleepingHr: 46,
+        weightKg: 78.1,
       },
     });
     expect(observationFromIntervals({ id: "2026-11-17" }).values).toEqual({});

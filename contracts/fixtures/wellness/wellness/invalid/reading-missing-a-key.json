@@ -85,7 +85,9 @@
       "sleepStart": "2026-11-15T22:05:00Z",
       "sleepEnd": "2026-11-16T05:45:00Z",
       "steps": 8123,
-      "hrvSdnn": 71.5
+      "hrvSdnn": 71.5,
+      "weightKg": 78.4,
+      "weightKg7d": 78.6
     },
     {
       "date": "2026-11-17",
@@ -156,7 +158,9 @@
       "sleepStart": "2026-11-16T23:40:00Z",
       "sleepEnd": "2026-11-17T05:50:00Z",
       "steps": null,
-      "hrvSdnn": null
+      "hrvSdnn": null,
+      "weightKg": null,
+      "weightKg7d": null
     },
     {
       "date": "2026-11-18",
@@ -227,7 +231,9 @@
       "sleepStart": null,
       "sleepEnd": null,
       "steps": null,
-      "hrvSdnn": null
+      "hrvSdnn": null,
+      "weightKg": null,
+      "weightKg7d": null
     }
   ]
 }

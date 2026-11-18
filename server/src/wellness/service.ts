@@ -337,7 +337,9 @@ export function createWellness(options: WellnessOptions): WellnessService {
             date: item.startDate,
             durationSeconds: item.durationSeconds,
             load: item.load,
-            loadApproximate: item.loadApproximate,
+            // A heart-rate load is approximate by nature; the rides contract says so of every activity of the list. The
+            // detail's loadApproximate is finer: true when an estimate or a coverage under 80% was behind it.
+            loadApproximate: true,
             sport: item.type,
             averagePower: null,
             averageHeartRate: item.averageHeartRate,

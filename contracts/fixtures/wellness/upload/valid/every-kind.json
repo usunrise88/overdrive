@@ -104,6 +104,12 @@
       "id": "hrv-0001",
       "time": "2026-11-18T03:30:00Z",
       "ms": 62.5
+    },
+    {
+      "kind": "weight",
+      "id": "weight-0001",
+      "time": "2026-11-18T06:40:00Z",
+      "kg": 78.4
     }
   ],
   "device": "Synthetic phone"

@@ -19,6 +19,10 @@ export function describeProfile(profile: Profile) {
   return {
     ftp: profile.ftp,
     wPrimeKj: profile.wPrimeKj,
+    maxHeartRate: profile.maxHeartRate ?? null,
+    thresholdHeartRate: profile.thresholdHeartRate ?? null,
+    estimatedMaxHeartRate: profile.estimatedMaxHeartRate ?? null,
+    estimatedThresholdHeartRate: profile.estimatedThresholdHeartRate ?? null,
     zones: {
       upperPercentOfFtp: bounds,
       isDefault: bounds.every((bound, i) => bound === COGGAN_ZONE_UPPER_PERCENT[i]),
@@ -51,7 +55,10 @@ export function registerProfileTools(server: McpServer, ctx: ToolContext): void 
         "(Coggan's 55, 75, 90, 105, 120, 150 unless changed; zone 7 has no upper bound) with the zone ranges in watts worked out " +
         "from the FTP, minutes available on each weekday (null where unknown, 0 for a rest day), the rider's goals as short free-text " +
         "lines, and the physics constants the ride app uses for virtual speed (system mass in kg, CdA, Crr, air density, drivetrain " +
-        "efficiency). Also when it last changed. Use it before planning: workouts are written as fractions of FTP, so the FTP " +
+        "efficiency). Also the rider's maximum and threshold heart rate in bpm (null when not set) and the read-only estimates the " +
+        "rides give (estimatedMaxHeartRate: the highest heart rate in any ride; estimatedThresholdHeartRate: 95% of the best 20-minute " +
+        "average heart rate in any ride; null when the rides do not say), which scale the heart-rate load of workouts from the watch. " +
+        "Also when it last changed. Use it before planning: workouts are written as fractions of FTP, so the FTP " +
         "turns them into watts.",
       input: {},
     },
@@ -69,6 +76,8 @@ export function registerProfileTools(server: McpServer, ctx: ToolContext): void 
         "Changes parts of the rider's profile and returns the whole stored profile (as get_profile) and which parts changed. " +
         "Name only what should change; everything not named stays. ftp: watts (30 to 2000), null clears it. " +
         "wPrimeKj: the rider's W′ in kilojoules (1 to 100), used by the W′ balance with the FTP as critical power; null goes back to the default of 20 kJ. " +
+        "maxHeartRate (100 to 230) and thresholdHeartRate (80 to 220, below the maximum): whole bpm, null clears one; they scale the " +
+        "heart-rate load of the watch's workouts and take the place of the estimates from the rides. " +
         "zones: all six upper bounds in whole percent of FTP, strictly increasing, or null to go back to Coggan's. " +
         "weeklyAvailability: minutes (0 to 1440) for the weekdays named (mon to sun), null makes a day unknown again. " +
         "goals: the complete new list of short lines (at most 10, each at most 200 characters), replacing the old one; [] clears it. " +
@@ -87,6 +96,20 @@ export function registerProfileTools(server: McpServer, ctx: ToolContext): void 
           .nullable()
           .optional()
           .describe("W′ in kilojoules, 1 to 100, or null for the default of 20."),
+        maxHeartRate: z
+          .number()
+          .int()
+          .nullable()
+          .optional()
+          .describe("Maximum heart rate in bpm, 100 to 230, or null to clear."),
+        thresholdHeartRate: z
+          .number()
+          .int()
+          .nullable()
+          .optional()
+          .describe(
+            "Threshold heart rate in bpm, 80 to 220 and below the maximum, or null to clear.",
+          ),
         zones: z
           .strictObject({
             upperPercentOfFtp: z

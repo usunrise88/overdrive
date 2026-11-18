@@ -30,6 +30,7 @@ export const WELLNESS_RECORD_KINDS = [
   "steps",
   "exerciseSession",
   "heartRateVariabilityRmssd",
+  "weight",
 ] as const;
 
 export type WellnessRecordKind = (typeof WELLNESS_RECORD_KINDS)[number];
@@ -116,6 +117,13 @@ export interface HeartRateVariabilityRmssdRecord extends RecordBase {
   ms: number;
 }
 
+/** WeightRecord: body weight in kilograms at a time (spec §12.5). */
+export interface WeightRecord extends RecordBase {
+  kind: "weight";
+  time: string;
+  kg: number;
+}
+
 export type WellnessRecord =
   | RestingHeartRateRecord
   | HeartRateSamplesRecord
@@ -124,7 +132,8 @@ export type WellnessRecord =
   | OxygenSaturationRecord
   | StepsRecord
   | ExerciseSessionRecord
-  | HeartRateVariabilityRmssdRecord;
+  | HeartRateVariabilityRmssdRecord
+  | WeightRecord;
 
 /** The body of `POST /v1/wellness`. */
 export interface WellnessUpload {
@@ -192,6 +201,10 @@ export interface WellnessDay {
   sleepEnd: string | null;
   steps: number | null;
   hrvSdnn: number | null;
+  /** The day's body weight in kilograms (spec §12.5). */
+  weightKg: number | null;
+  /** The mean of the daily weights of the seven days up to and including this one; null with no weighing in them. */
+  weightKg7d: number | null;
 }
 
 export interface UsualRange {
@@ -411,6 +424,7 @@ function timesOf(record: WellnessRecord): { path: string; value: string }[] {
     case "respiratoryRate":
     case "oxygenSaturation":
     case "heartRateVariabilityRmssd":
+    case "weight":
       add("/time", record.time);
       break;
     case "heartRateSamples":

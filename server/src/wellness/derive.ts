@@ -1,7 +1,7 @@
 import { addDaysToIsoDate, isoDateToEpochDay } from "@overdrive/contracts";
 import { localDate } from "../time.ts";
 import { localParts, zonedInstant } from "../zoned.ts";
-import { isPlausible, type StoredMetric } from "./metrics.ts";
+import { isPlausible, PLAUSIBLE_WEIGHT_KG, type StoredMetric } from "./metrics.ts";
 import type { Rec } from "./records.ts";
 
 /**
@@ -24,6 +24,8 @@ import type { Rec } from "./records.ts";
  *   {@link SLEEP_HR_MAX_MEAN_GAP_MINUTES} minutes or better on average over the night. Otherwise none:
  *   a mean of a handful of samples would be a guess.
  * - **Steps.** The sum of the records that start on the local date.
+ * - **Weight.** The mean of the plausible weighings of the local date (spec §12.5); the 7-day average is worked out when the
+ *   days are read (`series.ts`). Nothing in the service changes because of it.
  *
  * A reading outside the plausible range of its metric (`metrics.ts`) is a sensor glitch and is ignored.
  */
@@ -172,6 +174,16 @@ export function deriveDay(date: string, records: readonly Rec[], timezone: strin
       r.kind === "steps" && localDate(r.startMs, timezone) === date,
   );
   if (steps.length > 0) derived.steps = steps.reduce((sum, r) => sum + r.count, 0);
+
+  const weighings = records.flatMap((r) =>
+    r.kind === "weight" &&
+    localDate(r.tMs, timezone) === date &&
+    r.kg >= PLAUSIBLE_WEIGHT_KG[0] &&
+    r.kg <= PLAUSIBLE_WEIGHT_KG[1]
+      ? [r.kg]
+      : [],
+  );
+  if (weighings.length > 0) derived.weightKg = mean(weighings);
 
   return derived;
 }

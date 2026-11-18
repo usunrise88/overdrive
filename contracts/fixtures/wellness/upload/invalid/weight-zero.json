@@ -1,0 +1,11 @@
+{
+  "source": "healthconnect",
+  "records": [
+    {
+      "kind": "weight",
+      "id": "weight-0001",
+      "time": "2026-11-18T06:40:00Z",
+      "kg": 0
+    }
+  ]
+}

@@ -29,7 +29,8 @@
           { "$ref": "#/$defs/oxygenSaturation" },
           { "$ref": "#/$defs/steps" },
           { "$ref": "#/$defs/exerciseSession" },
-          { "$ref": "#/$defs/heartRateVariabilityRmssd" }
+          { "$ref": "#/$defs/heartRateVariabilityRmssd" },
+          { "$ref": "#/$defs/weight" }
         ]
       }
     }
@@ -213,6 +214,20 @@
         "time": { "$ref": "#/$defs/instant" },
         "zoneOffsetSeconds": { "$ref": "#/$defs/zoneOffsetSeconds" },
         "ms": { "type": "number", "exclusiveMinimum": 0, "maximum": 1000 }
+      }
+    },
+    "weight": {
+      "description": "WeightRecord: body weight in kilograms at a time (spec §12.5). Stored and shown as a trend (the daily figure and its 7-day average); the service does not change anything because of it.",
+      "type": "object",
+      "required": ["kind", "id", "time", "kg"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "weight" },
+        "id": { "$ref": "#/$defs/id" },
+        "lastModified": { "$ref": "#/$defs/lastModified" },
+        "time": { "$ref": "#/$defs/instant" },
+        "zoneOffsetSeconds": { "$ref": "#/$defs/zoneOffsetSeconds" },
+        "kg": { "type": "number", "exclusiveMinimum": 0, "maximum": 1000 }
       }
     }
   }

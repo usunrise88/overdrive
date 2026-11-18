@@ -80,7 +80,9 @@
       "sleepStart": null,
       "sleepEnd": null,
       "steps": null,
-      "hrvSdnn": null
+      "hrvSdnn": null,
+      "weightKg": null,
+      "weightKg7d": null
     }
   ]
 }

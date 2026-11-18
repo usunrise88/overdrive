@@ -94,6 +94,8 @@ export const intervalsWellnessSchema = z.looseObject({
   respiration: z.number().nullish(),
   steps: z.number().nullish(),
   avgSleepingHR: z.number().nullish(),
+  /** Body weight in kilograms. */
+  weight: z.number().nullish(),
 });
 
 export type IntervalsWellness = z.infer<typeof intervalsWellnessSchema>;

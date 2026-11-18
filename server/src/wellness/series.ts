@@ -15,6 +15,7 @@ import {
   type MetricSpec,
   roundTo,
   type StoredMetric,
+  WEIGHT_AVERAGE_DAYS,
   type WellnessSettings,
 } from "./metrics.ts";
 
@@ -135,6 +136,23 @@ export function nightsLogged(table: DailyTable, date: string, settings: Wellness
   return nights;
 }
 
+/**
+ * The mean of the daily body weights of the seven days up to and including `date`, or null when none of them has a weighing. Days
+ * without a weighing are left out of the mean, not counted as zero (spec §12.5: a trend, not a measurement).
+ */
+export function weightAverage(
+  table: ReadonlyMap<string, DailyValue> | undefined,
+  date: string,
+): number | null {
+  if (table === undefined) return null;
+  const values: number[] = [];
+  for (let back = 0; back < WEIGHT_AVERAGE_DAYS; back++) {
+    const value = table.get(addDaysToIsoDate(date, -back))?.value;
+    if (value !== undefined) values.push(value);
+  }
+  return values.length === 0 ? null : values.reduce((a, b) => a + b, 0) / values.length;
+}
+
 const asInstant = (ms: number | undefined): string | null =>
   ms === undefined ? null : new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
 
@@ -163,6 +181,8 @@ export function buildDays(
       readingOf(tracks.get(key)?.get(date), METRIC_SPECS[key]);
     const steps = table.steps?.get(date)?.value;
     const sdnn = table.hrvSdnn?.get(date)?.value;
+    const weight = table.weightKg?.get(date)?.value;
+    const weight7d = weightAverage(table.weightKg, date);
     days.push({
       date,
       restingHr: reading("restingHr"),
@@ -177,6 +197,8 @@ export function buildDays(
       sleepEnd: asInstant(table.sleepEndMs?.get(date)?.value),
       steps: steps === undefined ? null : Math.round(steps),
       hrvSdnn: sdnn === undefined ? null : roundTo(sdnn, 1),
+      weightKg: weight === undefined ? null : roundTo(weight, 1),
+      weightKg7d: weight7d === null ? null : roundTo(weight7d, 1),
     });
   }
   const usualOf = (key: "bedtimeMinutes" | "wakeMinutes"): UsualRange | null => {

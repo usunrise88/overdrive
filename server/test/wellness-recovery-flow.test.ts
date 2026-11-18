@@ -7,7 +7,7 @@ import {
 } from "@overdrive/contracts";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "../src/db.ts";
-import { expectError } from "./helpers/app.ts";
+import { bearer, expectError } from "./helpers/app.ts";
 import { clearWellness, openMigratedTestDb } from "./helpers/db.ts";
 import { type FakeIntervals, startFakeIntervals } from "./helpers/fake-intervals.ts";
 import {
@@ -19,10 +19,12 @@ import {
 } from "./helpers/mcp.ts";
 import { alternating, constant, planted, TODAY } from "./helpers/wellness.ts";
 import {
+  batch,
   get,
   history,
   type NightPatterns,
   nightRecords,
+  post,
   uploadAll,
 } from "./helpers/wellness-data.ts";
 
@@ -237,6 +239,100 @@ describe("upload, daily figures, recovery: the whole path over 60 synthetic days
     expect(answer.facts.map((f) => f.metric)).toContain("hrvRmssd");
     const fact = answer.facts.find((f) => f.metric === "hrvRmssd");
     expect(fact).toMatchObject({ unit: "ms", deviation: "below" });
+  });
+});
+
+describe("body weight (spec §12.5)", () => {
+  const weight = (id: string, time: string, kg: number) => ({
+    kind: "weight" as const,
+    id,
+    time,
+    kg,
+  });
+  const profileOf = async () =>
+    (await h.app.inject({ method: "GET", url: "/v1/profile", headers: bearer() })).json();
+
+  it("keeps the day's weight and a 7-day average, and the days between weighings share the average", async () => {
+    // 78.0 on the 12th, two weighings on the 14th (78.4 and 78.8), one on the 17th (77.0).
+    const res = await post(
+      h.app,
+      batch(
+        weight("w-12", "2026-11-12T06:40:00Z", 78),
+        weight("w-14a", "2026-11-14T06:40:00Z", 78.4),
+        weight("w-14b", "2026-11-14T19:40:00Z", 78.8),
+        weight("w-17", "2026-11-17T06:40:00Z", 77),
+      ),
+    );
+    expect(res.json()).toMatchObject({ accepted: 4, byType: { weight: { accepted: 4 } } });
+    const answer = (
+      await get(h.app, "/v1/wellness?from=2026-11-11&to=2026-11-18")
+    ).json() as WellnessResponse;
+    expect(validateWellnessResponse(answer)).toMatchObject({ ok: true });
+    const byDate = Object.fromEntries(answer.days.map((d) => [d.date, [d.weightKg, d.weightKg7d]]));
+    expect(byDate).toEqual({
+      "2026-11-11": [null, null],
+      // The day's weight is the mean of its weighings; the average is of the days that have one, in the 7 days up to the day.
+      "2026-11-12": [78, 78],
+      "2026-11-13": [null, 78],
+      "2026-11-14": [78.6, 78.3],
+      "2026-11-15": [null, 78.3],
+      "2026-11-16": [null, 78.3],
+      "2026-11-17": [77, 77.9],
+      // From the 12th to the 18th are 7 days: the 12th is still in.
+      "2026-11-18": [null, 77.9],
+    });
+  });
+
+  it("drops a weighing that is not a body weight", async () => {
+    await post(
+      h.app,
+      batch(weight("slip", "2026-11-17T06:40:00Z", 7.8), weight("ok", "2026-11-17T06:41:00Z", 78)),
+    );
+    const day = (
+      (await get(h.app, "/v1/wellness?from=2026-11-17&to=2026-11-17")).json() as WellnessResponse
+    ).days[0];
+    expect(day?.weightKg).toBe(78);
+  });
+
+  it("is idempotent, and a corrected weighing replaces the old one", async () => {
+    await post(
+      h.app,
+      batch({ ...weight("w", "2026-11-17T06:40:00Z", 78), lastModified: "2026-11-17T06:41:00Z" }),
+    );
+    const again = await post(
+      h.app,
+      batch({ ...weight("w", "2026-11-17T06:40:00Z", 78), lastModified: "2026-11-17T06:41:00Z" }),
+    );
+    expect(again.json()).toMatchObject({ accepted: 0, duplicates: 1 });
+    await post(
+      h.app,
+      batch({ ...weight("w", "2026-11-17T06:40:00Z", 79.2), lastModified: "2026-11-17T08:00:00Z" }),
+    );
+    const day = (
+      (await get(h.app, "/v1/wellness?from=2026-11-17&to=2026-11-17")).json() as WellnessResponse
+    ).days[0];
+    expect(day?.weightKg).toBe(79.2);
+  });
+
+  it("changes nothing else: the profile, with its physics, is as it was", async () => {
+    const before = await profileOf();
+    await post(h.app, batch(weight("w", "2026-11-17T06:40:00Z", 91.5)));
+    expect(await profileOf()).toEqual(before);
+    expect((before as { physics: { systemMassKg: number } }).physics.systemMassKg).toBe(80);
+  });
+
+  it("is told to the agent: get_wellness has the weight and its trend", async () => {
+    await post(
+      h.app,
+      batch(weight("a", "2026-11-17T06:40:00Z", 78), weight("b", "2026-11-18T06:40:00Z", 79)),
+    );
+    const { json } = await mcp("get_wellness", { from: "2026-11-17", to: "2026-11-18" });
+    const answer = json as { units: Record<string, string>; days: Record<string, unknown>[] };
+    expect(answer.units.weightKg).toBe("kg");
+    expect(answer.days).toMatchObject([
+      { date: "2026-11-17", weightKg: 78, weightKg7d: 78 },
+      { date: "2026-11-18", weightKg: 79, weightKg7d: 78.5 },
+    ]);
   });
 });
 

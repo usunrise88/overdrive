@@ -138,7 +138,7 @@ describe("wellness upload", () => {
     ).toBe(true);
   });
 
-  it("knows the eight kinds, and the schema defines exactly those", () => {
+  it("knows the nine kinds, and the schema defines exactly those", () => {
     const schema = JSON.parse(
       readFileSync(new URL("../schema/wellness-upload.schema.json", import.meta.url), "utf8"),
     ) as { properties: { records: { items: { oneOf: { $ref: string }[] } } } };

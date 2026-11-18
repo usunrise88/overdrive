@@ -20,7 +20,8 @@
         "oxygenSaturation": { "$ref": "#/$defs/counts" },
         "steps": { "$ref": "#/$defs/counts" },
         "exerciseSession": { "$ref": "#/$defs/counts" },
-        "heartRateVariabilityRmssd": { "$ref": "#/$defs/counts" }
+        "heartRateVariabilityRmssd": { "$ref": "#/$defs/counts" },
+        "weight": { "$ref": "#/$defs/counts" }
       }
     },
     "generatedAt": {

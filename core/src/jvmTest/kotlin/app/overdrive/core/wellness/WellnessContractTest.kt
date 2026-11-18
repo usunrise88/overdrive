@@ -106,7 +106,7 @@ class WellnessContractTest {
     fun `every kind of record is in the every-kind fixture`() {
         val upload =
             WellnessApiJson.decodeUpload(File(contracts, "fixtures/wellness/upload/valid/every-kind.json").readText())
-        assertEquals(8, upload.records.size)
+        assertEquals(9, upload.records.size)
         assertEquals(
             listOf(
                 RestingHeartRateRecord::class,
@@ -117,6 +117,7 @@ class WellnessContractTest {
                 StepsRecord::class,
                 ExerciseSessionRecord::class,
                 HeartRateVariabilityRmssdRecord::class,
+                WeightRecord::class,
             ),
             upload.records.map { it::class },
         )
@@ -183,6 +184,9 @@ class WellnessContractTest {
         assertEquals(WellnessSourceId.INTERVALS, response.days[0].respiratoryRate.source)
         assertNotNull(response.usual.bedtime)
         assertEquals(-80.0, response.usual.bedtime.low)
+        assertEquals(78.4, response.days[0].weightKg)
+        assertEquals(78.6, response.days[0].weightKg7d)
+        assertNull(response.days[1].weightKg)
     }
 
     @Test

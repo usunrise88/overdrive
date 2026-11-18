@@ -37,7 +37,8 @@ export type Rec =
       /** The samples the phone attached to the session; null when it attached none. */
       samples: HrSample[] | null;
     }
-  | { kind: "heartRateVariabilityRmssd"; id: string; tMs: number; ms: number };
+  | { kind: "heartRateVariabilityRmssd"; id: string; tMs: number; ms: number }
+  | { kind: "weight"; id: string; tMs: number; kg: number };
 
 /** The compact payload as stored; every key is short on purpose. */
 type Payload = Record<string, unknown>;
@@ -78,6 +79,10 @@ export function toStored(record: WellnessRecord): Stored {
     case "heartRateVariabilityRmssd": {
       const t = ms(record.time);
       return { kind: record.kind, startMs: t, endMs: t, payload: { t, ms: record.ms } };
+    }
+    case "weight": {
+      const t = ms(record.time);
+      return { kind: record.kind, startMs: t, endMs: t, payload: { t, kg: record.kg } };
     }
     case "steps": {
       const start = ms(record.start);
@@ -133,6 +138,8 @@ export function fromStored(kind: string, id: string, payload: Payload): Rec | nu
       return { kind, id, tMs: p.t as number, percent: p.percent as number };
     case "heartRateVariabilityRmssd":
       return { kind, id, tMs: p.t as number, ms: p.ms as number };
+    case "weight":
+      return { kind, id, tMs: p.t as number, kg: p.kg as number };
     case "steps":
       return { kind, id, startMs: p.s as number, endMs: p.e as number, count: p.count as number };
     case "heartRateSamples":

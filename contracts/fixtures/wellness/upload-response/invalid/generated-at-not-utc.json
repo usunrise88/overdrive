@@ -22,6 +22,11 @@
       "accepted": 1,
       "duplicates": 0,
       "rejected": 1
+    },
+    "weight": {
+      "accepted": 0,
+      "duplicates": 0,
+      "rejected": 0
     }
   },
   "generatedAt": "2026-11-18T08:40:12+01:00"

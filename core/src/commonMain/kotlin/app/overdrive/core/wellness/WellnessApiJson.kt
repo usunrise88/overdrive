@@ -33,6 +33,7 @@ public object WellnessApiJson {
             "steps",
             "exerciseSession",
             "heartRateVariabilityRmssd",
+            "weight",
         )
 
     /** For reading: every key must be known and present. */
@@ -46,7 +47,7 @@ public object WellnessApiJson {
             encodeDefaults = true
         }
 
-    private val uploadNumbers = setOf("bpm", "rate", "percent", "count", "ms", "zoneOffsetSeconds")
+    private val uploadNumbers = setOf("bpm", "rate", "percent", "count", "ms", "kg", "zoneOffsetSeconds")
     private val uploadResponseNumbers = setOf("accepted", "duplicates", "rejected")
     private val wellnessNumbers =
         setOf(
@@ -58,6 +59,8 @@ public object WellnessApiJson {
             "high",
             "steps",
             "hrvSdnn",
+            "weightKg",
+            "weightKg7d",
             "nightsLogged",
             "nightsNeeded",
             "baselineDays",

@@ -6,8 +6,14 @@ import type { RecoveryUnit, WellnessMetric, WellnessSourceId } from "@overdrive/
  * rules know about a metric is in this table, so a threshold is changed in one place.
  */
 
-/** What is kept per day and source: the eight metrics with a baseline and four that only travel along. */
-export type StoredMetric = WellnessMetric | "hrvSdnn" | "steps" | "sleepStartMs" | "sleepEndMs";
+/** What is kept per day and source: the eight metrics with a baseline and five that only travel along. */
+export type StoredMetric =
+  | WellnessMetric
+  | "hrvSdnn"
+  | "steps"
+  | "sleepStartMs"
+  | "sleepEndMs"
+  | "weightKg";
 
 export const STORED_METRICS: readonly StoredMetric[] = [
   "restingHr",
@@ -22,7 +28,14 @@ export const STORED_METRICS: readonly StoredMetric[] = [
   "steps",
   "sleepStartMs",
   "sleepEndMs",
+  "weightKg",
 ];
+
+/** A weighing outside this is a typing slip or a broken scale, not a body weight: ignored when the daily figure is worked out. */
+export const PLAUSIBLE_WEIGHT_KG: readonly [number, number] = [20, 400];
+
+/** The weight trend is the mean of the daily weights of this many days, the day itself included (spec §12.5). */
+export const WEIGHT_AVERAGE_DAYS = 7;
 
 export const SOURCE_IDS: readonly WellnessSourceId[] = ["healthconnect", "intervals"];
 

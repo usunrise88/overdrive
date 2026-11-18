@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Overdrive wellness response",
-  "description": "The answer to GET /v1/wellness?from=YYYY-MM-DD&to=YYYY-MM-DD (spec §6.4, §8.3, ADR 0023): one entry per local day from from to to (both included, at most 186 days, otherwise 400 invalid_range), each with the daily wellness figures and, for every metric, the personal baseline in force that day. A night belongs to the date of the morning it ends. A Reading is the day's value with where it came from (healthconnect or intervals, by the configured preference), the usual range that day (baselineLow to baselineHigh: the mean of the metric over the 42 days before that day, minus and plus one standard deviation, shown only when at least 14 readings stand behind it, otherwise null), deviation (inside, above or below that range; null without a value or a range) and streak (how many days in a row up to and including this one the metric has been outside its range on the same side; 0 inside the range or without a value or a range). Units: restingHr and sleepingHr in bpm, sleepSeconds in seconds, bedtimeMinutes and wakeMinutes in minutes from local midnight (a bedtime before midnight is negative: 23:05 is -55), respiratoryRate in breaths per minute, spo2 in percent, hrvRmssd in milliseconds. sleepStart and sleepEnd are the night's first bedtime and last wake-up as UTC instants. usual is the usual bedtime and wake-up range as of the last day of the answer. nightsLogged counts the days with at least one reading in the 42 days before the last day, nightsNeeded (14) is what a recovery verdict needs. stale is true when a source the service pulls from (intervals.icu) failed at its last read. Rules a schema cannot state, checked by every implementation: from is not after to, the range spans at most 186 days, the days are every date from from to to in order, a Reading without a value has no source, deviation or streak, baselineLow and baselineHigh are both null or both set and low is not above high.",
+  "description": "The answer to GET /v1/wellness?from=YYYY-MM-DD&to=YYYY-MM-DD (spec §6.4, §8.3, ADR 0023): one entry per local day from from to to (both included, at most 186 days, otherwise 400 invalid_range), each with the daily wellness figures and, for every metric, the personal baseline in force that day. A night belongs to the date of the morning it ends. A Reading is the day's value with where it came from (healthconnect or intervals, by the configured preference), the usual range that day (baselineLow to baselineHigh: the mean of the metric over the 42 days before that day, minus and plus one standard deviation, shown only when at least 14 readings stand behind it, otherwise null), deviation (inside, above or below that range; null without a value or a range) and streak (how many days in a row up to and including this one the metric has been outside its range on the same side; 0 inside the range or without a value or a range). Units: restingHr and sleepingHr in bpm, sleepSeconds in seconds, bedtimeMinutes and wakeMinutes in minutes from local midnight (a bedtime before midnight is negative: 23:05 is -55), respiratoryRate in breaths per minute, spo2 in percent, hrvRmssd in milliseconds. sleepStart and sleepEnd are the night's first bedtime and last wake-up as UTC instants. weightKg is the day's body weight in kilograms (the mean of the day's weighings, from Health Connect or intervals.icu) and weightKg7d the mean of the daily weights of the seven days up to and including this one (null when none of them has a weighing): a trend for people and the planning agent, which changes nothing in the service (spec §12.5). usual is the usual bedtime and wake-up range as of the last day of the answer. nightsLogged counts the days with at least one reading in the 42 days before the last day, nightsNeeded (14) is what a recovery verdict needs. stale is true when a source the service pulls from (intervals.icu) failed at its last read. Rules a schema cannot state, checked by every implementation: from is not after to, the range spans at most 186 days, the days are every date from from to to in order, a Reading without a value has no source, deviation or streak, baselineLow and baselineHigh are both null or both set and low is not above high.",
   "type": "object",
   "required": [
     "from",
@@ -81,7 +81,9 @@
         "sleepStart",
         "sleepEnd",
         "steps",
-        "hrvSdnn"
+        "hrvSdnn",
+        "weightKg",
+        "weightKg7d"
       ],
       "additionalProperties": false,
       "properties": {
@@ -97,7 +99,9 @@
         "sleepStart": { "oneOf": [{ "$ref": "#/$defs/utcInstant" }, { "type": "null" }] },
         "sleepEnd": { "oneOf": [{ "$ref": "#/$defs/utcInstant" }, { "type": "null" }] },
         "steps": { "type": ["integer", "null"], "minimum": 0 },
-        "hrvSdnn": { "type": ["number", "null"] }
+        "hrvSdnn": { "type": ["number", "null"] },
+        "weightKg": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "weightKg7d": { "type": ["number", "null"], "exclusiveMinimum": 0 }
       }
     }
   }

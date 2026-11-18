@@ -279,7 +279,7 @@ describe("POST /v1/wellness", () => {
     it("refuses an unknown kind, a repeated id and a source that is not Health Connect", async () => {
       expect(
         expectError(
-          await post(h.app, { source: "healthconnect", records: [{ kind: "weight", id: "x" }] }),
+          await post(h.app, { source: "healthconnect", records: [{ kind: "height", id: "x" }] }),
           "invalid_record",
         ).message,
       ).toContain("/records/0/kind");

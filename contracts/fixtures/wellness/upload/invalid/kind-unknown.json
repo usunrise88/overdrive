@@ -2,7 +2,7 @@
   "source": "healthconnect",
   "records": [
     {
-      "kind": "weight",
+      "kind": "height",
       "id": "rhr-0001",
       "time": "2026-11-18T06:30:00Z",
       "bpm": 52
