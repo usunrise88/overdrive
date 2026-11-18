@@ -58,6 +58,7 @@ class AppContainerPlanTest {
     private val directory = RideFixtures.directory()
     private val extra = RideFixtures.directory()
     private val containers = mutableListOf<AppContainer>()
+    private val names = mutableMapOf<AppContainer, String>()
     private val worldScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val service = LocalService()
     private val today = "2026-11-18"
@@ -83,7 +84,64 @@ class AppContainerPlanTest {
             planFile = File(extra, "plan/workouts"),
             today = { today },
             syncSettleMillis = 50,
-        ).also { containers += it }
+        ).also {
+            containers += it
+            names[it] = name
+        }
+
+    /**
+     * What was going on when a wait ran out, for a CI log that has nothing else to go on: the plan's state and the settings of
+     * each container, what the service saw, the files on disk and what the default dispatcher's threads were doing. Never the
+     * token or the address.
+     */
+    private fun diagnostics(): String =
+        buildString {
+            appendLine()
+            appendLine(
+                "service: plan requests=${service.planRequests.size} ${service.planRequests.map { it.query }}, " +
+                    "ride requests=${service.received.size}, down=${service.down}, planStatus=${service.planStatus}",
+            )
+            for (c in containers) {
+                val state = c.plan.state.value
+                val now = c.settings.value
+                appendLine(
+                    "container ${names[c]}: visible=${state.visible} loaded=${state.loaded} stale=${state.stale} " +
+                        "refreshing=${state.refreshing} problem=${state.problem} workouts=${state.workouts.map {
+                            it.id
+                        }} " +
+                        "settings: address set=${now.syncUrl.isNotEmpty()} token set=${!now.syncToken.isEmpty}",
+                )
+            }
+            val datastore = File(context.filesDir, "datastore")
+            appendLine(
+                "datastore files: " +
+                    datastore.listFiles().orEmpty().sortedBy { it.name }.joinToString { "${it.name}=${it.length()}" },
+            )
+            val plan = File(extra, "plan/workouts")
+            appendLine("plan cache: exists=${plan.isFile} size=${if (plan.isFile) plan.length() else -1}")
+            val workers = Thread.getAllStackTraces().entries.filter { it.key.name.startsWith("DefaultDispatcher") }
+            appendLine(
+                "default dispatcher threads: ${workers.size}, " +
+                    workers.groupingBy { it.key.state }.eachCount().entries.joinToString { "${it.key}=${it.value}" },
+            )
+            for ((thread, stack) in workers.filter { it.key.state == Thread.State.RUNNABLE }.take(6)) {
+                appendLine("  ${thread.name} RUNNABLE at ${stack.take(3).joinToString(" < ")}")
+            }
+        }
+
+    /** The ids of the planned workouts in the cache file as it reads now, or null while it is missing or not whole. */
+    private fun cachedIds(): List<String>? =
+        try {
+            File(extra, "plan/workouts")
+                .takeIf { it.isFile }
+                ?.readText()
+                ?.let(PlanCacheFormat::decode)
+                ?.response
+                ?.workouts
+                ?.map { it.id }
+        } catch (e: java.io.IOException) {
+            null
+        }
 
     private fun await(
         what: String,
@@ -95,7 +153,7 @@ class AppContainerPlanTest {
             if (condition()) return
             Thread.sleep(10)
         }
-        throw AssertionError("Timed out waiting for: $what")
+        throw AssertionError("Timed out waiting for: $what" + diagnostics())
     }
 
     private fun AppContainer.configure(
@@ -172,7 +230,7 @@ class AppContainerPlanTest {
         assertTrue(c.planState.visible && c.planState.loaded)
         assertFalse(c.planState.stale)
         assertEquals("2026-11-18T06:30:00Z", c.planState.generatedAt)
-        await("kept on disk") { File(extra, "plan/workouts").isFile }
+        await("kept on disk") { cachedIds() == listOf("icu-1", "icu-2") }
 
         // The Ready screen opening within the minute asks nothing more; the rider's refresh does (it is dropped while one
         // is still finishing, so it is pressed until it has asked).
@@ -190,6 +248,9 @@ class AppContainerPlanTest {
         val first = container("plan-first")
         first.configure()
         await("the list is there") { first.planState.workouts.isNotEmpty() }
+        // The list is shown as soon as the answer is in, and written to disk a moment after (on a slow disk, a long moment):
+        // closing the container before then would cancel that write, and the restart would have nothing to read.
+        await("the answer is on disk") { cachedIds() == listOf("icu-1") }
         await("the settings are on disk") { File(context.filesDir, "datastore/plan-first.preferences_pb").isFile }
         first.close()
         containers.remove(first)
@@ -198,7 +259,7 @@ class AppContainerPlanTest {
 
         service.down = true
         val second = container("plan-second")
-        await("the cached list is shown before any answer") {
+        await("the cached list is shown") {
             second.planState.visible && second.planState.workouts.map { it.id } == listOf("icu-1")
         }
         await(
@@ -221,9 +282,7 @@ class AppContainerPlanTest {
         val c = container("plan-damaged")
         c.configure()
         await("the list is there") { c.planState.workouts.map { it.id } == listOf("icu-1") }
-        await("the cache is rewritten whole, so it reads again") {
-            PlanCacheFormat.decode(file.readText())?.response?.workouts?.map { it.id } == listOf("icu-1")
-        }
+        await("the cache is rewritten whole, so it reads again") { cachedIds() == listOf("icu-1") }
         assertFalse(c.planState.stale)
     }
 
@@ -288,7 +347,7 @@ class AppContainerPlanTest {
             runBlocking { c.plan.refresh(PlanRefresh.REQUESTED) }
             c.planState.workouts.isNotEmpty()
         }
-        await("and is kept") { File(extra, "plan/workouts").isFile }
+        await("and is kept") { cachedIds() == listOf("icu-1") }
         for (line in ShadowLog.getLogs()) {
             assertFalse("a log line holds the token: ${line.msg}", line.msg.contains(token))
             assertFalse("a log line holds the address: ${line.msg}", line.msg.contains(service.baseUrl))
