@@ -35,7 +35,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
       - run: ./gradlew check
         working-directory: core
 
@@ -48,7 +48,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
       # assembleRelease (unsigned) catches R8 problems before a tag does.
       - run: ./gradlew check assembleDebug assembleRelease
         working-directory: android
