@@ -71,9 +71,9 @@ public data class PlanState(
  * - **What is asked.** `from` today to `to` today plus 13 days (the service caches a fortnight, spec §5.1), in the tablet's
  *   local dates; the address and token come from [config], read at every request, so a change in Settings needs no restart.
  * - **When.** [PlanRefresh.START] and [PlanRefresh.REQUESTED] always ask; [PlanRefresh.SCREEN_OPENED] asks only when the last
- *   request was at least a minute ago; [PlanRefresh.SETTINGS_CHANGED] always asks. One request at a time: a refresh that
- *   arrives during one is dropped, except a settings change, which is asked again once the one under way is done (it was
- *   made with the old address or token).
+ *   request was at least a minute ago; [PlanRefresh.SETTINGS_CHANGED] asks unless the last request was made with these very
+ *   address and token (then nothing changed). One request at a time: a refresh that arrives during one is dropped, except a
+ *   settings change, which is asked again once the one under way is done (it was made with the old address or token).
  * - **Offline.** A failed request keeps the last good list and says so ([PlanState.problem], [PlanState.stale]); the cache is
  *   read by [load] before the first request, so the list is there with no network and after a restart. A damaged cache reads as
  *   no cache. A cache written for another address is not used.
@@ -114,6 +114,9 @@ public class PlanRepository(
     private val running = Mutex()
     private val askAgain = MutableStateFlow(false)
 
+    /** The address and token of the last request that got an outcome (an answer or no answer); not one that was cancelled. */
+    private val lastAsked = MutableStateFlow<SyncConfig?>(null)
+
     // Touched only while holding [running].
     private var rejected: SyncConfig? = null
     private var lastAttemptAt: Long? = null
@@ -139,25 +142,42 @@ public class PlanRepository(
     }
 
     /**
-     * The address or token in Settings changed: re-reads them for [state] (a section that no longer has a service disappears)
-     * and forgets the last problem, which was about the old ones. The refresh that follows asks again.
+     * The address or token in Settings were read or changed: re-reads them for [state] (a section that no longer has a service
+     * disappears) and forgets the last problem when it was about other settings than these. The refresh that follows asks again.
      */
     public fun settingsChanged() {
-        inner.update { Inner(known = it.known, problem = null, refreshing = it.refreshing) }
+        val aboutThese = config() == lastAsked.value
+        inner.update {
+            Inner(
+                known = it.known,
+                problem = if (aboutThese) it.problem else null,
+                refreshing = it.refreshing,
+            )
+        }
         publish()
     }
 
-    /** Asks the service for the plan if [why] allows it (see the class). Returns when the request is done; never throws for a failed one. */
+    /**
+     * Asks the service for the plan if [why] allows it (see the class). Returns when the request is done; never throws for a
+     * failed one.
+     *
+     * **A settings change is never lost.** It is written down first ([askAgain]) and only then is the lock tried, and whoever
+     * lets go of the lock looks at it once more: a change that arrives while a request is under way, or in the instant between
+     * that request's last look and its letting go, is made by the holder or by whoever takes the lock next.
+     */
     public suspend fun refresh(why: PlanRefresh) {
-        if (!running.tryLock()) {
-            if (why == PlanRefresh.SETTINGS_CHANGED) askAgain.value = true
-            return
-        }
-        try {
-            attempt(why)
-            while (askAgain.compareAndSet(true, false)) attempt(PlanRefresh.SETTINGS_CHANGED)
-        } finally {
-            running.unlock()
+        if (why == PlanRefresh.SETTINGS_CHANGED) askAgain.value = true
+        var pending: PlanRefresh? = if (why == PlanRefresh.SETTINGS_CHANGED) null else why
+        while (true) {
+            if (!running.tryLock()) return
+            try {
+                pending?.let { attempt(it) }
+                pending = null
+                while (askAgain.compareAndSet(true, false)) attempt(PlanRefresh.SETTINGS_CHANGED)
+            } finally {
+                running.unlock()
+            }
+            if (!askAgain.value) return
         }
     }
 
@@ -165,6 +185,12 @@ public class PlanRepository(
         val settings = config()
         if (!settings.isConfigured) {
             setInner(problem = null, refreshing = false)
+            return
+        }
+        // The settings are the ones the last request was made with: they did not change, so there is nothing to ask again
+        // (the start and the first settle of the settings can both say so for the same address and token).
+        if (why == PlanRefresh.SETTINGS_CHANGED && settings == lastAsked.value) {
+            publish()
             return
         }
         val now = elapsedMillis()
@@ -188,9 +214,11 @@ public class PlanRepository(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: TransportException) {
+                    lastAsked.value = settings
                     setInner(problem = PlanProblem.Failed(e.failure.plainReason()), refreshing = false)
                     return
                 }
+            lastAsked.value = settings
             when (val status = answer.status) {
                 HTTP_OK -> {
                     accept(answer.body, settings)
