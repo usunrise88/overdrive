@@ -30,7 +30,10 @@ import java.io.File
  * else can reach, and an app that has no network permission and is not backed up.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+// A plain Application, not OverdriveApp: OverdriveApp builds the container at start, whose ride library scans
+// files/rides/ in the background and deletes a `.fit` that has no record or log, so under load it could remove
+// this test's file between its creation and its reading. The test is about the provider and the manifest only.
+@Config(sdk = [35], application = android.app.Application::class)
 class RideFilesTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val rides = File(context.filesDir, "rides")
