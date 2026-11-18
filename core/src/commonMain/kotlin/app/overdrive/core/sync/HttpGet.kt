@@ -48,3 +48,39 @@ internal fun TransportFailure.plainReason(): String =
  * (SocketException · EACCES)").
  */
 internal fun TransportException.plainReason(): String = failure.plainReason() + (hint?.let { " ($it)" } ?: "")
+
+/**
+ * What the service answered when it was not the answer asked for, in plain words ([noRoute] is the words for its
+ * `404 not_found`, which is what a service without the route says).
+ */
+internal fun reasonForStatus(
+    status: Int,
+    body: String,
+    noRoute: String,
+): String =
+    when {
+        status == HTTP_REQUEST_TIMEOUT -> "The service timed out"
+        status == HTTP_TOO_MANY_REQUESTS -> "The service is busy"
+        status in HTTP_SERVER_ERRORS -> "Service error ($status)"
+        status in HTTP_REDIRECTS -> "The address redirects elsewhere"
+        status == HTTP_NOT_FOUND && errorCodeOf(body) == ApiErrorCode.NOT_FOUND -> noRoute
+        status in HTTP_CLIENT_ERRORS -> "The service refused the request ($status)"
+        else -> NOT_THE_SERVICE
+    }
+
+/** The words for an answer that is not the contract's: whatever answered, it is not the Overdrive service. */
+internal const val NOT_THE_SERVICE: String = "That is not the Overdrive service"
+
+private fun errorCodeOf(body: String): ApiErrorCode? =
+    try {
+        SyncApiJson.decodeApiError(body).code
+    } catch (e: IllegalArgumentException) {
+        null
+    }
+
+private const val HTTP_NOT_FOUND = 404
+private const val HTTP_REQUEST_TIMEOUT = 408
+private const val HTTP_TOO_MANY_REQUESTS = 429
+private val HTTP_REDIRECTS = 300..399
+private val HTTP_CLIENT_ERRORS = 400..499
+private val HTTP_SERVER_ERRORS = 500..599
