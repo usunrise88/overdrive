@@ -2,6 +2,7 @@
   "description": "Right shape, but not a valid profile once applied.",
   "before": {
     "ftp": 250,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         50,

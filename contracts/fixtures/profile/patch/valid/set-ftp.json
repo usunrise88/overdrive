@@ -2,6 +2,7 @@
   "description": "A number replaces the FTP.",
   "before": {
     "ftp": null,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         55,
@@ -36,6 +37,7 @@
   },
   "after": {
     "ftp": 260,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         55,

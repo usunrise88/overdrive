@@ -5,6 +5,7 @@ import {
   applyProfilePatch,
   COGGAN_ZONE_UPPER_PERCENT,
   DEFAULT_PHYSICS,
+  DEFAULT_W_PRIME_KJ,
   defaultProfile,
   type PowerZoneRange,
   type Profile,
@@ -75,6 +76,24 @@ describe("profile schema", () => {
       drivetrainEfficiency: 1,
     });
     expect(WEEKDAYS).toEqual(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
+  });
+
+  it("has no W′ by default, and the service's default for it is 20 kJ", () => {
+    expect(defaultProfile().wPrimeKj).toBeNull();
+    expect(DEFAULT_W_PRIME_KJ).toBe(20);
+  });
+
+  it("accepts W′ from 1 to 100 kJ, whole or fractional, and refuses the rest", () => {
+    for (const value of [1, 12.5, 20, 100, null]) {
+      expect(validateProfile({ ...defaultProfile(), wPrimeKj: value }).ok, String(value)).toBe(
+        true,
+      );
+    }
+    for (const value of [0, 0.99, 100.01, -5, "20", Number.NaN]) {
+      expect(validateProfile({ ...defaultProfile(), wPrimeKj: value }).ok, String(value)).toBe(
+        false,
+      );
+    }
   });
 });
 

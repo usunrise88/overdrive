@@ -20,6 +20,11 @@ src/         @overdrive/contracts: the schema plus a validator for the TypeScrip
 | Planned workouts (`GET /v1/workouts`) | `schema/workouts-response.schema.json` | §5.1, §8.3, ADR 0016 |
 | Rider's profile (`GET /v1/profile`) | `schema/profile.schema.json` | §8.3, ADR 0018 |
 | Profile patch (`PATCH /v1/profile`) | `schema/profile-patch.schema.json` | §8.3, ADR 0018 |
+| Training metrics (`GET /v1/metrics`) | `schema/metrics-response.schema.json` | §6.3, §8.3, ADR 0022 |
+| One ride's metrics (`GET /v1/rides/{id}/metrics`) | `schema/ride-metrics-response.schema.json` | §6.3, §8.3, ADR 0022 |
+| Ride list (`GET /v1/rides`) | `schema/rides-response.schema.json` | §6.7, §8.3, ADR 0022 |
+| Dismissing an FTP suggestion (`POST /v1/ftp-suggestion/dismiss`) | `schema/ftp-suggestion-dismiss-request.schema.json`, `…-response.schema.json` | §6.3, §8.3, ADR 0022 |
+| Ride detail (`GET /v1/rides/{id}`) | `schema/ride-detail-response.schema.json` | §8.3, ADR 0022 |
 
 The remaining sync API payloads and the MCP tool inputs (spec §8.3–§8.4) get schemas here as they are fixed during
 implementation. The sync outbox of the ride app (ADR 0012) is a local journal, not a wire format, and has no schema.
@@ -50,6 +55,21 @@ would make, and `before` is untouched); and `zone-ranges.json`, the seven zones 
 every whole-watt power derived from them (Kotlin also checks Coggan's against `PowerZone.of`). `contracts/test/profile.test.ts`,
 Kotlin's `ProfileContractTest` (`ProfileApiJson`, strict like the schemas) and the service's `profile.test.ts` (through HTTP) run the
 same files. The new API error code `invalid_profile` (422) has its fixture under `sync/api-error/valid/`.
+
+`fixtures/metrics/` holds the golden files of the answers of stage P3-1 (ADR 0022), each in `{valid,invalid}`, shaped by the data the
+companion's screens need (`design/companion.md` §11): `metrics-response` (`GET /v1/metrics?from&to`, at most 366 days: `generatedAt` and
+`stale`, one entry per local day with load, fitness `ctl`, fatigue `atl` and form `tsb`, one per ISO week with `rideLoad`, `otherLoad`,
+`rides` and `activities`, the power curve at 25 durations for the range and for all time, the FTP with `setAt`, the pending suggestion,
+`latestEstimate`, `history` and weekly `estimates`, and the aerobic drift of the steady rides), `ride-metrics-response`
+(`GET /v1/rides/{id}/metrics`: the ride's power curve and drift, and with `wbal=true` the W′ balance, with `series=true` its series),
+`rides-response` (`GET /v1/rides?before&limit`: rides and, later, watch activities, newest first, by cursor), `ride-detail-response`
+(`GET /v1/rides/{id}`: summary, laps with the plan's targets, time in zones, the plan and how it went, W′ and, with `series=true`,
+the series at 10 s) and `ftp-suggestion-dismiss-request/-response` (`POST /v1/ftp-suggestion/dismiss`). What a schema cannot say
+(tsb equal to ctl minus atl, a day for every day of the range, weeks that start on a Monday, a power curve that does not rise with the
+duration, `nextBefore` that follows from the page, laps that tile the ride, …) is in each schema's description and checked by
+`validateMetricsResponse` & co. here and by `MetricsApiJson` in Kotlin (`MetricsContractTest`), against the same fixtures. The profile has
+a new key, `wPrimeKj` (W′ in kJ, 1 to 100, or null for the default of 20 kJ), in the schema, the patch and every profile fixture; the API
+error codes have a new one, `invalid_query` (400), for a malformed `limit`, `before`, `step` or `cp`. All the fixtures are synthetic.
 
 `fixtures/fit/` holds two FIT files for the upload's tests: `fit-golden-3s.fit`, the 376 bytes `FitWriter` writes for
 `rides/valid/fit-golden-3s.json` (the worked example of `docs/protocols/fit.md`; Kotlin's `FitFixturesTest` regenerates it

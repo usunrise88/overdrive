@@ -21,6 +21,7 @@ export const API_ERROR_STATUS = {
   invalid_json: 400,
   invalid_ride_id: 400,
   invalid_range: 400,
+  invalid_query: 400,
   invalid_record: 422,
   invalid_profile: 422,
   ride_id_mismatch: 422,

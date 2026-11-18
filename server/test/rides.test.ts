@@ -294,11 +294,14 @@ describe("PUT /v1/rides/{rideId}", () => {
     expectUpload(await putRecord(app, "ride-big", text), "ride-big", "stored");
   });
 
-  it("routes only PUT: other methods are 404", async () => {
-    for (const method of ["GET", "POST", "DELETE", "PATCH"] as const) {
+  it("routes only PUT and GET (the companion's read): other methods are 404", async () => {
+    for (const method of ["POST", "DELETE", "PATCH"] as const) {
       const res = await app.inject({ method, url: "/v1/rides/ride-1", headers: bearer() });
       expectError(res, "not_found");
     }
+    // GET is the ride's detail (ADR 0022): for a ride that is not stored, the ride's own 404.
+    const res = await app.inject({ method: "GET", url: "/v1/rides/ride-1", headers: bearer() });
+    expectError(res, "ride_not_found");
   });
 });
 

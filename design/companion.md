@@ -359,7 +359,7 @@ colour). Common geometry for this file:
 
 ### 6.6 Aerobic drift (dots + rolling mean, reference band)
 
-- **Data:** `drift [{date, rideId, name, driftPercent}]`, steady rides only (the service decides which; default 45 min or more
+- **Data:** `drift [{date, rideId, name, driftPercent}]`, steady rides only (the service decides which; default 40 min or more
   of steady power with heart rate).
 - **x:** days as §6.1. **y:** 0–10% (more if a value exceeds it), ticks 0, 5, 10 "%". Zero line `borderStrong`.
 - **Band:** 0–5% surface 2 labelled "Steady".
@@ -367,7 +367,7 @@ colour). Common geometry for this file:
   connects across days without rides).
 - **Readout:** "14 Nov · Endurance 90 ● Drift 3.3% — Last 5 rides 4.5%", one decimal. Scrubbing snaps to rides. Tapping the
   readout's ride name opens it.
-- Note under it: "How much heart rate rose against power on steady rides of 45 minutes or more. Lower is better."
+- Note under it: "How much heart rate rose against power on steady rides of 40 minutes or more. Lower is better."
 - **Height** 150 dp.
 
 ### 6.7 Wellness small multiples (line in a baseline band)
@@ -472,7 +472,7 @@ A technical hint in brackets follows where the ride app gives one ("(UnknownHost
 - Fitness: "No load yet" / "Fitness and fatigue start with your first ride on the tablet or your first activity on the watch."
 - Power: "No rides yet" / "The power curve, FTP and aerobic drift fill in from rides on the tablet. They appear here after the
   tablet uploads its first ride."
-- Aerobic drift alone: "No steady rides yet. Drift is measured on steady rides of 45 minutes or more with heart rate."
+- Aerobic drift alone: "No steady rides yet. Drift is measured on steady rides of 40 minutes or more with heart rate."
 - Wellness, no access: "Overdrive cannot read Health Connect yet." + **Allow** (primary).
 - Wellness, a metric with no readings: "No readings in the last 4 weeks. The watch writes them during sleep; check that
   blood-oxygen tracking is on in OHealth." (resting HR and respiratory rate say "…check that the watch is worn at night.")

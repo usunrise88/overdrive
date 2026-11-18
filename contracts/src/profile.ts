@@ -35,9 +35,14 @@ export const DEFAULT_PHYSICS: Readonly<Physics> = {
   drivetrainEfficiency: 1,
 };
 
+/** The W′ in kilojoules the service uses while the profile has none: a typical value, a placeholder until the rider sets their own. */
+export const DEFAULT_W_PRIME_KJ = 20;
+
 export interface Profile {
   /** Watts, or null when not set. */
   ftp: number | null;
+  /** W′ in kilojoules (1 to 100) for the W′ balance, or null for {@link DEFAULT_W_PRIME_KJ}. Critical power is the FTP. */
+  wPrimeKj: number | null;
   zones: { upperPercentOfFtp: number[] };
   /** Minutes per weekday; null where unknown. */
   weeklyAvailability: Record<Weekday, number | null>;
@@ -50,6 +55,8 @@ export interface Profile {
 /** What `PATCH /v1/profile` takes (see `profile-patch.schema.json`). */
 export interface ProfilePatch {
   ftp?: number | null;
+  /** null puts W′ back to the default. */
+  wPrimeKj?: number | null;
   /** null resets the zones to Coggan's. */
   zones?: { upperPercentOfFtp: number[] } | null;
   weeklyAvailability?: Partial<Record<Weekday, number | null>>;
@@ -61,6 +68,7 @@ export interface ProfilePatch {
 export function defaultProfile(): Profile {
   return {
     ftp: null,
+    wPrimeKj: null,
     zones: { upperPercentOfFtp: [...COGGAN_ZONE_UPPER_PERCENT] },
     weeklyAvailability: Object.fromEntries(WEEKDAYS.map((day) => [day, null])) as Record<
       Weekday,
@@ -140,6 +148,7 @@ export function applyProfilePatch(profile: Profile, patch: unknown): Validation<
   const change = shape.value;
   const next = structuredClone(profile);
   if (change.ftp !== undefined) next.ftp = change.ftp;
+  if (change.wPrimeKj !== undefined) next.wPrimeKj = change.wPrimeKj;
   if (change.zones !== undefined) {
     next.zones = {
       upperPercentOfFtp:

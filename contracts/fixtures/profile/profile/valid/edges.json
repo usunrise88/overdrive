@@ -1,5 +1,6 @@
 {
   "ftp": 30,
+  "wPrimeKj": 100,
   "zones": {
     "upperPercentOfFtp": [
       1,

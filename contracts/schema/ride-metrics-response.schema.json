@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive ride metrics response",
+  "description": "The service's answer to GET /v1/rides/{rideId}/metrics[?wbal=true[&series=true][&cp=watts][&wPrimeKj=kilojoules]] (spec §6.3, §8.3, ADR 0022): what the service computed from one stored ride. generatedAt is when (UTC) and stale is true when an input source failed. powerCurve is the best average power over each of the 25 durations (see metrics-response.schema.json) in which the ride is long enough, pauses and missing readings counting as 0 W; empty when no power was measured. drift says whether the ride (or a steady stretch of it) allowed a measure of aerobic drift and, if not, why. wPrimeBalance is present only when asked (wbal=true) because it reads the whole record: the W′ balance model of Skiba et al. (2012) for the critical power cpWatts (the profile's FTP, else the ride's own FTP, else the cp asked for) and the W′ wPrimeKj (the profile's, else 20 kJ, else the one asked for); series, present only with series=true, is the balance in kilojoules at the end of every stepSeconds-th second. Rules a schema cannot state, checked by every implementation: powerCurve durations ascend; drift is available exactly when driftPercent, efFirst, efSecond, startSec and endSec are all present and reason is null, and not available exactly when reason is present and the others are null; minBalanceKj is not above wPrimeKj and maxDepletionPercent follows from them; the series has no more than one point per stepSeconds of the ride.",
+  "type": "object",
+  "required": [
+    "generatedAt",
+    "stale",
+    "rideId",
+    "startTime",
+    "date",
+    "ftp",
+    "durationSec",
+    "movingSec",
+    "load",
+    "powerCurve",
+    "drift"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "generatedAt": { "$ref": "metrics-response.schema.json#/$defs/instant" },
+    "stale": { "type": "boolean" },
+    "rideId": { "$ref": "metrics-response.schema.json#/$defs/rideId" },
+    "startTime": { "$ref": "metrics-response.schema.json#/$defs/instant" },
+    "date": {
+      "description": "The rider's local day of the start.",
+      "$ref": "metrics-response.schema.json#/$defs/date"
+    },
+    "ftp": {
+      "description": "The FTP in watts the ride was recorded with.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "durationSec": {
+      "description": "Length of the ride, pauses included.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "movingSec": { "description": "Seconds not paused.", "type": "integer", "minimum": 0 },
+    "load": {
+      "description": "Training stress score of the ride (100 is one hour at FTP), one decimal; null without 30 s of power.",
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "powerCurve": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["durationSec", "power"],
+        "additionalProperties": false,
+        "properties": {
+          "durationSec": { "$ref": "metrics-response.schema.json#/$defs/duration" },
+          "power": { "description": "Watts, one decimal.", "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "drift": { "$ref": "#/$defs/drift" },
+    "wPrimeBalance": { "$ref": "#/$defs/wPrimeBalance" }
+  },
+  "$defs": {
+    "drift": {
+      "type": "object",
+      "required": [
+        "available",
+        "reason",
+        "driftPercent",
+        "efFirst",
+        "efSecond",
+        "startSec",
+        "endSec"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "available": { "type": "boolean" },
+        "reason": {
+          "description": "Why there is no drift for this ride; null when there is.",
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "driftPercent": {
+          "description": "One decimal; positive when the efficiency factor fell.",
+          "type": ["number", "null"]
+        },
+        "efFirst": {
+          "description": "Normalised power over average heart rate, first half, three decimals.",
+          "type": ["number", "null"],
+          "exclusiveMinimum": 0
+        },
+        "efSecond": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "startSec": {
+          "description": "The steady stretch measured begins after this many seconds of the ride.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "endSec": {
+          "description": "…and ends at this second.",
+          "type": ["integer", "null"],
+          "minimum": 1
+        }
+      }
+    },
+    "wPrimeBalance": {
+      "type": ["object", "null"],
+      "required": [
+        "cpWatts",
+        "cpSource",
+        "wPrimeKj",
+        "wPrimeSource",
+        "tauSeconds",
+        "dCpWatts",
+        "minBalanceKj",
+        "minAtSec",
+        "maxDepletionPercent"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "cpWatts": {
+          "description": "Critical power used, in watts.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "cpSource": {
+          "description": "profile: the profile's FTP; ride: the FTP the ride was recorded with (the profile has none); request: the cp query parameter.",
+          "enum": ["profile", "ride", "request"]
+        },
+        "wPrimeKj": {
+          "description": "W′ used, in kilojoules.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "wPrimeSource": {
+          "description": "profile: the profile's wPrimeKj; default: 20 kJ; request: the wPrimeKj query parameter.",
+          "enum": ["profile", "default", "request"]
+        },
+        "tauSeconds": {
+          "description": "Time constant of the recovery of W′, 546·e^(−0.01·dCpWatts) + 316 seconds, one decimal.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "dCpWatts": {
+          "description": "Critical power minus the average power of the seconds below it, one decimal (0 when there were none).",
+          "type": "number"
+        },
+        "minBalanceKj": {
+          "description": "The lowest balance of the ride in kilojoules, two decimals; below 0 means the model says W′ was exceeded, so CP or W′ are set too low for this rider.",
+          "type": "number"
+        },
+        "minAtSec": {
+          "description": "The second at which it was reached (0 when W′ was never used).",
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxDepletionPercent": {
+          "description": "How much of W′ was used at the lowest point, in percent, one decimal.",
+          "type": "number"
+        },
+        "series": {
+          "type": ["object", "null"],
+          "required": ["stepSeconds", "balanceKj"],
+          "additionalProperties": false,
+          "properties": {
+            "stepSeconds": { "type": "integer", "minimum": 1 },
+            "balanceKj": {
+              "description": "The balance at second stepSeconds, 2·stepSeconds, … in kilojoules, two decimals.",
+              "type": "array",
+              "items": { "type": "number" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

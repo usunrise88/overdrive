@@ -12,6 +12,7 @@ import {
   type UploadWorker,
 } from "./intervals/uploads.ts";
 import type { Logger } from "./log.ts";
+import { createMetricsService, type MetricsService } from "./metrics/service.ts";
 import { createPlanRefresher, type PlanRefresher } from "./plan/refresher.ts";
 import { createPlanStore, type PlanStore } from "./plan/store.ts";
 import { createProfileStore, type ProfileStore } from "./profile/store.ts";
@@ -49,6 +50,8 @@ export interface Services {
   rides: RideStore;
   /** The workout a stored ride was played from, kept when the ride is stored (ADR 0018). */
   rideWorkouts: RideWorkoutResolver;
+  /** Training metrics: load, fitness, power curve, FTP suggestion, aerobic drift, W′ balance (ADR 0022). */
+  metrics: MetricsService;
   /** The intervals.icu client; null when `INTERVALS_API_KEY` is not set (the integration is off). */
   intervals: IntervalsClient | null;
   /** null when the integration is off: no plan is read and the API says so. */
@@ -131,6 +134,16 @@ export function createServices(options: ServicesOptions): Services {
     now: now ?? (() => new Date()),
     log,
   });
+  const metrics = createMetricsService({
+    db,
+    rides,
+    rideWorkouts,
+    profile,
+    bus,
+    timezone,
+    now: now ?? (() => new Date()),
+    log,
+  });
   // A ride keeps the workout it was played from, whatever the plan does later.
   bus.on("ride-stored", async ({ rideId }) => {
     const header = await rides.getHeader(rideId);
@@ -193,6 +206,7 @@ export function createServices(options: ServicesOptions): Services {
     profile,
     rides,
     rideWorkouts,
+    metrics,
     intervals,
     refresher,
     uploads,
@@ -210,6 +224,7 @@ export function createServices(options: ServicesOptions): Services {
       refresher?.start(config.PLAN_REFRESH_MINUTES ?? 15);
       void calendar?.start();
       telegram?.start();
+      metrics.start();
     },
     async stop() {
       await Promise.all([
@@ -218,6 +233,7 @@ export function createServices(options: ServicesOptions): Services {
         refresher?.stop(),
         calendar?.stop(),
         telegram?.stop(),
+        metrics.stop(),
       ]);
     },
   };

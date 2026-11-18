@@ -6,8 +6,11 @@ import { readPlanEvent } from "./plan/entries.ts";
 import type { PlanStore } from "./plan/store.ts";
 import type { RideStore } from "./ride-store.ts";
 
-/** The workout a ride was played from, or why there is none to compare with. */
-export type RideWorkout = { workout: Workout } | { workout: null; reason: string };
+/**
+ * The workout a ride was played from, or why there is none to compare with. `failed` is set when a lookup
+ * failed (intervals.icu could not be asked, the database failed), not when there is simply no workout.
+ */
+export type RideWorkout = { workout: Workout } | { workout: null; reason: string; failed?: true };
 
 export interface RideWorkoutResolver {
   /**
@@ -73,7 +76,7 @@ export function createRideWorkoutResolver(deps: RideWorkoutDeps): RideWorkoutRes
             ? `intervals.icu could not be asked about the workout (${error.message})`
             : "the workout could not be looked up";
         log.warn({ rideId: ride.id, err: error }, "ride workout lookup failed");
-        return none(reason);
+        return { workout: null, reason, failed: true };
       }
     },
   };

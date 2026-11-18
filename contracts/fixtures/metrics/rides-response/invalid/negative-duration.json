@@ -1,0 +1,36 @@
+{
+  "generatedAt": "2026-11-18T08:00:00Z",
+  "stale": false,
+  "before": null,
+  "limit": 2,
+  "hasMore": true,
+  "nextBefore": "2026-11-10T19:00:00Z",
+  "items": [
+    {
+      "id": "ride-1795160000000",
+      "kind": "ride",
+      "name": "Sweet spot 2x20",
+      "start": "2026-11-12T18:40:00Z",
+      "date": "2026-11-12",
+      "durationSeconds": -1,
+      "load": 64.1,
+      "loadApproximate": false,
+      "sport": null,
+      "averagePower": 187.4,
+      "averageHeartRate": null
+    },
+    {
+      "id": "ride-1794996000000",
+      "kind": "ride",
+      "name": "Free ride",
+      "start": "2026-11-10T19:00:00Z",
+      "date": "2026-11-10",
+      "durationSeconds": 1800,
+      "load": null,
+      "loadApproximate": false,
+      "sport": null,
+      "averagePower": null,
+      "averageHeartRate": null
+    }
+  ]
+}

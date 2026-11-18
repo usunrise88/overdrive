@@ -1,0 +1,50 @@
+{
+  "generatedAt": "2026-11-16T07:30:12Z",
+  "stale": true,
+  "rideId": "ride-1795160000000",
+  "startTime": "2026-11-12T18:40:00Z",
+  "date": "2026-11-12",
+  "ftp": 250,
+  "durationSec": 40,
+  "movingSec": 40,
+  "load": 2.1,
+  "powerCurve": [
+    {
+      "durationSec": 1,
+      "power": 420
+    }
+  ],
+  "drift": {
+    "available": false,
+    "reason": "The ride is 0 minutes long; aerobic drift needs a steady stretch of at least 40 minutes",
+    "driftPercent": null,
+    "efFirst": null,
+    "efSecond": null,
+    "startSec": null,
+    "endSec": null
+  },
+  "wPrimeBalance": {
+    "cpWatts": 250,
+    "cpSource": "request",
+    "wPrimeKj": 20,
+    "wPrimeSource": "request",
+    "tauSeconds": 487.3,
+    "dCpWatts": 96.4,
+    "minBalanceKj": 19.04,
+    "minAtSec": 10,
+    "maxDepletionPercent": 4.8,
+    "series": {
+      "stepSeconds": 5,
+      "balanceKj": [
+        19.55,
+        19.04,
+        19.07,
+        19.11,
+        19.14,
+        19.17,
+        19.2,
+        19.23
+      ]
+    }
+  }
+}

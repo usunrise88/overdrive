@@ -2,6 +2,7 @@
   "description": "A patch is an object.",
   "before": {
     "ftp": 250,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         50,

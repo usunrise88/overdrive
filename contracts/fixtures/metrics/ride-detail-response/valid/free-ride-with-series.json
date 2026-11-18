@@ -1,0 +1,124 @@
+{
+  "generatedAt": "2026-11-18T08:00:00Z",
+  "stale": false,
+  "id": "ride-1795160000000",
+  "name": "Free ride",
+  "startTime": "2026-11-12T18:40:00Z",
+  "endTime": "2026-11-12T18:42:00Z",
+  "date": "2026-11-12",
+  "workoutId": null,
+  "devices": [
+    "Wahoo KICKR",
+    "Polar H10"
+  ],
+  "ftp": 250,
+  "cp": 250,
+  "wPrime": 20,
+  "wPrimeLowest": {
+    "kilojoules": 20,
+    "atSec": 0
+  },
+  "summary": {
+    "durationSeconds": 120,
+    "movingSeconds": 120,
+    "distanceMeters": 900,
+    "averagePower": 150,
+    "workKilojoules": 18
+  },
+  "secondsInZones": [
+    0,
+    120,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "laps": [
+    {
+      "stepIndex": null,
+      "label": null,
+      "type": null,
+      "startSeconds": 0,
+      "endSeconds": 120,
+      "averagePower": 150,
+      "averageHeartRate": null,
+      "targetPower": null
+    }
+  ],
+  "plan": null,
+  "series": [
+    {
+      "t": 10,
+      "power": 140,
+      "heartRate": null,
+      "wBal": 20
+    },
+    {
+      "t": 20,
+      "power": 141,
+      "heartRate": null,
+      "wBal": 20
+    },
+    {
+      "t": 30,
+      "power": 142,
+      "heartRate": 112,
+      "wBal": 20
+    },
+    {
+      "t": 40,
+      "power": 143,
+      "heartRate": 113,
+      "wBal": 20
+    },
+    {
+      "t": 50,
+      "power": 144,
+      "heartRate": 114,
+      "wBal": 20
+    },
+    {
+      "t": 60,
+      "power": null,
+      "heartRate": 115,
+      "wBal": 20
+    },
+    {
+      "t": 70,
+      "power": 146,
+      "heartRate": 116,
+      "wBal": 20
+    },
+    {
+      "t": 80,
+      "power": 147,
+      "heartRate": 117,
+      "wBal": 20
+    },
+    {
+      "t": 90,
+      "power": 148,
+      "heartRate": 118,
+      "wBal": 20
+    },
+    {
+      "t": 100,
+      "power": 149,
+      "heartRate": 119,
+      "wBal": 20
+    },
+    {
+      "t": 110,
+      "power": 150,
+      "heartRate": 120,
+      "wBal": 20
+    },
+    {
+      "t": 120,
+      "power": 151,
+      "heartRate": 121,
+      "wBal": 20
+    }
+  ]
+}

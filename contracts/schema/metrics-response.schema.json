@@ -1,0 +1,298 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive metrics response",
+  "description": "The service's answer to GET /v1/metrics?from=YYYY-MM-DD&to=YYYY-MM-DD (spec §6.3, §8.3, ADR 0022): the training metrics of the rider's local days from `from` to `to`, both included, at most 366 days. Everything is computed by the service from the stored rides; nothing here is a model's output. generatedAt is when the service computed it (UTC) and stale is true when an input source failed (its load is then missing from the numbers). daily has exactly one entry per day of the range, in order: load is the day's training stress (loadCycling from rides, loadOther from other activities; load is their sum), ctl (fitness) and atl (fatigue) are exponentially weighted averages of the daily load over 42 and 7 days seeded at 0 on the first day with any load (firstLoadDate; before it all three are 0), tsb (form) is ctl minus atl on the same day. weekly has one entry per ISO week (Monday start) from the week of `from` to the week of `to`: whole weeks, rideLoad and otherLoad and their sum load, the number of rides and of other activities. powerCurve holds, for each of the 25 durations of the power curve in which some ride is long enough, the best average power: range among the rides of the range, allTime among all rides up to `to`; ascending durations, each with the ride and its day. ftp.current is the profile's FTP and ftp.setAt the day it got that value (null while there is none); ftp.suggestion is the pending FTP suggestion estimated from the best efforts of the last 42 days (a suggestion only: nothing changes until the rider accepts it with PATCH /v1/profile, and POST /v1/ftp-suggestion/dismiss hides it), null when there is none; ftp.latestEstimate is the estimate of today in whole watts whether or not it is worth suggesting, null when the efforts do not allow one; ftp.history is the profile's FTP over time, oldest first, with the value in force at `from` first; ftp.estimates is the estimate as of the end of each week of the range. drift lists the aerobic drift (power to heart rate decoupling, percent) of the steady rides of the range, with the ride's name. Rules a schema cannot state, checked by every implementation: from is not after to and the range spans at most 366 days; daily has one entry for each day from `from` to `to`, tsb is ctl minus atl and load is loadCycling plus loadOther (each to within the rounding of one decimal), ctl, atl and the loads are not negative; every weekStart is a Monday, strictly increasing, from the week of `from` to the week of `to` without gaps, and load is rideLoad plus otherLoad; powerCurve entries have unique ascending durations, the range ones have dates inside the range and each is matched at the same duration by an allTime one with at least that power; ftp.setAt is null exactly when ftp.current is; history and estimates dates do not decrease, estimates are inside the range; drift dates are inside the range and not decreasing.",
+  "type": "object",
+  "required": [
+    "from",
+    "to",
+    "generatedAt",
+    "stale",
+    "firstLoadDate",
+    "daily",
+    "weekly",
+    "powerCurve",
+    "ftp",
+    "drift"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "from": {
+      "description": "First day of the range as asked, in the rider's local time.",
+      "$ref": "#/$defs/date"
+    },
+    "to": { "description": "Last day of the range as asked (inclusive).", "$ref": "#/$defs/date" },
+    "generatedAt": {
+      "description": "When the service computed this answer (UTC).",
+      "$ref": "#/$defs/instant"
+    },
+    "stale": {
+      "description": "true when an input source failed while computing: the answer is what could be computed without it.",
+      "type": "boolean"
+    },
+    "firstLoadDate": {
+      "description": "The first local day on which the rider has any load up to `to`, before `from` or not; null when there is none. Fitness, fatigue and form are 0 before it.",
+      "oneOf": [{ "$ref": "#/$defs/date" }, { "type": "null" }]
+    },
+    "daily": {
+      "type": "array",
+      "maxItems": 366,
+      "items": { "$ref": "#/$defs/day" }
+    },
+    "weekly": {
+      "type": "array",
+      "maxItems": 54,
+      "items": { "$ref": "#/$defs/week" }
+    },
+    "powerCurve": {
+      "type": "object",
+      "required": ["range", "allTime"],
+      "additionalProperties": false,
+      "properties": {
+        "range": {
+          "description": "The best average power over each duration among the rides of the range. Pauses and missing readings count as 0 W inside a window.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/curvePoint" }
+        },
+        "allTime": {
+          "description": "The same among every ride up to `to`.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/curvePoint" }
+        }
+      }
+    },
+    "ftp": {
+      "type": "object",
+      "required": ["current", "setAt", "suggestion", "latestEstimate", "history", "estimates"],
+      "additionalProperties": false,
+      "properties": {
+        "current": {
+          "description": "The profile's FTP in watts, or null when the owner has not set one.",
+          "type": ["integer", "null"],
+          "minimum": 30,
+          "maximum": 2000
+        },
+        "setAt": {
+          "description": "The local day the FTP got its current value; null while there is none.",
+          "oneOf": [{ "$ref": "#/$defs/date" }, { "type": "null" }]
+        },
+        "suggestion": {
+          "oneOf": [{ "$ref": "#/$defs/suggestion" }, { "type": "null" }]
+        },
+        "latestEstimate": {
+          "description": "The estimate of today in whole watts, worth suggesting or not; null when the efforts of the last 42 days do not allow one.",
+          "type": ["integer", "null"],
+          "minimum": 30,
+          "maximum": 2000
+        },
+        "history": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/historyEntry" }
+        },
+        "estimates": {
+          "type": "array",
+          "maxItems": 54,
+          "items": { "$ref": "#/$defs/estimate" }
+        }
+      }
+    },
+    "drift": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/driftPoint" }
+    }
+  },
+  "$defs": {
+    "date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "instant": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "rideId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "duration": {
+      "description": "A duration of the power curve, in seconds: 1, 2, 3, 5, 8, 10, 15, 20, 30, 45 s; 1, 1.5, 2, 3, 4, 5, 7, 10, 15, 20, 30, 40, 60, 90, 120 min.",
+      "enum": [
+        1, 2, 3, 5, 8, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 300, 420, 600, 900, 1200, 1800,
+        2400, 3600, 5400, 7200
+      ]
+    },
+    "day": {
+      "type": "object",
+      "required": ["date", "load", "loadCycling", "loadOther", "ctl", "atl", "tsb"],
+      "additionalProperties": false,
+      "properties": {
+        "date": { "$ref": "#/$defs/date" },
+        "load": {
+          "description": "Training stress of the day, one decimal.",
+          "type": "number",
+          "minimum": 0
+        },
+        "loadCycling": {
+          "description": "The part of it from rides.",
+          "type": "number",
+          "minimum": 0
+        },
+        "loadOther": {
+          "description": "The part of it from other activities (heart-rate based, spec §6.7).",
+          "type": "number",
+          "minimum": 0
+        },
+        "ctl": {
+          "description": "Fitness at the end of the day: exponentially weighted average of the daily load over 42 days.",
+          "type": "number",
+          "minimum": 0
+        },
+        "atl": {
+          "description": "Fatigue at the end of the day: the same over 7 days.",
+          "type": "number",
+          "minimum": 0
+        },
+        "tsb": {
+          "description": "Form at the end of the day: ctl minus atl; negative when more tired than fit.",
+          "type": "number"
+        }
+      }
+    },
+    "week": {
+      "type": "object",
+      "required": ["weekStart", "load", "rideLoad", "otherLoad", "rides", "activities"],
+      "additionalProperties": false,
+      "properties": {
+        "weekStart": { "description": "The Monday of the week.", "$ref": "#/$defs/date" },
+        "load": {
+          "description": "Load of its seven days, one decimal.",
+          "type": "number",
+          "minimum": 0
+        },
+        "rideLoad": { "description": "The part of it from rides.", "type": "number", "minimum": 0 },
+        "otherLoad": {
+          "description": "The part of it from other activities.",
+          "type": "number",
+          "minimum": 0
+        },
+        "rides": { "type": "integer", "minimum": 0 },
+        "activities": {
+          "description": "Other activities, not rides.",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "curvePoint": {
+      "type": "object",
+      "required": ["durationSec", "power", "date", "rideId"],
+      "additionalProperties": false,
+      "properties": {
+        "durationSec": { "$ref": "#/$defs/duration" },
+        "power": {
+          "description": "Best average power over the duration, in watts, one decimal.",
+          "type": "number",
+          "minimum": 0
+        },
+        "date": { "description": "The local day of the ride.", "$ref": "#/$defs/date" },
+        "rideId": { "$ref": "#/$defs/rideId" }
+      }
+    },
+    "suggestion": {
+      "description": "An FTP the service estimates from recent best efforts. Only a suggestion: the profile changes when the rider accepts it.",
+      "type": "object",
+      "required": ["id", "watts", "basedOnRides", "windowDays", "createdAt", "confidence", "basis"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "What POST /v1/ftp-suggestion/dismiss takes.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "watts": {
+          "description": "The suggested FTP in whole watts.",
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 2000
+        },
+        "basedOnRides": {
+          "description": "How many rides had an effort close to the best one it comes from.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "windowDays": {
+          "description": "How many days back the efforts were looked at.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "createdAt": { "$ref": "#/$defs/instant" },
+        "confidence": {
+          "description": "low: two rides had a comparable effort, medium: three or four, high: five or more.",
+          "enum": ["low", "medium", "high"]
+        },
+        "basis": {
+          "description": "The effort it comes from: the best average power over durationSec, in the ride rideId on that date.",
+          "type": "object",
+          "required": ["durationSec", "power", "rideId", "date"],
+          "additionalProperties": false,
+          "properties": {
+            "durationSec": { "$ref": "#/$defs/duration" },
+            "power": { "type": "number", "minimum": 0 },
+            "rideId": { "$ref": "#/$defs/rideId" },
+            "date": { "$ref": "#/$defs/date" }
+          }
+        }
+      }
+    },
+    "historyEntry": {
+      "type": "object",
+      "required": ["date", "ftp"],
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "description": "The local day the profile's FTP became this value.",
+          "$ref": "#/$defs/date"
+        },
+        "ftp": {
+          "description": "Watts; null when the FTP was cleared.",
+          "type": ["integer", "null"],
+          "minimum": 30,
+          "maximum": 2000
+        }
+      }
+    },
+    "estimate": {
+      "type": "object",
+      "required": ["date", "eftp"],
+      "additionalProperties": false,
+      "properties": {
+        "date": { "description": "The local day the estimate is as of.", "$ref": "#/$defs/date" },
+        "eftp": { "description": "Whole watts.", "type": "integer", "minimum": 30, "maximum": 2000 }
+      }
+    },
+    "driftPoint": {
+      "type": "object",
+      "required": ["date", "rideId", "name", "driftPercent", "efFirst", "efSecond"],
+      "additionalProperties": false,
+      "properties": {
+        "date": { "$ref": "#/$defs/date" },
+        "rideId": { "$ref": "#/$defs/rideId" },
+        "name": {
+          "description": "The workout the ride was played from, or Free ride.",
+          "type": "string",
+          "minLength": 1
+        },
+        "driftPercent": {
+          "description": "How much the efficiency factor fell from the first half of the steady stretch to the second, in percent of the first (positive: heart rate rose against power).",
+          "type": "number"
+        },
+        "efFirst": {
+          "description": "Normalised power over average heart rate in the first half.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "efSecond": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    }
+  }
+}

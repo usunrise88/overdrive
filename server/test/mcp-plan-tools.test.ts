@@ -102,11 +102,12 @@ const NEW_WORKOUT = {
 };
 
 describe("the tools and what they say about themselves", () => {
-  it("lists the eight Phase 2 tools, each described with its units and its limits", async () => {
+  it("lists the Phase 2 tools and get_fitness, each described with its units and its limits", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       "create_workout",
       "delete_workout",
+      "get_fitness",
       "get_profile",
       "get_ride",
       "list_planned_workouts",
@@ -121,7 +122,13 @@ describe("the tools and what they say about themselves", () => {
     }
     const by = Object.fromEntries(tools.map((t) => [t.name, t]));
     // Reads and writes are marked, and the delete says it destroys.
-    for (const name of ["get_profile", "list_planned_workouts", "list_rides", "get_ride"]) {
+    for (const name of [
+      "get_profile",
+      "list_planned_workouts",
+      "list_rides",
+      "get_ride",
+      "get_fitness",
+    ]) {
       expect(by[name]?.annotations?.readOnlyHint, name).toBe(true);
     }
     for (const name of ["create_workout", "update_workout", "update_profile", "delete_workout"]) {

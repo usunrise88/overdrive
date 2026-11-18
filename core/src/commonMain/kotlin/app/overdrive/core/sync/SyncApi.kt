@@ -47,6 +47,9 @@ public enum class ApiErrorCode(
     @SerialName("invalid_range")
     INVALID_RANGE(400),
 
+    @SerialName("invalid_query")
+    INVALID_QUERY(400),
+
     @SerialName("invalid_record")
     INVALID_RECORD(422),
 
