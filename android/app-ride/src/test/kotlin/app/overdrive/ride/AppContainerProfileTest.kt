@@ -341,12 +341,16 @@ class AppContainerProfileTest {
         c.simulate()
         c.configure()
         c.awaitReadyRide(175)
-        await("the first read is done") { !c.profile.state.value.refreshing && gets >= 1 }
+        // Both start requests are over, so what is counted next is the rider's refresh and nothing else.
+        await("the first reads are done") {
+            !c.profile.state.value.refreshing && gets >= 1 && !c.plan.state.value.refreshing &&
+                service.planRequests.isNotEmpty()
+        }
         val plans = service.planRequests.size
 
         service.profile = profileOf(190)
+        c.refreshPlan()
         await("the rider's refresh asked for both and the tablet follows") {
-            c.refreshPlan()
             c.effectiveSettings.value.ftp == 190 && service.planRequests.size > plans
         }
         c.awaitReadyRide(190)
@@ -365,10 +369,8 @@ class AppContainerProfileTest {
         runBlocking { c.profile.refresh(ProfileRefresh.SCREEN_OPENED) }
         runBlocking { c.profile.refresh(ProfileRefresh.SCREEN_OPENED) }
         assertEquals("within the minute: not asked again", asked, gets)
-        await("the rider's refresh asks") {
-            c.refreshPlan()
-            gets > asked
-        }
+        c.refreshPlan()
+        await("the rider's refresh asks") { gets > asked }
     }
 
     @Test
@@ -446,10 +448,8 @@ class AppContainerProfileTest {
         assertEquals("beside the service's last answer", 175, cachedProfile()?.profile?.ftp)
 
         service.down = false
-        await("the rider's refresh sends it") {
-            c.refreshPlan()
-            service.profile?.ftp == 180
-        }
+        c.refreshPlan()
+        await("the rider's refresh sends it") { service.profile?.ftp == 180 }
         await(
             "nothing is left unsent",
         ) { c.profile.state.value.pending == null && c.profile.state.value.problem == null }

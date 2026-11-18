@@ -3,8 +3,10 @@ package app.overdrive.companion
 import android.app.Application
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import app.overdrive.core.profile.ProfileProblem
 import app.overdrive.core.remote.MetricsRange
 import app.overdrive.core.remote.ProblemKind
+import app.overdrive.core.remote.Refresh
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -49,14 +51,23 @@ class CompanionContainerTest {
 
     @Test
     fun `the first run connects with one profile request and stores the address and token only then`() {
-        val c = world.container()
+        // The container's own first refresh comes once the stored address has settled. Here that takes an hour, so that what the
+        // service has seen after Connect is Connect's request and nothing else, whatever the machine is doing meanwhile; the rider's
+        // pull down then stands in for it.
+        val c = world.container(settleMillis = 3_600_000)
         await("the settings are read") { c.settings.value != null }
         assertFalse(c.settings.value!!.isConfigured)
+        assertEquals("nothing is asked before Connect", emptyList<LocalService.Received>(), service.received.toList())
         val result = blocking { c.connect(service.baseUrl, service.token) }
         assertEquals(ConnectResult.Connected, result)
-        assertEquals(1, service.requests("GET", "/v1/profile").size)
+        assertEquals(
+            "one request, the profile, with the token that was typed",
+            listOf("GET /v1/profile Bearer ${service.token}"),
+            service.received.map { "${it.method} ${it.path} ${it.authorization}" },
+        )
         await("the settings are stored") { c.settings.value?.isConfigured == true }
         assertEquals(service.baseUrl, c.settings.value!!.serviceUrl)
+        c.refresh(RefreshTarget.Today)
         await("the first figures arrive", diagnostics = diagnostics(c)) {
             c.metricsFor(MetricsRange.DEFAULT).state.value.value !=
                 null
@@ -107,16 +118,17 @@ class CompanionContainerTest {
         }
         first.screenOpened(RefreshTarget.RideDetail("ride-1112"))
         await("the ride") { first.rideDetail("ride-1112").state.value.value != null }
-        val files =
+        // The answers are written before they are published, but the profile's cache is written a moment after, on a coroutine that
+        // stopping the container would cancel: the stop waits for the disk.
+        val expected = setOf("metrics-26w", "workouts", "rides", "ride-1112", "profile")
+        await("everything is on disk", diagnostics = { world.cache.walkTopDown().joinToString { it.name } }) {
             world.cache
                 .walkTopDown()
                 .filter { it.isFile }
                 .map { it.name }
                 .toSet()
-        assertTrue(
-            files.toString(),
-            files.containsAll(setOf("metrics-26w", "workouts", "rides", "ride-1112", "profile")),
-        )
+                .containsAll(expected)
+        }
         world.stop(first)
 
         service.down = true
@@ -152,9 +164,12 @@ class CompanionContainerTest {
             c.rides.newest.state.value
                 .let { it.value != null && !it.refreshing }
         }
-        c.screenOpened(RefreshTarget.Rides)
+        // Opened again within the minute: the call returns when it has decided, so the count after it is the answer.
+        blocking { c.rides.refresh(Refresh.SCREEN_OPENED) }
+        assertEquals("not asked again within the minute", before + 1, service.requests("GET", "/v1/rides").size)
+        // The rider pulls down: that always asks, whenever it is done.
         c.refresh(RefreshTarget.Rides)
-        await("the pull down") { service.requests("GET", "/v1/rides").size == before + 2 }
+        await("the pull down asks again") { service.requests("GET", "/v1/rides").size > before + 1 }
     }
 
     @Test
@@ -210,11 +225,16 @@ class CompanionContainerTest {
         service.rejectToken = true
         val c = world.container()
         c.configure()
-        await("the token is refused", diagnostics = diagnostics(c)) {
+        // The start asks for the figures, today's workout and the profile at once; each is refused, or told it will be without
+        // asking, so how many requests that was depends on who was first. They are counted once all three have their answer.
+        await("the token is refused everywhere the start asked", diagnostics = diagnostics(c)) {
             c
                 .metricsFor(MetricsRange.DEFAULT)
                 .state.value.problem
-                ?.kind == ProblemKind.TOKEN_REJECTED
+                ?.kind == ProblemKind.TOKEN_REJECTED &&
+                c.workouts.state.value.problem
+                    ?.kind == ProblemKind.TOKEN_REJECTED &&
+                c.profile.state.value.problem == ProfileProblem.TokenRejected
         }
         val asked = service.received.size
         c.screenOpened(RefreshTarget.Rides)

@@ -222,24 +222,27 @@ class AppContainerPlanTest {
         val c = container("plan-set")
         c.configure()
         await("the list is there") { c.planState.workouts.map { it.id } == listOf("icu-1", "icu-2") }
-        val request = service.planRequests.single()
-        assertEquals("from=2026-11-18&to=2026-12-01", request.query)
-        assertEquals("Bearer ${service.token}", request.authorization)
-        assertEquals("GET", request.method)
-        assertEquals(0, request.body.size)
+        // Every request is the fortnight, with the token, a GET with no body. How many there are is not the point: a request the
+        // start made and a settings change abandoned a moment later is made again.
+        assertTrue(service.planRequests.isNotEmpty())
+        for (request in service.planRequests) {
+            assertEquals("from=2026-11-18&to=2026-12-01", request.query)
+            assertEquals("Bearer ${service.token}", request.authorization)
+            assertEquals("GET", request.method)
+            assertEquals(0, request.body.size)
+        }
         assertTrue(c.planState.visible && c.planState.loaded)
         assertFalse(c.planState.stale)
         assertEquals("2026-11-18T06:30:00Z", c.planState.generatedAt)
         await("kept on disk") { cachedIds() == listOf("icu-1", "icu-2") }
 
-        // The Ready screen opening within the minute asks nothing more; the rider's refresh does (it is dropped while one
-        // is still finishing, so it is pressed until it has asked).
+        // The Ready screen opening within the minute asks nothing more (the call returns when it has decided); the rider's
+        // refresh does, whenever it is pressed: it waits for a request under way and asks once more.
+        val asked = service.planRequests.size
         runBlocking { c.plan.refresh(PlanRefresh.SCREEN_OPENED) }
-        assertEquals(1, service.planRequests.size)
-        await("the rider's refresh asked") {
-            c.refreshPlan()
-            service.planRequests.size >= 2
-        }
+        assertEquals("within the minute: not asked again", asked, service.planRequests.size)
+        c.refreshPlan()
+        await("the rider's refresh asked") { service.planRequests.size > asked }
     }
 
     @Test
@@ -292,16 +295,14 @@ class AppContainerPlanTest {
         val c = container("plan-token")
         c.configure(token = "tok-wrong-0123456789abcdef0123456789abcdef")
         await("the token is rejected") { c.planState.problem == PlanProblem.TokenRejected }
-        assertEquals(1, service.planRequests.size)
         assertEquals(PlanUi.TOKEN_REJECTED, PlanUi.of(c.planState, emptyList(), today, 0L).status)
 
+        val asked = service.planRequests.size
         runBlocking { c.plan.refresh(PlanRefresh.SCREEN_OPENED) }
         runBlocking { c.plan.refresh(PlanRefresh.START) }
-        assertEquals("not asked again by itself", 1, service.planRequests.size)
-        await("the rider's refresh asked") {
-            c.refreshPlan()
-            service.planRequests.size >= 2
-        }
+        assertEquals("not asked again by itself", asked, service.planRequests.size)
+        c.refreshPlan()
+        await("the rider's refresh asked") { service.planRequests.size > asked }
         await(
             "and it is rejected again",
         ) { c.planState.problem == PlanProblem.TokenRejected && !c.planState.refreshing }

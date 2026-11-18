@@ -297,6 +297,9 @@ class AppContainerSyncTest {
     fun aRejectedTokenIsSaidOnceAndAChangedTokenOrSendNowTriesAgain() {
         val c = container("rejected")
         val id = ride(c)
+        // The ride's own kick (it is queued a moment after it is saved) is spent once the coordinator has found nowhere to upload.
+        // Until then it could reach the wrong token and ask on its own, so the settings change below is the only thing that asks.
+        await("it waits: nothing to send to") { c.sync.status.value == SyncStatus.NotConfigured(1) }
         c.configure(token = "tok-wrong-0123456789abcdef0123456789abcdef")
         await("the token is rejected") { c.sync.status.value == SyncStatus.TokenRejected(1) }
         assertEquals("one request, then silence", 1, service.received.size)
@@ -304,7 +307,7 @@ class AppContainerSyncTest {
         await("send now asked again") { service.received.size == 2 }
         await("and it is rejected again") { c.sync.status.value == SyncStatus.TokenRejected(1) }
         Thread.sleep(300)
-        assertEquals(2, service.received.size)
+        assertEquals("nothing else asks by itself", 2, service.received.size)
 
         // The right token, typed: tried again without a restart.
         c.configure()
