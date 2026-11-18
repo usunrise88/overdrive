@@ -216,13 +216,13 @@ build's `aapt_rules.txt` and `mapping.txt`, and the manifest of the release APK 
 | Claim | Where it is settled |
 |---|---|
 | The sideloaded APK's "Display over other apps" toggle is available on Android 15 ZUI | bench 1.3, 1.4 |
-| `createWindowContext` gives the right bounds on the tablet; cutouts and split screen | bench 2.7, 2.15 |
-| Long press from the overlay brings the app to the front on Android 15 ZUI | bench 2.4, 2.12 |
-| A notification tap opens the app while another app is in front | bench 2.12 |
-| Dragging drops no frames at 60, 90 and 120 Hz, and makes no binder call per move | bench 2.5, 2.6 |
-| The overlay is drawn over DRM video and appears (or not) in screen recordings | bench 2.2 |
-| ZUI keeps the specialUse service alive for an hour with the screen off | bench 2.8, 2.9, 2.10 |
+| `createWindowContext` gives the right bounds on the tablet; cutouts and split screen | bench 6.7, 6.15 |
+| Long press from the overlay brings the app to the front on Android 15 ZUI | bench 6.4, 6.12 |
+| A notification tap opens the app while another app is in front | bench 6.12 |
+| Dragging drops no frames at 60, 90 and 120 Hz, and makes no binder call per move | bench 6.5, 6.6 |
+| The overlay is drawn over DRM video and appears (or not) in screen recordings | bench 6.2 |
+| ZUI keeps the specialUse service alive for an hour with the screen off | bench 6.8, 6.9, 6.10 |
 | `connectedDevice` plus `specialUse` starts with "Nearby devices" allowed, and `specialUse` alone starts without it (Android 14+) | bench 3.16 |
-| Blur behind the window looks right and does not cost frames | bench 2.14 |
-| The bottom-edge resize shows no visible jump | bench 2.7 |
-| Battery overhead is under 3% an hour (spec §7.3) | bench 2.11 |
+| Blur behind the window looks right and does not cost frames | bench 6.14 |
+| The bottom-edge resize shows no visible jump | bench 6.7 |
+| Battery overhead is under 3% an hour (spec §7.3) | bench 6.11 |

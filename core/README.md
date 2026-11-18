@@ -31,7 +31,9 @@ Currently implemented:
 
 The Android side of Bluetooth (the `GattTransport` on `BluetoothGatt`, scanning, permissions, remembered devices, pairing and the
 Devices screen) is in `android/` (M3-2, ADR 0010), and so are the storage, recovery and share buttons (M2b-2, ADR 0008). The
-Click's wiring into the app, the outbox on disk and the settings are M4-2.
+Click's wiring into the app (ownership, the Devices row, Learn buttons, the developer settings), the outbox on disk and the sync
+settings are there too (M4-2, ADR 0012). **Phase 1 of `core` is complete; no part of it has run against real hardware yet**, which
+is what `docs/bench-checklist.md` is for.
 
 The first section below is the real engine; the one after it is the UI's view of a session
 (`RideSession`, `RideSnapshot`), which the engine and the simulated session both provide.
@@ -172,8 +174,10 @@ controls.start()
 - **The mapping** (`ButtonMapping`, role to the Click's bits, stored as text with `serialize` and `parse`) has an ergonomic default
   and is replaced by *Learn buttons*: feed `ButtonLearner` the `held` mask after each change; it asks for one press per role
   and refuses a combo or a duplicate.
-- **The router** (`ActionRouter`) is the rule of the app's `RideActions` restated in `core`: in an ERG step the gear actions change
-  intensity by 5 points, the pause toggle works while riding or paused.
+- **The router** (`ActionRouter`) is **the one routing rule**: the app's `RideActions` (the ride screen's buttons) delegate to it, so an
+  on-screen button and a handlebar button cannot diverge. In an ERG step the gear actions change intensity by 5 points, the pause
+  toggle works while riding or paused. `ActionRouter({ session }, media) { snapshotOf(it) }` takes an optional accessor for a host that
+  keeps its own copy of the state; the default reads the session's own snapshot.
 - **The fake in your tests.** `FakeClick` (`world.add(id, FakeClick())`) answers `RideOn 02 03`, delivers frames, and can be
   `lock = HIDDEN` or `SILENT`; `fake.script { tap(ClickBits.PLUS, at = 3.seconds); hold(...); drop(...); silence(...); unlock(...) }`.
   See `ClickDeviceTest`, `ClickRideTest` (all ten actions through the real engine) and the sessions in
@@ -183,8 +187,8 @@ controls.start()
 
 `SyncCoordinator(scope, outbox, { provider }).start()`; when a ride is stored, `coordinator.rideFinished(OutboxEntry.of(record, now))`
 returns at once. `NoopSyncProvider` acknowledges nothing, so every ride stays in the outbox for Phase 2; a failing provider or outbox is a
-`SyncStatus`, never an exception, and never reaches the ride. `InMemoryOutbox` is the stage's stand-in; the on-disk one is the
-app's (M4-2). There is no network code and no payload format here.
+`SyncStatus`, never an exception, and never reaches the ride. `InMemoryOutbox` is the tests' stand-in; the on-disk one is the app's
+(`FileOutbox` in `android/data`, ADR 0012). There is no network code and no payload format here.
 
 ### Workouts (`app.overdrive.core.workout`)
 

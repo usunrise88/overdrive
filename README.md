@@ -43,5 +43,10 @@ Self-hosted deployment is `docker compose up -d --build` (see [`compose.yaml`](c
 
 ## Status
 
-Bootstrap. The repository structure, toolchains and CI are in place; Phase 1 (Android ride app MVP)
-starts with the design step in [`design/`](design).
+**Phase 1 (Android ride app MVP) is built and waiting for the bench.** All four stages are done (see
+[`docs/roadmap.md`](docs/roadmap.md)): the design system and the overlay, the ride engine and workouts with crash recovery and
+FIT export, the Bluetooth layer for the trainer and the heart-rate strap, and the Zwift Click with the gesture layer, *Learn
+buttons*, the developer settings and the sync outbox. Everything a JVM can prove is proved and green in CI; **nothing has run on
+the tablet, the bike or a real Click yet.** The owner's bench is next: [`docs/bench-checklist.md`](docs/bench-checklist.md) is the
+one ordered list to run, and [`docs/phase1-acceptance.md`](docs/phase1-acceptance.md) says what is automatic and what the bench
+confirms. Phase 2 (web service, planned workouts, upload) starts after it.

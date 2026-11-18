@@ -258,6 +258,8 @@ The plain path on the right puck, in `core` (`app.overdrive.core.click`, `app.ov
 
 **Vectors.** The ones the code is tested against are synthetic, derived by hand from the notes, never captured: **CK-V1** the neutral frame `23 08 FF FF FF FF 0F` (§4); **CK-V2 to CK-V7** one pressed button each, by the varint rule of the §4 table: A `EF FF FF FF 0F`, B `DF FF FF FF 0F`, Y `BF FF FF FF 0F`, Z `FF FE FF FF 0F`, Plus `FF DF FF FF 0F`, Plus's second bit `FF BF FF FF 0F` (each after `23 08`); **CK-V8** A and Plus together `EF DF FF FF 0F`; **CK-V9** battery `19 10 1F` = 31 % (§4); **CK-V10** heartbeat `15`; **CK-V11** `3C 01 02` unrecognised; **CK-V12** `FE`; **CK-V13** the handshake `52 69 64 65 4F 6E`; **CK-V14** the reply `RideOn 02 03`, with and without a 64-byte tail; **CK-V15** `FF 04 00` (all in `ClickCodecTest`). Beyond them: fields in another order and unknown fields skipped, a ten-byte varint, every wire type, every proper prefix, random bytes of every short length and an encode-and-decode round trip, none of which may throw.
 
+**Wired into the app (stage M4-2, ADR 0012).** The same code runs in the ride app over the Android transport: the Click is paired from the Devices scan, owned by the container, driven through the one routing rule, and its options are switches in Settings, Developer · Click. **Each question below has a step in `docs/bench-checklist.md`, session 5** (the coverage table there maps CK 1 to CK 14); the app's Bluetooth session files (`...-click.txt`) are the recordings. Nothing was observed on a Click yet.
+
 **Which option settles which question of section 9** (the names are `ClickOptions` unless noted):
 
 | Question | Option or constant |

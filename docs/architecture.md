@@ -48,7 +48,7 @@ point that reaches the external services. The ride app works fully offline.
 | Companion app (phone) | `android/app-companion` | Kotlin, Compose |
 | Shared pure-Kotlin core | `core` | Kotlin Multiplatform (JVM target) |
 | BLE transport | `android/ble` | Android library |
-| Local database, outbox, sync client | `android/data` | Android library |
+| Ride files, sync outbox (`FileOutbox`, Phase 1); the sync client is Phase 2 | `android/data` | Android library |
 | Design system | `android/ui-kit` (design sources in `design/`) | Compose |
 | Web service | `server` | TypeScript on Node, PostgreSQL |
 | Wire formats and shared fixtures | `contracts` | JSON Schema, JSON fixtures |

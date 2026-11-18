@@ -237,12 +237,12 @@ stack.** Each row is named in `docs/bench-checklist.md` (the step that settles i
 | T3 | A callback that never arrives is caught by the 5 s watchdog and the link is rebuilt cleanly | `GattTimings.abandonedGrace` | 3.12 |
 | T4 | The return codes of `writeCharacteristic`/`writeDescriptor` (Android 13 and later) and the boolean forms (before) map as written | `BluetoothGattShim` (`startOfStatusCode`) | 3.4, 3.5 |
 | T5 | `setCharacteristicNotification` plus the CCCD write is enough on this stack (no `refresh()` of the GATT cache is needed) | `BluetoothGattShim.enable` | 3.2 |
-| P1 | One system question covers both `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT` on this ROM | `rememberBluetoothFix` | 1.7 |
-| P2 | After a refusal the system stops asking and **Open settings** reaches the app's page | `BluetoothController.openAppSettings` | 1.7 |
+| P1 | One system question covers both `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT` on this ROM | `rememberBluetoothFix` | 2.1 |
+| P2 | After a refusal the system stops asking and **Open settings** reaches the app's page | `BluetoothController.openAppSettings` | 2.1 |
 | P3 | `ACTION_BLUETOOTH_SETTINGS` opens the Bluetooth page on this ROM | `BluetoothController.openBluetoothSettings` | 3.13 |
 | R1 | The adapter-state broadcast and `refresh()` on resume are enough to follow Bluetooth being switched and the permission being changed | `AndroidBleEnvironment` | 3.13 |
 | F1 | `connectedDevice` plus `specialUse` starts with the permission and `specialUse` alone starts without it; `dumpsys` shows the types as designed | `ForegroundServiceTypes`, `OverlayService` | 3.13, 3.16 |
-| F2 | Android 15's time limits do not stop a `connectedDevice` plus `specialUse` service during an hour's ride (ADR 0006) | the manifest | 2.8 to 2.10 |
+| F2 | Android 15's time limits do not stop a `connectedDevice` plus `specialUse` service during an hour's ride (ADR 0006) | the manifest | 6.8 to 6.10 |
 | L1 | A 2 MB file, 60 files and 20 MB are enough, and the share sheet takes several `text/plain` files at once | `BleLogLimits`, `BleLogShare` | 3.17 |
 | H1 | Everything the adapters assume about the D500 and the HR7 (ADR 0009 section 8) | `core` | FT 1 to FT 12 |
 

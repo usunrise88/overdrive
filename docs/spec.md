@@ -105,6 +105,9 @@ Phase 1 delivers a complete offline ride: connect the devices, ride free or play
 - **Trainer (FTMS).** Subscribe to Indoor Bike Data for power, cadence and speed. Use the Fitness Machine Control Point to request control, set target power (ERG), and set simulation parameters (grade, rolling and wind resistance). Read Fitness Machine Feature and Status. FTMS is an open Bluetooth SIG specification (Fitness Machine Service 1.0), not an ISO standard.
 - **Heart rate.** Standard Heart Rate Measurement characteristic. Record RR intervals when the strap sends them.
 - **Click v2.** Zwift's proprietary encrypted protocol, ported from BikeControl. Button down and up events are delivered to the gesture layer.
+  *As built (M4-1, M4-2):* not ported. The code is written from our own research notes, `docs/protocols/click-v2.md` (public
+  sources, clean room), and implements only the **plain path on the right puck**: discovery, the `RideOn` handshake and the button
+  bitmap. **Nothing here encrypts or unlocks a controller**; a locked one is reported (§4.7) and the ride goes on without it.
 - **Reconnect.** Each device reconnects on its own with backoff. A dropout never stops the ride; missing values are recorded as gaps.
 - **Pairing.** One setup screen scans and remembers the three devices. Later launches connect without user action.
 - *Settled in stage M3-1* (`app.overdrive.core.ble`, ADR 0009; written from `docs/protocols/ftms-hr.md`, **nothing observed
@@ -136,7 +139,7 @@ Phase 1 delivers a complete offline ride: connect the devices, ride free or play
   the permission check). **Pairing** is on the **Devices** screen, not a separate setup screen: **Scan for devices** lists
   trainers and straps apart by advertised name with the signal as a word ("Strong · −58 dBm"), a tap pairs; one trainer and one
   strap are remembered (`DeviceStore`), a new pairing replaces the old one, **Forget** removes it, and neither is offered while
-  a ride is live. The Click row stays the simulated placeholder until M4. **Remembered devices are owned by the app container,
+  a ride is live. (The Click row was a simulated placeholder until M4-2, where it became the real Click.) **Remembered devices are owned by the app container,
   not by a ride**: they connect when the app starts with no user action, keep their links between rides and reconnect with the
   backoff above, and a ride session only uses them. A Devices row reads Connected, Connecting, "Connection lost · retrying in
   N s", "Not found · retrying in N s", Bluetooth off, needs Nearby devices, or Not paired; **Retry now** cuts a wait. Bluetooth
@@ -251,6 +254,35 @@ One controller, the right Click v2, drives everything with two gestures: press a
   signal is an option), not found, Bluetooth unavailable, set-up failed. A release lost in a dropped link is made by the adapter,
   so no button is left held. The ride never depends on any of it.
 
+**Settled in stage M4-2** (`android/ble`, `android/app-ride`, ADR 0012; **nothing run on a Click yet, and the tablet's Bluetooth
+stack has not been run on a radio either**):
+
+- *The Click is a long-lived device of the app, like the trainer and the strap.* It is paired from the **Devices** scan
+  (listed under "Handlebar controllers" as "Zwift Click (right)": told by its manufacturer data and its service, never by its
+  name, and only the right puck unless a developer setting says either), remembered (`DeviceStore`), connected when the app
+  starts, and owned by the container, so **no ride session ever closes it** and it keeps its link between rides. It is never a
+  ride input: pairing or forgetting it does not rebuild a ride. A different Click replaces the old one cleanly, and a button
+  held on the old one is released first.
+- *One routing rule.* The Click's gesture layer (`HandlebarControls`) calls `ActionRouter`, and the ride screen's buttons
+  (`RideActions`) delegate to the same router, so a handlebar button and an on-screen button cannot diverge. The container
+  runs the chain in its own scope, **with no activity**: a press with another app in front reaches the ride as one with the
+  app on screen does. The foreground service of a live ride is what keeps the process alive; **that it does so with the
+  screen off on this tablet, and that a media key from a background process reaches a video app, are bench items** (ADR 0012).
+- *The Click's row* says what it is doing in plain words: Connected (with the battery once the Click has said), Connecting,
+  "checking it answers", "Not found · retrying in N s", "Connection lost · …", "Could not connect · …", Bluetooth off or
+  Nearby devices missing, and **locked**. A locked Click gets one notice, in two wordings by the sign that gave it away: the
+  Zwift service is hidden ("Click is locked": "Zwift has it locked. Unlock it through Zwift once; the ride continues without
+  it.") or it answered and says nothing ("Click sends no presses": "It is connected but silent. Unlock it through Zwift once;
+  the ride continues without it."). Neither is ever an error of the ride.
+- *Learn buttons* (Devices, offered with a connected Click and no live ride) asks for the five roles in turn, rejects a
+  combination and a duplicate with a plain message, can be cancelled, and saves the mapping (`ButtonMapping.serialize`) in the
+  settings; a stored value that is not a valid mapping reads as the default. **Reset to default** puts it back. The Click does
+  nothing while the lesson runs, so a press made to be learned never moves the ride, and a ride that goes live ends the lesson.
+- *Developer settings for the bench* (Settings, **Developer · Click**, persisted and sanitised, a change reconnects only the
+  Click): the setup message `FF 04 00`, the handshake with response, the reply check, the keep-alive, the silence limit, the
+  message size, whether a scan result must list the service, which pucks a scan lists, and the two gesture timings (hold
+  threshold 250 to 1000 ms, volume repeat 50 to 500 ms; the spec's 500 ms and 150 ms are the defaults), with **Reset**.
+
 ### 4.8 FIT export
 
 - One FIT activity file per ride. FIT is Garmin's published format, written with the FIT SDK profile.
@@ -295,6 +327,23 @@ idempotent per ride id) with the in-memory `InMemoryOutbox`, the persistent one 
 `SyncCoordinator` drains the outbox oldest first with the project's backoff (5 s, doubling, 15 minutes at most), and never
 blocks or fails a ride: finishing a ride only queues it. With the no-op provider every ride stays queued for Phase 2.
 
+**Settled in stage M4-2** (`android/data` `FileOutbox`, `android/app-ride`, ADR 0012):
+
+- The persistent outbox is `FileOutbox`: an append-only journal in `filesDir/sync/outbox.log`, one checksummed line per entry
+  (`E`) or upload (`D`), forced to storage before a call returns, with a torn last line ignored and the file compacted through
+  a temporary file and an atomic rename. A ride is queued **once, ever** (the journal remembers uploaded ids). It grows by about
+  100 bytes a ride; nothing is trimmed, because a ride that was not uploaded must not be forgotten.
+- Every stored ride is announced to it: a ride that has just finished, a recovered one the rider kept, one completed silently at
+  start, and at each start every ride already on disk (an outbox that has seen a ride ignores it, so this only catches one
+  whose entry was lost between two steps). A tablet updated from an alpha therefore queues the rides it already holds, once.
+- The container runs a `SyncCoordinator` over `NoopSyncProvider`: **nothing is uploaded**, every ride waits for Phase 2, and the
+  app has no network code, no `INTERNET` permission and no payload format. A ride is never failed by its outbox.
+- Settings, **Sync**: the service address and the token are stored and **not used** ("Not used yet"), with the number of rides
+  waiting. The address must be `http(s)://` with a host and no user name or password, at most 2048 characters; its scheme and
+  host are written in lower case and an address that fails is explained and not stored. The token loses control characters and
+  surrounding spaces and is cut at 512 characters; it prints as dots, is hidden until **Show**, is never written to a log, a
+  ride record or the outbox, and is not backed up (`allowBackup` is off).
+
 ### 4.10 Acceptance criteria
 
 1. A 60-minute free ride completes with video playing full screen and the overlay visible throughout.
@@ -304,6 +353,10 @@ blocks or fails a ride: finishing a ride only queues it. With the no-op provider
 5. Killing the app mid-ride and relaunching recovers the ride.
 6. The exported FIT file opens correctly in intervals.icu with power, heart rate, cadence and laps.
 7. Dragging the overlay drops no frames at the tablet's refresh rate.
+
+**Status at the end of Phase 1 (`v0.1.0`).** Everything a JVM can prove is proved and green in CI; **no criterion is confirmed
+on the device yet**. `docs/phase1-acceptance.md` says, for each criterion, what is automatic and what the owner's bench
+settles (`docs/bench-checklist.md`), and has the table where a confirmation is recorded with its date.
 
 ## 5. Phase 2: Web service and planned workouts
 
@@ -482,6 +535,11 @@ Keeping `core` free of Android code costs almost nothing now and leaves an iOS p
 
 Four contracts hold the system together: the workout file, the ride record, the sync API and the MCP tool set. Names and fields here are a first draft to be fixed during implementation.
 
+*Status at the end of Phase 1:* §8.1 (workout format) and §8.2 (ride record) are settled and live in `contracts/` with their
+fixtures, read and written by `core` and checked by the TypeScript side. §8.3 and §8.4 are Phase 2 and stay a first draft. The
+outbox entry of §4.9 is **not** a wire format (ride id, enqueue time, start time, duration, title); what an upload sends is
+Phase 2's to settle, here, with its schema in `contracts/`, before any client or service code.
+
 ### 8.1 Workout format
 
 Native JSON, version-tagged. Targets are fractions of FTP. Durations are seconds.
@@ -585,18 +643,22 @@ Read tools return compact summaries by default and full series only on request, 
 
 One risk can change how a ride starts: the Click v2 unlock. The rest are small checks that resolve during development and block nothing.
 
-| Item | What is unknown | How it gets resolved | Fallback |
-|---|---|---|---|
-| Click v2 unlock bypass | Whether the no-unlock method from BikeControl 6.0.0 is in the open-source code or only in the paid build | Read the BikeControl repository before starting the Click module | Unlock once through Zwift before a ride. On-screen controls always work. |
-| Click firmware | A firmware update could break the bypass | Never update the Click. Decline the prompt in Zwift Companion. | Same as above |
-| Click v2 reliability | Zwift forum users report random disconnects | Watch for it during the first rides | Auto-reconnect; on-screen controls |
-| RR intervals from the Coospo strap | Whether the strap sends them | Visible in the first build, or in nRF Connect | Ride HRV data is simply absent |
-| Sleep stages in Health Connect | Whether OHealth writes stages or only session duration | First companion build reads the record | Sleep analysis uses duration and timing only |
-| HRV from the watch | Whether Wear OS passive monitoring exposes HRV on the OnePlus Watch 3 | One-evening probe on the watch, optional | Recovery model without HRV, already the baseline |
-| Strava map for virtual rides | Whether positions in the FIT file render a map | First test upload in Phase 2 | Rides appear without a map |
-| Gear feel | Whether a 1% grade step per gear feels right on the D500 | Tune by riding in Phase 1 | Step and gear count are settings |
-| ZUI background limits | Whether the China ROM interferes with the foreground service | First long ride on the tablet | Battery and autostart exemptions |
-| Literature citations | The references in section 10 were cited from memory | Verify each before relying on it | None needed for implementation |
+| Item | What is unknown | How it gets resolved | Fallback | Bench step |
+|---|---|---|---|---|
+| Click v2 unlock bypass | Whether the no-unlock method from BikeControl 6.0.0 is in the open-source code or only in the paid build | Read the BikeControl repository before starting the Click module. **Answered by research: it is not in the open code** (implementation notes below); the plain path is built, and only the bench can say whether a right puck delivers without an unlock | Unlock once through Zwift before a ride. On-screen controls always work. | 5.2, 5.3, 5.4 |
+| Click firmware | A firmware update could break the bypass | Never update the Click. Decline the prompt in Zwift Companion. | Same as above | 5.1 (record the version) |
+| Click v2 reliability | Zwift forum users report random disconnects | Watch for it during the first rides | Auto-reconnect; on-screen controls | 5.8, 5.10, 5.11 |
+| RR intervals from the Coospo strap | Whether the strap sends them | Visible in the first build, or in nRF Connect | Ride HRV data is simply absent | 4.2 |
+| Sleep stages in Health Connect | Whether OHealth writes stages or only session duration | First companion build reads the record | Sleep analysis uses duration and timing only | none (Phase 3) |
+| HRV from the watch | Whether Wear OS passive monitoring exposes HRV on the OnePlus Watch 3 | One-evening probe on the watch, optional | Recovery model without HRV, already the baseline | none (Phase 3) |
+| Strava map for virtual rides | Whether positions in the FIT file render a map | First test upload in Phase 2 | Rides appear without a map | 7.7 (optional) |
+| Gear feel | Whether a 1% grade step per gear feels right on the D500 | Tune by riding in Phase 1 | Step and gear count are settings | 3.6 |
+| ZUI background limits | Whether the China ROM interferes with the foreground service | First long ride on the tablet | Battery and autostart exemptions | 1.3, 1.6, 6.9 to 6.12, 6.17, 5.11 |
+| Literature citations | The references in section 10 were cited from memory | Verify each before relying on it | None needed for implementation | none (desk task) |
+
+The bench steps are those of `docs/bench-checklist.md`. The protocol notes have their own numbered questions (`FT n` in
+`docs/protocols/ftms-hr.md` §9, `CK n` in `docs/protocols/click-v2.md` §9, `FIT n` in `docs/protocols/fit.md` §8), each mapped
+to a step in the checklist's coverage tables.
 
 **Open decisions**
 
@@ -666,6 +728,9 @@ live spec document.
   unlock for Pro users, and the "right side only" mode came later. Consequence: Phase 1 implements the
   documented path (discovery, the `RideOn` write, the button bitmap) and falls back to the unlock
   notice of §4.7; the no-unlock handshake is a bench-test item. Details: `docs/protocols/click-v2.md`.
+- **§4.7 and §4.9, M4-2.** The Click is built clean room from `docs/protocols/click-v2.md` alone (no code from BikeControl, the
+  Zwift Play library or trainer-control), encryption stays unimplemented, and the sync outbox is on disk but uploads nothing.
+  Decisions and what only the bench can settle: `docs/adr/0012-click-on-android-and-sync-outbox.md`.
 - **§10, prior-art licences.** `intervals-icu-health-sync` is AGPL-3.0 (not GPLv3) and
   `intervals-mcp-server` is GPL-3.0. BikeControl is GPL-3.0 up to tag `gpl3` and under a
   Non-Commercial licence after it, so nothing from later versions may be copied. See

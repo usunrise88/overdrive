@@ -289,7 +289,8 @@ as first drawn, with the sync line of Phase 2.
 
 Two columns. Left: hint "Paired devices connect on their own when the app starts." and the
 device rows (§7.7) for Trainer, Heart rate, Click. Right: "Click buttons" card with the
-press/hold mapping table and the ERG note, and "Change button mapping" (secondary).
+press/hold mapping table with the Click's own name of each role's button under the role, the ERG note, and under the card
+**Learn buttons** (primary) and **Reset to default** (ghost; off while the mapping is the default).
 
 **Pairing and Bluetooth (stage M3-2).** Under the hint, in this order, **one** of the following blocks applies:
 
@@ -307,8 +308,29 @@ press/hold mapping table and the ERG note, and "Change button mapping" (secondar
 - **Simulated devices (Developer setting):** the hint says "These are simulated devices. Switch to Bluetooth under Settings,
   Developer, Devices."; no pairing, no **Forget**.
 
-A row that has a paired device ends with a ghost **Forget** (40 dp) after its status. The Click row stays the labelled
-placeholder until M4.
+A row that has a paired device ends with a ghost **Forget** (40 dp) after its status.
+
+**The Click (stage M4-2).** The mock-up `design/mockups/devices.html` is the M1 drawing and still shows the disabled "Change button
+mapping"; **Learn buttons** replaced it. The Click row is real. Scan results gain a section "Handlebar controllers" (label, text 3) whose
+rows read "Zwift Click (right)" over the signal. **Learn buttons** is enabled only with the Click connected and no ride live;
+otherwise it is off and one line under the buttons (label, text 3) says why: "Not during a ride.", "Connect the Click to learn
+its buttons." or, with simulated devices, "Learning needs the real Click: switch to Bluetooth under Settings, Developer."
+
+### 6.5b Learn buttons (`learn--*.png`)
+
+A full screen with the back top bar ("Learn buttons"), two columns like Devices, **no confirmation dialogs** and no decoration.
+Left: the step (label, text 3, "Step 3 of 5"), the question (title, "Press the button you want as Button 3"), what the role does
+(label, text 2, "Play or pause · hold for pause or resume ride"), the instruction (label, text 3, "Press and release one button,
+then wait."), then when the last press was refused one Notice (§7.6, no action): "One button at a time" / "Two buttons were
+pressed together. Press just the one you want as Button 3." or "That button is taken" / "It is already Plus. Press a different
+one for Button 3."; then **Cancel** (secondary) and **Reset to default** (ghost). Right: one card of the five roles (two-line
+rows, 8 dp padding), each with a marker (a `check` once set, a 10 dp text-1 dot for the one being asked and a `surface2` fill on
+the row, an empty 10 dp `surface3` dot for the rest), the role (bodyStrong) over what it does (label, text 2), and at the right
+the Click's own name of the button (bodyStrong: `Y`, `Z`, `A`, `B`, `Plus`), "Press now" for the one being asked and "—" for the
+rest. When all five are set the left column says "All five set", "The Click has its new buttons" and "They are saved. The Click
+does nothing until you press Done, so a press cannot move the ride.", and **Cancel** becomes **Done** (primary). If the Click
+drops meanwhile the instruction says "The Click is not connected. Reconnect it to go on." in text 1. The Click's own presses
+are the only input; nothing animates.
 
 ### 6.6 Settings (`settings--settings.png`)
 
@@ -326,7 +348,13 @@ Two columns of grouped cards; group label (label, text 3) above each card; setti
   early builds), **Share Bluetooth logs** (the row says "4 files · 120 KB" or "No logs yet", or what the last share could not
   do; a secondary 40 dp **Share** button with `share-2`, off while there are no logs), then the simulated-ride rows (Demo speed,
   Scripted dropouts, Simulated Click). The logs hold heart-rate values: they leave the tablet only through **Share**.
-- Later groups (Click mapping, Sync URL and token, About) use the same row.
+- **Sync** (stage M4-2), right column under the physics card: **Service address** and **Token** are *field rows* (title and note
+  on top, the 48 dp field under them, surface2 with the border, radius 8; a refused address shows its reason under the field in
+  label, text 1). Both notes say "Not used yet" (the token's adds "It stays on this tablet"); the token shows as dots, with a
+  ghost **Show** / **Hide**; **Waiting to upload** is a setting row whose value (numXS, right) is "3 rides".
+- **Developer · Click** (stage M4-2), last in the right column: setting rows only (switches, segmented controls, steppers with
+  "ms") for the Click's connection options and the two gesture timings, and a final **Reset** (secondary, off at the defaults).
+- Later groups (About) use the same row.
 
 ## 7. Components
 
@@ -391,10 +419,13 @@ found. No colour, no border.
 | Connected | icon text 1 | "Coospo HR7 · battery 80%" | `check` 16 dp + "Connected" (label, text 2) |
 | Connection lost | icon text 1 | `triangle-alert` 16 dp + "Connection lost · retrying in 8 s" ("Not found · …", "Could not connect · …", "Not a trainer · check the pairing") in text 1; the seconds count down once a second, only while it waits | **Retry now** (secondary) |
 | Blocked (stage M3-2) | icon text 1 | `triangle-alert` 16 dp + "D500 · Bluetooth is off" or "· needs Nearby devices" in text 1 | none: the Notice above the rows holds the one action |
-| Click locked | icon text 1 | "Zwift Click v2 · connected" | "No presses" (label, text 1) + the notice below the row: title "Click is locked", text "It is connected but sends no button presses. Unlock it once in the Zwift app, then check again. You can ride without it; every action is on screen.", button **Check again** |
+| Click connected (M4-2) | icon text 1 | "Zwift Click (right) · battery 87%" (the battery once the Click has said) | `check` 16 dp + "Connected" |
+| Click checking (M4-2) | icon text 1 | "Zwift Click (right) · checking it answers" | spinner ring |
+| Click locked | icon text 1 | "Zwift Click (right) · locked" | "No presses" (label, text 1) + the notice below the row, in **two wordings by the sign** (stage M4-2, spec §4.7): the Zwift service is hidden: title "Click is locked", text "Zwift has it locked. Unlock it through Zwift once; the ride continues without it."; it answers and says nothing: title "Click sends no presses", text "It is connected but silent. Unlock it through Zwift once; the ride continues without it."; button **Check again** |
 
 A row that has a paired device (stage M3-2) ends with a ghost **Forget** button, 40 dp, after the status. Searching reads
-"Connecting to <name>…".
+"Connecting to <name>…". The Click's lost and blocked rows read like the others' ("Not found · retrying in 8 s", "Connection
+lost · …", "Could not connect · …", "Zwift Click (right) · Bluetooth is off").
 
 **Top-bar device status:** three 16 dp icons in the same order, text 2 when connected, text 3
 when not paired, text 1 + `triangle-alert` when lost, blocked or locked. Tapping opens Devices.
