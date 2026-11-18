@@ -20,6 +20,8 @@ import { createRideWorkoutResolver, type RideWorkoutResolver } from "./ride-work
 import { createStrava, STRAVA_DESTINATION, type StravaUploads } from "./strava/index.ts";
 import { createTelegram, type TelegramBot } from "./telegram/index.ts";
 import type { Timers } from "./timers.ts";
+import { createRideHeartRateIndex } from "./wellness/heart-rate-index.ts";
+import { createWellness, type WellnessService } from "./wellness/service.ts";
 
 /** The part of the configuration the integrations read; all optional, with the defaults of `config.ts`. */
 export type ServicesConfig = Partial<
@@ -30,6 +32,10 @@ export type ServicesConfig = Partial<
     | "INTERVALS_BASE_URL"
     | "PLAN_REFRESH_MINUTES"
     | "TIMEZONE"
+    | "WELLNESS_SOURCE_ORDER"
+    | "WELLNESS_PULL_HOURS"
+    | "WELLNESS_BASELINE_DAYS"
+    | "WELLNESS_NIGHTS_NEEDED"
   >
 > &
   IntegrationsSettings &
@@ -65,7 +71,12 @@ export interface Services {
   calendar: CalendarMirror | null;
   /** The Telegram bot (ADR 0019); null when TELEGRAM_BOT_TOKEN is not set. */
   telegram: TelegramBot | null;
-  /** Starts the refresher, the upload worker, the calendar mirror and the bot. */
+  /**
+   * Wellness, recovery and the watch's other activities (ADR 0023). Health Connect uploads need no key; the intervals.icu pull and
+   * the forwarding of the watch's activities run only with one.
+   */
+  wellness: WellnessService;
+  /** Starts the refresher, the upload worker, the calendar mirror, the bot, the wellness pull and its forwarding. */
   start(): void;
   /** Stops them and waits for what is in flight. */
   stop(): Promise<void>;
@@ -94,8 +105,12 @@ export function createServices(options: ServicesOptions): Services {
   const timezone = config.TIMEZONE ?? "UTC";
   const plan = createPlanStore(db, bus);
   const now = options.now;
-  const profile = createProfileStore(db, bus, now ?? (() => new Date()));
   const rides = createRideStore(db);
+  // The profile carries heart-rate estimates from the stored rides (ADR 0023).
+  const heartRates = createRideHeartRateIndex(db, rides, log);
+  const profile = createProfileStore(db, bus, now ?? (() => new Date()), () =>
+    heartRates.estimates(),
+  );
 
   let intervals: IntervalsClient | null = null;
   let refresher: PlanRefresher | null = null;
@@ -165,6 +180,30 @@ export function createServices(options: ServicesOptions): Services {
     sleep: options.sleep,
     timers: options.timers,
   });
+  const wellness = createWellness({
+    db,
+    bus,
+    profile,
+    rides,
+    intervals,
+    timezone,
+    log,
+    heartRates,
+    ...(now === undefined ? {} : { now }),
+    ...(options.timers === undefined ? {} : { timers: options.timers }),
+    ...(config.WELLNESS_SOURCE_ORDER === undefined
+      ? {}
+      : { sourceOrder: config.WELLNESS_SOURCE_ORDER }),
+    ...(config.WELLNESS_PULL_HOURS === undefined ? {} : { pullHours: config.WELLNESS_PULL_HOURS }),
+    settings: {
+      ...(config.WELLNESS_BASELINE_DAYS === undefined
+        ? {}
+        : { baselineDays: config.WELLNESS_BASELINE_DAYS }),
+      ...(config.WELLNESS_NIGHTS_NEEDED === undefined
+        ? {}
+        : { nightsNeeded: config.WELLNESS_NIGHTS_NEEDED }),
+    },
+  });
   let strava: StravaUploads | null = null;
   const stravaMode = stravaSettings(config);
   if ("on" in stravaMode) {
@@ -204,12 +243,14 @@ export function createServices(options: ServicesOptions): Services {
     timezone,
     calendar,
     telegram,
+    wellness,
     start() {
       void uploads?.start();
       void strava?.start();
       refresher?.start(config.PLAN_REFRESH_MINUTES ?? 15);
       void calendar?.start();
       telegram?.start();
+      wellness.start();
     },
     async stop() {
       await Promise.all([
@@ -218,6 +259,7 @@ export function createServices(options: ServicesOptions): Services {
         refresher?.stop(),
         calendar?.stop(),
         telegram?.stop(),
+        wellness.stop(),
       ]);
     },
   };

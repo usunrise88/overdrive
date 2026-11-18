@@ -26,6 +26,9 @@ export interface FakeActivity {
 /** An event as the fake stores and lists it: whatever was sent, plus an id. */
 export type FakeEvent = Record<string, unknown> & { id: number; start_date_local: string };
 
+/** An activity made without a file (`POST activities/manual`): whatever was sent, plus an id. */
+export type FakeManualActivity = Record<string, unknown> & { id: string };
+
 export interface RecordedRequest {
   method: string;
   path: string;
@@ -44,7 +47,14 @@ export interface FakeIntervals {
   url: string;
   requests: RecordedRequest[];
   activities: FakeActivity[];
+  /** The activities made by `POST activities/manual`, in the order they were made. */
+  manualActivities: FakeManualActivity[];
   events: FakeEvent[];
+  /**
+   * The athlete's wellness by local date, as `GET .../wellness` lists it: the fields intervals.icu has (restingHR, hrv, sleepSecs, ...).
+   * Everything in it is invented.
+   */
+  wellness: Record<string, Record<string, unknown>>;
   /** The `start_date` the next created activity gets. */
   nextActivityStart: string | null;
   duplicateStyle: DuplicateStyle;
@@ -99,7 +109,9 @@ export async function startFakeIntervals(): Promise<FakeIntervals> {
     url: "",
     requests: [],
     activities: [],
+    manualActivities: [],
     events: [],
+    wellness: {},
     nextActivityStart: null,
     duplicateStyle: "empty-200",
     uploadStatus: 201,
@@ -126,7 +138,9 @@ export async function startFakeIntervals(): Promise<FakeIntervals> {
     reset() {
       state.requests.length = 0;
       state.activities.length = 0;
+      state.manualActivities.length = 0;
       state.events.length = 0;
+      state.wellness = {};
       state.nextActivityStart = null;
       state.duplicateStyle = "empty-200";
       state.uploadStatus = 201;
@@ -185,15 +199,46 @@ export async function startFakeIntervals(): Promise<FakeIntervals> {
       return send(response, 401, { status: 401, error: "Unauthorized" });
     }
 
-    const match = /^\/api\/v1\/athlete\/([^/]+)\/(activities|events)(?:\/(\d+))?$/.exec(
-      url.pathname,
-    );
+    const match =
+      /^\/api\/v1\/athlete\/([^/]+)\/(activities\/manual|activities|events|wellness)(?:\/(\d+))?$/.exec(
+        url.pathname,
+      );
     if (match === null) return send(response, 404, { status: 404, error: "Not found" });
     const [, athlete, collection, idText] = match;
     if (athlete !== FAKE_ATHLETE_ID && athlete !== "0") {
       return send(response, 404, { status: 404, error: "Athlete not found" });
     }
     const method = request.method;
+
+    if (collection === "wellness" && method === "GET") {
+      const oldest = url.searchParams.get("oldest") ?? "0000-00-00";
+      const newest = url.searchParams.get("newest") ?? "9999-99-99";
+      return send(
+        response,
+        200,
+        Object.entries(state.wellness)
+          .filter(([date]) => date >= oldest && date <= newest)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([date, fields]) => ({ id: date, ...fields })),
+      );
+    }
+
+    if (collection === "activities/manual" && method === "POST") {
+      const body = json as Record<string, unknown> | undefined;
+      if (
+        body === undefined ||
+        typeof body.start_date_local !== "string" ||
+        typeof body.type !== "string"
+      ) {
+        return send(response, 422, {
+          status: 422,
+          error: "start_date_local and type are required",
+        });
+      }
+      const id = `i${nextActivityId++}`;
+      state.manualActivities.push({ ...body, id });
+      return send(response, 200, { ...body, id, icu_athlete_id: FAKE_ATHLETE_ID });
+    }
 
     if (collection === "activities" && method === "POST") {
       const form = await new Request("http://fake/", {
@@ -242,16 +287,21 @@ export async function startFakeIntervals(): Promise<FakeIntervals> {
     }
 
     if (collection === "activities" && method === "GET") {
-      return send(
-        response,
-        200,
-        state.activities.map((a) => ({
+      return send(response, 200, [
+        ...state.activities.map((a) => ({
           id: a.id,
           external_id: a.external_id,
           start_date: a.start_date,
           name: a.name,
         })),
-      );
+        ...state.manualActivities.map((a) => ({
+          id: a.id,
+          external_id: a.external_id ?? null,
+          // The start the athlete's clock read; the fake does not know the zone, so a manual activity is found by its external id.
+          start_date: null,
+          name: a.name ?? null,
+        })),
+      ]);
     }
 
     if (collection === "events" && method === "GET" && idText === undefined) {

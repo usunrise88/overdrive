@@ -8,6 +8,7 @@ import { planRoutes } from "./plan/routes.ts";
 import { profileRoutes } from "./profile/routes.ts";
 import { DEFAULT_LIMITS, type Limits, ridesRoutes } from "./rides.ts";
 import { createServices, type Services, type ServicesConfig } from "./services.ts";
+import { wellnessRoutes } from "./wellness/routes.ts";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -83,6 +84,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       });
       v1.register(planRoutes, { store: services.plan, refresher: services.refresher });
       v1.register(profileRoutes, { store: services.profile });
+      v1.register(wellnessRoutes, { service: services.wellness });
     },
     { prefix: "/v1" },
   );

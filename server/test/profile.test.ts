@@ -1,5 +1,10 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { defaultProfile, type Profile, validateProfile } from "@overdrive/contracts";
+import {
+  defaultProfile,
+  type Profile,
+  validateProfile,
+  withHeartRateKeys,
+} from "@overdrive/contracts";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "../src/db.ts";
 import type { ProfileChangedEvent } from "../src/events.ts";
@@ -196,6 +201,16 @@ describe("the contract's patch fixtures", () => {
           ] as const,
       );
 
+  /**
+   * What the service answers for a fixture's profile: the four heart-rate keys are always written (the old fixtures lack them), and
+   * the estimates are the stored rides' (none here), never what a fixture says.
+   */
+  const shown = (profile: Profile): Profile => ({
+    ...withHeartRateKeys(profile),
+    estimatedMaxHeartRate: null,
+    estimatedThresholdHeartRate: null,
+  });
+
   const seed = async (profile: Profile) => {
     const { updatedAt, ...data } = profile;
     await db.query(
@@ -209,12 +224,12 @@ describe("the contract's patch fixtures", () => {
     const res = await patch(fixture.patch);
     expect(res.statusCode, res.body).toBe(200);
     const { updatedAt, ...made } = res.json() as Profile;
-    const { updatedAt: expectedStamp, ...expected } = fixture.after;
+    const { updatedAt: expectedStamp, ...expected } = shown(fixture.after);
     expect(made).toEqual(expected);
     // A patch that changed nothing keeps the old stamp; one that changed something has a new one.
     if (
       JSON.stringify(made) ===
-      JSON.stringify((({ updatedAt: _u, ...rest }) => rest)(fixture.before))
+      JSON.stringify((({ updatedAt: _u, ...rest }) => rest)(shown(fixture.before)))
     ) {
       expect(updatedAt).toBe(fixture.before.updatedAt ?? updatedAt);
     } else {

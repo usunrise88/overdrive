@@ -20,15 +20,24 @@ export interface PlanChangedEvent {
   removed: string[];
 }
 
-/** The parts of the profile that changed: `ftp`, `zones`, `weeklyAvailability`, `goals`, `physics`. Never empty. */
+/**
+ * The parts of the profile that changed: `ftp`, `zones`, `weeklyAvailability`, `goals`, `physics`, `maxHeartRate`,
+ * `thresholdHeartRate`. Never empty.
+ */
 export interface ProfileChangedEvent {
   fields: string[];
+}
+
+/** A workout from the watch that is stored and queued for intervals.icu (ADR 0023): `watch-<record id>`. */
+export interface ActivityStoredEvent {
+  activityId: string;
 }
 
 export interface AppEvents {
   "ride-stored": RideStoredEvent;
   "plan-changed": PlanChangedEvent;
   "profile-changed": ProfileChangedEvent;
+  "activity-stored": ActivityStoredEvent;
 }
 
 export type AppEventName = keyof AppEvents;

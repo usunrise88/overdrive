@@ -77,6 +77,42 @@ export const intervalsEventSchema = z.looseObject({
 
 export type IntervalsEvent = z.infer<typeof intervalsEventSchema>;
 
+/**
+ * One day of the athlete's wellness as intervals.icu keeps it (`GET .../wellness`): `id` is the local date. Only the fields
+ * this service reads are named; the rest is kept and ignored. **Health data: never log a field of it.** Which of these a
+ * natively integrated device fills is the device's business; a field that is absent or null is simply not there.
+ */
+export const intervalsWellnessSchema = z.looseObject({
+  /** The local date, `2026-11-18`. */
+  id: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  restingHR: z.number().nullish(),
+  /** rMSSD in milliseconds (intervals.icu's `hrv`; its documentation says rMSSD). */
+  hrv: z.number().nullish(),
+  hrvSDNN: z.number().nullish(),
+  sleepSecs: z.number().nullish(),
+  spO2: z.number().nullish(),
+  respiration: z.number().nullish(),
+  steps: z.number().nullish(),
+  avgSleepingHR: z.number().nullish(),
+});
+
+export type IntervalsWellness = z.infer<typeof intervalsWellnessSchema>;
+
+/** What `createManualActivity` sends: an activity with no file, as the watch's workout is. */
+export interface ManualActivityInput {
+  /** Our id of the activity, stored with it so a repeat can be recognised. */
+  externalId: string;
+  /** The start as the athlete's wall clock, `2026-11-17T20:05:00`. */
+  startDateLocal: string;
+  /** The intervals.icu sport: `Workout`, `Run`, `Ride`, ... */
+  type: string;
+  name: string;
+  /** Seconds. */
+  durationSeconds: number;
+  averageHeartRate?: number;
+  maxHeartRate?: number;
+}
+
 /** What create and update send (the fields of the OpenAPI `Event` this service writes). */
 export interface IntervalsEventPayload {
   category: "WORKOUT";
@@ -128,6 +164,17 @@ export interface IntervalsClient {
   updateEvent(id: number, payload: Partial<IntervalsEventPayload>): Promise<IntervalsEvent>;
   /** Deleting an event that is already gone succeeds. */
   deleteEvent(id: number): Promise<void>;
+  /**
+   * The athlete's wellness from `from` to `to` (local dates, both included), one entry per day that has any. Reading the owner's
+   * own wellness is the purpose of the key; the values are health data and are never logged.
+   */
+  listWellness(from: string, to: string): Promise<IntervalsWellness[]>;
+  /**
+   * Creates an activity without a file (`POST activities/manual`; unverified without an account, ADR 0023): the id of the
+   * activity it made. Not repeated after a network error or a 5xx (it could make two); the caller looks the activity up by its
+   * external id first and again after a failure.
+   */
+  createManualActivity(input: ManualActivityInput): Promise<string>;
 }
 
 // ---- The HTTP client -------------------------------------------------------------------------
@@ -476,6 +523,85 @@ export function createIntervalsClient(options: IntervalsClientOptions): Interval
           timeoutMs,
         }),
       );
+    },
+
+    async listWellness(from, to) {
+      const body = await send({
+        method: "GET",
+        path: "wellness",
+        query: { oldest: from, newest: to },
+        repeatable: true,
+        timeoutMs,
+      });
+      if (!Array.isArray(body)) {
+        throw new IntervalsError(
+          "bad-response",
+          "intervals.icu did not answer with a list of wellness days",
+          200,
+        );
+      }
+      const days: IntervalsWellness[] = [];
+      let dropped = 0;
+      for (const raw of body) {
+        const parsed = intervalsWellnessSchema.safeParse(raw);
+        if (parsed.success) days.push(parsed.data);
+        else dropped++;
+      }
+      // A count only: what the days say is health data.
+      if (dropped > 0)
+        log.warn({ dropped }, "intervals.icu wellness days without a date were ignored");
+      return days;
+    },
+
+    async createManualActivity(input) {
+      let body: unknown;
+      try {
+        body = await send({
+          method: "POST",
+          path: "activities/manual",
+          json: {
+            external_id: input.externalId,
+            start_date_local: input.startDateLocal,
+            type: input.type,
+            name: input.name,
+            moving_time: input.durationSeconds,
+            elapsed_time: input.durationSeconds,
+            ...(input.averageHeartRate === undefined
+              ? {}
+              : { average_heartrate: input.averageHeartRate }),
+            ...(input.maxHeartRate === undefined ? {} : { max_heartrate: input.maxHeartRate }),
+          },
+          // A repeated POST could make a second activity: only a 429 is retried.
+          repeatable: false,
+          timeoutMs,
+        });
+      } catch (error) {
+        // A refusal may quote the heart rates that were sent: the message keeps the status only.
+        if (error instanceof IntervalsError && error.kind === "rejected") {
+          throw new IntervalsError(
+            "rejected",
+            `intervals.icu refused the activity (HTTP ${error.status})`,
+            error.status,
+          );
+        }
+        throw error;
+      }
+      const [first] = activityIdsOf(body);
+      const bare =
+        typeof body === "object" && body !== null && "id" in body
+          ? typeof body.id === "string" || typeof body.id === "number"
+            ? String(body.id)
+            : undefined
+          : undefined;
+      const id = first ?? bare;
+      if (id === undefined) {
+        throw new IntervalsError(
+          "bad-response",
+          "intervals.icu answered without the id of the activity it made",
+          200,
+        );
+      }
+      return id;
     },
 
     async deleteEvent(id) {

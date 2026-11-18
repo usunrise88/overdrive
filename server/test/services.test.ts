@@ -46,7 +46,9 @@ describe("the loops", () => {
     expect(await h.services.plan.list({ from: "2026-11-18", to: "2026-12-02" })).toHaveLength(2);
     // And it is scheduled again.
     await vi.waitFor(() =>
-      expect(timers.pending.filter((t) => t.kind === "after")).toHaveLength(1),
+      expect(timers.pending.filter((t) => t.kind === "after" && t.ms === 7 * 60_000)).toHaveLength(
+        1,
+      ),
     );
 
     await h.app.close();

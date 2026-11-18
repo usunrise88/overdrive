@@ -32,7 +32,7 @@ export interface ProfileUpdate {
 }
 
 export interface ProfileStore {
-  /** The stored profile, or the defaults while nothing has been set. */
+  /** The stored profile, or the defaults while nothing has been set, with the heart-rate estimates the rides give. */
   get(): Promise<Profile>;
   /**
    * Applies a patch (`profile-patch.schema.json`) atomically. Throws {@link ProfilePatchError} and
@@ -42,16 +42,52 @@ export interface ProfileStore {
   update(patch: unknown): Promise<ProfileUpdate>;
 }
 
-type Stored = Omit<Profile, "updatedAt">;
+/**
+ * The heart rates the stored rides say about the rider (ADR 0023): `estimatedMaxHeartRate` and `estimatedThresholdHeartRate`.
+ * They are worked out when the profile is read, never stored with it.
+ */
+export type HeartRateEstimator = () => Promise<{ max: number | null; threshold: number | null }>;
 
-const PARTS = ["ftp", "zones", "weeklyAvailability", "goals", "physics"] as const;
+type Stored = Omit<Profile, "updatedAt" | "estimatedMaxHeartRate" | "estimatedThresholdHeartRate">;
 
+const PARTS = [
+  "ftp",
+  "zones",
+  "weeklyAvailability",
+  "goals",
+  "physics",
+  "maxHeartRate",
+  "thresholdHeartRate",
+] as const;
+
+/** What is stored: the profile without its stamp and without the estimates, which are read-only and computed. */
 function withoutStamp(profile: Profile): Stored {
-  const { updatedAt: _stamp, ...rest } = profile;
+  const {
+    updatedAt: _stamp,
+    estimatedMaxHeartRate: _max,
+    estimatedThresholdHeartRate: _threshold,
+    ...rest
+  } = profile;
   return rest;
 }
 
-export function createProfileStore(db: Db, bus: EventBus, now: () => Date): ProfileStore {
+export function createProfileStore(
+  db: Db,
+  bus: EventBus,
+  now: () => Date,
+  estimator?: HeartRateEstimator,
+): ProfileStore {
+  /** The profile with the estimates the rides give. */
+  async function withEstimates(profile: Profile): Promise<Profile> {
+    if (estimator === undefined) return profile;
+    const estimates = await estimator();
+    return {
+      ...profile,
+      estimatedMaxHeartRate: estimates.max,
+      estimatedThresholdHeartRate: estimates.threshold,
+    };
+  }
+
   async function read(tx: Pick<Db, "query">, lock: boolean): Promise<Profile> {
     const result = await tx.query<{ data: Stored; updated_at: Date | string }>(
       `SELECT data, updated_at FROM profile WHERE id${lock ? " FOR UPDATE" : ""}`,
@@ -68,7 +104,9 @@ export function createProfileStore(db: Db, bus: EventBus, now: () => Date): Prof
   }
 
   return {
-    get: () => read(db, false),
+    async get() {
+      return withEstimates(await read(db, false));
+    },
 
     async update(patch) {
       const outcome = await db.transaction(async (tx): Promise<ProfileUpdate> => {
@@ -88,7 +126,7 @@ export function createProfileStore(db: Db, bus: EventBus, now: () => Date): Prof
         return { profile: { ...applied.value, updatedAt: stamp }, changed: [...changed] };
       });
       if (outcome.changed.length > 0) bus.emit("profile-changed", { fields: outcome.changed });
-      return outcome;
+      return { ...outcome, profile: await withEstimates(outcome.profile) };
     },
   };
 }

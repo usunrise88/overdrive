@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { integrationsShape } from "./config-integrations.ts";
 import { stravaConfigShape } from "./config-strava.ts";
+import { wellnessConfigShape } from "./config-wellness.ts";
 import { parsePassphraseHash } from "./oauth/passphrase.ts";
 import { isTimeZone } from "./time.ts";
 
@@ -211,6 +212,7 @@ const schema = z.object({
       .default(15),
   ),
   ...stravaConfigShape, // Strava upload (ADR 0020): config-strava.ts
+  ...wellnessConfigShape, // Wellness and recovery (ADR 0023): config-wellness.ts
   // The rider's time zone: which day "today" is for the plan, and which day a ride belongs to.
   TIMEZONE: z.preprocess(
     blankIsUnset,
