@@ -21,6 +21,7 @@ internal fun <T> TestScope.collectAll(flow: Flow<T>): List<T> {
     return seen
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SimulatedDevicesTest {
     private val flat = SimulationParameters(gradePercent = 0.0, crr = 0.004, windResistance = 0.2144)
 

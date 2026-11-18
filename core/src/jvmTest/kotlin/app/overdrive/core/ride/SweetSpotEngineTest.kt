@@ -159,7 +159,7 @@ class SweetSpotEngineTest {
             val before = engine.snapshots.value
             assertEquals(RideState.RIDING, before.state)
             assertEquals(1, before.workout!!.stepIndex, "200 s into the first sweet-spot effort")
-            assertEquals(799, before.workout!!.workoutElapsedSeconds)
+            assertEquals(799, before.workout.workoutElapsedSeconds)
             assertEquals(220, before.targetPower)
 
             advanceSeconds(1)
