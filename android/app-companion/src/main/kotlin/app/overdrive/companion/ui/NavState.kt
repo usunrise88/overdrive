@@ -31,6 +31,8 @@ sealed interface Route {
 
     data object Licences : Route
 
+    data object Notes : Route
+
     data class RideDetail(
         val id: String,
     ) : Route

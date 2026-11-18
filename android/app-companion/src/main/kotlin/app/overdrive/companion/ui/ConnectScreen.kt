@@ -38,10 +38,10 @@ import app.overdrive.uikit.tokens.OverdriveColors
 import kotlinx.coroutines.launch
 
 /**
- * What the first run's steps are: the connect step now; Health Connect, the background reading and the first read of the last 60
- * days come with the watch data stage (P3-4b), which makes this 4 and shows "Step 1 of 3" (design/companion.md §4.10).
+ * The numbered steps of the first run (design/companion.md §4.10): connect, Health Connect, background reading. The first read of the
+ * last 60 days that follows has no number.
  */
-const val ONBOARDING_STEPS = 1
+const val ONBOARDING_STEPS = 3
 
 /** The first run (design/companion.md §4.10, the connect step): the address, the token and **Connect**. */
 @Composable

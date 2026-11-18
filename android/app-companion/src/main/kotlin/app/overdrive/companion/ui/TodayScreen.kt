@@ -50,7 +50,10 @@ class TodayActions(
     val onUseFtp: (Int) -> Unit,
     val onKeepFtp: (Int) -> Unit,
     val onOpenRide: (String) -> Unit,
-    val onOpenWellness: () -> Unit,
+    /** A fact row of the recovery card was tapped: Wellness opens at that metric. */
+    val onOpenWellness: (String) -> Unit,
+    val onOpenNotes: () -> Unit,
+    val onCopy: (String) -> Unit,
 )
 
 /** Today (design/companion.md §4.1) from the container. */
@@ -67,11 +70,13 @@ fun TodayScreen(
     val profile by container.profile.state.collectAsStateWithLifecycle()
     val answers by container.ftpAnswers.state.collectAsStateWithLifecycle()
     val justUsed by container.justUsed.collectAsStateWithLifecycle()
-    val recovery by container.wellness.recovery.collectAsStateWithLifecycle()
+    val recovery by container.recovery.state.collectAsStateWithLifecycle()
+    val insights by container.insights.view.collectAsStateWithLifecycle()
+    val watch by container.healthStatus.collectAsStateWithLifecycle()
     val host = remember(settings) { hostOf(settings?.serviceUrl.orEmpty()) }
     LaunchedEffect(Unit) { container.screenOpened(RefreshTarget.Today) }
     val ui =
-        remember(recovery, metrics, workouts, rides, profile, answers, justUsed, host) {
+        remember(recovery, metrics, workouts, rides, profile, answers, justUsed, host, insights, watch) {
             TodayUi.of(
                 recovery,
                 metrics,
@@ -83,6 +88,8 @@ fun TodayScreen(
                 today = container.clock.today(),
                 words = container.words,
                 host = host,
+                insights = insights,
+                watch = watch,
             )
         }
     val state = rememberLazyListState()
@@ -96,7 +103,9 @@ fun TodayScreen(
             onUseFtp = container::useFtp,
             onKeepFtp = container::keepFtp,
             onOpenRide = { container.nav.push(Route.RideDetail(it)) },
-            onOpenWellness = { container.nav.select(Tab.Wellness) },
+            onOpenWellness = container::focusWellness,
+            onOpenNotes = { container.nav.push(Route.Notes) },
+            onCopy = { copyToClipboard(context, "Question for your coach", it) },
         ),
         modifier,
         state,
@@ -121,22 +130,26 @@ fun TodayView(
         state = state,
         trailing = { OdIconButton(OverdriveIcons.Settings, actions.onSettings, "Settings") },
     ) { content ->
-        item(key = "recovery") {
-            val recovery = content.recovery
-            RecoveryCard(
-                label = recovery.label,
-                look = recovery.look,
-                reason = recovery.reason,
-                facts =
-                    recovery.facts.map {
-                        FactUi(it.key, it.name, it.value, it.unit, it.caption, it.outside, actions.onOpenWellness)
-                    },
-                heading = recovery.heading,
-                progress = recovery.progress,
-            )
+        content.recovery?.let { recovery ->
+            item(key = "recovery") {
+                RecoveryCard(
+                    label = recovery.label,
+                    look = recovery.look,
+                    reason = recovery.reason,
+                    facts =
+                        recovery.facts.map { fact ->
+                            FactUi(fact.key, fact.name, fact.value, fact.unit, fact.caption, fact.outside) {
+                                actions.onOpenWellness(fact.key)
+                            }
+                        },
+                    heading = recovery.heading,
+                    progress = recovery.progress,
+                )
+            }
         }
         content.planned?.let { planned -> item(key = "planned") { PlannedCard(planned, actions.onOpenRide) } }
         content.ftp?.let { ftp -> item(key = "ftp") { FtpNotice(ftp, actions) } }
+        content.note?.let { note -> item(key = "note") { TodayNoteCard(note, actions.onOpenNotes, actions.onCopy) } }
     }
 }
 

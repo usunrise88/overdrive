@@ -80,6 +80,35 @@ class Words(
         }
     }
 
+    /** The wall clock now, in milliseconds. */
+    fun nowMillis(): Long = clock.nowMillis()
+
+    /** The phone's local date of a UTC instant, `YYYY-MM-DD`; null for text that is not an instant. */
+    fun localDate(instant: String): String? = zoned(instant)?.toLocalDate()?.toString()
+
+    /** The phone's local hour (0 to 23) now: Today's morning note waits for the morning. */
+    fun hourNow(): Int = local(clock.nowMillis()).hour
+
+    /** "Today", "Yesterday" or "Monday 16 November": a day's heading in the Notes list. */
+    fun dayHeading(
+        date: String,
+        today: String,
+    ): String {
+        val day = LocalDate.parse(date)
+        val now = LocalDate.parse(today)
+        return when (day) {
+            now -> "Today"
+            now.minusDays(1) -> "Yesterday"
+            else -> format("EEEE d MMMM", day)
+        }
+    }
+
+    /** When a note was written, in the form of [updated]: "07:30", "yesterday 07:30", "16 Nov 07:30". Null for text that is not an instant. */
+    fun written(instant: String): String? =
+        app.overdrive.core.wellness.WellnessTime
+            .parseInstant(instant)
+            ?.let(::updated)
+
     /** The local clock time of a UTC instant, "18:04". */
     fun clockTime(instant: String): String? = zoned(instant)?.let { format("HH:mm", it) }
 

@@ -8,9 +8,16 @@ import app.overdrive.companion.model.ProblemWords
 import app.overdrive.companion.model.Words
 import app.overdrive.companion.settings.CompanionSettings
 import app.overdrive.companion.settings.CompanionSettingsRepository
+import app.overdrive.companion.settings.OnboardingStep
 import app.overdrive.companion.ui.NavState
-import app.overdrive.companion.wellness.UnavailableWellness
-import app.overdrive.companion.wellness.WellnessRepository
+import app.overdrive.companion.work.BackgroundScheduler
+import app.overdrive.companion.work.NoBackgroundWork
+import app.overdrive.core.health.HealthSource
+import app.overdrive.core.health.HealthStatus
+import app.overdrive.core.health.HealthSync
+import app.overdrive.core.health.RetryPolicy
+import app.overdrive.core.health.RunReason
+import app.overdrive.core.health.RunResult
 import app.overdrive.core.metrics.MetricsApiJson
 import app.overdrive.core.metrics.RideDetailResponse
 import app.overdrive.core.plan.PlanApiJson
@@ -23,6 +30,8 @@ import app.overdrive.core.profile.ProfileRepository
 import app.overdrive.core.profile.ProfileState
 import app.overdrive.core.remote.FtpAnswers
 import app.overdrive.core.remote.FtpSuggestionAnswers
+import app.overdrive.core.remote.InsightsRepository
+import app.overdrive.core.remote.InsightsView
 import app.overdrive.core.remote.MetricsRange
 import app.overdrive.core.remote.MetricsRepository
 import app.overdrive.core.remote.Outcome
@@ -34,10 +43,17 @@ import app.overdrive.core.remote.RideDetails
 import app.overdrive.core.remote.RidesRepository
 import app.overdrive.core.remote.ServiceClient
 import app.overdrive.core.remote.ServiceProblem
+import app.overdrive.core.remote.WellnessRange
+import app.overdrive.core.remote.WellnessResources
+import app.overdrive.core.remote.WellnessView
+import app.overdrive.core.remote.recoveryResource
 import app.overdrive.core.sync.HttpGetTransport
 import app.overdrive.core.sync.HttpPatchTransport
 import app.overdrive.core.sync.HttpPostTransport
 import app.overdrive.core.sync.SyncConfig
+import app.overdrive.core.wellness.RecoveryResponse
+import app.overdrive.data.health.FileBatchStore
+import app.overdrive.data.health.HealthConnectSource
 import app.overdrive.data.profile.FileProfileCache
 import app.overdrive.data.remote.FileTextStore
 import app.overdrive.data.remote.FileTextStores
@@ -47,6 +63,7 @@ import app.overdrive.data.settings.ServiceRules
 import app.overdrive.data.sync.UrlConnectionTransport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
@@ -57,7 +74,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -95,6 +114,10 @@ sealed interface RefreshTarget {
 
     data object Rides : RefreshTarget
 
+    data object Wellness : RefreshTarget
+
+    data object Notes : RefreshTarget
+
     data class RideDetail(
         val id: String,
     ) : RefreshTarget
@@ -116,6 +139,9 @@ sealed interface RefreshTarget {
  * @param transport the network under the GETs and the POST; @param patchTransport the one under the profile's PATCH (a test on a JDK,
  * whose `HttpURLConnection` refuses that verb, passes one with a way round it).
  * @param settleMillis how long the address and token must stay as typed before they are tried.
+ * @param healthSource Health Connect, or a fake.
+ * @param scheduler the daily and the first read on the system's clock.
+ * @param retryPolicy the wait before a failed upload of watch data is tried again while the app is alive.
  */
 class CompanionContainer(
     context: Context,
@@ -125,9 +151,18 @@ class CompanionContainer(
     postTransport: HttpPostTransport = UrlConnectionTransport(),
     patchTransport: HttpPatchTransport = UrlConnectionTransport(),
     val clock: Clock = Clock(),
-    elapsedMillis: () -> Long = { System.nanoTime() / NANOS_PER_MILLI },
+    private val elapsedMillis: () -> Long = { System.nanoTime() / NANOS_PER_MILLI },
     private val settleMillis: Long = SETTLE_MILLIS,
-    val wellness: WellnessRepository = UnavailableWellness(),
+    /** The watch data: Health Connect behind one interface (ADR 0027); a test passes a fake. */
+    private val healthSource: HealthSource = HealthConnectSource(context),
+    /** The permissions one request asks for; the real set comes from Health Connect, which knows which of them it has. */
+    private val permissionRequest: suspend () -> Set<String> = {
+        (healthSource as? HealthConnectSource)?.permissionsToRequest().orEmpty()
+    },
+    /** The system's clock for the daily and the first read; a test passes [NoBackgroundWork] and the container reads in-process. */
+    private val scheduler: BackgroundScheduler = NoBackgroundWork,
+    private val retryPolicy: RetryPolicy = RetryPolicy(),
+    private val openGapMillis: Long = APP_OPEN_GAP_MILLIS,
 ) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -192,7 +227,48 @@ class CompanionContainer(
     /** **Keep 250 W**: the answers to FTP suggestions, queued while the service cannot be reached. */
     val ftpAnswers: FtpSuggestionAnswers = FtpSuggestionAnswers(client, ::config, file("ftp-answers"))
 
+    /** The wellness figures of each range (`GET /v1/wellness`; a year is two requests, the service serves 186 days at most). */
+    private val wellnessResources =
+        WellnessResources(scope, client, ::config, { clock.today() }, { file(it) }, wall, elapsedMillis)
+
+    /** This morning's recovery rating (`GET /v1/recovery`). */
+    val recovery: RemoteResource<RecoveryResponse> =
+        recoveryResource(client, ::config, file("recovery"), wall, elapsedMillis)
+
+    /** The written notes and alerts (`GET /v1/insights`), 30 days at a time. */
+    val insights: InsightsRepository =
+        InsightsRepository(scope, client, ::config, { clock.today() }, file("insights"), wall, elapsedMillis)
+
+    /**
+     * The watch data's way to the service (ADR 0027): Health Connect read through [healthSource], queued on disk in `watch/outbox`
+     * and sent through the same [client] as everything else. Everything it keeps is private to the app and holds no figure in a
+     * file name or a log.
+     */
+    private val health: HealthSync =
+        HealthSync(
+            source = healthSource,
+            client = client,
+            stateStore = file("watch-state"),
+            batches = FileBatchStore(File(cache, "watch-outbox")),
+            wallMillis = wall,
+            device = deviceName(),
+            retry = retryPolicy,
+        )
+
+    /** What Settings, Today and the first run's steps say of the watch data. */
+    val healthStatus: StateFlow<HealthStatus> = health.status
+
     val nav = NavState()
+
+    private val focus = MutableStateFlow<String?>(null)
+
+    /** The metric Wellness should scroll to (the rider tapped a fact of the recovery card); the screen clears it when it has. */
+    val wellnessFocus: StateFlow<String?> = focus
+
+    fun focusWellness(key: String?) {
+        focus.value = key
+        if (key != null) nav.select(app.overdrive.companion.ui.Tab.Wellness)
+    }
 
     private val used = MutableStateFlow<Int?>(null)
 
@@ -207,6 +283,9 @@ class CompanionContainer(
             // Its cache is read as soon as it is first asked for, so the screen has the ride at once and offline.
             if (!resource.state.value.loaded) scope.launch { resource.load() }
         }
+
+    /** The Wellness figures for [range]. */
+    fun wellnessFor(range: WellnessRange): WellnessView = wellnessResources.view(range)
 
     /** The Fitness and Power metrics for [range]. */
     fun metricsFor(range: MetricsRange): RemoteResource<app.overdrive.core.metrics.MetricsResponse> =
@@ -247,6 +326,10 @@ class CompanionContainer(
             rides.load()
             profile.load()
             ftpAnswers.load()
+            wellnessResources.load()
+            recovery.load()
+            insights.load()
+            health.load()
             var first = true
             settings.filterNotNull().map { it.config }.distinctUntilChanged().collectLatest {
                 metrics.settingsChanged()
@@ -255,6 +338,9 @@ class CompanionContainer(
                 rideDetails.settingsChanged()
                 profile.settingsChanged()
                 ftpAnswers.settingsChanged()
+                wellnessResources.settingsChanged()
+                recovery.settingsChanged()
+                insights.settingsChanged()
                 if (!first) delay(settleMillis)
                 val why = if (first) Refresh.START else Refresh.SETTINGS_CHANGED
                 first = false
@@ -262,6 +348,46 @@ class CompanionContainer(
             }
         }
     }
+
+    init {
+        // What the service computes from the watch data is asked again when new data has reached it: the rating, the notes, the charts.
+        scope.launch {
+            health.status
+                .map { it.lastSentMillis }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { refreshWatchFigures(Refresh.REQUESTED) }
+        }
+        // A batch that could not be sent is tried again after its backoff while the app is alive; the daily job does the same later.
+        scope.launch {
+            health.status
+                .map {
+                    RetryAt(
+                        it.nextRetryMillis,
+                        it.waitingBatches > 0 && it.uploadProblem?.kind != ProblemKind.TOKEN_REJECTED,
+                    )
+                }.distinctUntilChanged()
+                .collectLatest { retry ->
+                    val at = retry.at
+                    if (retry.waiting && at != null) {
+                        delay((at - clock.nowMillis()).coerceAtLeast(0))
+                        health.run(RunReason.RETRY)
+                    }
+                }
+        }
+    }
+
+    private data class RetryAt(
+        val at: Long?,
+        val waiting: Boolean,
+    )
+
+    private suspend fun refreshWatchFigures(why: Refresh) =
+        coroutineScope {
+            launch { recovery.refresh(why) }
+            launch { insights.refresh(why) }
+            launch { wellnessResources.refresh(settings.value?.wellnessRange ?: WellnessRange.DEFAULT, why) }
+        }
 
     private suspend fun refreshToday(
         why: Refresh,
@@ -271,6 +397,8 @@ class CompanionContainer(
         launch { workouts.refresh(why) }
         launch { profile.refresh(if (why == Refresh.SETTINGS_CHANGED) ProfileRefresh.SETTINGS_CHANGED else profileWhy) }
         launch { ftpAnswers.flush() }
+        launch { recovery.refresh(why) }
+        launch { insights.refresh(why) }
     }
 
     /** A screen came on screen: asks for what it shows, each resource at most once a minute. */
@@ -305,6 +433,17 @@ class CompanionContainer(
                     )
                 }
                 launch { ftpAnswers.flush() }
+                launch { recovery.refresh(why) }
+                launch { insights.refresh(why) }
+            }
+
+            RefreshTarget.Wellness -> {
+                launch { wellnessResources.refresh(settings.value?.wellnessRange ?: WellnessRange.DEFAULT, why) }
+                launch { health.refreshAccess() }
+            }
+
+            RefreshTarget.Notes -> {
+                launch { insights.refresh(why) }
             }
 
             RefreshTarget.Fitness -> {
@@ -336,6 +475,11 @@ class CompanionContainer(
         }
     }
 
+    /** Asks the next 30 days of older notes. */
+    fun loadMoreNotes() {
+        scope.launch { insights.loadMore() }
+    }
+
     /** Asks the next page of older rides. */
     fun loadMoreRides() {
         scope.launch { rides.loadMore() }
@@ -354,6 +498,16 @@ class CompanionContainer(
                     launch { rides.refresh(Refresh.REQUESTED) }
                     launch { profile.refresh(ProfileRefresh.REQUESTED) }
                     launch { ftpAnswers.flush() }
+                    launch { recovery.refresh(Refresh.REQUESTED) }
+                    launch { insights.refresh(Refresh.REQUESTED) }
+                    launch {
+                        wellnessResources.refresh(
+                            settings.value?.wellnessRange ?: WellnessRange.DEFAULT,
+                            Refresh.REQUESTED,
+                        )
+                    }
+                    // The watch data too: read what is new and send what waits (design/companion.md §3.3).
+                    launch { health.run(RunReason.MANUAL) }
                 }
             } finally {
                 syncingNow.value = false
@@ -382,6 +536,102 @@ class CompanionContainer(
         scope.launch { ftpAnswers.dismiss(suggestionId) }
     }
 
+    // region the watch data
+
+    /** The permissions one request asks for, for the system dialog (design/companion.md §4.10). */
+    suspend fun permissionsToRequest(): Set<String> = permissionRequest()
+
+    /** Re-reads what Health Connect is and allows now, for Settings and the first run's steps; reads no record. */
+    fun refreshHealthAccess() {
+        scope.launch { health.refreshAccess() }
+    }
+
+    /**
+     * The rider answered the permission dialog, or came back from Health Connect's own screen: re-read what is allowed, and when
+     * something is, put the daily read on the clock and read what is new.
+     */
+    fun healthAccessChanged() {
+        scope.launch {
+            health.refreshAccess()
+            if (health.status.value.access.granted
+                    .isNotEmpty()
+            ) {
+                scheduler.scheduleDaily()
+                if (settings.value?.onboarding == OnboardingStep.Done) health.run(RunReason.APP_OPENED)
+            }
+        }
+    }
+
+    /** The first run moves to [step]. */
+    fun setOnboarding(step: OnboardingStep) {
+        scope.launch {
+            settingsRepository.update { it.copy(onboarding = step) }
+            if (step == OnboardingStep.Reading) startFirstRead()
+        }
+    }
+
+    /** Starts the first read of the last 60 days where it keeps going when the rider leaves, or in this process when it cannot. */
+    fun startFirstRead() {
+        scheduler.scheduleDaily()
+        if (!scheduler.startFirstRead()) scope.launch { runWatch(RunReason.FIRST_READ) }
+    }
+
+    /**
+     * Reads, queues and sends the watch data, then asks again for the figures Today shows. What the background job calls, and Sync
+     * now's and the app opening's way in; one at a time ([RunResult.outcome] says when another was running).
+     */
+    suspend fun runWatch(reason: RunReason): RunResult {
+        val result = health.run(reason)
+        if (settings.value?.isConfigured == true) refreshToday(Refresh.REQUESTED, ProfileRefresh.REQUESTED)
+        return result
+    }
+
+    /** The app came on screen (design/companion.md §9): read what is new, at most once in [openGapMillis]. */
+    fun appOpened() {
+        val now = elapsedMillis()
+        val last = lastOpenRun
+        if (last != null && now - last < openGapMillis) return
+        lastOpenRun = now
+        scope.launch {
+            val configured = settings.filterNotNull().first().isConfigured
+            health.refreshAccess()
+            if (!configured) return@launch
+            if (health.status.value.access.granted
+                    .isNotEmpty()
+            ) {
+                scheduler.scheduleDaily()
+            }
+            val step = settings.value?.onboarding
+            // During the first run the steps decide when reading starts.
+            if (step == OnboardingStep.Done || step == OnboardingStep.Reading) health.run(RunReason.APP_OPENED)
+        }
+    }
+
+    private var lastOpenRun: Long? = null
+
+    // region heart rate
+
+    private var sendEdit: Job? = null
+
+    /** Settings' stepper: the maximum heart rate goes on the profile at once and to the service once the rider stops tapping. */
+    fun setMaxHeartRate(bpm: Int) = editHeartRate(ProfilePatch(maxHeartRate = Change.Set(bpm)))
+
+    fun setThresholdHeartRate(bpm: Int) = editHeartRate(ProfilePatch(thresholdHeartRate = Change.Set(bpm)))
+
+    private fun editHeartRate(patch: ProfilePatch) {
+        if (!profile.edit(patch)) {
+            // No profile in force yet (the service was never reached): ask for it, the rider can try again when it is here.
+            scope.launch { profile.refresh(ProfileRefresh.REQUESTED) }
+            return
+        }
+        sendEdit?.cancel()
+        sendEdit =
+            scope.launch {
+                delay(EDIT_SETTLE_MILLIS)
+                profile.refresh(ProfileRefresh.EDITED)
+            }
+    }
+
     // region settings
 
     /** The Settings fields: a changed address or token (already in the valid form) is stored; the refresh follows once it settles. */
@@ -402,6 +652,10 @@ class CompanionContainer(
 
     fun setPowerRange(range: MetricsRange) {
         scope.launch { settingsRepository.update { it.copy(powerRange = range) } }
+    }
+
+    fun setWellnessRange(range: WellnessRange) {
+        scope.launch { settingsRepository.update { it.copy(wellnessRange = range) } }
     }
 
     /**
@@ -448,6 +702,13 @@ class CompanionContainer(
 
     private val probeTransport: HttpGetTransport = getTransport
 
+    private fun deviceName(): String =
+        android.os.Build.MODEL
+            .orEmpty()
+            .trim()
+            .ifEmpty { "Phone" }
+            .take(DEVICE_CHARS)
+
     /** Stops what the container started. Only tests call it; the process owns it otherwise. */
     fun close() {
         scope.cancel()
@@ -458,7 +719,14 @@ class CompanionContainer(
         /** An address or token that has not changed for this long is tried. */
         const val SETTLE_MILLIS = 1_500L
 
+        /** Opening the app reads the watch data at most this often. */
+        const val APP_OPEN_GAP_MILLIS = 5 * 60_000L
+
+        /** A heart-rate stepper sends its change once it has been left alone this long. */
+        private const val EDIT_SETTLE_MILLIS = 700L
+
         private const val NANOS_PER_MILLI = 1_000_000L
+        private const val DEVICE_CHARS = 64
         private const val PROBE_MAX_BYTES = 65_536
         private const val RESOURCE_COUNT = 5
         private const val PROFILE_AT = 5

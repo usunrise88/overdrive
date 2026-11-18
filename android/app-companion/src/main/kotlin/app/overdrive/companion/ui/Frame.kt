@@ -86,6 +86,7 @@ fun <T> TabScreen(
     onPhoneSettings: () -> Unit,
     modifier: Modifier = Modifier,
     state: LazyListState = rememberLazyListState(),
+    onEmptyAction: () -> Unit = {},
     trailing: (@Composable () -> Unit)? = null,
     controls: LazyListScope.() -> Unit = {},
     content: LazyListScope.(T) -> Unit,
@@ -144,7 +145,9 @@ fun <T> TabScreen(
             }
 
             is Body.Empty -> {
-                item(key = "empty") { EmptyBlock(body.heading, body.text) }
+                item(
+                    key = "empty",
+                ) { EmptyBlock(body.heading, body.text, actionLabel = body.action, onAction = onEmptyAction) }
             }
 
             is Body.Content -> {

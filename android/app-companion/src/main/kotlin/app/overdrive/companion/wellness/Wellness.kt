@@ -1,9 +1,5 @@
 package app.overdrive.companion.wellness
 
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-
 /**
  * One signal of the recovery card (design/companion.md §4.1), already in words: the service writes the figures and the usual
  * ranges, the phone only draws them. [key] names the metric, for the tap that opens Wellness at it.
@@ -22,12 +18,12 @@ data class RecoveryFactData(
 enum class RecoveryLevel { Ready, Caution, Rest }
 
 /**
- * What the recovery card shows. **The producer of everything but [NotAvailableYet] arrives with the watch data stage (P3-4b)**: this
- * is the seam, and the card, its words and its tests are already here, so that stage only fills it.
+ * What the recovery card shows, made from `GET /v1/recovery` by `RecoveryWords` (ADR 0027): the phone words the service's rating
+ * and rates nothing itself.
  */
 sealed interface RecoveryState {
-    /** The watch data is not connected: nothing is rated and nothing is being learned (stage P3-4a). */
-    data object NotAvailableYet : RecoveryState
+    /** Health Connect is not allowed: nothing is rated, and the card says where to allow it (design/companion.md §4.10). */
+    data object AccessNeeded : RecoveryState
 
     /** Fewer nights than the baseline needs: no state, the figures of last night, and how far along it is. */
     data class Learning(
@@ -46,21 +42,4 @@ sealed interface RecoveryState {
 
     /** No reading from last night: the watch was not worn, or its data has not arrived. */
     data object NoReading : RecoveryState
-}
-
-/**
- * The seam to the watch data (design/companion.md §11, spec §6.4): the recovery rating, and later the Wellness charts, the
- * Health Connect access and the background reading. In this stage there is only [UnavailableWellness].
- */
-interface WellnessRepository {
-    /** The rating for Today's recovery card. */
-    val recovery: StateFlow<RecoveryState>
-}
-
-/** The watch data is not here yet: everything that reads it draws the design's learning and empty states. */
-class UnavailableWellness : WellnessRepository {
-    override val recovery: StateFlow<RecoveryState> =
-        MutableStateFlow<RecoveryState>(
-            RecoveryState.NotAvailableYet,
-        ).asStateFlow()
 }

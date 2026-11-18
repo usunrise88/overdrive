@@ -23,9 +23,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overdrive.companion.CompanionContainer
+import app.overdrive.companion.model.AccessAction
+import app.overdrive.companion.model.BackgroundFix
+import app.overdrive.companion.model.HealthSettingsUi
+import app.overdrive.companion.model.HealthWords
+import app.overdrive.companion.model.HeartRateRowUi
+import app.overdrive.companion.model.HeartRateUi
+import app.overdrive.companion.model.HeartRateWords
 import app.overdrive.companion.model.ProblemWords
+import app.overdrive.core.health.HealthStatus
 import app.overdrive.core.remote.ProblemKind
 import app.overdrive.data.settings.AddressCheck
 import app.overdrive.data.settings.ServiceRules
@@ -33,12 +42,14 @@ import app.overdrive.uikit.BackTopBar
 import app.overdrive.uikit.ButtonVariant
 import app.overdrive.uikit.HorizontalRule
 import app.overdrive.uikit.InlineIconSize
+import app.overdrive.uikit.Notice
 import app.overdrive.uikit.OdButton
 import app.overdrive.uikit.OdIcon
 import app.overdrive.uikit.OdText
 import app.overdrive.uikit.OdTextField
 import app.overdrive.uikit.OdType
 import app.overdrive.uikit.Spinner
+import app.overdrive.uikit.Stepper
 import app.overdrive.uikit.icons.OverdriveIcons
 import app.overdrive.uikit.plainClickable
 import app.overdrive.uikit.rememberInteractionSource
@@ -60,6 +71,10 @@ data class SettingsUiState(
     val lastSyncNote: String,
     val syncing: Boolean,
     val version: String,
+    /** The Health Connect group: permission state, the last read, what was sent, the background reading. */
+    val health: HealthSettingsUi? = null,
+    /** The Heart rate group, or null while the service has sent no profile (nothing to edit yet). */
+    val heartRate: HeartRateUi? = null,
 )
 
 class SettingsActions(
@@ -68,6 +83,13 @@ class SettingsActions(
     val onToken: (String) -> Unit,
     val onSyncNow: () -> Unit,
     val onLicences: () -> Unit,
+    /** **Manage**, or **Allow** while nothing is allowed. */
+    val onAccess: (AccessAction) -> Unit = {},
+    val onBackgroundFix: (BackgroundFix) -> Unit = {},
+    val onMaxStep: (Int) -> Unit = {},
+    val onThresholdStep: (Int) -> Unit = {},
+    val onUseMaxEstimate: (Int) -> Unit = {},
+    val onUseThresholdEstimate: (Int) -> Unit = {},
 )
 
 /** The words of Settings' "Last sync" row (design/companion.md §4.9), pure so they are tested. */
@@ -77,11 +99,16 @@ object SyncWords {
         words: app.overdrive.companion.model.Words,
     ): String = fetchedAtMillis?.let(words::lastSync) ?: "Never"
 
+    /**
+     * The note under "Last sync": what was sent and received, or, after a failure, what is waiting ("Nothing sent since then. 312 watch
+     * records are waiting.") and why. [watch] is the watch data's state, which has its own upload next to the service's answers.
+     */
     fun note(
         fetchedAtMillis: Long?,
         problem: app.overdrive.core.remote.ServiceProblem?,
         waiting: Int,
         host: String,
+        watch: HealthStatus = HealthStatus(),
     ): String {
         val waitingText =
             when (waiting) {
@@ -89,12 +116,34 @@ object SyncWords {
                 1 -> "1 answer is waiting to be sent."
                 else -> "$waiting answers are waiting to be sent."
             }
+        val watchProblem = watch.uploadProblem
+        val watchWaiting = HealthWords.waiting(watch)
         return when {
             problem != null -> {
                 listOfNotNull(
                     "The last attempt failed. ${ProblemWords.causeOf(problem, host)}",
                     waitingText,
+                    watchWaiting,
                 ).joinToString(" ")
+            }
+
+            watchProblem != null || watchWaiting != null -> {
+                listOfNotNull(
+                    "Nothing sent since then.".takeIf { watch.uploadProblem != null },
+                    watchWaiting,
+                    watchProblem?.let { ProblemWords.causeOf(it, host) },
+                    waitingText,
+                ).joinToString(" ")
+            }
+
+            watch.lastSent != null -> {
+                val sent = watch.lastSent!!.total
+                listOfNotNull(
+                    "Sent ${HealthWords.count(
+                        sent,
+                    )} watch ${if (sent == 1) "record" else "records"} · received your latest figures",
+                    waitingText,
+                ).joinToString(". ").let { if (it.endsWith(".")) it else "$it." }
             }
 
             fetchedAtMillis == null -> {
@@ -117,21 +166,36 @@ fun SettingsScreen(
     val context = LocalContext.current
     val settings by container.settings.collectAsStateWithLifecycle()
     val overview by container.syncOverview.collectAsStateWithLifecycle()
+    val watch by container.healthStatus.collectAsStateWithLifecycle()
+    val profile by container.profile.state.collectAsStateWithLifecycle()
     var address by remember { mutableStateOf(settings?.serviceUrl.orEmpty()) }
     var token by remember { mutableStateOf(settings?.token?.value.orEmpty()) }
+    var battery by remember { mutableStateOf(batteryUnrestricted(context)) }
+    // Coming back from Health Connect's or the phone's own settings: what is allowed now.
+    LifecycleResumeEffect(Unit) {
+        battery = batteryUnrestricted(context)
+        container.refreshHealthAccess()
+        onPauseOrDispose {}
+    }
+    val request = rememberHealthAccessRequest(container)
     val check = ServiceRules.checkAddress(address)
     val host = hostOf(settings?.serviceUrl.orEmpty())
+    val lastMillis = listOfNotNull(overview.lastFetchedMillis, watch.lastSentMillis).maxOrNull()
     val state =
         SettingsUiState(
             address = address,
             addressMistake = (check as? AddressCheck.Invalid)?.reason,
             notEncrypted = check is AddressCheck.Valid && !check.isEncrypted,
             token = token,
-            tokenRefused = overview.problem?.kind == ProblemKind.TOKEN_REJECTED,
-            lastSyncValue = SyncWords.lastSync(overview.lastFetchedMillis, container.words),
-            lastSyncNote = SyncWords.note(overview.lastFetchedMillis, overview.problem, overview.waiting, host),
-            syncing = overview.syncing,
+            tokenRefused =
+                overview.problem?.kind == ProblemKind.TOKEN_REJECTED ||
+                    watch.uploadProblem?.kind == ProblemKind.TOKEN_REJECTED,
+            lastSyncValue = SyncWords.lastSync(lastMillis, container.words),
+            lastSyncNote = SyncWords.note(overview.lastFetchedMillis, overview.problem, overview.waiting, host, watch),
+            syncing = overview.syncing || watch.running,
             version = versionOf(context),
+            health = HealthWords.settings(watch, battery, container.words),
+            heartRate = profile.profile?.let(HeartRateWords::of),
         )
     SettingsView(
         state,
@@ -152,6 +216,23 @@ fun SettingsScreen(
             },
             onSyncNow = container::syncNow,
             onLicences = { container.nav.push(Route.Licences) },
+            onAccess = { action -> if (action == AccessAction.Allow) request() else openHealthConnect(context) },
+            onBackgroundFix = { fix ->
+                when (fix) {
+                    BackgroundFix.BatterySaving -> openBatterySettings(context)
+                    BackgroundFix.HealthConnect -> openHealthConnect(context)
+                }
+            },
+            onMaxStep = { by ->
+                profile.profile?.let { p -> HeartRateWords.stepMax(p, by)?.let(container::setMaxHeartRate) }
+            },
+            onThresholdStep = { by ->
+                profile.profile?.let { p ->
+                    HeartRateWords.stepThreshold(p, by)?.let(container::setThresholdHeartRate)
+                }
+            },
+            onUseMaxEstimate = container::setMaxHeartRate,
+            onUseThresholdEstimate = container::setThresholdHeartRate,
         ),
         modifier,
     )
@@ -236,6 +317,19 @@ fun SettingsView(
                     }
                 }
             }
+            state.health?.let { health ->
+                item { GroupLabel("Health Connect") }
+                val unavailable = health.unavailable
+                if (unavailable != null) {
+                    item { Notice(OverdriveIcons.Info, unavailable.title, unavailable.text) }
+                } else {
+                    item { HealthGroup(health, actions) }
+                }
+            }
+            state.heartRate?.let { heartRate ->
+                item { GroupLabel("Heart rate") }
+                item { HeartRateGroup(heartRate, actions) }
+            }
             item { GroupLabel("About") }
             item {
                 SettingsCard {
@@ -278,6 +372,132 @@ fun SettingsView(
                 }
             }
         }
+    }
+}
+
+/** The Health Connect card (design/companion.md §4.9): data access, last read, and background reading. */
+@Composable
+private fun HealthGroup(
+    health: HealthSettingsUi,
+    actions: SettingsActions,
+) {
+    SettingsCard {
+        ActionRow("Data access", health.dataAccess, health.accessAction.label) { actions.onAccess(health.accessAction) }
+        HorizontalRule()
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(Modifier.weight(1f)) {
+                    OdText("Last read", style = OdType.bodyStrong)
+                    OdText(health.lastReadNote, style = OdType.label, color = OverdriveColors.textSecondary)
+                }
+                OdText(health.lastRead, style = OdType.numXS, maxLines = 1, softWrap = false)
+            }
+            health.sentByType?.let {
+                OdText("Sent: $it", style = OdType.label, color = OverdriveColors.textSecondary)
+            }
+            health.waiting?.let { OdText(it, style = OdType.label, color = OverdriveColors.textPrimary) }
+            health.readProblem?.let { Message(it, alert = true) }
+        }
+        HorizontalRule()
+        val background = health.background
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(
+                    min = OverdriveDimens.sizeListRowTwoLine,
+                ).padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                OdText("Background reading", style = OdType.bodyStrong)
+                OdText(
+                    background.text,
+                    style = OdType.label,
+                    color = if (background.allowed) OverdriveColors.textSecondary else OverdriveColors.textPrimary,
+                )
+            }
+            val action = background.action
+            val fix = background.fix
+            if (background.allowed) {
+                OdIcon(OverdriveIcons.Check, tint = OverdriveColors.textSecondary)
+            } else if (action != null && fix != null) {
+                OdButton(action, { actions.onBackgroundFix(fix) }, height = 40.dp)
+            }
+        }
+    }
+}
+
+/** The Heart rate card (design/companion.md §4.9): the maximum and the threshold as steppers, the estimates from the rides beside them. */
+@Composable
+private fun HeartRateGroup(
+    heartRate: HeartRateUi,
+    actions: SettingsActions,
+) {
+    SettingsCard {
+        HeartRateRow("Maximum", heartRate.maximum, actions.onMaxStep, actions.onUseMaxEstimate)
+        HorizontalRule()
+        HeartRateRow("Threshold", heartRate.threshold, actions.onThresholdStep, actions.onUseThresholdEstimate)
+    }
+}
+
+@Composable
+private fun HeartRateRow(
+    title: String,
+    row: HeartRateRowUi,
+    onStep: (Int) -> Unit,
+    onUseEstimate: (Int) -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(
+                min = OverdriveDimens.sizeListRowTwoLine,
+            ).padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            OdText(title, style = OdType.bodyStrong)
+            OdText(row.note, style = OdType.label, color = OverdriveColors.textSecondary)
+            row.estimate?.let { estimate ->
+                OdButton("Use $estimate bpm", {
+                    onUseEstimate(estimate)
+                }, variant = ButtonVariant.Ghost, height = 48.dp, horizontalPadding = 0.dp)
+            }
+        }
+        Stepper(
+            row.valueText,
+            onDecrement = { onStep(-1) },
+            onIncrement = { onStep(1) },
+            canDecrement = row.canDecrease,
+            canIncrement = row.canIncrease,
+            label = title.lowercase(),
+        )
+    }
+}
+
+@Composable
+private fun ActionRow(
+    title: String,
+    note: String,
+    action: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(
+                min = OverdriveDimens.sizeListRowTwoLine,
+            ).padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            OdText(title, style = OdType.bodyStrong)
+            OdText(note, style = OdType.label, color = OverdriveColors.textSecondary)
+        }
+        OdButton(action, onClick, height = 40.dp)
     }
 }
 

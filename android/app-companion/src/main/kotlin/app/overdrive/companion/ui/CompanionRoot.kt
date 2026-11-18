@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overdrive.companion.CompanionContainer
+import app.overdrive.companion.settings.OnboardingStep
 import app.overdrive.uikit.BackTopBar
 import app.overdrive.uikit.BottomNav
 import app.overdrive.uikit.EmptyBlock
@@ -43,8 +44,24 @@ fun CompanionRoot(
     val settings by container.settings.collectAsStateWithLifecycle()
     Box(modifier.fillMaxSize().background(OverdriveColors.bg)) {
         when (val current = settings) {
-            null -> Unit
-            else -> if (current.isConfigured) Tabs(container) else ConnectScreen(container)
+            null -> {
+                Unit
+            }
+
+            else -> {
+                when {
+                    !current.isConfigured -> ConnectScreen(container)
+
+                    // A phone that is connected and has not finished the first run meets the steps of the watch data.
+                    current.onboarding == OnboardingStep.Health -> HealthStep(container, hostOf(current.serviceUrl))
+
+                    current.onboarding == OnboardingStep.Background -> BackgroundStep(container)
+
+                    current.onboarding == OnboardingStep.Reading -> ReadingStep(container)
+
+                    else -> Tabs(container)
+                }
+            }
         }
     }
 }
@@ -66,6 +83,7 @@ private fun Tabs(container: CompanionContainer) {
                 when (target) {
                     is Route.Settings -> SettingsScreen(container)
                     is Route.Licences -> LicencesScreen(container)
+                    is Route.Notes -> NotesScreen(container)
                     is Route.RideDetail -> RideDetailScreen(container, target.id)
                     is Route.ActivityDetail -> ActivityScreen(container, target.id)
                     Tab.Today -> TodayScreen(container)
@@ -82,29 +100,6 @@ private fun Tabs(container: CompanionContainer) {
                 selected = nav.tab.ordinal,
                 onSelect = { nav.select(Tab.entries[it]) },
                 onReselect = { nav.reselect(Tab.entries[it]) },
-            )
-        }
-    }
-}
-
-/** Wellness (design/companion.md §4.5): the watch data comes with its own stage; until then the screen says so. */
-@Composable
-fun WellnessScreen(
-    container: CompanionContainer,
-    modifier: Modifier = Modifier,
-) {
-    val state = rememberLazyListState()
-    ScrollToTopOn(container.nav, Tab.Wellness, state)
-    LazyColumn(
-        modifier.fillMaxSize(),
-        state = state,
-        contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 24.dp),
-    ) {
-        item { ScreenHeader("Wellness", null, refreshing = false) }
-        item {
-            EmptyBlock(
-                "Overdrive cannot read Health Connect yet.",
-                "Resting heart rate, sleep and the other signals your watch records appear here once the watch is connected.",
             )
         }
     }

@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import app.overdrive.companion.wellness.RecoveryFactData
 import app.overdrive.companion.wellness.RecoveryLevel
 import app.overdrive.companion.wellness.RecoveryState
+import app.overdrive.core.health.HealthStatus
 import app.overdrive.core.metrics.MetricsResponse
 import app.overdrive.core.metrics.RideKind
 import app.overdrive.core.plan.PlannedWorkout
@@ -14,10 +15,12 @@ import app.overdrive.core.plan.plannedLoad
 import app.overdrive.core.plan.playability
 import app.overdrive.core.profile.ProfileState
 import app.overdrive.core.remote.FtpAnswers
+import app.overdrive.core.remote.InsightsView
 import app.overdrive.core.remote.ResourceState
 import app.overdrive.core.remote.RidesView
 import app.overdrive.core.ride.flatSteps
 import app.overdrive.core.ride.totalDurationSeconds
+import app.overdrive.core.wellness.RecoveryResponse
 import app.overdrive.uikit.RecoveryLook
 import app.overdrive.uikit.UiFormat
 import app.overdrive.uikit.chart.ProfileData
@@ -49,10 +52,13 @@ data class PlannedRowUi(
 
 @Immutable
 class TodayContent(
-    val recovery: RecoveryUi,
+    /** Null while the rating has not been fetched and Health Connect is allowed: the card appears when it has something to say. */
+    val recovery: RecoveryUi?,
     /** Null when there is no plan source: the card is not drawn. An empty list is "Nothing planned today". */
     val planned: List<PlannedRowUi>?,
     val ftp: FtpUi?,
+    /** Today's note, or the sentence that it is not written yet; null when there is nothing to say (the card is not drawn). */
+    val note: NoteCardUi? = null,
 )
 
 /**
@@ -63,7 +69,7 @@ object TodayUi {
     const val NIGHTS_NEEDED = 14
 
     fun of(
-        recovery: RecoveryState,
+        recovery: ResourceState<RecoveryResponse>,
         metrics: ResourceState<MetricsResponse>,
         workouts: ResourceState<WorkoutsResponse>,
         rides: RidesView,
@@ -73,6 +79,8 @@ object TodayUi {
         today: String,
         words: Words,
         host: String,
+        insights: InsightsView = InsightsView(),
+        watch: HealthStatus = HealthStatus(),
     ): ScreenUi<TodayContent> {
         val states = listOf(metrics, workouts)
         val fetched = states.mapNotNull { it.fetchedAtMillis }.maxOrNull()
@@ -80,8 +88,13 @@ object TodayUi {
         val problem = states.firstNotNullOfOrNull { it.problem }
         val refreshing = states.any { it.refreshing }
         val hasData = states.any { it.value != null }
-        val problemUi = problem?.let { ProblemWords.of(it, host, updated) }
+        val problemUi =
+            problem?.let { ProblemWords.of(it, host, updated) } ?: HealthWords.todayLine(watch, words.nowMillis())
         val date = words.todayLine()
+        val watchConnected = watch.access.granted.isNotEmpty()
+        val card =
+            recovery.value?.let { RecoveryWords.state(it, today) }
+                ?: if (watch.checked && !watchConnected) RecoveryState.AccessNeeded else null
         return when {
             !hasData && problemUi != null -> {
                 ScreenUi(date, refreshing, null, Body.Failed(problemUi))
@@ -99,9 +112,10 @@ object TodayUi {
                     body =
                         Body.Content(
                             TodayContent(
-                                recovery = recoveryUi(recovery),
+                                recovery = card?.let(::recoveryUi),
                                 planned = planned(workouts.value, rides, today, words),
                                 ftp = metrics.value?.let { FtpWords.of(it, profile, answers, justUsed, words).answer },
+                                note = NotesUi.todayCard(insights, rides, today, words, watchConnected),
                             ),
                         ),
                 )
@@ -160,12 +174,12 @@ object TodayUi {
 
     fun recoveryUi(state: RecoveryState): RecoveryUi =
         when (state) {
-            RecoveryState.NotAvailableYet -> {
+            RecoveryState.AccessNeeded -> {
                 RecoveryUi(
                     "Recovery",
                     RecoveryLook.Learning,
                     "Learning your usual range",
-                    "Overdrive rates recovery after $NIGHTS_NEEDED nights with the watch. The watch is not connected yet.",
+                    "Overdrive rates recovery after $NIGHTS_NEEDED nights with the watch. Allow Health Connect in Settings to rate recovery.",
                     emptyList(),
                     0f,
                 )
