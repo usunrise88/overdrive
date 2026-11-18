@@ -1,0 +1,6 @@
+{
+  "statusCode": 401,
+  "code": "FST_ERR_UNAUTHORIZED",
+  "error": "Unauthorized",
+  "message": "x"
+}

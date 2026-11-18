@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import { Ajv2020 } from "ajv/dist/2020.js";
 
+// The sync API's request and response shapes (spec §8.3) live in their own file.
+export * from "./sync.ts";
+
 // ---- Workout (spec §8.1) -------------------------------------------------------------------
 // Hand-written mirror of schema/workout.schema.json. The schema is the source of truth; the
 // fixtures test keeps the two honest.

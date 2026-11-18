@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "invalid_record",
+    "message": "/summary/durationSeconds is 9, there are 3 samples"
+  }
+}

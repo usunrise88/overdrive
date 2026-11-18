@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive upload response",
+  "description": "The service's answer to a successful PUT /v1/rides/{rideId} or PUT /v1/rides/{rideId}/fit (spec §8.3, ADR 0014): 201 with status \"stored\" the first time a record (or file) is stored, 200 with \"already-stored\" when the identical body was stored before. A ride counts as uploaded only when both requests have succeeded.",
+  "type": "object",
+  "required": ["rideId", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "rideId": {
+      "description": "The ride's id, as in the path and in the record's ride.id: 1 to 128 characters from A-Z a-z 0-9 . _ -, starting with a letter or digit (the engine's own ids are ride-<start millis>).",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "status": {
+      "description": "stored: this request stored it. already-stored: it was stored before, with exactly this body, and nothing changed.",
+      "enum": ["stored", "already-stored"]
+    }
+  }
+}
