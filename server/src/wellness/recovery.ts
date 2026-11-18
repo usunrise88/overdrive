@@ -106,6 +106,16 @@ const PHRASES: Record<string, { name: string; plain: string; strong: string }> =
   },
 };
 
+/** What each row of the rule table means, in words (for a reader of the answer who wants to know why). */
+export const RULE_MEANINGS: Record<RecoveryRule, string> = {
+  R1: "three or more signals are more than 1.5 spreads outside their usual range in the direction that matters",
+  R2: "a signal has been more than 3 spreads outside its usual range in the direction that matters on two mornings in a row",
+  C1: "two or more signals are outside their usual range in the direction that matters",
+  C2: "one signal is more than 2 spreads outside its usual range in the direction that matters",
+  C3: "one signal has been outside its usual range in the direction that matters on two mornings in a row",
+  OK: "no rule for caution or rest applies",
+};
+
 export const GUIDANCE = {
   ready: "Train as planned.",
   caution: "Train, but keep the hard parts short.",

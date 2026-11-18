@@ -22,7 +22,19 @@ const round = (value: number | null | undefined, digits: number): number | null 
 const DEFAULT_DAYS = 30;
 const MAX_LIMIT = 100;
 
-export function registerRideTools(server: McpServer, ctx: ToolContext): void {
+/** What the ride tools expose to the tools that build on them (`list_activities`, `get_activity`). */
+export interface RideTools {
+  /** A ride's row of `list_rides`. */
+  describeListing: (ride: RideListing) => Promise<Record<string, unknown>>;
+  /** What `get_ride` answers. */
+  getRide: (args: {
+    rideId: string;
+    series?: boolean | undefined;
+    seriesStepSeconds?: number | undefined;
+  }) => Promise<unknown>;
+}
+
+export function registerRideTools(server: McpServer, ctx: ToolContext): RideTools {
   const { services, now } = ctx;
   const timezone = services.timezone;
 
@@ -64,6 +76,7 @@ export function registerRideTools(server: McpServer, ctx: ToolContext): void {
       title: "List completed rides",
       kind: "read",
       description:
+        "DEPRECATED, kept for one more release: list_activities answers the same and also lists the workouts recorded on the watch. " +
         "The rides recorded on the tablet and uploaded to the server, newest first, as summaries: when it started, length and moving time in " +
         "seconds, distance in km (virtual), average, normalised and maximum power in watts, average and maximum heart rate, work in kJ, " +
         "intensity factor, load (training stress score), the FTP used, and the planned workout it was ridden from (workoutId, workoutName; " +
@@ -117,7 +130,7 @@ export function registerRideTools(server: McpServer, ctx: ToolContext): void {
     },
   );
 
-  defineTool(
+  const getRide = defineTool(
     server,
     ctx,
     {
@@ -125,6 +138,7 @@ export function registerRideTools(server: McpServer, ctx: ToolContext): void {
       title: "Get one ride",
       kind: "read",
       description:
+        "DEPRECATED, kept for one more release: get_activity answers the same for a ride (and for a workout from the watch). " +
         "One ride in detail, worked out by the server from the recorded samples. statistics: power (average, normalised, maximum, minimum, " +
         "variability index, intensity factor, load, work in kJ, best average power over 5 s, 1 min, 5 min and 20 min, and seconds in each of " +
         "the seven power zones by the FTP of the ride and the profile's zone bounds), heart rate (average, maximum, minimum, over the " +
@@ -209,4 +223,6 @@ export function registerRideTools(server: McpServer, ctx: ToolContext): void {
       };
     },
   );
+
+  return { describeListing, getRide };
 }

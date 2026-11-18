@@ -67,7 +67,7 @@ export function defineTool<Shape extends z.ZodRawShape>(
   ctx: ToolContext,
   spec: ToolSpec<Shape>,
   run: (args: z.infer<z.ZodObject<Shape>>) => Promise<unknown>,
-): void {
+): (args: z.infer<z.ZodObject<Shape>>) => Promise<unknown> {
   const annotations: ToolAnnotations = {
     title: spec.title,
     readOnlyHint: spec.kind === "read",
@@ -94,4 +94,6 @@ export function defineTool<Shape extends z.ZodRawShape>(
     // The SDK has parsed the arguments with the shape; its types for them are looser than ours.
     callback as never,
   );
+  // The tool's own function, for another tool that answers the same question (an alias, a merged list).
+  return run;
 }

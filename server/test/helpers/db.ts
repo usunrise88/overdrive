@@ -53,6 +53,13 @@ export async function clearRides(db: Db): Promise<void> {
   await db.exec("TRUNCATE ride_destinations, rides");
 }
 
+/** Empties the wellness records, the daily figures, the watch's activities and the rides' heart-rate index. */
+export async function clearWellness(db: Db): Promise<void> {
+  await db.exec(
+    "TRUNCATE wellness_records, wellness_daily, wellness_sync_state, activities, activity_destinations, ride_heart_rate",
+  );
+}
+
 /** Empties the plan cache and its refresh state. */
 export async function clearPlan(db: Db): Promise<void> {
   await db.exec("TRUNCATE planned_workouts, plan_sync_state");

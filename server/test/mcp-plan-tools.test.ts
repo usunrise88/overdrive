@@ -102,13 +102,17 @@ const NEW_WORKOUT = {
 };
 
 describe("the tools and what they say about themselves", () => {
-  it("lists the eight Phase 2 tools, each described with its units and its limits", async () => {
+  it("lists the tools, each described with its units and its limits", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       "create_workout",
       "delete_workout",
+      "get_activity",
       "get_profile",
+      "get_recovery",
       "get_ride",
+      "get_wellness",
+      "list_activities",
       "list_planned_workouts",
       "list_rides",
       "update_profile",
@@ -121,9 +125,21 @@ describe("the tools and what they say about themselves", () => {
     }
     const by = Object.fromEntries(tools.map((t) => [t.name, t]));
     // Reads and writes are marked, and the delete says it destroys.
-    for (const name of ["get_profile", "list_planned_workouts", "list_rides", "get_ride"]) {
+    for (const name of [
+      "get_profile",
+      "list_planned_workouts",
+      "list_rides",
+      "get_ride",
+      "list_activities",
+      "get_activity",
+      "get_wellness",
+      "get_recovery",
+    ]) {
       expect(by[name]?.annotations?.readOnlyHint, name).toBe(true);
     }
+    // The ride tools stay for one release and say they are replaced.
+    expect(by.list_rides?.description).toMatch(/^DEPRECATED.*list_activities/);
+    expect(by.get_ride?.description).toMatch(/^DEPRECATED.*get_activity/);
     for (const name of ["create_workout", "update_workout", "update_profile", "delete_workout"]) {
       expect(by[name]?.annotations?.readOnlyHint, name).toBe(false);
     }
