@@ -1,0 +1,15 @@
+{
+  "event": {
+    "id": 2003,
+    "category": "WORKOUT",
+    "type": "Ride",
+    "start_date_local": "2026-11-20T00:00:00",
+    "name": "Until you press",
+    "workout_doc": {
+      "steps": [
+        { "until_lap_press": true, "power": { "value": 60, "units": "%ftp" } }
+      ]
+    }
+  },
+  "reason": "lap button"
+}

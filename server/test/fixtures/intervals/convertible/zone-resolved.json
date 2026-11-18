@@ -1,0 +1,25 @@
+{
+  "_comment": "Synthetic. A zone target is used through the watts intervals.icu resolved it to (resolve=true), over the FTP of the workout.",
+  "event": {
+    "id": 1005,
+    "category": "WORKOUT",
+    "type": "Ride",
+    "start_date_local": "2026-11-25T00:00:00",
+    "name": "Zone 2",
+    "icu_ftp": 250,
+    "workout_doc": {
+      "ftp": 250,
+      "steps": [
+        { "text": "Endurance", "duration": 3600, "power": { "value": 2, "units": "power_zone" }, "_power": { "start": 140, "end": 187, "units": "w" } }
+      ]
+    }
+  },
+  "native": {
+    "schema": 1,
+    "id": "icu-1005",
+    "name": "Zone 2",
+    "steps": [
+      { "type": "steady", "duration": 3600, "target": 0.654, "label": "Endurance" }
+    ]
+  }
+}

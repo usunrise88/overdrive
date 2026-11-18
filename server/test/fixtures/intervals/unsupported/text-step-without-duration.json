@@ -1,0 +1,11 @@
+{
+  "event": {
+    "id": 2007,
+    "category": "WORKOUT",
+    "type": "Ride",
+    "start_date_local": "2026-11-20T00:00:00",
+    "name": "No duration",
+    "description": "- 10m 60%\n- Hard 90%"
+  },
+  "reason": "line 2: no duration"
+}

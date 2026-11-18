@@ -1,0 +1,11 @@
+{
+  "event": {
+    "id": 2008,
+    "category": "WORKOUT",
+    "type": "Ride",
+    "start_date_local": "2026-11-20T00:00:00",
+    "name": "Prompts",
+    "description": "- 0s^Settle in 30s^Go <!> 10m 70%"
+  },
+  "reason": "prompts at a time"
+}

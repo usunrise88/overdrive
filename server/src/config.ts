@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isTimeZone } from "./time.ts";
 
 /** A device allowed to call the API: its name (for logs and `rides.uploaded_by`) and its secret. */
 export interface DeviceToken {
@@ -54,6 +55,17 @@ export function parseDeviceTokens(raw: string): DeviceToken[] {
   return devices;
 }
 
+/** Environment variables that are set but empty (compose passes `${VAR:-}`) count as not set. */
+const blankIsUnset = (value: unknown): unknown =>
+  typeof value === "string" && value.trim() === "" ? undefined : value;
+
+export const DEFAULT_INTERVALS_BASE_URL = "https://intervals.icu";
+
+/** intervals.icu athlete ids are `i12345` (or a number); `0` means the athlete the API key belongs to. */
+const ATHLETE_ID = /^[A-Za-z0-9_-]{1,32}$/;
+// Visible ASCII, no spaces: the key goes into an Authorization header.
+const API_KEY = /^[\x21-\x7e]{1,256}$/;
+
 const schema = z.object({
   HOST: z.string().default("127.0.0.1"),
   PORT: z.coerce.number().int().min(1).max(65535).default(8080),
@@ -74,13 +86,74 @@ const schema = z.object({
         return z.NEVER;
       }
     }),
+  // intervals.icu (ADR 0016). The integration is off unless the key is set. Messages never repeat a value.
+  INTERVALS_API_KEY: z.preprocess(
+    blankIsUnset,
+    z
+      .string()
+      .trim()
+      .regex(
+        API_KEY,
+        "INTERVALS_API_KEY must be 1 to 256 visible characters with no spaces (Settings, Developer Settings, API key in intervals.icu)",
+      )
+      .optional(),
+  ),
+  INTERVALS_ATHLETE_ID: z.preprocess(
+    blankIsUnset,
+    z
+      .string()
+      .trim()
+      .regex(ATHLETE_ID, "INTERVALS_ATHLETE_ID must be 1 to 32 characters from A-Z a-z 0-9 _ -")
+      .default("0"),
+  ),
+  INTERVALS_BASE_URL: z.preprocess(
+    blankIsUnset,
+    z
+      .string()
+      .trim()
+      .default(DEFAULT_INTERVALS_BASE_URL)
+      .transform((raw, ctx): string => {
+        try {
+          const url = new URL(raw);
+          if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("scheme");
+          if (url.username !== "" || url.password !== "") throw new Error("credentials");
+          if (url.search !== "" || url.hash !== "") throw new Error("query");
+          return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
+        } catch {
+          ctx.addIssue({
+            code: "custom",
+            message:
+              "INTERVALS_BASE_URL must be an http(s) address with no credentials, query or fragment",
+          });
+          return z.NEVER;
+        }
+      }),
+  ),
+  PLAN_REFRESH_MINUTES: z.preprocess(
+    blankIsUnset,
+    z.coerce
+      .number({ error: "PLAN_REFRESH_MINUTES must be a whole number of minutes" })
+      .int("PLAN_REFRESH_MINUTES must be a whole number of minutes")
+      .min(1, "PLAN_REFRESH_MINUTES must be at least 1")
+      .max(1440, "PLAN_REFRESH_MINUTES must be at most 1440 (a day)")
+      .default(15),
+  ),
+  // The rider's time zone: which day "today" is for the plan, and which day a ride belongs to.
+  TIMEZONE: z.preprocess(
+    blankIsUnset,
+    z
+      .string()
+      .trim()
+      .default("UTC")
+      .refine(isTimeZone, "TIMEZONE must be an IANA time zone such as Europe/Paris or UTC"),
+  ),
 });
 
 export type Config = z.infer<typeof schema>;
 
 /**
  * Reads configuration from the environment. Secrets (the device tokens, the database password,
- * and later intervals.icu, Strava, Google, Telegram and the LLM endpoint) live in the server
+ * the intervals.icu key, and later Strava, Google, Telegram and the LLM endpoint) live in the server
  * environment only (spec §7.2). Throws on anything invalid, so a bad configuration stops the
  * start instead of running half-open.
  */

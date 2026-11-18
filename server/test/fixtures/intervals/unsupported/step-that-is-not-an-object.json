@@ -1,0 +1,13 @@
+{
+  "event": {
+    "id": 2011,
+    "category": "WORKOUT",
+    "type": "Ride",
+    "start_date_local": "2026-11-20T00:00:00",
+    "name": "Garbage",
+    "workout_doc": {
+      "steps": [ "ten minutes easy" ]
+    }
+  },
+  "reason": "a step that is not an object"
+}

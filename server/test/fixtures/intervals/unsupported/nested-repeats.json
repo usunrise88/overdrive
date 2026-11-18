@@ -1,0 +1,20 @@
+{
+  "event": {
+    "id": 2001,
+    "category": "WORKOUT",
+    "type": "Ride",
+    "start_date_local": "2026-11-20T00:00:00",
+    "name": "Blocks of blocks",
+    "workout_doc": {
+      "steps": [
+        { "reps": 2, "steps": [
+          { "reps": 3, "steps": [
+            { "duration": 60, "power": { "value": 110, "units": "%ftp" } },
+            { "duration": 60, "power": { "value": 50, "units": "%ftp" } }
+          ] }
+        ] }
+      ]
+    }
+  },
+  "reason": "repeats inside repeats"
+}

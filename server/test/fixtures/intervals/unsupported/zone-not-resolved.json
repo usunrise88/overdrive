@@ -1,0 +1,15 @@
+{
+  "event": {
+    "id": 2004,
+    "category": "WORKOUT",
+    "type": "Ride",
+    "start_date_local": "2026-11-20T00:00:00",
+    "name": "Zone 3 without watts",
+    "workout_doc": {
+      "steps": [
+        { "duration": 1200, "power": { "value": 3, "units": "power_zone" } }
+      ]
+    }
+  },
+  "reason": "power_zone that intervals.icu did not resolve to watts"
+}

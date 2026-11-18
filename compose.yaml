@@ -15,6 +15,13 @@ services:
       DATABASE_URL: postgres://overdrive:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/overdrive
       # name:token,name:token (ADR 0014); empty means the API answers 401 to everyone.
       DEVICE_TOKENS: ${DEVICE_TOKENS:-}
+      # intervals.icu (ADR 0016): off while the key is empty. Empty values mean the defaults.
+      INTERVALS_API_KEY: ${INTERVALS_API_KEY:-}
+      INTERVALS_ATHLETE_ID: ${INTERVALS_ATHLETE_ID:-}
+      INTERVALS_BASE_URL: ${INTERVALS_BASE_URL:-}
+      PLAN_REFRESH_MINUTES: ${PLAN_REFRESH_MINUTES:-}
+      # The rider's time zone (IANA name): which day is "today" for the plan and for a ride.
+      TIMEZONE: ${TIMEZONE:-}
     ports:
       - "127.0.0.1:${SERVER_PORT:-8080}:8080"
 

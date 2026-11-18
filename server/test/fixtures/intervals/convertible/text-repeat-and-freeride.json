@@ -1,0 +1,25 @@
+{
+  "_comment": "Synthetic. Text only: a standalone repeat header, a header with a cue, a freeride step, a time written 1m30.",
+  "event": {
+    "id": 1003,
+    "category": "WORKOUT",
+    "type": "Ride",
+    "start_date_local": "2026-11-23T00:00:00",
+    "name": "Sprints",
+    "description": "- 10m 55%\n\nSprint set 6x\n- Go 15s 150%\n- 1m30 45%\n\n- 10m freeride\n- 5m 50%"
+  },
+  "native": {
+    "schema": 1,
+    "id": "icu-1003",
+    "name": "Sprints",
+    "steps": [
+      { "type": "steady", "duration": 600, "target": 0.55 },
+      { "type": "repeat", "count": 6, "label": "Sprint set", "steps": [
+        { "type": "steady", "duration": 15, "target": 1.5, "label": "Go" },
+        { "type": "steady", "duration": 90, "target": 0.45 }
+      ] },
+      { "type": "free", "duration": 600 },
+      { "type": "steady", "duration": 300, "target": 0.5 }
+    ]
+  }
+}

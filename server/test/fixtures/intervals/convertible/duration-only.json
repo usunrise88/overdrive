@@ -1,0 +1,19 @@
+{
+  "_comment": "Synthetic. Planned by duration alone (no steps, no description): a free ride of that length. An event with no name is called Workout.",
+  "event": {
+    "id": 1007,
+    "category": "WORKOUT",
+    "type": "Ride",
+    "start_date_local": "2026-11-27T00:00:00",
+    "name": "  ",
+    "moving_time": 5400
+  },
+  "native": {
+    "schema": 1,
+    "id": "icu-1007",
+    "name": "Workout",
+    "steps": [
+      { "type": "free", "duration": 5400 }
+    ]
+  }
+}
