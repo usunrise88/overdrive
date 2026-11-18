@@ -4,6 +4,17 @@ import app.overdrive.core.profile.Change
 import app.overdrive.core.profile.PhysicsPatch
 import app.overdrive.core.profile.Profile
 import app.overdrive.core.profile.ProfilePatch
+import app.overdrive.core.profile.ProfileState
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The settings a ride, the Ready screen and the Settings screen use: the tablet's own, with the rider's profile from the service on
@@ -50,3 +61,38 @@ fun riderPatch(
                 crr = after.crr.takeIf { it != before.crr },
             ),
     )
+
+/**
+ * How long the first ride waits for the profile to be known ([ProfileState.ready]: the cache read and the settings looked at). That
+ * takes milliseconds, so this is only the bound that keeps **a ride from ever depending on the profile or its cache** (a disk that
+ * does not answer, a flow that never says so): the tablet's own values apply until the profile is known, and a ride that has not
+ * started is rebuilt when it is.
+ */
+const val PROFILE_WAIT_MILLIS: Long = 3_000
+
+/**
+ * What [profile] says is in force: the first value waits until the profile is known, but at most [waitMillis] (then it is null, the
+ * tablet's own values), and every later change follows. Cold: each collector waits on its own.
+ */
+fun profileInForce(
+    profile: StateFlow<ProfileState>,
+    waitMillis: Long = PROFILE_WAIT_MILLIS,
+): Flow<Profile?> =
+    flow {
+        val known = withTimeoutOrNull(waitMillis) { profile.first { it.ready } }
+        emit(known?.profile)
+        emitAll(profile.filter { it.ready }.map { it.profile })
+    }.distinctUntilChanged()
+
+/**
+ * The tablet's settings with the profile in force on top ([withProfile]), as a flow that changes only when a value does. The first
+ * value waits for the profile to be known, within [PROFILE_WAIT_MILLIS], so the ride built first uses the right FTP and not the
+ * tablet's own for a moment (ADR 0021), and never waits for it longer than that (ADR 0027).
+ */
+fun effectiveSettingsOf(
+    own: Flow<AppSettings>,
+    profile: StateFlow<ProfileState>,
+    waitMillis: Long = PROFILE_WAIT_MILLIS,
+): Flow<AppSettings> =
+    combine(own, profileInForce(profile, waitMillis)) { settings, inForce -> settings.withProfile(inForce) }
+        .distinctUntilChanged()

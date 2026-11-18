@@ -6,13 +6,22 @@ import app.overdrive.core.profile.PhysicsPatch
 import app.overdrive.core.profile.Profile
 import app.overdrive.core.profile.ProfilePatch
 import app.overdrive.core.profile.ProfilePhysics
+import app.overdrive.core.profile.ProfileState
 import app.overdrive.ride.host.toRideSettings
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** The settings a ride is built from: the tablet's own with the service's profile on top where it has an answer (ADR 0021). */
+@OptIn(ExperimentalCoroutinesApi::class)
 class RiderProfileTest {
     private val own = AppSettings(ftp = 200, massKg = 75.0, cdA = 0.32, crr = 0.005)
 
@@ -108,4 +117,60 @@ class RiderProfileTest {
         // What the profile holds but the tablet does not edit is never part of it.
         assertTrue(riderPatch(before, before.copy(gearCount = 12, overlayBlur = true)).isEmpty)
     }
+
+    // ---- Waiting for the profile, and not for ever (ADR 0021, ADR 0027) -----------------------------
+
+    @Test
+    fun `the first value waits for the profile to be known and is then built with it`() =
+        runTest {
+            val state = MutableStateFlow(ProfileState())
+            val seen = mutableListOf<AppSettings>()
+            val job = backgroundScope.launch { effectiveSettingsOf(flowOf(own), state).collect { seen += it } }
+            runCurrent()
+            advanceTimeBy(PROFILE_WAIT_MILLIS - 1)
+            assertEquals("nothing is built while the profile is being read", emptyList<AppSettings>(), seen)
+
+            state.value = ProfileState(ready = true, profile = profile())
+            runCurrent()
+            assertEquals("the first ride is at the service's FTP, never at the tablet's own for a moment", 1, seen.size)
+            assertEquals(175, seen.single().ftp)
+            job.cancel()
+        }
+
+    @Test
+    fun `a profile that is never known does not hold the ride up, and is followed when it is`() =
+        runTest {
+            val state = MutableStateFlow(ProfileState())
+            val seen = mutableListOf<AppSettings>()
+            val job = backgroundScope.launch { effectiveSettingsOf(flowOf(own), state).collect { seen += it } }
+            runCurrent()
+            advanceTimeBy(PROFILE_WAIT_MILLIS - 1)
+            assertTrue(seen.isEmpty())
+            advanceTimeBy(2)
+            runCurrent()
+            assertEquals("after the bound the tablet's own values apply", listOf(own), seen)
+
+            state.value = ProfileState(ready = true, profile = profile())
+            runCurrent()
+            assertEquals("and a ride that has not started is rebuilt when the profile arrives", 175, seen.last().ftp)
+            assertEquals(2, seen.size)
+            job.cancel()
+        }
+
+    @Test
+    fun `a profile that is known when nobody waited is the first value, and a later answer follows`() =
+        runTest {
+            val state = MutableStateFlow(ProfileState(ready = true, profile = null))
+            val seen = mutableListOf<AppSettings>()
+            val job = backgroundScope.launch { effectiveSettingsOf(flowOf(own), state).collect { seen += it } }
+            runCurrent()
+            assertEquals(listOf(own), seen)
+            state.value = ProfileState(ready = true, profile = profile())
+            runCurrent()
+            assertEquals(listOf(200, 175), seen.map { it.ftp })
+            advanceTimeBy(2 * PROFILE_WAIT_MILLIS)
+            runCurrent()
+            assertEquals("the bound is not a timer that fires again", 2, seen.size)
+            job.cancel()
+        }
 }
