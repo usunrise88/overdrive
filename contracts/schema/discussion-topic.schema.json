@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive discussion topic",
+  "description": "A discussion topic (spec §12.3, ADR 0025): the post-ride analysis found a ride worth a conversation with the coach agent. It is attached to the ride's note (insights-response.schema.json, topic) and listed by the MCP tool list_discussion_topics. A topic exists only for a real reason (a rule of a fixed table, ADR 0025: ride cut short against the plan, a power record at a standard duration, load far from the plan, repeated plan drift), at most two in any 7 days. text is one sentence on what stood out; openingQuestion is a question the rider can paste as the first message of a chat with the coach, written in the rider's voice; both are written by code from computed facts, so every number in them was computed by the service. status is open until the coach agent marks it discussed or 14 days have passed (then expired). A topic belongs to exactly one ride. Rules a schema cannot state, checked by every implementation: createdAt is a real UTC instant.",
+  "type": "object",
+  "required": ["id", "text", "openingQuestion", "rideId", "createdAt", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "integer", "minimum": 1 },
+    "text": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "openingQuestion": { "type": "string", "minLength": 1, "maxLength": 400 },
+    "rideId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "createdAt": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "status": { "enum": ["open", "discussed", "expired"] }
+  }
+}

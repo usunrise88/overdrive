@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive insights response",
+  "description": "The answer to GET /v1/insights?from&to (spec §6.5, §6.6, §12.3, §8.3, ADR 0025): the written notes whose createdAt falls on a local day (TIMEZONE) from `from` to `to`, both included, at most 366 days (400 invalid_range otherwise), newest first (createdAt, then id, descending). kind is morning (state, why, what to do with today's workout: a recommendation in words, never a plan change), ride (how a ride went against its plan; its rideId is set), week (the weekly review), deviation (a metric outside the rider's own baseline for several days in a row, with a plain reading of what that usually means for training) or drift (missed sessions, or load far from the plan). text is plain text of one to a few short paragraphs, written from facts the service computed (by a language model, checked by code so that it quotes only numbers that were supplied, or by a deterministic template when no model is configured or its text was rejected); it never carries a diagnosis and names no medical condition. rideId is the ride a ride note is about and is null for every other kind. topic is the discussion topic the ride note carries (discussion-topic.schema.json) or null; only ride notes have one, and its rideId is the note's. Every answer carries generatedAt (when the service built it) and stale, which is false: notes are read from the service's own database, so nothing they depend on can be out of date. Rules a schema cannot state, checked by every implementation: from and to are real calendar dates, from is not after to and the range is at most 366 days; generatedAt and every createdAt are real UTC instants; a note's id is unique in the answer; the notes are ordered newest first; rideId is set exactly for kind ride; topic is null unless kind is ride, and then topic.rideId equals rideId.",
+  "type": "object",
+  "required": ["from", "to", "generatedAt", "stale", "insights"],
+  "additionalProperties": false,
+  "properties": {
+    "from": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "to": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "generatedAt": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "stale": { "type": "boolean" },
+    "insights": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/insight" }
+    }
+  },
+  "$defs": {
+    "insight": {
+      "type": "object",
+      "required": ["id", "kind", "createdAt", "text", "rideId", "topic"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "kind": { "enum": ["morning", "ride", "week", "deviation", "drift"] },
+        "createdAt": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+        },
+        "text": { "type": "string", "minLength": 1, "maxLength": 1500 },
+        "rideId": {
+          "oneOf": [
+            { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+            { "type": "null" }
+          ]
+        },
+        "topic": {
+          "oneOf": [{ "$ref": "#/$defs/topic" }, { "type": "null" }]
+        }
+      }
+    },
+    "topic": {
+      "type": "object",
+      "required": ["id", "text", "openingQuestion", "rideId", "createdAt", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "text": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "openingQuestion": { "type": "string", "minLength": 1, "maxLength": 400 },
+        "rideId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+        },
+        "status": { "enum": ["open", "discussed", "expired"] }
+      }
+    }
+  }
+}

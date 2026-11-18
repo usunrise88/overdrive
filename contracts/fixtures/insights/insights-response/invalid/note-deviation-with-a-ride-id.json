@@ -1,0 +1,16 @@
+{
+  "from": "2026-11-09",
+  "to": "2026-11-18",
+  "generatedAt": "2026-11-18T08:00:00Z",
+  "stale": false,
+  "insights": [
+    {
+      "id": 8,
+      "kind": "deviation",
+      "createdAt": "2026-11-14T06:00:09Z",
+      "text": "Your resting heart rate has been above your usual range for 3 mornings in a row. That usually means the body is carrying fatigue, so hard sessions tend to feel heavier. Keep the next day or two easy.",
+      "rideId": "ride-1794984000000",
+      "topic": null
+    }
+  ]
+}

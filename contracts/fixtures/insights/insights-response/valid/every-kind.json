@@ -1,0 +1,55 @@
+{
+  "from": "2026-11-09",
+  "to": "2026-11-18",
+  "generatedAt": "2026-11-18T08:00:00Z",
+  "stale": false,
+  "insights": [
+    {
+      "id": 12,
+      "kind": "morning",
+      "createdAt": "2026-11-18T06:00:08Z",
+      "text": "Caution today: resting heart rate is above your usual range for the second morning. Do the planned sweet spot but keep the hard parts short, and stop at 40 minutes if it feels heavy.",
+      "rideId": null,
+      "topic": null
+    },
+    {
+      "id": 11,
+      "kind": "ride",
+      "createdAt": "2026-11-17T19:12:04Z",
+      "text": "You rode 38 of the planned 65 minutes. The steps you did were close to target: 262 W against 264 W.",
+      "rideId": "ride-1794984000000",
+      "topic": {
+        "id": 4,
+        "text": "The ride stopped at 38 of the planned 65 minutes.",
+        "openingQuestion": "I stopped Tuesday's sweet spot after 38 of 65 minutes. Can we look at why and at what to change for the rest of the week?",
+        "rideId": "ride-1794984000000",
+        "createdAt": "2026-11-17T19:12:04Z",
+        "status": "open"
+      }
+    },
+    {
+      "id": 9,
+      "kind": "week",
+      "createdAt": "2026-11-15T17:00:03Z",
+      "text": "Week 9 to 15 November: 3 of 4 planned sessions done, load 212 against 188 the week before. Fitness rose by 3.1. Next week starts fresh enough for the planned intervals.",
+      "rideId": null,
+      "topic": null
+    },
+    {
+      "id": 8,
+      "kind": "deviation",
+      "createdAt": "2026-11-14T06:00:09Z",
+      "text": "Your resting heart rate has been above your usual range for 3 mornings in a row. That usually means the body is carrying fatigue, so hard sessions tend to feel heavier. Keep the next day or two easy.",
+      "rideId": null,
+      "topic": null
+    },
+    {
+      "id": 7,
+      "kind": "drift",
+      "createdAt": "2026-11-13T06:00:11Z",
+      "text": "2 planned sessions were missed in the last 7 days. If the week is going to stay light, ask the coach to reshape it.",
+      "rideId": null,
+      "topic": null
+    }
+  ]
+}

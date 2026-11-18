@@ -30,6 +30,8 @@ src/         @overdrive/contracts: the schema plus a validator for the TypeScrip
 | Daily wellness (`GET /v1/wellness`) | `schema/wellness-response.schema.json` | §6.4, §12.5, §8.3, ADR 0023 |
 | Recovery (`GET /v1/recovery`) | `schema/recovery-response.schema.json` | §6.4, §8.3, ADR 0023 |
 | Watch activity (`GET /v1/activities/{id}`) | `schema/activity.schema.json` | §6.7, §8.3, ADR 0023 |
+| Written insights (`GET /v1/insights?from&to`) | `schema/insights-response.schema.json` | §6.5, §6.6, §8.3, ADR 0025 |
+| Discussion topic (inside a ride note; MCP `list_discussion_topics`) | `schema/discussion-topic.schema.json` | §12.3, ADR 0025 |
 
 The remaining sync API payloads and the MCP tool inputs (spec §8.3–§8.4) get schemas here as they are fixed during
 implementation. The sync outbox of the ride app (ADR 0012) is a local journal, not a wire format, and has no schema.
@@ -87,6 +89,15 @@ load): `validateWellnessUploadResponse`, `validateWellnessResponse`, `validateRe
 `WellnessApiJson` (`WellnessContractTest`), against the same files. The profile gained four heart-rate keys (`maxHeartRate`,
 `thresholdHeartRate`, `estimatedMaxHeartRate`, `estimatedThresholdHeartRate`), **optional on read** so that a profile cached before they existed
 stays valid, with `profile/valid/heart-rates.json` and the patch fixtures `heart-rate-*`.
+
+`fixtures/insights/` holds the golden files of the written notes (stage P3-3, ADR 0025): `insights-response` (`GET /v1/insights?from&to`, at most
+366 days of local days by the note's `createdAt`, newest first: `generatedAt`, `stale` which is always false, and `insights`, each `{ id, kind, createdAt,
+text, rideId, topic }` with `kind` one of `morning`, `ride`, `week` (the notes of spec §6.5) and `deviation`, `drift` (the alerts of §6.6), `rideId` set
+exactly for a ride note, and `topic` null or the discussion topic of that ride note) and `discussion-topic` (`{ id, text, openingQuestion, rideId,
+createdAt, status }`, status `open`, `discussed` or `expired`; spec §12.3), each with `valid/` and `invalid/`. What a schema cannot state (real dates,
+at most 366 days, unique ids, newest first, `rideId` set exactly for ride notes, a topic only on a ride note and naming the same ride) is in the schema's
+description and checked by `validateInsightsResponse` and `validateDiscussionTopic` here and by `InsightsApiJson` in Kotlin (`InsightsContractTest`),
+against the same files. Errors name a path and a rule, never the text of a note. All the text in the fixtures is synthetic.
 
 `fixtures/fit/` holds two FIT files for the upload's tests: `fit-golden-3s.fit`, the 376 bytes `FitWriter` writes for
 `rides/valid/fit-golden-3s.json` (the worked example of `docs/protocols/fit.md`; Kotlin's `FitFixturesTest` regenerates it

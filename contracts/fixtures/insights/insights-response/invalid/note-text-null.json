@@ -1,0 +1,16 @@
+{
+  "from": "2026-11-09",
+  "to": "2026-11-18",
+  "generatedAt": "2026-11-18T08:00:00Z",
+  "stale": false,
+  "insights": [
+    {
+      "id": 12,
+      "kind": "morning",
+      "createdAt": "2026-11-18T06:00:08Z",
+      "text": null,
+      "rideId": null,
+      "topic": null
+    }
+  ]
+}

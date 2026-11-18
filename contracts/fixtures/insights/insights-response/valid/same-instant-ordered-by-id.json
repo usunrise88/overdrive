@@ -1,0 +1,24 @@
+{
+  "from": "2026-11-09",
+  "to": "2026-11-18",
+  "generatedAt": "2026-11-18T08:00:00Z",
+  "stale": false,
+  "insights": [
+    {
+      "id": 20,
+      "kind": "morning",
+      "createdAt": "2026-11-18T06:00:00Z",
+      "text": "Caution today: resting heart rate is above your usual range for the second morning. Do the planned sweet spot but keep the hard parts short, and stop at 40 minutes if it feels heavy.",
+      "rideId": null,
+      "topic": null
+    },
+    {
+      "id": 19,
+      "kind": "drift",
+      "createdAt": "2026-11-18T06:00:00Z",
+      "text": "2 planned sessions were missed in the last 7 days. If the week is going to stay light, ask the coach to reshape it.",
+      "rideId": null,
+      "topic": null
+    }
+  ]
+}

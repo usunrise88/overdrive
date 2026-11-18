@@ -1,0 +1,24 @@
+{
+  "from": "2026-11-09",
+  "to": "2026-11-18",
+  "generatedAt": "2026-11-18T08:00:00Z",
+  "stale": false,
+  "insights": [
+    {
+      "id": 11,
+      "kind": "ride",
+      "createdAt": "2026-11-17T19:12:04Z",
+      "text": "You rode 38 of the planned 65 minutes. The steps you did were close to target: 262 W against 264 W.",
+      "rideId": "ride-1794984000000",
+      "topic": {
+        "id": 4,
+        "text": "The ride stopped at 38 of the planned 65 minutes.",
+        "openingQuestion": "I stopped Tuesday's sweet spot after 38 of 65 minutes. Can we look at why and at what to change for the rest of the week?",
+        "rideId": "ride-1794984000000",
+        "createdAt": "2026-11-17T19:12:04Z",
+        "status": "open",
+        "rule": "cut-short"
+      }
+    }
+  ]
+}

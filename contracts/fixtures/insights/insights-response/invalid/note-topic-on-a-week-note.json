@@ -1,0 +1,23 @@
+{
+  "from": "2026-11-09",
+  "to": "2026-11-18",
+  "generatedAt": "2026-11-18T08:00:00Z",
+  "stale": false,
+  "insights": [
+    {
+      "id": 9,
+      "kind": "week",
+      "createdAt": "2026-11-15T17:00:03Z",
+      "text": "Week 9 to 15 November: 3 of 4 planned sessions done, load 212 against 188 the week before. Fitness rose by 3.1. Next week starts fresh enough for the planned intervals.",
+      "rideId": null,
+      "topic": {
+        "id": 4,
+        "text": "The ride stopped at 38 of the planned 65 minutes.",
+        "openingQuestion": "I stopped Tuesday's sweet spot after 38 of 65 minutes. Can we look at why and at what to change for the rest of the week?",
+        "rideId": "ride-1794984000000",
+        "createdAt": "2026-11-17T19:12:04Z",
+        "status": "open"
+      }
+    }
+  ]
+}
