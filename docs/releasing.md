@@ -56,7 +56,9 @@ Pushing the tag starts two workflow runs: `ci.yml` and `release.yml`. Both run o
 
 1. **Restore the signing keystore.** It checks that the secrets `ANDROID_KEYSTORE_BASE64`,
    `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD` are set. It decodes
-   the keystore to a temporary file and prints the keystore entry with `keytool -list`.
+   the keystore to a temporary file and prints the keystore entry with `keytool -list`; this log
+   shows the keystore's certificate fingerprint. The later "Verify signatures" step prints the signer
+   digest of each APK, which must be the same value.
 2. **Build signed release APKs.** It runs `./gradlew check assembleRelease` in `android/`, with
    `-PoverdriveVersionName=<tag without v>` and `-PoverdriveVersionCode=<run number>`.
 3. **Verify signatures and collect assets.** For both apps it runs `apksigner verify --print-certs`
@@ -64,8 +66,10 @@ Pushing the tag starts two workflow runs: `ci.yml` and `release.yml`. Both run o
    fails the run. It then copies the APKs to `dist/` and writes `dist/SHA256SUMS`.
 4. **Upload the workflow artifact** `overdrive-<tag>` with the same files. This is kept by GitHub
    for a limited time and is useful for a dry run.
-5. **Publish the GitHub Release.** This step runs only when the ref is a tag starting with `v`. It
-   runs `gh release create <tag> dist/* --title "Overdrive <version>" --generate-notes`, and adds
+5. **Publish the GitHub Release.** This step runs only when the ref is a tag starting with `v` and
+   the run is a tag push (or a manual run with `dry_run` turned off). It runs
+   `gh release create <tag> dist/* --title "Overdrive <version>"`, with `--notes-file
+   docs/releases/<tag>.md` when that file exists and `--generate-notes` otherwise, and adds
    `--prerelease` when the tag contains a hyphen.
 
 Release assets, for a tag `v<version>`:
@@ -80,10 +84,9 @@ Notes:
 
 - `gh release create` fails when a release for the tag already exists. A failed run is not
   overwritten by a second run on the same tag.
-- Release notes: the workflow currently uses `--generate-notes`. The convention for hand-written
-  notes is `docs/releases/<tag>.md`, for example `docs/releases/v0.1.0-alpha.1.md`, written from
-  `docs/releases/TEMPLATE.md`. The workflow does not read that file yet; the orchestrator adds it
-  to `release.yml` (`--notes-file`) before the first release that uses it.
+- Release notes: hand-written notes live in `docs/releases/<tag>.md`, for example
+  `docs/releases/v0.1.0-alpha.1.md`, written from `docs/releases/TEMPLATE.md`. The workflow uses that
+  file as the release body when it exists and generates notes otherwise.
 
 ## 5. Verifying the release
 
@@ -131,9 +134,8 @@ A dry run builds and verifies the signed APKs but does not publish. It happens w
 Run the dry run before tagging whenever `release.yml` changed, and confirm that the "Verify
 signatures" step passes.
 
-Warning: the manual run has a `dry_run` input (default `true`), but the workflow does not read it.
-The Release step runs whenever the ref is a tag starting with `v`. Start a manual run only from a
-branch, never from a tag. Until the workflow reads `dry_run`, treat the input as having no effect.
+The manual run has a `dry_run` input (default `true`). The Release step publishes only for a tag
+push, or for a manual run from a tag with `dry_run` turned off. Start dry runs from a branch.
 
 ## 7. Release notes
 
