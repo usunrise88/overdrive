@@ -1,5 +1,6 @@
 package app.overdrive.core.wellness
 
+import app.overdrive.core.plan.PlanCalendar
 import app.overdrive.core.plan.PlanDates
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -39,6 +40,23 @@ public object WellnessTime {
         return epochDay * MILLIS_PER_DAY + hour.toLong() * MILLIS_PER_HOUR + minute.toLong() * MILLIS_PER_MINUTE +
             second.toLong() * MILLIS_PER_SECOND + millis
     }
+
+    /**
+     * [millis] (milliseconds since the Unix epoch) as the upload writes an instant: `2026-11-18T06:30:00Z`, with the milliseconds
+     * only when there are any (`2026-11-18T06:30:00.123Z`). The inverse of [parseInstant] for whole milliseconds.
+     */
+    public fun formatInstant(millis: Long): String {
+        val day = millis.floorDiv(MILLIS_PER_DAY)
+        val inDay = millis.mod(MILLIS_PER_DAY)
+        val hour = inDay / MILLIS_PER_HOUR
+        val minute = inDay % MILLIS_PER_HOUR / MILLIS_PER_MINUTE
+        val second = inDay % MILLIS_PER_MINUTE / MILLIS_PER_SECOND
+        val milli = inDay % MILLIS_PER_SECOND
+        val fraction = if (milli == 0L) "" else "." + milli.toString().padStart(MILLIS_DIGITS, '0')
+        return PlanCalendar.ofEpochDay(day) + "T${two(hour)}:${two(minute)}:${two(second)}${fraction}Z"
+    }
+
+    private fun two(value: Long): String = value.toString().padStart(2, '0')
 
     /** A UTC instant as the answers write it: `2026-11-18T07:40:00Z`, with up to three fractional digits. */
     public fun isUtcInstant(text: String): Boolean = utcInstant.matches(text) && parseInstant(text) != null

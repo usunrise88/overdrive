@@ -29,6 +29,7 @@ android {
 
 dependencies {
     api(libs.overdrive.core)
+    api(libs.androidx.health.connect.client)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

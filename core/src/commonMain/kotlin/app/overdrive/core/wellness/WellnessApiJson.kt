@@ -121,6 +121,9 @@ public object WellnessApiJson {
     /** The JSON of [upload] as `POST /v1/wellness` takes it: keys without a value left out, on one line. */
     public fun encodeUpload(upload: WellnessUpload): String = writer.encodeToString(WellnessUpload.serializer(), upload)
 
+    /** One record as it stands in an upload's `records`, to measure a batch before it is made. */
+    public fun encodeRecord(record: WellnessRecord): String = writer.encodeToString(WellnessRecord.serializer(), record)
+
     /** @throws IllegalArgumentException if [text] is not an upload answer of the schema. */
     public fun decodeUploadResponse(text: String): WellnessUploadResponse =
         strict.decodeFromJsonElement(WellnessUploadResponse.serializer(), parse(text, uploadResponseNumbers))
