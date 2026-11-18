@@ -14,7 +14,8 @@ RUN pnpm install --frozen-lockfile
 
 COPY contracts contracts
 COPY server server
-RUN pnpm --filter @overdrive/server build \
+# "server..." builds the workspace packages it depends on (contracts) first.
+RUN pnpm --filter "@overdrive/server..." build \
  && pnpm --filter @overdrive/server deploy --prod /out
 
 FROM node:24-slim
@@ -23,6 +24,7 @@ WORKDIR /app
 COPY --from=build /out/package.json ./
 COPY --from=build /out/node_modules ./node_modules
 COPY --from=build /out/dist ./dist
+COPY --from=build /out/migrations ./migrations
 USER node
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
