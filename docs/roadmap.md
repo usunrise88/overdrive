@@ -9,8 +9,22 @@ rest is solid.
 |---|---|---|---|
 | **M1 Design and overlay** | `v0.1.0-alpha.1` | Design system and mock-ups (§7.4); ride app with a **simulated** trainer, strap and Click: ride screen, overlay (compact and detailed, draggable, snaps, remembered), foreground service | Overlay over a real video app on the tablet: legibility, drag smoothness, ZUI background behaviour, battery (§9 "ZUI background limits") |
 | **M2 Engine and workouts** | `v0.1.0-alpha.2` | Ride engine, physics, virtual gears, workout player (steady, ramp, repeat, free; ERG and simulation), auto-pause, crash recovery, FIT export. Still simulated devices | A full simulated workout; the exported FIT opens in intervals.icu with power, heart rate, cadence and laps (acceptance 2, 5, 6) |
-| **M3 Real devices** | `v0.1.0-alpha.3` | BLE transport, FTMS trainer, heart-rate strap, pairing and reconnect, raw BLE session recorder | Ride on the D500 with the Coospo strap: control, dropouts, RR intervals, gear feel (§9) |
-| **M4 Handlebar and MVP** | `v0.1.0` | Click v2 and the gesture layer, all ten actions, sync stub and outbox, settings, acceptance criteria 1–7 (§4.10) | The whole acceptance list, on the bike |
+| **M3 Real devices** | `v0.1.0-alpha.3` | BLE transport, FTMS trainer, heart-rate strap, pairing and reconnect, raw BLE session recorder. Built against the specs, open-source references and replayed sessions | *Deferred to the bench:* ride on the D500 with the Coospo strap: control, dropouts, RR intervals, gear feel (§9) |
+| **M4 Handlebar and MVP** | `v0.1.0` | Click v2 and the gesture layer, all ten actions, sync stub and outbox, settings, acceptance criteria 1–7 (§4.10), bench checklist | *Deferred to the bench:* the whole acceptance list, on the bike |
+
+## Hardware verification is deferred
+
+Decision (owner): M3 and M4 are built without access to the trainer, strap or Click. They are tested on
+the owner's bench once it exists: an environment with `adb` to the tablet and the devices in reach.
+Until then correctness rests on the Bluetooth specifications, open-source reference implementations
+(for the Click, BikeControl, §9 risk 1) and a fake GATT transport that replays recorded or synthetic
+sessions (§7.5). The honest consequences:
+
+- `v0.1.0-alpha.3` and `v0.1.0` are cut when every automated criterion is green. Their release notes
+  say plainly which parts have not touched real hardware.
+- Defects found on the bench are fixed in `v0.1.x`; `docs/phase1-acceptance.md` marks which criteria
+  have been confirmed on device.
+- M4 delivers `docs/bench-checklist.md`: what to check, in which order, which logs to capture.
 
 ## Why this order
 

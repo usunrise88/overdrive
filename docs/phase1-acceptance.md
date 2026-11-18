@@ -16,6 +16,12 @@ in that release's notes as something to try.
 
 ## Release gate for `v0.1.0`
 
-All seven criteria pass, the owner has confirmed the "Owner" column on the bike, and the open checks of
-spec §9 that Phase 1 can settle (RR intervals from the strap, Click unlock, gear feel, ZUI background
-limits) are written down with their outcome in the release notes and `docs/spec.md`.
+All "Auto" checks are green and the release notes list every "Owner" check as not yet run on hardware
+(the owner's bench comes after M4, see `docs/roadmap.md`). A criterion counts as *confirmed* only after
+its "Owner" check has been done on the device; record the date and the outcome in the table below.
+The open checks of spec §9 that Phase 1 can settle (RR intervals from the strap, Click unlock, gear
+feel, ZUI background limits) are written into the release notes and `docs/spec.md` as they get answered.
+
+| # | Confirmed on device |
+|---|---|
+| 1–7 | not yet |
