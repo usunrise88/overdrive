@@ -83,3 +83,20 @@ feel, ZUI background limits) are written into the release notes and `docs/spec.m
 | 5 | Kill mid-ride, relaunch recovers | 8.1 to 8.3, 8.5 | not yet | |
 | 6 | FIT opens in intervals.icu with power, HR, cadence, laps | 7.2 to 7.6 | not yet | |
 | 7 | Overlay drag drops no frames | 6.5, 6.6, 6.14 | not yet | |
+
+## First bench (2026-11-18): observations only, no criterion confirmed
+
+The owner's first ride on the real devices (`docs/bench-reports/2026-11-18-first-ride.md`: the signed `v0.1.0`, the D500, a strap and
+the right puck of a Click) was **not run as the steps of `docs/bench-checklist.md`**, so no "Owner" cell above is run and no criterion
+is confirmed. It bears on these, as signs and not as confirmations:
+
+| # | What it showed |
+|---|---|
+| 1, 7 | Not reported: the overlay worked over a video by the owner's eye; no frame times, no 60-minute ride |
+| 2 | An ERG ramp from 98 W to 138 W in 4 W steps every 12 seconds: the measured power four to nine seconds after each step was within about 3 W of the target (a last step ran 12 W high); a target of zero read zero power. Every Control Point command was answered with success. A good sign; the criterion also needs ramp and interval steps in a workout file |
+| 3 | By the owner's eye the gear buttons change gears and the media buttons work. Not with a video app in front, not the ten actions, no timing |
+| 4, 5 | Not tried |
+| 6 | An exported FIT file of 224 one-second records, two laps and a start and a stop event was produced; **not yet imported into intervals.icu** (FIT 1 to FIT 8 stay open) |
+
+It also changed code (ADR 0013): the Click's default reply check accepts the bare `RideOn` it answers, silence is no longer taken
+for a lock, and the trainer adapter ignores the D500's Reset after its own Request Control. FT 1 (bit 2 is cadence) is settled.
