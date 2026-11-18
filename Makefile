@@ -19,8 +19,8 @@ ts-check: ## Lint, typecheck and test the TypeScript workspaces
 core-check: ## Build and test the shared Kotlin core
 	cd core && ./gradlew check
 
-android-check: ## Build and test the Android apps (needs the Android SDK)
-	cd android && ./gradlew check assembleDebug
+android-check: ## Build and test the Android apps incl. unsigned release (needs the Android SDK)
+	cd android && ./gradlew check assembleDebug assembleRelease
 
 format: ## Auto-format TypeScript and Kotlin
 	pnpm format

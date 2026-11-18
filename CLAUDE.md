@@ -8,7 +8,7 @@ Single-user indoor cycling system. The authoritative spec is `docs/spec.md`; cit
 | Path | Contents | Build |
 |---|---|---|
 | `core/` | Pure Kotlin (KMP, JVM target). **No Android or other platform imports.** Own Gradle build. | `cd core && ./gradlew check` |
-| `android/` | Gradle build: `ble`, `data`, `ui-kit`, `app-ride`, `app-companion`. Uses `../core` via `includeBuild`. | `cd android && ./gradlew check assembleDebug` (Android SDK) |
+| `android/` | Gradle build: `ble`, `data`, `ui-kit`, `app-ride`, `app-companion`. Uses `../core` via `includeBuild`. | `cd android && ./gradlew check assembleDebug assembleRelease` (Android SDK) |
 | `server/` | TypeScript web service (Fastify, Zod). | `pnpm --filter @overdrive/server test` |
 | `contracts/` | JSON Schemas + fixtures shared by Kotlin and TypeScript. | `pnpm --filter @overdrive/contracts test` |
 | `design/`, `docs/` | Design deliverables; spec, architecture, ADRs. | |
@@ -33,6 +33,25 @@ Layout rationale: `docs/adr/0001-repository-layout-and-toolchain.md`.
   writes insight text from facts the service computed; it never calculates.
 - Spec §8 is a first draft: names and fields are fixed during implementation, so update
   `docs/spec.md` and the schema when you settle them.
+
+## Process
+
+- **Work autonomously.** Make decisions yourself and record the significant ones as ADRs in
+  `docs/adr/`. Ask the owner only for things only they can do (their hardware, their accounts and
+  secrets).
+- **The repository is public.** Never commit secrets, keystores, tokens, personal data or raw
+  recordings of the owner's body (heart rate, rides). Test data is synthetic or short and anonymised.
+  Release signing material lives in GitHub Actions secrets only.
+- **Every stage ends with a release.** Stages are the milestones inside a phase. Before tagging:
+  `make check` and `make android-check` are green, `docs/spec.md` and the ADRs reflect what was
+  built, and CI on the commit is green. Then tag `vX.Y.Z` (pre-releases `vX.Y.Z-alpha.N`) on that
+  commit. `.github/workflows/release.yml` builds, signs and publishes the APKs as a GitHub Release.
+  Write release notes for a human: what works, what to test on the bike, what is known broken.
+- **Signing secrets** (set by the owner, never printed or committed): `ANDROID_KEYSTORE_BASE64`,
+  `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. The workflow's manual
+  dry run (`workflow_dispatch`, default `dry_run: true`) verifies them without publishing.
+  The key must never change: a different key forces uninstalling the app and loses its data.
+- Version code is the release workflow's run number; the version name is the tag.
 
 ## Conventions
 

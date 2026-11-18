@@ -1,0 +1,107 @@
+name: Release
+
+# Push a tag like v0.1.0 (or v0.2.0-alpha.1 for a pre-release) to build signed APKs and publish a
+# GitHub Release. Run manually with dry_run (the default) to do everything except publish: that also
+# verifies the signing secrets.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build and verify signed APKs, but do not publish a release
+        type: boolean
+        default: true
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, sign and publish
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v0.0.0-dry.{0}', github.run_number) }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore the signing keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          missing=0
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Repository secret ANDROID_${name} is missing or empty"
+              missing=1
+            fi
+          done
+          [ "$missing" = 0 ] || exit 1
+
+          keystore="$RUNNER_TEMP/overdrive-release.jks"
+          printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > "$keystore" \
+            || { echo "::error::ANDROID_KEYSTORE_BASE64 is not valid base64"; exit 1; }
+          echo "ANDROID_KEYSTORE_FILE=$keystore" >> "$GITHUB_ENV"
+
+          echo "Keystore entry (the certificate fingerprint is public, compare it with the one you saved):"
+          keytool -list -keystore "$keystore" -storepass:env KEYSTORE_PASSWORD -alias "$KEY_ALIAS" \
+            || { echo "::error::Cannot open the keystore: wrong password, or no entry with alias ANDROID_KEY_ALIAS"; exit 1; }
+
+      - name: Build signed release APKs
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: >
+          ./gradlew check assembleRelease
+          -PoverdriveVersionName="${VERSION#v}"
+          -PoverdriveVersionCode="${{ github.run_number }}"
+
+      - name: Verify signatures and collect assets
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
+          expected="$(keytool -list -keystore "$ANDROID_KEYSTORE_FILE" -storepass:env KEYSTORE_PASSWORD -alias "$KEY_ALIAS" \
+            | sed -n 's/^Certificate fingerprint (SHA-256): //p' | tr -d ':' | tr 'A-F' 'a-f')"
+
+          mkdir -p dist
+          for app in ride companion; do
+            apk="android/app-$app/build/outputs/apk/release/app-$app-release.apk"
+            "$apksigner" verify --print-certs "$apk" | tee "$RUNNER_TEMP/certs-$app.txt"
+            actual="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/certs-$app.txt")"
+            [ "$actual" = "$expected" ] || { echo "::error::$app APK is not signed with the release key"; exit 1; }
+            cp "$apk" "dist/overdrive-$app-${VERSION#v}.apk"
+          done
+          (cd dist && sha256sum *.apk > SHA256SUMS && cat SHA256SUMS)
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: overdrive-${{ env.VERSION }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Publish the GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=""
+          case "$VERSION" in *-*) flags="--prerelease" ;; esac
+          gh release create "$VERSION" dist/* --title "Overdrive ${VERSION#v}" --generate-notes $flags
