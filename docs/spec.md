@@ -191,7 +191,8 @@ Phase 1 delivers a complete offline ride: connect the devices, ride free or play
 
 - Loads a workout from a local file: the native JSON format (section 8) or a Zwift ZWO file.
 - Step types: steady, ramp, repeated interval set, free ride.
-- Targets are a percentage of FTP. FTP is a manual setting in Phase 1.
+- Targets are a percentage of FTP. FTP is a manual setting in Phase 1. *From Phase 2 the rider's profile on the service is the
+  source of truth for FTP and the physics when there is one, and the tablet's own setting applies when there is not (§8.3, ADR 0021).*
 - Structured steps run in ERG mode. Free-ride steps run in simulation mode with gears.
 - Controls: pause, next interval, previous interval, intensity up and down in 5% steps between 50% and 150%.
 - After a pause, target power ramps back in over 3 s. While paused the trainer holds 0 W in ERG steps, so the ramp
@@ -799,6 +800,18 @@ path: everything is under `/v1`.
   constants it names. It answers the whole profile. A change that would not make a valid profile changes nothing and is
   `422 invalid_profile` (a new code of the closed list); a body that is not JSON is `400 invalid_json`. A change emits the
   `profile-changed` event inside the service.
+
+**Settled in P2 fix: profile on the tablet (ADR 0021, `core` `ProfileRepository`, `android/data` `FileProfileCache`):** the ride app
+uses the profile. It reads `GET /v1/profile` with the same address, token and transport class as the plan (at start, when the Ready
+screen opens at most once a minute, after a settled change of the address or token, and on the refresh button, which refreshes the
+plan and the profile together) and keeps the last good answer in `filesDir/profile/profile` so it works offline and after a restart.
+**Where a profile is in force it is the source of truth for FTP (a profile whose `ftp` is `null` leaves the tablet's own) and for the
+physics** (`systemMassKg`, `cdA`, `crr`, `airDensity`, `drivetrainEfficiency` map one to one onto the engine's `PhysicsSettings`);
+with no address and token, or the service never reached and nothing cached, the tablet's own settings apply as before. The tablet's
+stored settings are never overwritten: the value in force is derived, so removing the service returns the rider's own. The ride
+record's `ride.ftp` is the FTP in force when the ride was built. A change of FTP, mass, CdA or Crr in Settings is sent as
+`PATCH /v1/profile`; one that cannot be sent is kept as one pending patch (last write wins per field) with the cache, shown "Not sent
+yet", and sent first by the next refresh; a `4xx` other than 401, 408 and 429 drops it.
 
 ### 8.4 MCP tools
 

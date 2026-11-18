@@ -355,6 +355,12 @@ Two columns of grouped cards; group label (label, text 3) above each card; setti
 - **Rider and gears:** FTP (stepper, ±5 W, long-press repeats), Gears (stepper, 10–30), Step per
   gear (stepper, ±0.1%, 0.5–2.0%; caption says the total stays within 15%).
 - **Physics for speed and distance:** mass (kg, ±1), CdA (m², ±0.01), Crr (±0.0005).
+- **The rider's profile on these four** (FTP, mass, CdA, Crr; Phase 2 fix, ADR 0021): a row shows the value in force, and when it
+  is not the tablet's own a **source marker** sits left of the stepper: **From service** (the profile on the service) or **Not sent
+  yet** (changed here, the service has not taken it). Label style, text 3, one line, no icon and no colour (the zone colours are the
+  only accent, §2); nothing at all for the tablet's own value. When the last request for the profile failed, one plain line
+  ("Profile: Service unreachable · showing the last known profile") replaces the FTP row's note. No other screen marks it: the
+  Ready detail and the ride show the number in force.
 - **Developer** (stage M3-2), after the overlay card in the left column: **Devices** (segmented **Bluetooth** / **Simulated**;
   Bluetooth is the default and a ride never falls back to the simulation), **Record Bluetooth sessions** (switch, on in the
   early builds), **Share Bluetooth logs** (the row says "4 files · 120 KB" or "No logs yet", or what the last share could not

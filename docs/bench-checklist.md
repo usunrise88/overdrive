@@ -703,6 +703,30 @@ Everything a ride is, once, on all three devices, then the file it leaves.
     the Ready screen): write down whether the tablet gives the Click any way to move focus, and whether Start has to be pressed
     on the screen. Also write down a workout the app showed as disabled, if one ever appears, and its reason.
   Settles: ADR 0017 ("what only the real tablet can settle"), spec §5.7.
+- [ ] **7.11 The rider's profile on the tablet (ADR 0021).** Needs 7.9 done (address and token set) and the MCP server on
+  (ADR 0018), with an AI client that can call `update_profile`. On the tablet, Settings, **Rider and gears**: note the FTP the
+  tablet shows (its own, 200 W by default). Then:
+  - **The tablet follows the service.** Through the AI client set the FTP to **175 W** (`update_profile`). On the tablet press the
+    refresh button of the **Planned** section on the Ready screen (or leave the Ready screen and come back after a minute): the
+    Ready detail says **FTP 175 W**, and in Settings the FTP row says **175 W** with **From service** beside it, and so do mass,
+    CdA and Crr. The tablet's own value was not changed: clear the service address (Settings, Sync) and the FTP row goes back to
+    the tablet's own number, put the address back and it is 175 W again without a refresh.
+  - **110 W at FTP 175.** Choose a planned workout whose first step is **63% FTP** (or any 63% step), press **Start**, pedal:
+    the target reads **110 W** (not 126 W, which is 63% of the tablet's own 200). Finish the ride: the finished summary and the
+    ride's zones are at FTP 175, and the ride's record says `"ftp": 175` (the record JSON exported with **Save to folder**, or the
+    `rides` table on the server).
+  - **Offline.** Put the tablet in flight mode, force-stop and reopen the app (8.2): the FTP is still 175 W (the last profile is
+    cached), and a ride started now is at 175 W. Settings says what happened to the request ("Profile: No network connection (…) ·
+    showing the last known profile").
+  - **A change made on the tablet reaches the service.** Settings, FTP, press **+** once: **180 W**. Through the AI client call
+    `get_profile`: **180 W** within a second or two. Do the same with the mass (one **+**) and read it back.
+  - **A change made offline is sent later.** In flight mode press **+** on the FTP: **185 W** with **Not sent yet** beside it, and
+    the value stays after force-stopping and reopening the app. Turn flight mode off and open the Ready screen (or press the refresh
+    button): the marker goes, and `get_profile` says 185 W. Write down how long it took.
+  - **What would be wrong.** If **+** with the network on leaves **Not sent yet** and the line under FTP says "Could not talk to
+    the service (ProtocolException)", Android's `HttpURLConnection` refuses PATCH on this tablet: send the exact words back
+    (ADR 0021, section 7).
+  Settles: ADR 0021 ("what only the real tablet can settle"), spec §8.3.
 
 ---
 
@@ -899,6 +923,7 @@ the app in the background and with the screen off, a 60-minute ride, the laps an
 | 7.8 Waiting to upload | | | |
 | 7.9 Upload to the service | | | |
 | 7.10 Planned workouts | | | |
+| 7.11 The rider's profile on the tablet | | | |
 | 8.1 to 8.3 Crash recovery (AC 5) | | | |
 | 8.4 Swipe away | | | |
 | 8.5 The outbox survives it | | | |
