@@ -38,9 +38,18 @@ kotlin {
 // Cross-language contract tests read the shared fixtures from the monorepo's contracts/ directory.
 val contractsDir = layout.projectDirectory.dir("../contracts")
 
+// Opt-in oracle for the FIT writer: with `-PfitOracleJar=/path/to/fit.jar`, GarminFitOracleTest decodes our files with
+// Garmin's decoder. The jar is not a dependency of this build and is never committed or fetched by it (docs/protocols/
+// fit.md section 7); the test loads it from this path at run time. Without the property that test is skipped, as in CI.
+val fitOracleJar = providers.gradleProperty("fitOracleJar")
+
 tasks.named<Test>("jvmTest") {
     systemProperty("overdrive.contracts.dir", contractsDir.asFile.absolutePath)
     inputs.dir(contractsDir.dir("fixtures")).withPropertyName("contractFixtures")
+    fitOracleJar.orNull?.let { jar ->
+        systemProperty("overdrive.fit.oracle.jar", jar)
+        inputs.file(jar).withPropertyName("fitOracleJar")
+    }
 }
 
 spotless {
