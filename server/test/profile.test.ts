@@ -111,6 +111,28 @@ describe("PATCH /v1/profile", () => {
     expect(((await get()).json() as Profile).updatedAt).toBe(before.updatedAt);
   });
 
+  it("sets W′, announces it as its own part, and puts the default back with null", async () => {
+    const set = await patch({ wPrimeKj: 18.5 });
+    expect((set.json() as Profile).wPrimeKj).toBe(18.5);
+    expect(changes).toEqual([{ fields: ["wPrimeKj"] }]);
+    expect(((await get()).json() as Profile).wPrimeKj).toBe(18.5);
+    await patch({ wPrimeKj: null });
+    expect(((await get()).json() as Profile).wPrimeKj).toBeNull();
+    expectError(await patch({ wPrimeKj: 0 }), "invalid_profile");
+    expectError(await patch({ wPrimeKj: 101 }), "invalid_profile");
+  });
+
+  it("reads a profile stored before W′ existed as one without W′", async () => {
+    const { updatedAt: _stamp, wPrimeKj: _w, ...old } = defaultProfile();
+    await db.query("INSERT INTO profile (id, data, updated_at) VALUES (true, $1::jsonb, now())", [
+      JSON.stringify({ ...old, ftp: 240 }),
+    ]);
+    const profile = (await get()).json() as Profile;
+    expect(profile.ftp).toBe(240);
+    expect(profile.wPrimeKj).toBeNull();
+    expect(validateProfile(profile).ok).toBe(true);
+  });
+
   it("accepts application/merge-patch+json", async () => {
     const res = await patch({ ftp: 240 }, "application/merge-patch+json");
     expect(res.statusCode, res.body).toBe(200);

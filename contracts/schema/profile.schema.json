@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Overdrive profile",
-  "description": "The rider's profile: the answer to GET /v1/profile and the body PATCH /v1/profile returns (spec §8.3, ADR 0018). One profile per service. ftp is in watts, or null when the owner has not set one (the tablet then keeps its own). zones.upperPercentOfFtp are the inclusive upper bounds of zones 1 to 6 as whole percentages of FTP (zone 7 has none); the default is Coggan's, 55 75 90 105 120 150, the same as the ride app's PowerZone, and the watts of each zone are derived from the FTP by code, never stored. weeklyAvailability is the minutes the rider can train on each weekday, null where unknown (0 is a rest day). goals are short free-text lines, at most 10. physics mirrors the ride engine's PhysicsSettings, same names and units. updatedAt is when the profile last changed (UTC), null while it is still the defaults. Rules a schema cannot state, checked by every implementation: the six zone bounds strictly increase, and no goal is blank.",
+  "description": "The rider's profile: the answer to GET /v1/profile and the body PATCH /v1/profile returns (spec §8.3, ADR 0018). One profile per service. ftp is in watts, or null when the owner has not set one (the tablet then keeps its own). wPrimeKj is the rider's W′ (anaerobic work capacity above critical power) in kilojoules for the W′ balance of spec §6.3, or null to use the service's default of 20 kJ; critical power is taken to be the FTP. zones.upperPercentOfFtp are the inclusive upper bounds of zones 1 to 6 as whole percentages of FTP (zone 7 has none); the default is Coggan's, 55 75 90 105 120 150, the same as the ride app's PowerZone, and the watts of each zone are derived from the FTP by code, never stored. weeklyAvailability is the minutes the rider can train on each weekday, null where unknown (0 is a rest day). goals are short free-text lines, at most 10. physics mirrors the ride engine's PhysicsSettings, same names and units. updatedAt is when the profile last changed (UTC), null while it is still the defaults. Rules a schema cannot state, checked by every implementation: the six zone bounds strictly increase, and no goal is blank.",
   "type": "object",
-  "required": ["ftp", "zones", "weeklyAvailability", "goals", "physics", "updatedAt"],
+  "required": ["ftp", "wPrimeKj", "zones", "weeklyAvailability", "goals", "physics", "updatedAt"],
   "additionalProperties": false,
   "properties": {
     "ftp": {
@@ -11,6 +11,12 @@
       "type": ["integer", "null"],
       "minimum": 30,
       "maximum": 2000
+    },
+    "wPrimeKj": {
+      "description": "W′ in kilojoules (1 to 100) for the W′ balance, or null to use the default of 20 kJ. Critical power is the FTP.",
+      "type": ["number", "null"],
+      "minimum": 1,
+      "maximum": 100
     },
     "zones": { "$ref": "#/$defs/zones" },
     "weeklyAvailability": {

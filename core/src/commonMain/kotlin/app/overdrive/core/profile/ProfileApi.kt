@@ -38,6 +38,8 @@ public data class ProfilePatch(
     val weeklyAvailability: Map<Weekday, Int?> = emptyMap(),
     val goals: List<String>? = null,
     val physics: PhysicsPatch = PhysicsPatch(),
+    /** Set to null puts W′ back to the service's default. */
+    val wPrimeKj: Change<Double?> = Change.Keep,
 ) {
     /**
      * The profile this patch makes of [profile], with `updatedAt` as it was.
@@ -58,6 +60,11 @@ public data class ProfilePatch(
                 when (zones) {
                     Change.Keep -> profile.zones
                     is Change.Set -> zones.value ?: PowerZones.COGGAN
+                },
+            wPrimeKj =
+                when (wPrimeKj) {
+                    Change.Keep -> profile.wPrimeKj
+                    is Change.Set -> wPrimeKj.value
                 },
             weeklyAvailability = availability,
             goals = goals ?: profile.goals,
@@ -80,7 +87,7 @@ public data class ProfilePatch(
 public object ProfileApiJson {
     private val json = Json { encodeDefaults = true }
 
-    private val patchKeys = setOf("ftp", "zones", "weeklyAvailability", "goals", "physics")
+    private val patchKeys = setOf("ftp", "wPrimeKj", "zones", "weeklyAvailability", "goals", "physics")
     private val physicsKeys = setOf("systemMassKg", "cdA", "crr", "airDensity", "drivetrainEfficiency")
 
     /** @throws IllegalArgumentException if [text] is not a profile of the schema. */
@@ -89,6 +96,9 @@ public object ProfileApiJson {
         require(root is JsonObject) { "A profile is a JSON object" }
         // kotlinx reads "250" as the number 250; the schema does not.
         root["ftp"]?.let { requireNumber(it, "ftp") }
+        // The key is always on the wire; the model's default is only for code that builds a profile.
+        require("wPrimeKj" in root) { "A profile has a wPrimeKj, null when not set" }
+        root["wPrimeKj"]?.let { requireNumber(it, "wPrimeKj") }
         (root["zones"] as? JsonObject)?.let { requireBoundsAreNumbers(it) }
         (root["weeklyAvailability"] as? JsonObject)?.forEach { (day, value) -> requireNumber(value, day) }
         (root["physics"] as? JsonObject)?.forEach { (key, value) -> requireNumber(value, key) }
@@ -123,7 +133,17 @@ public object ProfileApiJson {
             weeklyAvailability = element["weeklyAvailability"]?.let(::availabilityOf).orEmpty(),
             goals = element["goals"]?.let(::goalsOf),
             physics = element["physics"]?.let(::physicsOf) ?: PhysicsPatch(),
+            wPrimeKj = element["wPrimeKj"]?.let { Change.Set(nullableNumber(it, "wPrimeKj")) } ?: Change.Keep,
         )
+    }
+
+    private fun nullableNumber(
+        element: JsonElement,
+        what: String,
+    ): Double? {
+        if (element is JsonNull) return null
+        require(element is JsonPrimitive && !element.isString) { "$what must be a number or null" }
+        return requireNotNull(element.content.toDoubleOrNull()) { "$what must be a number or null" }
     }
 
     private fun nullableInt(

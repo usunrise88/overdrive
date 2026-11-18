@@ -2,6 +2,7 @@
   "description": "Every part of a patch applies together.",
   "before": {
     "ftp": null,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         55,
@@ -56,6 +57,7 @@
   },
   "after": {
     "ftp": 240,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         55,

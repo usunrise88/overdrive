@@ -20,7 +20,7 @@ export interface PlanChangedEvent {
   removed: string[];
 }
 
-/** The parts of the profile that changed: `ftp`, `zones`, `weeklyAvailability`, `goals`, `physics`. Never empty. */
+/** The parts of the profile that changed: `ftp`, `wPrimeKj`, `zones`, `weeklyAvailability`, `goals`, `physics`. Never empty. */
 export interface ProfileChangedEvent {
   fields: string[];
 }

@@ -97,6 +97,7 @@ describe("get_profile and update_profile", () => {
     const { json } = await call("get_profile");
     expect(json).toEqual({
       ftp: null,
+      wPrimeKj: null,
       zones: { upperPercentOfFtp: [55, 75, 90, 105, 120, 150], isDefault: true, watts: null },
       weeklyAvailability: {
         mon: null,

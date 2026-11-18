@@ -2,6 +2,7 @@
   "description": "The six bounds replace the zones.",
   "before": {
     "ftp": null,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         55,
@@ -45,6 +46,7 @@
   },
   "after": {
     "ftp": null,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         50,

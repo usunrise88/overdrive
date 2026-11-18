@@ -2,6 +2,7 @@
   "description": "null makes a weekday unknown again.",
   "before": {
     "ftp": 250,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         50,
@@ -41,6 +42,7 @@
   },
   "after": {
     "ftp": 250,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         50,
