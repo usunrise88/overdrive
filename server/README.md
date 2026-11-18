@@ -83,6 +83,11 @@ general 1 to 128 characters from `A-Z a-z 0-9 . _ -`, starting with a letter or 
 | `GET /v1/workouts?from=YYYY-MM-DD&to=YYYY-MM-DD[&refresh=true]` | none | `200` the planned workouts of those days in the native format (`workouts-response.schema.json`) · `400 invalid_range` a missing, malformed or reversed range, or more than 62 days |
 | `GET /v1/profile` | none | `200` the rider's profile (`profile.schema.json`): FTP or null, the six zone bounds (Coggan's by default), minutes per weekday, goals, the physics constants of the ride engine, `updatedAt` |
 | `PATCH /v1/profile` | A partial update, `application/json` or `application/merge-patch+json` (`profile-patch.schema.json`) | `200` the whole profile after the change · `422 invalid_profile` the change does not make a valid profile (nothing changed) · `400 invalid_json` · `415` |
+| `GET /v1/metrics?from=YYYY-MM-DD&to=YYYY-MM-DD` | none | `200` the training metrics of those local days, at most 366 (`metrics-response.schema.json`, ADR 0022): `daily` load, fitness `ctl`, fatigue `atl` and form `tsb`; `weekly` loads; the power curve at 25 durations for the range and for all time; the FTP with its pending suggestion, history and weekly estimates; the aerobic drift of steady rides. `generatedAt` and `stale` · `400 invalid_range` a missing, malformed or reversed range, or more than 366 days |
+| `GET /v1/rides[?before=<UTC instant>][&limit=n]` | none | `200` the rider's rides, newest first, by cursor (`rides-response.schema.json`): `limit` 1 to 100 (default 50), `nextBefore` is the next page's `before`; activities from the watch join the list when the wellness part registers its source · `400 invalid_query` a malformed `before` or `limit` |
+| `GET /v1/rides/{rideId}[?series=true]` | none | `200` one ride (`ride-detail-response.schema.json`): summary, laps with the plan's targets, seconds in power zones, the plan and how it went, CP and W′ used; `series=true` adds the series every 10 s with the W′ balance · `404 ride_not_found` · `400 invalid_ride_id`, `invalid_query` |
+| `GET /v1/rides/{rideId}/metrics[?wbal=true[&series=true][&cp=watts][&wPrimeKj=kJ]]` | none | `200` the ride's load, power curve and aerobic drift (and why there is none), and with `wbal=true` the W′ balance (`ride-metrics-response.schema.json`) · `404 ride_not_found` · `400 invalid_query` |
+| `POST /v1/ftp-suggestion/dismiss` | `{ "suggestionId": n }` | `200` `{ suggestionId, status }` (`dismissed`, or `accepted`/`superseded` when it had left that way) · `404 not_found` no such suggestion · `400 invalid_json`. Accepting a suggestion is `PATCH /v1/profile` with its value |
 
 Also `401 unauthorized` everywhere, `404 not_found` for any other path or method, and `500
 internal_error` (the tablet retries those). "The same" means the same content: a record is compared
@@ -108,6 +113,9 @@ are only ever digests. `calendar_events`, `plan_history`, `bot_notifications` an
 calendar mirror and the bot (migration 0004, ADR 0019).
 Migration 0005 (ADR 0020) adds `strava_auth` (the one rotated Strava refresh token) and
 `strava_uploads` (the Strava upload each ride made, so a ride is never posted twice).
+Migration 0006 (ADR 0022) adds `ride_metrics` (what is worked out once per ride: load, power curve, aerobic drift; computed when
+the ride's FIT arrives and, for rides stored earlier or when the formulas change, on the next read), `ftp_suggestions` (each FTP
+suggestion with its status: pending, accepted, dismissed, superseded) and `ftp_history` (every change of the profile's FTP).
 
 Tests run on PGlite and need nothing installed. To run them on a real PostgreSQL as well (CI does),
 set `TEST_DATABASE_URL`: **the `public` schema of that database is dropped**, so point it at a scratch one.
@@ -221,7 +229,9 @@ instead: `openssl rand -base64 36`, `MCP_STATIC_TOKENS=claude:<that>`, restart.
 
 **The tools** (spec §8.4, Phase 2): `list_planned_workouts`, `create_workout`, `update_workout`, `delete_workout` (the calendar in
 intervals.icu, through the same client the plan refresher uses, then the plan cache and the `plan-changed` event), `list_rides`,
-`get_ride` (statistics, laps and compliance with the plan, computed here from the stored record), `get_profile`, `update_profile`.
+`get_ride` (statistics, laps and compliance with the plan, power curve, aerobic drift and W′ balance, computed here from the stored record),
+`get_fitness` (load, fitness, fatigue, form, best efforts, drift and the FTP with its suggestion, which is only a suggestion; ADR 0022),
+`get_profile`, `update_profile`.
 Results are compact JSON, failures are tool errors in plain words (`plan source not configured: …`, `workout does not validate: /steps/0/duration must
 be integer`); without `INTERVALS_API_KEY` the plan tools say so and the rest work.
 
@@ -286,6 +296,7 @@ Other modules (the MCP tools, Telegram, Google Calendar, Strava) plug in without
 | Destinations | `services.destinations` | the destinations a stored ride is queued for; a new one (Strava) adds its name and runs its own worker over `ride_destinations` like `src/intervals/uploads.ts` |
 | Profile | `services.profile` (`src/profile/store.ts`) | `get()` the FTP, zones, availability, goals and physics; `update(patch)` (validated, atomic); a change emits `profile-changed` (`{ fields }`) |
 | Rides | `services.rides` (`src/ride-store.ts`), `services.rideWorkouts` | `list`, `getRecord` of the stored rides; the workout a ride was played from, copied when it was stored. `src/ride-stats.ts` has the pure statistics, series and compliance (`rideStatistics`, `rideSeries`, `rideCompliance`) a ride summary for Telegram can reuse |
+| Training metrics | `services.metrics` (`src/metrics/`, ADR 0022) | `metrics(from, to)`, `rideMetrics`, `rideList`, `rideDetail`, `ftpAdvice`, `dismissSuggestion`; `registerLoadSource({ name, entries(untilDate) })` feeds the daily load with other activities (`kind: "other"`: counts for fatigue and form, never for the power curve, eFTP or drift) and `registerActivitySource({ name, list({ beforeMillis, limit }) })` adds them to `GET /v1/rides`. The pure math (`power-curve.ts`, `load.ts`, `ftp.ts`, `drift.ts`, `wbal.ts`) knows nothing of the database. A listener on `ride-stored` computes a ride, one on `profile-changed` keeps the FTP history and marks a suggestion accepted |
 | Plan entries | `src/plan/entries.ts` (`readPlanEvent`), `src/plan/summary.ts` | one reading of a calendar event as a plan entry; duration, estimated load and a one-line outline of a native workout |
 
 ## Deployment

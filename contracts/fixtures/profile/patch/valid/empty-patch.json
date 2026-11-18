@@ -2,6 +2,7 @@
   "description": "An empty patch is accepted and changes nothing.",
   "before": {
     "ftp": 250,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         50,
@@ -37,6 +38,7 @@
   "patch": {},
   "after": {
     "ftp": 250,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         50,

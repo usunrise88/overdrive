@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive rides response",
+  "description": "The service's answer to GET /v1/rides[?before=instant][&limit=n] (spec §6.7, §8.3, ADR 0022): what the rider did, newest first, one page at a time. A rider's list holds rides (recorded on the tablet) and, once the wellness part of the service has them, activities from the watch (spec §6.7); each item says which. generatedAt is when the service computed the page (UTC) and stale is true when a source of items failed (its items are then missing). before is the cursor as asked (a UTC instant, only items that started before it are listed), null for the newest page; limit is 1 to 100 (default 50); hasMore is true when there are older items than the page's, and then nextBefore is the start of the page's last item, to be sent as `before` for the next page, otherwise null. An item: name is the workout a ride was played from or `Free ride`, the activity's name for an activity; start is its UTC instant and date its local day; durationSeconds is its length; load is its training stress (a ride's from power, an activity's from heart rate), null when it has none, and loadApproximate is true for the heart-rate kind (it under-counts short hard efforts, spec §6.7); sport is the activity's type, null for a ride; averagePower is a ride's average power in watts (null for an activity or a ride without power) and averageHeartRate an activity's average heart rate (null for a ride). Rules a schema cannot state, checked by every implementation: before, when given, is a real UTC instant; items number at most limit and start strictly before `before`, newest first, and are unique by kind and id; hasMore and nextBefore agree as above; a ride has no sport, no averageHeartRate and an exact load; an activity has no averagePower and an approximate load.",
+  "type": "object",
+  "required": ["generatedAt", "stale", "before", "limit", "hasMore", "nextBefore", "items"],
+  "additionalProperties": false,
+  "properties": {
+    "generatedAt": { "$ref": "metrics-response.schema.json#/$defs/instant" },
+    "stale": { "type": "boolean" },
+    "before": {
+      "oneOf": [{ "$ref": "metrics-response.schema.json#/$defs/instant" }, { "type": "null" }]
+    },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 100 },
+    "hasMore": { "type": "boolean" },
+    "nextBefore": {
+      "oneOf": [{ "$ref": "metrics-response.schema.json#/$defs/instant" }, { "type": "null" }]
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/item" }
+    }
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "start",
+        "date",
+        "durationSeconds",
+        "load",
+        "loadApproximate",
+        "sport",
+        "averagePower",
+        "averageHeartRate"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "The ride's id (GET /v1/rides/{id}); an activity's own id.",
+          "$ref": "metrics-response.schema.json#/$defs/rideId"
+        },
+        "kind": { "enum": ["ride", "activity"] },
+        "name": { "type": "string", "minLength": 1 },
+        "start": { "$ref": "metrics-response.schema.json#/$defs/instant" },
+        "date": {
+          "description": "The rider's local day of the start.",
+          "$ref": "metrics-response.schema.json#/$defs/date"
+        },
+        "durationSeconds": { "type": "integer", "minimum": 0 },
+        "load": { "type": ["number", "null"], "minimum": 0 },
+        "loadApproximate": { "type": "boolean" },
+        "sport": { "type": ["string", "null"], "minLength": 1 },
+        "averagePower": { "type": ["number", "null"], "minimum": 0 },
+        "averageHeartRate": { "type": ["number", "null"], "minimum": 0 }
+      }
+    }
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "from": "2026-11-12",
+  "to": "2026-11-18",
+  "generatedAt": "2026-11-18T08:00:00Z",
+  "stale": false,
+  "firstLoadDate": null,
+  "daily": [
+    {
+      "date": "2026-11-12",
+      "load": 0,
+      "loadCycling": 0,
+      "loadOther": 0,
+      "ctl": 0,
+      "atl": 0,
+      "tsb": 0
+    },
+    {
+      "date": "2026-11-13",
+      "load": 0,
+      "loadCycling": 0,
+      "loadOther": 0,
+      "ctl": 0,
+      "atl": 0,
+      "tsb": 0
+    },
+    {
+      "date": "2026-11-14",
+      "load": 0,
+      "loadCycling": 0,
+      "loadOther": 0,
+      "ctl": 0,
+      "atl": 0,
+      "tsb": 0
+    },
+    {
+      "date": "2026-11-15",
+      "load": 0,
+      "loadCycling": 0,
+      "loadOther": 0,
+      "ctl": 0,
+      "atl": 0,
+      "tsb": 0
+    },
+    {
+      "date": "2026-11-16",
+      "load": 0,
+      "loadCycling": 0,
+      "loadOther": 0,
+      "ctl": 0,
+      "atl": 0,
+      "tsb": 0
+    },
+    {
+      "date": "2026-11-17",
+      "load": 0,
+      "loadCycling": 0,
+      "loadOther": 0,
+      "ctl": 0,
+      "atl": 0,
+      "tsb": 0
+    },
+    {
+      "date": "2026-11-18",
+      "load": 0,
+      "loadCycling": 0,
+      "loadOther": 0,
+      "ctl": 0,
+      "atl": 0,
+      "tsb": 0
+    }
+  ],
+  "weekly": [
+    {
+      "weekStart": "2026-11-09",
+      "load": 0,
+      "rideLoad": 0,
+      "otherLoad": 0,
+      "rides": 0,
+      "activities": 0
+    },
+    {
+      "weekStart": "2026-11-16",
+      "load": 0,
+      "rideLoad": 0,
+      "otherLoad": 0,
+      "rides": 0,
+      "activities": 0
+    }
+  ],
+  "powerCurve": {
+    "range": [],
+    "allTime": []
+  },
+  "ftp": {
+    "current": null,
+    "setAt": null,
+    "suggestion": null,
+    "latestEstimate": null,
+    "history": [],
+    "estimates": []
+  },
+  "drift": []
+}

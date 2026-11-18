@@ -992,6 +992,7 @@ describe("a real MCP client, the SDK's, from nothing to a tool call", () => {
       "create_workout",
       "delete_workout",
       "get_activity",
+      "get_fitness",
       "get_profile",
       "get_recovery",
       "get_ride",

@@ -4,6 +4,7 @@ import type { Config } from "./config.ts";
 import type { Db } from "./db.ts";
 import { installErrorHandling, sendError } from "./errors.ts";
 import { type McpConfig, type McpTestOptions, mcpModule, mcpSettings } from "./mcp/index.ts";
+import { metricsRoutes } from "./metrics/routes.ts";
 import { planRoutes } from "./plan/routes.ts";
 import { profileRoutes } from "./profile/routes.ts";
 import { DEFAULT_LIMITS, type Limits, ridesRoutes } from "./rides.ts";
@@ -84,6 +85,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       });
       v1.register(planRoutes, { store: services.plan, refresher: services.refresher });
       v1.register(profileRoutes, { store: services.profile });
+      v1.register(metricsRoutes, { metrics: services.metrics });
       v1.register(wellnessRoutes, { service: services.wellness });
     },
     { prefix: "/v1" },

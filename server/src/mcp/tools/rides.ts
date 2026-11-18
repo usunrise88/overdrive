@@ -147,7 +147,12 @@ export function registerRideTools(server: McpServer, ctx: ToolContext): RideTool
         "ride's FTP) against the time actually spent and the average power ridden, with the difference in watts and percent, plus totals " +
         "over the steps with a power target; otherwise it says why there is nothing to compare. By default no time series is included. " +
         "series true adds power, heart rate, cadence and target power averaged over steps of seriesStepSeconds (default 10, longer for a " +
-        "very long ride so that no series has more than 1200 points); ask for it only when the numbers above are not enough, it is large.",
+        "very long ride so that no series has more than 1200 points); ask for it only when the numbers above are not enough, it is large. " +
+        "powerCurve: the best average power over each of 25 durations from 1 s to 2 h in which the ride is long enough, a pause or a missing reading counting as 0 W. " +
+        "aerobicDrift: for a steady stretch of at least 40 minutes with power and heart rate (the whole ride or one long steady step), the percent the efficiency " +
+        "factor (normalised power over average heart rate) fell from the first half to the second, positive when heart rate rose against power; otherwise it says why there is none. " +
+        "wPrimeBalance: the W′ balance model (Skiba 2012) with critical power taken as the FTP and W′ from the profile (20 kJ when unset): the lowest balance in kJ, when, and " +
+        "how much of W′ it used; below 0 means CP or W′ are set too low for this rider.",
       input: {
         rideId: z.string().describe("The ride's id from list_rides, such as ride-1794996000000."),
         series: z.boolean().optional().describe("Include the time series. Default false."),
@@ -182,6 +187,8 @@ export function registerRideTools(server: McpServer, ctx: ToolContext): RideTool
                 ? { available: false as const, reason: result.problem }
                 : { available: true as const, ...result };
             })();
+
+      const computed = await services.metrics.rideMetrics(rideId, { wbal: true }, record);
 
       const startedAt = record.ride.startEpochMillis;
       return {
@@ -219,6 +226,9 @@ export function registerRideTools(server: McpServer, ctx: ToolContext): RideTool
           averageHeartRate: round(lap.averageHeartRate, 1),
         })),
         compliance,
+        powerCurve: computed?.powerCurve ?? [],
+        aerobicDrift: computed?.drift ?? null,
+        wPrimeBalance: computed?.wPrimeBalance ?? null,
         ...(series === true ? { series: rideSeries(record.samples, seriesStepSeconds ?? 10) } : {}),
       };
     },

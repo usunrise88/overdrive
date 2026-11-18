@@ -2,6 +2,7 @@
   "description": "null clears the threshold heart rate and leaves the maximum.",
   "before": {
     "ftp": 250,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         50,
@@ -43,6 +44,7 @@
   },
   "after": {
     "ftp": 250,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         50,

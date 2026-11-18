@@ -1,0 +1,150 @@
+{
+  "generatedAt": "2026-11-18T08:00:00Z",
+  "stale": false,
+  "id": "ride-1795160000000",
+  "name": "Sweet spot 2x20",
+  "startTime": "2026-11-12T18:40:00Z",
+  "endTime": "2026-11-12T19:45:00Z",
+  "date": "2026-11-12",
+  "workoutId": "icu-5001",
+  "devices": [
+    "Wahoo KICKR",
+    "Polar H10"
+  ],
+  "ftp": 250,
+  "cp": 250,
+  "wPrime": 20,
+  "wPrimeLowest": {
+    "kilojoules": 17.84,
+    "atSec": 1735
+  },
+  "summary": {
+    "durationSeconds": 3900,
+    "movingSeconds": 3880,
+    "distanceMeters": 31200,
+    "averagePower": 187.4,
+    "normalizedPower": 201.2,
+    "maxPower": 420,
+    "averageHeartRate": 138.5,
+    "maxHeartRate": 161,
+    "workKilojoules": 727.4,
+    "intensityFactor": 0.8,
+    "trainingStressScore": 64.1
+  },
+  "secondsInZones": [
+    1210,
+    540,
+    150,
+    1980,
+    0,
+    0,
+    0
+  ],
+  "laps": [
+    {
+      "stepIndex": 0,
+      "label": "Warm-up",
+      "type": "steady",
+      "startSeconds": 0,
+      "endSeconds": 600,
+      "averagePower": 140.2,
+      "averageHeartRate": 118.4
+    },
+    {
+      "stepIndex": 1,
+      "label": "Sweet spot",
+      "type": "steady",
+      "startSeconds": 600,
+      "endSeconds": 1800,
+      "averagePower": 223.4,
+      "averageHeartRate": 151.2,
+      "targetPower": 225
+    },
+    {
+      "stepIndex": 2,
+      "label": "Recovery",
+      "type": "steady",
+      "startSeconds": 1800,
+      "endSeconds": 2100,
+      "averagePower": 125.3,
+      "averageHeartRate": null,
+      "targetPower": 125
+    },
+    {
+      "stepIndex": 3,
+      "label": "Sweet spot",
+      "type": "steady",
+      "startSeconds": 2100,
+      "endSeconds": 3300,
+      "averagePower": 227.1,
+      "averageHeartRate": 156.7,
+      "targetPower": 225
+    },
+    {
+      "stepIndex": 4,
+      "label": "Recovery",
+      "type": "steady",
+      "startSeconds": 3300,
+      "endSeconds": 3600,
+      "averagePower": 123.9,
+      "averageHeartRate": 129.5,
+      "targetPower": 125
+    },
+    {
+      "stepIndex": 5,
+      "label": "Cool-down",
+      "type": "steady",
+      "startSeconds": 3600,
+      "endSeconds": 3900,
+      "averagePower": 112.2,
+      "averageHeartRate": 121,
+      "targetPower": 113
+    }
+  ],
+  "plan": {
+    "workout": {
+      "schema": 1,
+      "id": "icu-5001",
+      "name": "Sweet spot 2x20",
+      "steps": [
+        {
+          "type": "steady",
+          "duration": 600,
+          "target": 0.55,
+          "label": "Warm-up"
+        },
+        {
+          "type": "repeat",
+          "count": 2,
+          "steps": [
+            {
+              "type": "steady",
+              "duration": 1200,
+              "target": 0.9,
+              "label": "Sweet spot"
+            },
+            {
+              "type": "steady",
+              "duration": 300,
+              "target": 0.5,
+              "label": "Recovery"
+            }
+          ]
+        },
+        {
+          "type": "steady",
+          "duration": 300,
+          "target": 0.45,
+          "label": "Cool-down"
+        }
+      ]
+    },
+    "stepsRidden": 6,
+    "stepsPlanned": 6,
+    "effortRange": {
+      "minWatts": 223,
+      "maxWatts": 227
+    },
+    "effortTarget": 225
+  }
+}

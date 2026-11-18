@@ -562,6 +562,24 @@ Wellness input sits behind one `WellnessSource` interface so the wearable can ch
 - **Power curve** and **W′ balance** for interval analysis. W′ balance follows Skiba et al. (2012), peer-reviewed.
 - **Not used:** acute-to-chronic workload ratio. Impellizzeri et al. (2020) describe conceptual flaws in it.
 
+**Settled in stage P3-1** (ADR 0022, `server/src/metrics/`; the numbers are computed by code, tested against hand-worked examples):
+
+- *Load:* the day is the rider's local day (`TIMEZONE`); daily load is the sum of the rides' TSS (the ride's own FTP) plus, once stage P3-2
+  registers its source, the heart-rate load of other activities (`LoadEntry` kind `other`: fatigue and form only, never the power curve,
+  eFTP or drift).
+- *Fitness, fatigue, form:* `avg = avg_yesterday + (load - avg_yesterday) * (1 - exp(-1/τ))`, τ = 42 and 7 days, form = fitness − fatigue on
+  the same day; seeded at 0 on the first day with any load and walked day by day, rest days included. No acute:chronic ratio anywhere.
+- *Power curve:* 25 durations from 1 s to 2 h; a pause or a missing reading counts as 0 W inside a window (conservative); kept per ride;
+  best of the range and best of all time.
+- *eFTP, a suggestion only:* the larger of 0.95 × the best 20-minute power and 1.00 × the best 60-minute power over the last 42 days, each
+  needing at least two rides within 90% of the best; made a suggestion only when it differs from the FTP by 3% or more (and from a pending
+  or dismissed one by 3 W); `pending → accepted | dismissed | superseded`, accepted by `PATCH /v1/profile` with its value. The profile never
+  changes by itself.
+- *Aerobic drift:* a steady stretch (the whole ride or a lap) of at least 40 minutes, 95% of it with power and heart rate, variability index
+  at most 1.05: (EF first half − EF second half) / EF first half, EF = normalised power over average heart rate. Otherwise skipped with the reason.
+- *W′ balance:* Skiba et al. (2012), integral model, 1 Hz; CP = the profile's FTP (else the ride's), W′ = the profile's `wPrimeKj` (new field,
+  1 to 100 kJ) else 20 kJ.
+
 ### 6.4 Recovery without HRV
 
 - For each daily metric, keep a personal baseline: rolling mean and spread over the last 28 to 60 days.
@@ -746,9 +764,10 @@ path: everything is under `/v1`.
 | `PUT /v1/rides/{rideId}` | Ride app | Upload the ride record (§8.2), the JSON body. **Settled** |
 | `PUT /v1/rides/{rideId}/fit` | Ride app | Upload the FIT file generated from that record (`application/vnd.ant.fit`). **Settled** |
 | `GET /v1/workouts?from&to` | Ride app | Planned workouts in native format. **Settled** (stage P2-2a, below) |
-| `GET /v1/rides`, `GET /v1/rides/{id}` | Companion | History and detail |
+| `GET /v1/rides`, `GET /v1/rides/{id}`, `GET /v1/rides/{id}/metrics` | Companion | History, detail, and what was computed from one ride. **Settled** (stage P3-1, below) |
 | `POST /v1/wellness` | Companion | Batch of Health Connect records |
-| `GET /v1/metrics?from&to` | Companion | Load, form, recovery state, baselines |
+| `GET /v1/metrics?from&to` | Companion | Load, form, power curve, FTP, drift. **Settled** (stage P3-1, below); recovery state and baselines come with the wellness stage |
+| `POST /v1/ftp-suggestion/dismiss` | Companion | Hide an FTP suggestion. **Settled** (stage P3-1) |
 | `GET /v1/insights?from&to` | Companion | Written notes |
 | `GET /v1/profile`, `PATCH /v1/profile` | Both | FTP, zones, physics settings. **Settled** (stage P2-3, below) |
 
@@ -813,6 +832,25 @@ record's `ride.ftp` is the FTP in force when the ride was built. A change of FTP
 `PATCH /v1/profile`; one that cannot be sent is kept as one pending patch (last write wins per field) with the cache, shown "Not sent
 yet", and sent first by the next refresh; a `4xx` other than 401, 408 and 429 drops it.
 
+**Settled in stage P3-1 (training metrics; ADR 0022, `contracts/schema/metrics-response.schema.json`, `ride-metrics-response.schema.json`,
+`rides-response.schema.json`, `ride-detail-response.schema.json`, `ftp-suggestion-dismiss-*.schema.json`, Kotlin `MetricsApiJson`):**
+
+- `GET /v1/metrics?from=YYYY-MM-DD&to=YYYY-MM-DD` answers `{ from, to, generatedAt, stale, firstLoadDate, daily, weekly, powerCurve, ftp, drift }`:
+  `daily` one `{ date, load, loadCycling, loadOther, ctl, atl, tsb }` per local day; `weekly` one `{ weekStart, load, rideLoad, otherLoad, rides,
+  activities }` per ISO week; `powerCurve` `{ range, allTime }`, each `[{ durationSec, power, date, rideId }]` at the 25 durations of the design;
+  `ftp` `{ current, setAt, suggestion, latestEstimate, history, estimates }` (the suggestion `{ id, watts, basedOnRides, windowDays, createdAt,
+  confidence, basis }` or null; history with the value in force at `from`); `drift` `[{ date, rideId, name, driftPercent, efFirst, efSecond }]`.
+  At most **366 days** (`400 invalid_range` otherwise, as for the plan's range); `stale` is true when a source of load failed.
+- `GET /v1/rides?before&limit` pages by cursor, newest first: `{ generatedAt, stale, before, limit, hasMore, nextBefore, items }` with items
+  `{ id, kind: "ride" | "activity", name, start, date, durationSeconds, load, loadApproximate, sport, averagePower, averageHeartRate }`
+  (activities come from the wellness stage, spec §6.7; the schema is fixed now). `GET /v1/rides/{id}[?series=true]` is the ride screen's data:
+  summary, laps with the plan's `targetPower`, `secondsInZones[7]`, `plan` (the workout as stored, `stepsRidden`, `stepsPlanned`, `effortRange`,
+  `effortTarget`), `ftp`, `cp`, `wPrime`, `wPrimeLowest` and, with `series=true`, `[{ t, power, heartRate, wBal }]` at 10 s.
+  `GET /v1/rides/{id}/metrics[?wbal=true[&series=true][&cp=][&wPrimeKj=]]` is the power curve, load, drift and W′ balance of one ride.
+- `POST /v1/ftp-suggestion/dismiss` takes `{ "suggestionId" }`; accepting a suggestion is `PATCH /v1/profile {ftp}`. A malformed query
+  parameter is `400 invalid_query` (a new code of the closed list).
+- The profile has a new key, `wPrimeKj` (§8.3 profile): W′ in kilojoules, 1 to 100, null for the default of 20.
+
 ### 8.4 MCP tools
 
 | Tool | Kind | Purpose |
@@ -847,6 +885,12 @@ Read tools return compact summaries by default and full series only on request, 
 - `get_profile` and `update_profile` are the profile of §8.3, with the zones in watts worked out.
 - Results are compact JSON; failures are tool errors in plain words (`plan source not configured: …`). Without an intervals.icu key
   the plan tools say so and the others work.
+
+**Settled in stage P3-1 (ADR 0022):** `get_fitness` gives load, fitness, fatigue and form (today and the change over 7 and 28 days, the weekly
+loads, optionally every day), the best efforts at 5 s, 1, 5, 20 and 60 minutes in the range and ever, the aerobic drift of steady rides and the
+FTP with its **suggestion and basis**; the eFTP is described, and returned, as only a suggestion that is not to be written to the profile
+unasked. Without dates it covers the last 42 days; `series: true` adds the daily series, the whole 25-duration curve and the weekly estimates.
+`get_ride` gains `powerCurve`, `aerobicDrift` and `wPrimeBalance`; `update_profile` and `get_profile` carry `wPrimeKj`.
 
 ## 9. Risks and open checks
 
@@ -924,6 +968,231 @@ Cited from memory during planning. Verify titles and details before quoting them
 - [Strava upload documentation](https://developers.strava.com/docs/uploads/): lists VirtualRide as an activity type.
 
 ---
+
+## 11. Additions after review
+
+Eight additions agreed on 2026-11-18. Each names the phase it belongs to and extends an earlier section rather than replacing it.
+
+| Addition | Phase | Extends |
+|---|---|---|
+| ERG stall guard | 1 | 4.5 Workout player |
+| Heart-rate hold as a workout type | 1 | 4.5, 8.1 |
+| Overlay that expands around step changes | 1 | 4.6 Overlay |
+| Routes with elevation, optional | 2 | 4.3, 5.6 |
+| Easier variant for each planned workout | 2 | 5.1, 5.7 |
+| Coach notebook | 2 | 5.2 MCP server |
+| Repeat-session comparison | 3 | 6.1 Companion |
+| Outdoor rides from the bike computer | 3, needed from March 2027 | 6.7 |
+
+### 11.1 ERG stall guard
+
+In ERG a falling cadence makes the trainer raise torque, which drops cadence further until the pedals stop. The app breaks this loop.
+
+- **Trigger:** cadence below a floor for 3 s during an ERG step. Default floor 55 rpm, a setting.
+- **Action:** target power drops to 70% of the step target and holds there.
+- **Release:** cadence back above the floor plus 10 rpm for 5 s, then the target ramps back over 5 s.
+- The overlay shows that the guard is active.
+- Each activation is recorded as an implicit feedback event with its step.
+
+### 11.2 Heart-rate hold
+
+A workout step that holds heart rate in a band by adjusting power. It needs no FTP and matches the load to the day's condition, which suits base training.
+
+- New step type `hr` in the workout format, with a target, a band and power limits:
+
+```
+{ "type": "hr", "duration": 2400, "target_bpm": 135, "band": 5, "power_min": 80, "power_max": 220, "label": "Zone 2 by heart rate" }
+```
+
+- The target may also be given as a fraction of threshold heart rate.
+- **Control:** the app adjusts ERG target power in small steps every 10 s. Heart rate lags effort by tens of seconds, so the controller is deliberately slow and limits its step size.
+- **Start:** a fixed easy ramp for the first minutes, then the controller takes over from the power reached.
+- **Safety:** power never leaves the stated limits. If the strap signal is lost for 15 s the app holds the last power, and after 60 s drops to `power_min` and says so.
+- The two gear buttons shift the target by 2 bpm during the step.
+- Compliance for this step type is time inside the band.
+- Controller gains are tuned on the bike. They are a setting, not a constant.
+
+### 11.3 Overlay expands around step changes
+
+- 10 s before a step change the overlay switches to detailed mode and shows the countdown and the next step.
+- 10 s after the change it returns to the mode the rider had chosen.
+- A setting turns this off. Step changes get no sound of their own: the overlay is always in view. Spoken cues exist only as the opt-in feature in 12.1.
+
+### 11.4 Routes with elevation
+
+An optional alternative to the flat free ride. Routes come from the agent, never from a built-in catalogue.
+
+- A route is a named list of points: distance, elevation, and coordinates when it follows real roads.
+- **The agent supplies routes through MCP** in one of three ways: an imported GPX file, a list of waypoints that the service turns into a road route with elevation, or a synthetic elevation profile with no coordinates.
+- Road routing and elevation use a self-hosted engine. Candidates: BRouter or GraphHopper with open elevation data. To be chosen.
+- **On the bike:** the route's grade feeds the trainer's simulation mode. Virtual gears add their offset on top.
+- **Difficulty** scales the grade, default 50%, so steep roads stay rideable on one cog. Grade is smoothed and clamped to the trainer's 15% limit.
+- A route can back a free ride or a `free` step of a workout.
+- Routes with coordinates write positions into the FIT file, which is what should make Strava draw a map. Synthetic profiles produce no map.
+- New MCP tools: `create_route`, `list_routes`, `delete_route`.
+
+### 11.5 Easier variant
+
+- A planned workout may carry one alternative version, written by the agent when it creates the workout.
+- **The variant lives only in the Overdrive service.** intervals.icu and Google Calendar hold the primary, so no second calendar entry exists and nothing needs deleting.
+- At ride start the app shows the recovery state and offers both versions. One tap chooses.
+- If the variant is ridden, the service updates the intervals.icu event to match what was done, so planned and completed line up.
+- If neither is ridden, the variant disappears with the planned day.
+- The choice is recorded and reaches the agent as an implicit feedback fact.
+- `create_workout` and `update_workout` gain an optional `variant` field in the same format as `steps`.
+
+### 11.6 Coach notebook
+
+Every agent session starts with no memory of the last one. The notebook is the agent's persistent working memory about this rider, kept on the server.
+
+- A structured text document with fixed sections: rider profile and constraints, what works, what does not, injuries and niggles, current plan rationale, open questions, and a dated log of decisions.
+- **MCP tools:** `get_notebook`, `update_notebook_section`, `append_notebook_log`.
+- The server instructions tell every agent to read the notebook first and to record the reason for any plan change.
+- Every edit is versioned and can be rolled back.
+- Size is capped. When the log grows past the cap the agent is asked to condense old entries into the sections above.
+- The rider can read the notebook in the companion. It is read-only there; corrections go through feedback or a note in Telegram.
+- Game-master secrets do not belong here. A second notebook under the `game-master` scope holds the agent's game plans, invisible to the rider.
+
+### 11.7 Repeat-session comparison
+
+Riding the same session again is the cleanest measure of progress. The system detects repeats on its own.
+
+- **Detection:** two rides match when they used the same workout structure or the same route. Workouts are matched by a hash of their steps, so a renamed copy still matches.
+- **Live, in the overlay:** one compact line against the previous attempt. For a route it is the time gap. For an ERG workout power is fixed, so it is the heart-rate difference at the same point: lower at the same power means fitter.
+- **Afterwards, in the companion:** a page per repeated session with every attempt side by side: average heart rate at the same power, drift, rating, compliance, and their trend.
+- Heart rate at fixed power as a fitness marker is standard coaching practice. Day-to-day heart rate also moves with heat, sleep and caffeine, so the trend over several attempts matters, not one comparison.
+- Repeats become available to the game as metrics, and to the agent through `get_ride`.
+
+### 11.8 Outdoor rides
+
+From spring the load picture must include rides outside, recorded on a Geoid CC600 with a speed sensor and a heart-rate strap, without power or cadence.
+
+- **Import:** the CC600 syncs through the OnelapFit app, which exports FIT files and can auto-sync to Strava and TrainingPeaks. It has no direct intervals.icu link.
+- **Path A, preferred:** share the FIT file from OnelapFit to the Overdrive companion or send it to the Telegram bot. The service stores it and forwards it to intervals.icu.
+- **Path B:** OnelapFit to Strava, and intervals.icu imports from Strava. Less control, and it depends on Strava's API terms.
+- **Load:** from heart rate, with the same method as watch-recorded workouts in 6.7. No power meter is needed for the fatigue and form model.
+- **Limits:** outdoor rides do not feed the power curve or FTP estimate. A cadence sensor would add nothing to load. A power meter would lift both limits and is not required.
+- Duplicate protection: the same ride arriving by both paths is recognised by start time and duration.
+- Confirmed by the rider on 2026-11-18: OnelapFit shares FIT files to other Android apps, so Path A needs only a share target in the companion.
+
+## 12. Additions, second round
+
+Five more additions agreed on 2026-11-18. All five make the agent a more consistent coach; none changes the ride app's core.
+
+| Addition | Phase | Extends |
+|---|---|---|
+| Live coach: spoken cues generated in real time, online only | 2 | 4.5, 4.6, 8.1 |
+| Agent replans the week after a missed session | 2 | 5.1, feedback queue |
+| Post-ride analysis that hands a topic to the coach | 3 | 6.5 |
+| Methodology fixed in the notebook | 2 | 11.6 |
+| Body weight from Health Connect | 3 | 6.2 |
+
+### 12.1 Live coach
+
+During selected workouts a coach on the server watches the ride as it happens and speaks short cues. It needs a connection; without one the feature is simply off and the ride is unaffected.
+
+**Scope**
+
+- Opt-in per workout through a `live_coach` flag. The agent sets it for key or strict sessions.
+- The live coach talks and shows text. It never changes targets, intensity or the workout. Trainer control stays on the tablet.
+- Offline at ride start: the flag is ignored and the overlay notes that the live coach is unavailable.
+- Connection lost mid-ride: cues stop, the ride continues, cues resume on reconnect.
+
+**How a cue is made**
+
+- The ride app streams a compact snapshot to the service every 5 s over one persistent connection: step, target, power, heart rate, cadence, compliance, time left, recent events such as the stall guard.
+- **Trigger rules on the server decide when a cue may happen.** Examples: a hard step begins; two minutes remain; power drifts off target for 20 s; cadence sags; heart rate climbs faster than in earlier repeats; a strong finish.
+- When a trigger fires and the limits allow, a fast LLM writes the line. It sees the workout's purpose, the agent's brief for this session, the relevant notebook sections, the live snapshot and the cues already said. It may also answer that nothing is worth saying.
+- The line goes to the rider's TTS service and the audio is pushed to the tablet.
+- The tablet plays it with transient audio focus, so the video's sound dips and returns, and shows the text on a plate under the overlay.
+
+Rules gate the model rather than the model polling the ride. This keeps cost and chatter bounded and makes the timing predictable.
+
+**What the planning agent provides**
+
+- A `coach_brief` on the workout: what the session is for, what to watch in this rider, what tone to take.
+- Optional `must_say` lines tied to a step, spoken as written. Use sparingly.
+
+```
+{ "live_coach": true,
+  "coach_brief": "Threshold progression. He tends to start intervals too hard and fade. Keep him smooth in the first two minutes. Calm, technical tone.",
+  "steps": [ { "type": "steady", "duration": 600, "target": 0.95, "label": "Threshold",
+    "must_say": [ { "at": "start", "text": "First one. Ease into it." } ] } ] }
+```
+
+**Services**
+
+- **TTS:** an OpenAI-compatible speech endpoint (`/v1/audio/speech`), the rider's own. Settings: base URL, key, model, voice, speed, audio format.
+- **LLM:** any OpenAI-compatible chat endpoint. A small, fast model is enough for one sentence.
+- Both are configured on the web service. The tablet talks only to the web service.
+- Cue language is a setting.
+
+**Latency**
+
+- Target: under 3 s from trigger to the first sound.
+- A cue that is not ready within 5 s is dropped, since a late cue about a moment that has passed is worse than none.
+- Time-critical lines, such as the start of a step, are triggered a few seconds early to absorb the delay.
+
+**Limits on talking, enforced by the server**
+
+| Limit | Default |
+|---|---|
+| Length of one cue | 80 characters, about 5 s of speech |
+| Gap between any two cues | 60 s |
+| Cues per ride | 12 per hour |
+| Same trigger repeating | Twice per step, with a 3-minute cooldown |
+| Final 15 s of a step | Silent, so the countdown stays clear |
+| Recovery steps | One cue at most |
+
+- The defaults are settings.
+- The model is instructed to give instruction, not encouragement filler, and never to repeat a line it has already said in this ride.
+- One overlay control mutes the live coach for the rest of the ride.
+
+**Record**
+
+- Every cue is logged on the ride with its trigger, text and time.
+- The log is part of the facts the planning agent sees afterwards, so it knows what the rider was told.
+
+### 12.2 Replanning after a missed session
+
+The coach agent rebuilds the week itself. The service only detects that a rebuild is needed and asks for one.
+
+- **Detection:** a planned day ends with no matching activity; a session is moved or deleted by the rider; the easier variant was ridden; the rider declares illness or travel.
+- Each case creates a **plan event** in the same queue the agent already reads for feedback.
+- An unattended coach run picks it up, reads the notebook and the current load and recovery picture, and reshapes the remaining days with the normal planning tools.
+- It then writes a short note to the rider through Telegram: what changed and why.
+- No algorithm in the service moves workouts on its own.
+- A missed session is not always rescheduled. Dropping it is a valid outcome, and the note says so.
+- New MCP tools: `list_plan_events`, `resolve_plan_event`.
+
+### 12.3 Post-ride analysis that hands off to the coach
+
+The automatic post-ride note from 6.5 gains one job: saying when a ride is worth a conversation with the coach agent, and why.
+
+- The analysis may attach a **discussion topic** to its note: one sentence on what stood out and a suggested question to open with.
+- **When:** a real reason only. Examples: effort rating far above what the load predicts; a session cut short; the stall guard firing repeatedly; a record; the same tag for the third ride in a row; heart rate at fixed power trending the wrong way.
+- At most two topics a week, so it stays a signal.
+- The Telegram note shows the topic with the opening question ready to copy.
+- Topics are stored. When the rider opens a chat with the coach agent, the agent finds them through `list_discussion_topics` and can start from the latest one without the rider explaining anything.
+- A topic closes when the agent marks it discussed, or after 14 days.
+
+### 12.4 Methodology fixed in the notebook
+
+The notebook's plan rationale becomes a dedicated **Methodology** section, so the approach cannot drift from one agent session to the next.
+
+- **Contents:** the training approach in use and why it suits this rider; the weekly structure; how load progresses; what counts as a hard and an easy day; when and how FTP and zones are revisited; what would justify changing the approach; the date of the next review.
+- The server instructions require the agent to check every plan change against this section.
+- **Changing it is deliberate.** `update_notebook_section` on Methodology requires a written reason. The change is logged, versioned, and announced to the rider in Telegram.
+- Day-to-day adjustments happen inside the methodology and need no announcement.
+- A methodology review is scheduled at the end of each season.
+
+### 12.5 Body weight
+
+- The companion reads weight records from Health Connect. OHealth already writes them.
+- A 7-day average smooths daily swings.
+- **Used for:** watts per kilogram in statistics and records; system mass in the virtual-speed model, as rider weight plus a bike weight setting; the weight field in intervals.icu wellness.
+- Weight is shown as a trend in the companion's wellness screen and is available to the agent through `get_wellness`.
+- The game never rewards or reacts to weight.
 
 ## Implementation notes (added in the repository, not part of the owner's spec)
 

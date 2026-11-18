@@ -1,11 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Overdrive profile patch",
-  "description": "The body of PATCH /v1/profile (spec §8.3, ADR 0018): a partial update in the manner of a JSON merge patch (RFC 7396), applied to the stored profile (profile.schema.json). A key that is absent changes nothing. ftp is replaced, or cleared with null. zones is replaced as a whole (all six bounds), or reset to Coggan's defaults with null. weeklyAvailability changes only the weekdays it names (a number sets the minutes, null makes the day unknown again). goals replaces the whole list ([] clears it). maxHeartRate and thresholdHeartRate are replaced, or cleared with null (the estimates are read-only and cannot be sent). physics changes only the constants it names, and none of them can be null. updatedAt cannot be sent: the service sets it. Rules a schema cannot state, checked by every implementation on the profile the patch would make: the six zone bounds strictly increase, no goal is blank, and a threshold heart rate is below the maximum when both are set. A patch that makes an invalid profile changes nothing and is refused with 422 invalid_profile.",
+  "description": "The body of PATCH /v1/profile (spec §8.3, ADR 0018): a partial update in the manner of a JSON merge patch (RFC 7396), applied to the stored profile (profile.schema.json). A key that is absent changes nothing. ftp is replaced, or cleared with null. wPrimeKj is replaced, or cleared with null (back to the default). zones is replaced as a whole (all six bounds), or reset to Coggan's defaults with null. weeklyAvailability changes only the weekdays it names (a number sets the minutes, null makes the day unknown again). goals replaces the whole list ([] clears it). maxHeartRate and thresholdHeartRate are replaced, or cleared with null (the estimates are read-only and cannot be sent). physics changes only the constants it names, and none of them can be null. updatedAt cannot be sent: the service sets it. Rules a schema cannot state, checked by every implementation on the profile the patch would make: the six zone bounds strictly increase, no goal is blank, and a threshold heart rate is below the maximum when both are set. A patch that makes an invalid profile changes nothing and is refused with 422 invalid_profile.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "ftp": { "$ref": "profile.schema.json#/properties/ftp" },
+    "wPrimeKj": { "$ref": "profile.schema.json#/properties/wPrimeKj" },
     "zones": {
       "oneOf": [{ "$ref": "profile.schema.json#/$defs/zones" }, { "type": "null" }]
     },

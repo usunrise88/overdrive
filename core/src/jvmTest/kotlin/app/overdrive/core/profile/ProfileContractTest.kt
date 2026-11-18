@@ -154,10 +154,11 @@ class ProfileContractTest {
     fun `every key is written, null included`() {
         val written = parse(ProfileApiJson.encodeProfile(Profile.default())).jsonObject
         assertEquals(
-            setOf("ftp", "zones", "weeklyAvailability", "goals", "physics", "updatedAt") + heartRateKeys,
+            setOf("ftp", "wPrimeKj", "zones", "weeklyAvailability", "goals", "physics", "updatedAt") + heartRateKeys,
             written.keys,
         )
         assertEquals(JsonNull, written.getValue("ftp"))
+        assertEquals(JsonNull, written.getValue("wPrimeKj"))
         assertEquals(JsonNull, written.getValue("updatedAt"))
         assertEquals(JsonNull, written.getValue("weeklyAvailability").jsonObject.getValue("mon"))
     }
@@ -231,6 +232,24 @@ class ProfileContractTest {
             }
         }
         assertEquals(1, PowerZones.COGGAN.zoneOf(-40, 250))
+    }
+
+    @Test
+    fun `W prime is set and cleared by a patch, and a profile without it is read as not valid`() {
+        val profile = Profile.default().copy(ftp = 250)
+        val set = ProfileApiJson.decodePatch("""{"wPrimeKj":18.5}""").applyTo(profile)
+        assertEquals(18.5, set.wPrimeKj)
+        assertNull(ProfileApiJson.decodePatch("""{"wPrimeKj":null}""").applyTo(set).wPrimeKj)
+        assertEquals(set, ProfileApiJson.decodePatch("{}").applyTo(set))
+        assertFailsWith<IllegalArgumentException> { ProfileApiJson.decodePatch("""{"wPrimeKj":"20"}""") }
+        assertFailsWith<IllegalArgumentException> { ProfileApiJson.decodePatch("""{"wPrimeKj":0}""").applyTo(profile) }
+        assertFailsWith<IllegalArgumentException> { Profile.default().copy(wPrimeKj = Double.NaN) }
+        // Code may build a profile without it, but the wire says it every time.
+        val written = ProfileApiJson.encodeProfile(profile)
+        assertTrue("\"wPrimeKj\":null" in written, written)
+        assertFailsWith<IllegalArgumentException> {
+            ProfileApiJson.decodeProfile(written.replace(",\"wPrimeKj\":null", ""))
+        }
     }
 
     @Test

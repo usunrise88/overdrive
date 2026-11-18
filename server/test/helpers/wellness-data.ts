@@ -1,4 +1,4 @@
-import type { WellnessRecord, WellnessUpload } from "@overdrive/contracts";
+import type { HeartRateSamplesRecord, WellnessRecord, WellnessUpload } from "@overdrive/contracts";
 import { addDaysToIsoDate } from "@overdrive/contracts";
 import type { FastifyInstance } from "fastify";
 import { bearer, COMPANION } from "./app.ts";
@@ -80,7 +80,7 @@ export function heartRateSeconds(
   seconds: number,
   everySeconds: number,
   bpm: (i: number) => number,
-): WellnessRecord {
+): HeartRateSamplesRecord {
   const from = Date.parse(start);
   const samples = [];
   for (let s = 0, i = 0; s <= seconds; s += everySeconds, i++) {

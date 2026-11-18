@@ -1,0 +1,21 @@
+{
+  "generatedAt": "2026-11-16T07:30:12Z",
+  "stale": false,
+  "rideId": "ride-1795160000000",
+  "startTime": "2026-11-12T18:40:00Z",
+  "date": "2026-11-12",
+  "ftp": 250,
+  "durationSec": 20,
+  "movingSec": 20,
+  "load": null,
+  "powerCurve": [],
+  "drift": {
+    "available": false,
+    "reason": "The ride is 0 minutes long; aerobic drift needs a steady stretch of at least 40 minutes",
+    "driftPercent": null,
+    "efFirst": null,
+    "efSecond": null,
+    "startSec": null,
+    "endSec": null
+  }
+}

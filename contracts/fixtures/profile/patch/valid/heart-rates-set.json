@@ -2,6 +2,7 @@
   "description": "Sets the maximum and threshold heart rates; the estimates stay as the service computed them.",
   "before": {
     "ftp": 250,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         50,
@@ -40,6 +41,7 @@
   },
   "after": {
     "ftp": 250,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         50,

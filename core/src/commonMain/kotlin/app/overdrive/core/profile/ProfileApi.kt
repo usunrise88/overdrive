@@ -38,6 +38,8 @@ public data class ProfilePatch(
     val weeklyAvailability: Map<Weekday, Int?> = emptyMap(),
     val goals: List<String>? = null,
     val physics: PhysicsPatch = PhysicsPatch(),
+    /** Set to null puts W′ back to the service's default. */
+    val wPrimeKj: Change<Double?> = Change.Keep,
     val maxHeartRate: Change<Int?> = Change.Keep,
     val thresholdHeartRate: Change<Int?> = Change.Keep,
 ) {
@@ -45,7 +47,8 @@ public data class ProfilePatch(
     public val isEmpty: Boolean
         get() =
             ftp == Change.Keep && zones == Change.Keep && weeklyAvailability.isEmpty() && goals == null &&
-                physics == PhysicsPatch() && maxHeartRate == Change.Keep && thresholdHeartRate == Change.Keep
+                physics == PhysicsPatch() && wPrimeKj == Change.Keep && maxHeartRate == Change.Keep &&
+                thresholdHeartRate == Change.Keep
 
     /**
      * The one patch that does what this one does and then [later] does: where both name a field, [later] wins (the last write
@@ -56,6 +59,7 @@ public data class ProfilePatch(
         ProfilePatch(
             ftp = if (later.ftp == Change.Keep) ftp else later.ftp,
             zones = if (later.zones == Change.Keep) zones else later.zones,
+            wPrimeKj = if (later.wPrimeKj == Change.Keep) wPrimeKj else later.wPrimeKj,
             weeklyAvailability = weeklyAvailability + later.weeklyAvailability,
             goals = later.goals ?: goals,
             physics =
@@ -91,6 +95,11 @@ public data class ProfilePatch(
                     Change.Keep -> profile.zones
                     is Change.Set -> zones.value ?: PowerZones.COGGAN
                 },
+            wPrimeKj =
+                when (wPrimeKj) {
+                    Change.Keep -> profile.wPrimeKj
+                    is Change.Set -> wPrimeKj.value
+                },
             weeklyAvailability = availability,
             goals = goals ?: profile.goals,
             physics =
@@ -123,7 +132,16 @@ public object ProfileApiJson {
     private val json = Json { encodeDefaults = true }
 
     private val patchKeys =
-        setOf("ftp", "zones", "weeklyAvailability", "goals", "physics", "maxHeartRate", "thresholdHeartRate")
+        setOf(
+            "ftp",
+            "wPrimeKj",
+            "zones",
+            "weeklyAvailability",
+            "goals",
+            "physics",
+            "maxHeartRate",
+            "thresholdHeartRate",
+        )
     private val physicsKeys = setOf("systemMassKg", "cdA", "crr", "airDensity", "drivetrainEfficiency")
 
     /** @throws IllegalArgumentException if [text] is not a profile of the schema. */
@@ -132,6 +150,10 @@ public object ProfileApiJson {
         require(root is JsonObject) { "A profile is a JSON object" }
         // kotlinx reads "250" as the number 250; the schema does not.
         root["ftp"]?.let { requireNumber(it, "ftp") }
+        // The key is always on the wire; the model's default is only for code that builds a profile.
+        require("wPrimeKj" in root) { "A profile has a wPrimeKj, null when not set" }
+        root["wPrimeKj"]?.let { requireNumber(it, "wPrimeKj") }
+        // The four heart-rate keys are optional on read (a profile cached before they existed) and always written.
         for (key in listOf(
             "maxHeartRate",
             "thresholdHeartRate",
@@ -161,6 +183,7 @@ public object ProfileApiJson {
     public fun encodePatch(patch: ProfilePatch): String {
         val body = LinkedHashMap<String, JsonElement>()
         (patch.ftp as? Change.Set)?.let { body["ftp"] = it.value?.let(::JsonPrimitive) ?: JsonNull }
+        (patch.wPrimeKj as? Change.Set)?.let { body["wPrimeKj"] = it.value?.let(::JsonPrimitive) ?: JsonNull }
         (patch.zones as? Change.Set)?.let { change ->
             body["zones"] = change.value?.let { json.encodeToJsonElement(PowerZones.serializer(), it) } ?: JsonNull
         }
@@ -207,10 +230,20 @@ public object ProfileApiJson {
             weeklyAvailability = element["weeklyAvailability"]?.let(::availabilityOf).orEmpty(),
             goals = element["goals"]?.let(::goalsOf),
             physics = element["physics"]?.let(::physicsOf) ?: PhysicsPatch(),
+            wPrimeKj = element["wPrimeKj"]?.let { Change.Set(nullableNumber(it, "wPrimeKj")) } ?: Change.Keep,
             maxHeartRate = element["maxHeartRate"]?.let { Change.Set(nullableInt(it, "maxHeartRate")) } ?: Change.Keep,
             thresholdHeartRate =
                 element["thresholdHeartRate"]?.let { Change.Set(nullableInt(it, "thresholdHeartRate")) } ?: Change.Keep,
         )
+    }
+
+    private fun nullableNumber(
+        element: JsonElement,
+        what: String,
+    ): Double? {
+        if (element is JsonNull) return null
+        require(element is JsonPrimitive && !element.isString) { "$what must be a number or null" }
+        return requireNotNull(element.content.toDoubleOrNull()) { "$what must be a number or null" }
     }
 
     private fun nullableInt(

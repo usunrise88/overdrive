@@ -2,6 +2,7 @@
   "description": "Heart rates and FTP in one patch.",
   "before": {
     "ftp": 250,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         50,
@@ -44,6 +45,7 @@
   },
   "after": {
     "ftp": 260,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         50,

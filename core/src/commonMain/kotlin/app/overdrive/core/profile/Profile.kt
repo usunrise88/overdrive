@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * The rider's profile as `GET /v1/profile` answers it (spec §8.3, ADR 0018, `contracts/schema/profile.schema.json`):
- * the FTP, the power zones, the weekly availability, the goals and the physics constants the ride engine uses.
+ * the FTP, W′, the power zones, the weekly availability, the goals and the physics constants the ride engine uses.
  *
  * [ftp] is in watts, or null while the owner has not set one (a tablet then keeps its own setting). [updatedAt] is the
  * UTC instant of the last change (`2026-11-18T09:30:00Z`), null while this is still the defaults. Every key is always
@@ -22,7 +22,13 @@ public data class Profile(
     val goals: List<String>,
     val physics: ProfilePhysics,
     val updatedAt: String?,
-    /** Maximum heart rate in bpm, or null when not set (spec §6.7, ADR 0023). */
+    /**
+     * W′ in kilojoules (1 to 100) for the W′ balance, or null for the service's default of 20 kJ; critical power is the
+     * FTP. Last, with a default, so code that builds a profile without it still compiles; on the wire the key is always
+     * present (the decoder insists).
+     */
+    val wPrimeKj: Double? = null,
+    /** Maximum heart rate in bpm, or null when not set (spec §6.7, ADR 0023). Optional on the wire. */
     val maxHeartRate: Int? = null,
     /** Threshold heart rate in bpm, or null when not set. */
     val thresholdHeartRate: Int? = null,
@@ -33,6 +39,9 @@ public data class Profile(
 ) {
     init {
         require(ftp == null || ftp in MIN_FTP..MAX_FTP) { "FTP must be within $MIN_FTP..$MAX_FTP W, got $ftp" }
+        require(wPrimeKj == null || wPrimeKj in MIN_W_PRIME_KJ..MAX_W_PRIME_KJ) {
+            "W′ must be within $MIN_W_PRIME_KJ..$MAX_W_PRIME_KJ kJ, got $wPrimeKj"
+        }
         require(maxHeartRate == null || maxHeartRate in MIN_MAX_HR..MAX_MAX_HR) {
             "Maximum heart rate must be within $MIN_MAX_HR..$MAX_MAX_HR bpm, got $maxHeartRate"
         }
@@ -62,6 +71,8 @@ public data class Profile(
     public companion object {
         public const val MIN_FTP: Int = 30
         public const val MAX_FTP: Int = 2000
+        public const val MIN_W_PRIME_KJ: Double = 1.0
+        public const val MAX_W_PRIME_KJ: Double = 100.0
         public const val MAX_GOALS: Int = 10
         public const val MAX_GOAL_LENGTH: Int = 200
         public const val MIN_MAX_HR: Int = 100

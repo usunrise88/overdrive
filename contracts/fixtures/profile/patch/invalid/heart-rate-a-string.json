@@ -2,6 +2,7 @@
   "description": "A string, not a number.",
   "before": {
     "ftp": 250,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         50,

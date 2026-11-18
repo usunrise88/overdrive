@@ -52,6 +52,7 @@ type Stored = Omit<Profile, "updatedAt" | "estimatedMaxHeartRate" | "estimatedTh
 
 const PARTS = [
   "ftp",
+  "wPrimeKj",
   "zones",
   "weeklyAvailability",
   "goals",
@@ -94,7 +95,12 @@ export function createProfileStore(
     );
     const row = result.rows[0];
     if (row === undefined) return defaultProfile();
-    const profile = { ...row.data, updatedAt: new Date(row.updated_at).toISOString() };
+    // A row written before W′ existed has no such key (the type says it does): it reads as "not set".
+    const profile = {
+      ...row.data,
+      wPrimeKj: row.data.wPrimeKj ?? null,
+      updatedAt: new Date(row.updated_at).toISOString(),
+    };
     // What is stored was valid when it was written; a row someone edited by hand is not served as if it were.
     const checked = validateProfile(profile);
     if (!checked.ok) {

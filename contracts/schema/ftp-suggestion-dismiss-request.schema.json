@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive FTP suggestion dismissal",
+  "description": "The body of POST /v1/ftp-suggestion/dismiss (spec §6.3, §8.3, ADR 0022): the rider keeps their FTP and hides the suggestion with this id (ftp.suggestion.id of GET /v1/metrics). A dismissed suggestion stays hidden until the service's estimate moves 3 W or more from the one that was dismissed. Accepting a suggestion is PATCH /v1/profile with the suggested ftp, which also marks the pending suggestion with that value accepted. A body that is not this is 400 invalid_json; a suggestion that does not exist is 404 not_found.",
+  "type": "object",
+  "required": ["suggestionId"],
+  "additionalProperties": false,
+  "properties": {
+    "suggestionId": { "type": "integer", "minimum": 1 }
+  }
+}

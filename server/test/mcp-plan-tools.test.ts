@@ -108,6 +108,7 @@ describe("the tools and what they say about themselves", () => {
       "create_workout",
       "delete_workout",
       "get_activity",
+      "get_fitness",
       "get_profile",
       "get_recovery",
       "get_ride",
@@ -134,6 +135,7 @@ describe("the tools and what they say about themselves", () => {
       "get_activity",
       "get_wellness",
       "get_recovery",
+      "get_fitness",
     ]) {
       expect(by[name]?.annotations?.readOnlyHint, name).toBe(true);
     }

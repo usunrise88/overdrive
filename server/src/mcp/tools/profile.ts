@@ -18,6 +18,7 @@ export function describeProfile(profile: Profile) {
   const bounds = profile.zones.upperPercentOfFtp;
   return {
     ftp: profile.ftp,
+    wPrimeKj: profile.wPrimeKj,
     zones: {
       upperPercentOfFtp: bounds,
       isDefault: bounds.every((bound, i) => bound === COGGAN_ZONE_UPPER_PERCENT[i]),
@@ -46,7 +47,7 @@ export function registerProfileTools(server: McpServer, ctx: ToolContext): void 
       title: "Get the rider's profile",
       kind: "read",
       description:
-        "The rider's profile: FTP in watts (null when not set), the six upper bounds of power zones 1 to 6 as whole percent of FTP " +
+        "The rider's profile: FTP in watts (null when not set), W′ in kJ (null: the W′ balance uses 20 kJ), the six upper bounds of power zones 1 to 6 as whole percent of FTP " +
         "(Coggan's 55, 75, 90, 105, 120, 150 unless changed; zone 7 has no upper bound) with the zone ranges in watts worked out " +
         "from the FTP, minutes available on each weekday (null where unknown, 0 for a rest day), the rider's goals as short free-text " +
         "lines, and the physics constants the ride app uses for virtual speed (system mass in kg, CdA, Crr, air density, drivetrain " +
@@ -67,6 +68,7 @@ export function registerProfileTools(server: McpServer, ctx: ToolContext): void 
       description:
         "Changes parts of the rider's profile and returns the whole stored profile (as get_profile) and which parts changed. " +
         "Name only what should change; everything not named stays. ftp: watts (30 to 2000), null clears it. " +
+        "wPrimeKj: the rider's W′ in kilojoules (1 to 100), used by the W′ balance with the FTP as critical power; null goes back to the default of 20 kJ. " +
         "zones: all six upper bounds in whole percent of FTP, strictly increasing, or null to go back to Coggan's. " +
         "weeklyAvailability: minutes (0 to 1440) for the weekdays named (mon to sun), null makes a day unknown again. " +
         "goals: the complete new list of short lines (at most 10, each at most 200 characters), replacing the old one; [] clears it. " +
@@ -80,6 +82,11 @@ export function registerProfileTools(server: McpServer, ctx: ToolContext): void 
           .nullable()
           .optional()
           .describe("Watts, 30 to 2000, or null to clear."),
+        wPrimeKj: z
+          .number()
+          .nullable()
+          .optional()
+          .describe("W′ in kilojoules, 1 to 100, or null for the default of 20."),
         zones: z
           .strictObject({
             upperPercentOfFtp: z

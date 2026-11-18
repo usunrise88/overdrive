@@ -2,6 +2,7 @@
   "description": "Well shaped, but the profile it would make has a threshold at or above the maximum.",
   "before": {
     "ftp": 250,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         50,

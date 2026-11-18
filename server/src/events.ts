@@ -21,7 +21,7 @@ export interface PlanChangedEvent {
 }
 
 /**
- * The parts of the profile that changed: `ftp`, `zones`, `weeklyAvailability`, `goals`, `physics`, `maxHeartRate`,
+ * The parts of the profile that changed: `ftp`, `wPrimeKj`, `zones`, `weeklyAvailability`, `goals`, `physics`, `maxHeartRate`,
  * `thresholdHeartRate`. Never empty.
  */
 export interface ProfileChangedEvent {

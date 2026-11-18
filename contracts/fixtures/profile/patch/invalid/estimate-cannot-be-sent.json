@@ -2,6 +2,7 @@
   "description": "The estimates are read-only.",
   "before": {
     "ftp": 250,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         50,

@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-11-16T07:30:12Z",
+  "rideId": "ride-1795160000000",
+  "startTime": "2026-11-12T18:40:00Z",
+  "date": "2026-11-12",
+  "ftp": 250,
+  "durationSec": 3600,
+  "movingSec": 3580,
+  "load": 61.5,
+  "powerCurve": [
+    {
+      "durationSec": 1,
+      "power": 420
+    },
+    {
+      "durationSec": 5,
+      "power": 388.4
+    },
+    {
+      "durationSec": 60,
+      "power": 301.2
+    },
+    {
+      "durationSec": 300,
+      "power": 262.9
+    },
+    {
+      "durationSec": 1200,
+      "power": 232.7
+    },
+    {
+      "durationSec": 1800,
+      "power": 221.4
+    },
+    {
+      "durationSec": 3600,
+      "power": 205.6
+    }
+  ],
+  "drift": {
+    "available": true,
+    "reason": null,
+    "driftPercent": 3.4,
+    "efFirst": 1.512,
+    "efSecond": 1.461,
+    "startSec": 0,
+    "endSec": 3600
+  }
+}

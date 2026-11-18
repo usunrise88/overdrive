@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive FTP suggestion dismissal answer",
+  "description": "The answer to POST /v1/ftp-suggestion/dismiss (spec §6.3, §8.3, ADR 0022): the suggestion and what became of it. dismissed: it is now hidden (also when it was dismissed before: repeating the request changes nothing). accepted or superseded: it had already left the pending state that way and nothing was changed.",
+  "type": "object",
+  "required": ["suggestionId", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "suggestionId": { "type": "integer", "minimum": 1 },
+    "status": { "enum": ["dismissed", "accepted", "superseded"] }
+  }
+}

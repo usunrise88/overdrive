@@ -1,3 +1,4 @@
+import type { RideItem } from "@overdrive/contracts";
 import {
   type Activity,
   type ActivitySummary,
@@ -11,6 +12,7 @@ import type { Db } from "../db.ts";
 import type { EventBus } from "../events.ts";
 import type { IntervalsClient } from "../intervals/client.ts";
 import type { Logger } from "../log.ts";
+import type { MetricsService } from "../metrics/service.ts";
 import type { ProfileStore } from "../profile/store.ts";
 import type { RideStore } from "../ride-store.ts";
 import { dayStartMillis, localDate } from "../time.ts";
@@ -55,6 +57,8 @@ export interface OtherLoad {
 export interface ActivityListQuery {
   fromMs?: number;
   toMs?: number;
+  /** Leave out the sessions that overlap a ride on the tablet. */
+  excludeOverlapping?: boolean;
   limit: number;
   offset: number;
 }
@@ -108,6 +112,11 @@ export interface WellnessOptions {
   settings?: Partial<WellnessSettings>;
   /** The heart-rate index, when the profile store was already given one (it must be the same). */
   heartRates?: RideHeartRateIndex;
+  /**
+   * The training metrics (stage P3-1): the watch's load is registered as its `other` load source and its activities as a source
+   * of the rides list.
+   */
+  metrics?: Pick<MetricsService, "registerLoadSource" | "registerActivitySource">;
 }
 
 /** What went wrong in the database, without the row it may quote. */
@@ -198,7 +207,7 @@ export function createWellness(options: WellnessOptions): WellnessService {
     return resting;
   }
 
-  return {
+  const service: WellnessService = {
     upload,
     puller,
     forwarder,
@@ -295,6 +304,52 @@ export function createWellness(options: WellnessOptions): WellnessService {
       await Promise.all([puller?.stop(), forwarder?.stop()]);
     },
   };
+
+  // The metrics service reads the watch's load and activities through these (spec §6.7): the load feeds fatigue and
+  // form as the `other` kind, never the power curve, FTP or drift, which read rides only.
+  options.metrics?.registerLoadSource({
+    name: "watch",
+    async entries(untilDate) {
+      try {
+        return await service.otherLoadByDay("1970-01-01", untilDate);
+      } catch (error) {
+        throw storageError(error);
+      }
+    },
+  });
+  options.metrics?.registerActivitySource({
+    name: "watch",
+    async list({ beforeMillis, limit }) {
+      try {
+        const { items } = await service.listActivities({
+          ...(beforeMillis === null ? {} : { toMs: beforeMillis }),
+          // The same ride seen by the watch is one ride, and the ride is in the list.
+          excludeOverlapping: true,
+          limit,
+          offset: 0,
+        });
+        return items.map(
+          (item): RideItem => ({
+            id: item.id,
+            kind: "activity",
+            name: item.name,
+            start: item.start,
+            date: item.startDate,
+            durationSeconds: item.durationSeconds,
+            load: item.load,
+            loadApproximate: item.loadApproximate,
+            sport: item.type,
+            averagePower: null,
+            averageHeartRate: item.averageHeartRate,
+          }),
+        );
+      } catch (error) {
+        throw storageError(error);
+      }
+    },
+  });
+
+  return service;
 }
 
 export { HEALTH_CONNECT };

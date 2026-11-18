@@ -57,6 +57,8 @@ export interface ActivityRow {
 export interface ActivityQuery {
   fromMs?: number;
   toMs?: number;
+  /** Leave out the sessions that overlap a ride on the tablet (the same ride, seen by the watch). */
+  excludeOverlapping?: boolean;
   limit: number;
   offset: number;
 }
@@ -235,6 +237,7 @@ export function createActivityStore(db: Db): ActivityStore {
         params.push(query.toMs);
         conditions.push(`a.start_ms < $${params.length}`);
       }
+      if (query.excludeOverlapping === true) conditions.push(`${OVERLAPPING_RIDE} IS NULL`);
       const where = conditions.length === 0 ? "" : `WHERE ${conditions.join(" AND ")}`;
       const total = await db.query<{ n: string }>(
         `SELECT count(*)::text AS n FROM activities a ${where}`,
@@ -269,8 +272,8 @@ export interface LimitsInForce {
 
 /** The maximum and threshold heart rate the load uses: the owner's, else the estimate from the rides. */
 export function limitsInForce(profile: Profile): LimitsInForce {
-  const max = profile.maxHeartRate ?? profile.estimatedMaxHeartRate;
-  const threshold = profile.thresholdHeartRate ?? profile.estimatedThresholdHeartRate;
+  const max = profile.maxHeartRate ?? profile.estimatedMaxHeartRate ?? null;
+  const threshold = profile.thresholdHeartRate ?? profile.estimatedThresholdHeartRate ?? null;
   return {
     max,
     threshold,

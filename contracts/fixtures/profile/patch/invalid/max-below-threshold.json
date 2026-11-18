@@ -2,6 +2,7 @@
   "description": "Lowering the maximum below the threshold in force.",
   "before": {
     "ftp": 250,
+    "wPrimeKj": null,
     "zones": {
       "upperPercentOfFtp": [
         50,
