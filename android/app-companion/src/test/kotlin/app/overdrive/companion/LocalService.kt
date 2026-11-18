@@ -1,5 +1,8 @@
 package app.overdrive.companion
 
+import app.overdrive.core.health.kindName
+import app.overdrive.core.insights.InsightsApiJson
+import app.overdrive.core.insights.InsightsResponse
 import app.overdrive.core.metrics.DismissedStatus
 import app.overdrive.core.metrics.FtpSuggestion
 import app.overdrive.core.metrics.FtpSuggestionDismissResponse
@@ -8,9 +11,6 @@ import app.overdrive.core.metrics.RideItem
 import app.overdrive.core.plan.PlanApiJson
 import app.overdrive.core.profile.Profile
 import app.overdrive.core.profile.ProfileApiJson
-import app.overdrive.core.insights.InsightsApiJson
-import app.overdrive.core.insights.InsightsResponse
-import app.overdrive.core.health.kindName
 import app.overdrive.core.wellness.RecordCounts
 import app.overdrive.core.wellness.RecoveryResponse
 import app.overdrive.core.wellness.RecoveryState
@@ -65,9 +65,9 @@ class LocalService(
     @Volatile
     var dismissed = emptyList<Int>()
 
-    /** What `GET /v1/recovery` answers, and what `GET /v1/insights` does. */
+    /** What `GET /v1/recovery` answers (null is a 404, as a service with no rating yet), and what `GET /v1/insights` does. */
     @Volatile
-    var recovery: RecoveryResponse = WatchSamples.recovery(RecoveryState.READY)
+    var recovery: RecoveryResponse? = WatchSamples.recovery(RecoveryState.READY)
 
     @Volatile
     var insights: InsightsResponse = WatchSamples.insights()
@@ -175,7 +175,8 @@ class LocalService(
             }
 
             method == "GET" && path == "/v1/recovery" -> {
-                200 to WellnessApiJson.encodeRecoveryResponse(recovery)
+                recovery?.let { 200 to WellnessApiJson.encodeRecoveryResponse(it) }
+                    ?: (404 to error("not_found", "No rating"))
             }
 
             method == "GET" && path == "/v1/insights" -> {

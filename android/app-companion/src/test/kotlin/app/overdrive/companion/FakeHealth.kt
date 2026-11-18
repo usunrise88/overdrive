@@ -142,7 +142,17 @@ class FakeHealth : HealthSource {
                 health.add(HeartRateSeries("hr-$d", start - 4 * HOUR, morning + 4 * HOUR, samples, morning))
             }
             val session = end - 3 * DAY
-            health.add(ExerciseSessionReading("ex-1", "other_workout", session, session + 40 * 60_000, "Synthetic session", null, session))
+            health.add(
+                ExerciseSessionReading(
+                    "ex-1",
+                    "other_workout",
+                    session,
+                    session + 40 * 60_000,
+                    "Synthetic session",
+                    null,
+                    session,
+                ),
+            )
         }
 
         /** The ids the service ends up holding for [sixtyDays]. */

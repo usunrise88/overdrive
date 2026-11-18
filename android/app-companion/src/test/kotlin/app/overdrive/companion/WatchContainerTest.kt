@@ -46,8 +46,10 @@ class WatchContainerTest {
 
     private fun CompanionContainer.configure() = with(world) { configure() }
 
-    private fun CompanionContainer.diagnostics() =
-        "status=${healthStatus.value}\nservice=${service.wellnessBodies.size} bodies, ${service.wellnessRecords.size} records\n"
+    private fun diagnostics(c: CompanionContainer): () -> String =
+        {
+            "status=${c.healthStatus.value}\nservice=${service.wellnessBodies.size} bodies, ${service.wellnessRecords.size} records\n"
+        }
 
     private fun allowedHealth(days: Int = 60): FakeHealth =
         FakeHealth().also {
@@ -63,12 +65,12 @@ class WatchContainerTest {
     // region the first read
 
     @Test
-    fun `the first read sends the last 60 days once, keeps its progress on disk and refreshes what the service computes`() {
+    fun `the first read sends the last 60 days once, keeps its state on disk and asks for the figures again`() {
         val health = allowedHealth()
         val c = world.container(health = health)
         c.configure()
         c.setOnboarding(OnboardingStep.Reading)
-        await("the first read is done and everything sent", diagnostics = c::diagnostics) {
+        await("the first read is done and everything sent", diagnostics = diagnostics(c)) {
             c.healthStatus.value.firstReadDone && c.healthStatus.value.waitingBatches == 0 &&
                 service.wellnessRecords.size == FakeHealth.idsOf().size
         }
@@ -80,11 +82,14 @@ class WatchContainerTest {
         assertNotNull(status.lastReadMillis)
 
         // On disk before anyone asks: the token, no backfill left, nothing waiting.
-        await("the state is on disk") { stateText().contains("\"changesToken\"") && !stateText().contains("\"backfill\":{") }
+        await("the state is on disk") {
+            stateText().contains("\"changesToken\"") &&
+                !stateText().contains("\"backfill\":{")
+        }
         assertEquals(0, outboxFiles().size)
 
         // What the service computes from it is asked for again: the rating, the notes, the charts.
-        await("the rating arrives", diagnostics = c::diagnostics) { c.recovery.state.value.value != null }
+        await("the rating arrives", diagnostics = diagnostics(c)) { c.recovery.state.value.value != null }
         assertTrue(service.requests("GET", "/v1/recovery").isNotEmpty())
     }
 
@@ -113,7 +118,10 @@ class WatchContainerTest {
         val posts = service.wellnessBodies.size
         health.add(RestingHeartRateReading("rhr-new", end + 1_000, 55, end + 2_000))
         c.appOpened()
-        await("the new reading arrives", diagnostics = c::diagnostics) { "rhr-new" in service.wellnessRecords }
+        await(
+            "the new reading arrives",
+            diagnostics = diagnostics(c),
+        ) { service.wellnessRecords.containsKey("rhr-new") }
         val resent = service.wellnessBodies.drop(posts).count { it.contains("rhr-0\"") }
         assertEquals("what was sent is not read again", 0, resent)
     }
@@ -121,13 +129,13 @@ class WatchContainerTest {
     // region offline and failures
 
     @Test
-    fun `a service that is down keeps every batch on disk, a restart finds them, and they are sent when it is back`() {
+    fun `a service that is down keeps every batch on disk, a restart finds them, and they go when it is back`() {
         val health = allowedHealth(days = 12)
         service.down = true
         val first = world.container("watch-shared", health = health, moving = true)
         first.configure()
         first.setOnboarding(OnboardingStep.Reading)
-        await("the batches wait and the failure is known", diagnostics = first::diagnostics) {
+        await("the batches wait and the failure is known", diagnostics = diagnostics(first)) {
             first.healthStatus.value.let { it.firstReadDone && it.waitingBatches > 0 && it.uploadProblem != null }
         }
         await("they are on disk") { outboxFiles().isNotEmpty() && stateText().contains("\"failures\":") }
@@ -139,7 +147,7 @@ class WatchContainerTest {
         service.down = false
         val second = world.container("watch-shared", health = health, moving = true)
         await("what waits is known before anything runs") { second.healthStatus.value.waitingBatches == waiting }
-        await("it is all sent", diagnostics = second::diagnostics) {
+        await("it is all sent", diagnostics = diagnostics(second)) {
             service.wellnessRecords.size == FakeHealth.idsOf(12).size && second.healthStatus.value.waitingBatches == 0
         }
         assertEquals(0, outboxFiles().size)
@@ -152,7 +160,7 @@ class WatchContainerTest {
         val c = world.container(health = health, moving = true)
         c.configure()
         c.setOnboarding(OnboardingStep.Reading)
-        await("every record is at the service and nothing waits", diagnostics = c::diagnostics) {
+        await("every record is at the service and nothing waits", diagnostics = diagnostics(c)) {
             c.healthStatus.value.let { it.firstReadDone && it.waitingBatches == 0 } &&
                 service.wellnessRecords.size == FakeHealth.idsOf(4).size
         }
@@ -163,11 +171,12 @@ class WatchContainerTest {
     @Test
     fun `a batch the service refuses is set aside on disk and counted, and the rest goes`() {
         val health = allowedHealth(days = 12)
-        service.wellnessScript += 422 to """{"error":{"code":"invalid_record","message":"/records/1/bpm must be <= 300"}}"""
+        service.wellnessScript +=
+            422 to """{"error":{"code":"invalid_record","message":"/records/1/bpm must be <= 300"}}"""
         val c = world.container(health = health, moving = true)
         c.configure()
         c.setOnboarding(OnboardingStep.Reading)
-        await("the others are sent", diagnostics = c::diagnostics) {
+        await("the others are sent", diagnostics = diagnostics(c)) {
             c.healthStatus.value.let { it.firstReadDone && it.waitingBatches == 0 && it.parkedBatches == 1 }
         }
         assertEquals(1, File(world.cache, "watch-outbox/parked").listFiles().orEmpty().size)
@@ -181,13 +190,14 @@ class WatchContainerTest {
         val c = world.container(health = health, moving = true)
         c.configure()
         c.setOnboarding(OnboardingStep.Reading)
-        await("the token is refused", diagnostics = c::diagnostics) {
-            c.healthStatus.value.uploadProblem?.kind == ProblemKind.TOKEN_REJECTED && c.healthStatus.value.waitingBatches > 0
+        await("the token is refused", diagnostics = diagnostics(c)) {
+            c.healthStatus.value.uploadProblem?.kind == ProblemKind.TOKEN_REJECTED &&
+                c.healthStatus.value.waitingBatches > 0
         }
         assertTrue(service.wellnessRecords.isEmpty())
         service.rejectToken = false
         c.syncNow()
-        await("Sync now sends what waited", diagnostics = c::diagnostics) {
+        await("Sync now sends what waited", diagnostics = diagnostics(c)) {
             service.wellnessRecords.size == FakeHealth.idsOf(3).size && c.healthStatus.value.waitingBatches == 0
         }
     }
@@ -202,13 +212,16 @@ class WatchContainerTest {
         c.configure()
         c.appOpened()
         await("access is known") { c.healthStatus.value.checked }
-        assertTrue(c.healthStatus.value.access.granted.isEmpty())
+        assertTrue(
+            c.healthStatus.value.access.granted
+                .isEmpty(),
+        )
         assertTrue(service.wellnessBodies.isEmpty())
         assertEquals(0, health.pagesRead.get())
     }
 
     @Test
-    fun `access given later starts the read, a permission taken away is said, and an unavailable Health Connect is a plain state`() {
+    fun `access given later starts the read, a permission taken away and a missing Health Connect are plain`() {
         val health = FakeHealth()
         FakeHealth.sixtyDays(health, end, 3)
         val c = world.container(health = health, moving = true)
@@ -219,7 +232,7 @@ class WatchContainerTest {
         c.healthAccessChanged()
         c.appOpened()
         c.setOnboarding(OnboardingStep.Reading)
-        await("read and sent", diagnostics = c::diagnostics) {
+        await("read and sent", diagnostics = diagnostics(c)) {
             service.wellnessRecords.size == FakeHealth.idsOf(3).size
         }
         health.access = health.access.copy(granted = health.access.granted - HealthDataType.SLEEP)
@@ -241,10 +254,24 @@ class WatchContainerTest {
         first.screenOpened(RefreshTarget.Notes)
         await("the three answers") {
             first.wellnessFor(WellnessRange.FOUR_WEEKS).state.value.value != null &&
-                first.recovery.state.value.value != null && first.insights.view.value.list.items.isNotEmpty()
+                first.recovery.state.value.value != null &&
+                first.insights.view.value.list.items
+                    .isNotEmpty()
         }
-        assertEquals(28, first.wellnessFor(WellnessRange.FOUR_WEEKS).state.value.value?.days?.size)
-        val files = world.cache.walkTopDown().filter { it.isFile }.map { it.name }.toSet()
+        assertEquals(
+            28,
+            first
+                .wellnessFor(WellnessRange.FOUR_WEEKS)
+                .state.value.value
+                ?.days
+                ?.size,
+        )
+        val files =
+            world.cache
+                .walkTopDown()
+                .filter { it.isFile }
+                .map { it.name }
+                .toSet()
         assertTrue(files.toString(), files.containsAll(setOf("wellness-4w-0", "recovery", "insights")))
         world.stop(first)
 
@@ -252,7 +279,9 @@ class WatchContainerTest {
         val second = world.container("watch-figures")
         await("shown from disk with the service down") {
             second.wellnessFor(WellnessRange.FOUR_WEEKS).state.value.value != null &&
-                second.recovery.state.value.value != null && second.insights.view.value.list.items.isNotEmpty()
+                second.recovery.state.value.value != null &&
+                second.insights.view.value.list.items
+                    .isNotEmpty()
         }
     }
 
@@ -263,11 +292,20 @@ class WatchContainerTest {
         c.setWellnessRange(WellnessRange.ONE_YEAR)
         await("the range is remembered") { c.settings.value?.wellnessRange == WellnessRange.ONE_YEAR }
         c.screenOpened(RefreshTarget.Wellness)
-        await("both halves") { c.wellnessFor(WellnessRange.ONE_YEAR).state.value.value?.days?.size == 365 }
+        await("both halves") {
+            c
+                .wellnessFor(WellnessRange.ONE_YEAR)
+                .state.value.value
+                ?.days
+                ?.size == 365
+        }
         val asked = service.requests("GET", "/v1/wellness").map { it.query.orEmpty() }
         assertTrue(asked.toString(), asked.count { it.contains("to=2026-11-18") } >= 1)
         c.screenOpened(RefreshTarget.Notes)
-        await("the notes") { c.insights.view.value.list.items.isNotEmpty() }
+        await("the notes") {
+            c.insights.view.value.list.items
+                .isNotEmpty()
+        }
         c.loadMoreNotes()
         await("the older window was asked") {
             service.requests("GET", "/v1/insights").size >= 2
@@ -283,9 +321,16 @@ class WatchContainerTest {
         await("the profile") { c.profile.state.value.profile != null }
         c.setMaxHeartRate(190)
         c.setMaxHeartRate(191)
-        assertEquals("the number moves as the rider taps", 191, c.profile.state.value.profile?.maxHeartRate)
+        assertEquals(
+            "the number moves as the rider taps",
+            191,
+            c.profile.state.value.profile
+                ?.maxHeartRate,
+        )
         c.setThresholdHeartRate(170)
-        await("the service has both, in one or two patches", diagnostics = { service.received.joinToString("\n") { "${it.method} ${it.path}" } }) {
+        await("the service has both, in one or two patches", diagnostics = {
+            service.received.joinToString("\n") { "${it.method} ${it.path}" }
+        }) {
             service.profile?.maxHeartRate == 191 && service.profile?.thresholdHeartRate == 170
         }
         assertTrue("debounced: fewer requests than taps", service.requests("PATCH", "/v1/profile").size <= 2)
@@ -300,7 +345,7 @@ class WatchContainerTest {
         val c = world.container(health = health, moving = true)
         c.configure()
         c.setOnboarding(OnboardingStep.Reading)
-        await("sent", diagnostics = c::diagnostics) {
+        await("sent", diagnostics = diagnostics(c)) {
             c.healthStatus.value.firstReadDone && service.wellnessRecords.size == FakeHealth.idsOf(4).size
         }
         await("recovery too") { c.recovery.state.value.value != null }
@@ -330,7 +375,10 @@ class WatchContainerTest {
         again.configure()
         val before = service.wellnessRecords.size
         again.appOpened()
-        await("it reads again without harm", diagnostics = again::diagnostics) { again.healthStatus.value.firstReadDone }
+        await(
+            "it reads again without harm",
+            diagnostics = diagnostics(again),
+        ) { again.healthStatus.value.firstReadDone }
         assertEquals(before, service.wellnessRecords.size)
     }
 
@@ -342,7 +390,7 @@ class WatchContainerTest {
         val first = world.container("watch-resume", health = health)
         first.configure()
         first.setOnboarding(OnboardingStep.Reading)
-        await("some windows are done and the read stopped", diagnostics = first::diagnostics) {
+        await("some windows are done and the read stopped", diagnostics = diagnostics(first)) {
             Regex("\"chunksDone\":([1-9])").containsMatchIn(stateText()) && first.healthStatus.value.readIssue != null
         }
         assertFalse("no figure and no failure text in the state", stateText().contains("SENTINEL"))
@@ -352,7 +400,7 @@ class WatchContainerTest {
         health.failAfterPages = null
         val second = world.container("watch-resume", health = health)
         second.appOpened()
-        await("everything is there", diagnostics = second::diagnostics) {
+        await("everything is there", diagnostics = diagnostics(second)) {
             service.wellnessRecords.size == FakeHealth.idsOf(30).size && second.healthStatus.value.firstReadDone
         }
         assertEquals(FakeHealth.idsOf(30), service.wellnessRecords.keys.toSet())
@@ -369,8 +417,7 @@ class WatchContainerTest {
         health.add(RestingHeartRateReading("rhr-later", end + 7_000, 52, end + 8_000))
         val requests = service.requests("GET", "/v1/recovery").size
         c.syncNow()
-        await("synced", diagnostics = c::diagnostics) { "rhr-later" in service.wellnessRecords }
+        await("synced", diagnostics = diagnostics(c)) { service.wellnessRecords.containsKey("rhr-later") }
         await("recovery asked again") { service.requests("GET", "/v1/recovery").size > requests }
     }
-
 }
