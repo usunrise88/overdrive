@@ -59,6 +59,8 @@ Consequence: the SDK **must not be bundled** in the public APK unless Garmin giv
 
 FIT export (spec §4.8) does not by itself force a particular Overdrive licence. Option 2 would replace these terms with whatever Garmin grants in writing.
 
+**Decision for reading FIT files (stage P3-7, ADR 0026):** the service that imports outdoor rides decodes the few messages it needs with a decoder of its own (`server/src/fit-decode.ts`) and does not depend on `@garmin/fitsdk`: the terms above (no redistribution, the SDK and its documentation "Confidential Information", deletion on termination) do not fit a public repository and a published server image. The field numbers were checked against the published profile as facts; no code was copied.
+
 ## 5. Recommendation for the Overdrive licence
 
 The owner decides. Three options were compared.

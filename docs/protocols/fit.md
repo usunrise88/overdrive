@@ -542,3 +542,28 @@ encoder is within §1; (2) whether the `com.garmin:fit` jar may be used as a tes
    and the FIT Protocol PDF were not read. Check the field numbers against the PDF before the writer is merged.
 9. **Compressed headers and developer fields.** Not used. Not verified how importers handle them if a later version
    of the writer uses them.
+
+## 9. Reading outdoor rides (stage P3-7, ADR 0026)
+
+The service reads FIT files as well as the tablet writes them: an outdoor ride recorded by a bike computer (the Geoid CC600 through OnelapFit) arrives as a
+FIT file (`POST /v1/activities/fit`, spec §11.8). The decoder is `server/src/fit-decode.ts`, our own (section 7: the SDK is not a dependency). It uses
+sections 1 to 3 of this note as they stand and adds what a reader needs:
+
+- **Messages read** (global number, fields): `file_id` (0: type 0, time_created 4), `sport` (12: sport 0, sub_sport 1), `session` (18: timestamp 253,
+  start_time 2, sport 5, sub_sport 6, total_elapsed_time 7, total_timer_time 8, total_distance 9, total_ascent 22, avg_heart_rate 16, max_heart_rate 17),
+  `lap` (19: timestamp 253, start_time 2, total_elapsed_time 7, total_distance 9), `record` (20: timestamp 253, position_lat 0, position_long 1, altitude 2,
+  enhanced_altitude 78, heart_rate 3, cadence 4, distance 5, speed 6, enhanced_speed 73, power 7), `activity` (34: num_sessions 1). The field numbers are from
+  profile 21.222 (checked as facts, no code copied). Every other message is skipped by its size.
+- **Developer fields** (bit 5 of a definition's header): their definitions are read for their sizes and their bytes skipped.
+- **Compressed-timestamp headers** (bit 7): the five-bit offset is added to the last full timestamp of any message, with the 32-second rollover of the profile
+  (`t = last − (last & 31) + offset`, plus 32 when `offset < (last & 31)`).
+- **Invalid values** of a base type (section 2) mean "absent"; arrays of a field we read are skipped; a `date_time` below `0x10000000` is not a date and the
+  record is left out.
+- **Units:** time in FIT seconds since 1989-12-31 (section 3); distance in 1/100 m; speed in 1/1000 m/s (the 32-bit field wins when both are there); altitude in
+  1/5 m with an offset of 500 m; position in semicircles (`degrees = v · 180 / 2³¹`); elapsed time in 1/1000 s.
+- **What an outdoor ride is:** the file's cycling sessions (sport 2, or 21 for e-biking); the ride runs from the first session's start to the last session's end
+  (`max(timestamp, start + elapsed)`); the distance and climb are the sessions' totals when they say them, else the records' odometer and the altitudes with a 3 m dead
+  band. Heart rate is read at the file's own density; a bike computer stops writing records while its timer is stopped.
+
+The tests write FIT files with `server/test/helpers/fit-encoder.ts` (a second, independent encoder: both byte orders, developer fields, compressed timestamps,
+multi-session files) and read the tablet writer's own golden file. Open question for a real OnelapFit file: which of these messages and fields it writes.

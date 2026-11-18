@@ -89,6 +89,7 @@ Tasks live in Lific, project OVD.
 | P3-3 Insights and alerts | Written notes from computed facts (configurable LLM endpoint), morning/deviation/drift alerts in Telegram, MCP tools, coach topics (§6.5, §6.6, §12.3) | OVD-14 | server side done (ADR 0025); the companion shows the notes in P3-4 |
 | P3-4 Companion app | Phone app: five screens, Health Connect reader, background sync (§6.1) | OVD-15 | not started |
 | P3-5 FTP confirmation | The eFTP suggestion is confirmed or dismissed by the owner (companion, Telegram, MCP); only then do zones move (§6.3) | OVD-16 | not started |
+| P3-7 Repeats and outdoor rides | The same-session comparison (hash of the workout structure, heart rate at the same power, trends, `GET /v1/repeats`, `previous` for the overlay, MCP); outdoor rides from a FIT file (own decoder, `POST /v1/activities/fit`, heart-rate load as `other`, duplicate guard, forwarded to intervals.icu, Telegram document) (§11.7, §11.8) | | server side done (ADR 0026, 2026-11-18); the repeat page and the share target come with the companion, P3-4; the overlay line is `v0.4.0` |
 | P3-6 Release candidate | `v0.3.0-rc.1`, then the long checks while the owner tests, then `v0.3.0` | OVD-17 | not started |
 
 Owner's open design questions, answered with the designer's defaults until the owner says otherwise: 14 nights before a recovery
@@ -105,8 +106,8 @@ to Phase 3 join the Phase 3 stages above and ship in `v0.3.0`; those that belong
 
 | Addition (spec) | Spec phase | Where it is built |
 |---|---|---|
-| Repeat-session comparison (§11.7) | 3 | P3-7 (detection and comparison on the server) and P3-4 (page in the companion; the overlay line is in `v0.4.0`) |
-| Outdoor rides from the bike computer (§11.8) | 3, needed from March 2027 | P3-7 (FIT import, heart-rate load, duplicate guard) and P3-4 (share target in the companion), Telegram receives a FIT in P3-3 |
+| Repeat-session comparison (§11.7) | 3 | P3-7 (detection and comparison on the server: **done**, ADR 0026) and P3-4 (page in the companion; the overlay line is in `v0.4.0`) |
+| Outdoor rides from the bike computer (§11.8) | 3, needed from March 2027 | P3-7 (FIT import, heart-rate load, duplicate guard, the Telegram bot receiving a FIT: **done**, ADR 0026) and P3-4 (share target in the companion) |
 | Post-ride analysis that hands a topic to the coach (§12.3) | 3 | P3-3 |
 | Body weight from Health Connect (§12.5) | 3 | P3-2 (records, 7-day average, `get_wellness`) and P3-4 (trend on the Wellness screen); system mass in the tablet's physics in `v0.4.0` |
 | ERG stall guard (§11.1) | 1 | `v0.4.0`, stage A1 (tablet) |

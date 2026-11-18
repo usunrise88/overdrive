@@ -681,6 +681,7 @@ Workouts recorded on the watch, such as VR sessions in Beat Saber or Superhot, c
 - **Forwarding:** each session is also posted to intervals.icu as an activity of the matching type. Nothing is sent to Strava unless enabled.
 - **Interfaces:** MCP `list_rides` and `get_ride` become `list_activities` and `get_activity` with a type field; the companion history shows both.
 - **To check:** how dense the heart-rate samples are for an OHealth exercise session in Health Connect. Per-second or per-few-seconds is fine; per-minute would make the load estimate coarse.
+- **Outdoor rides** from a FIT file (§11.8) are activities too, with the same load and the same separation (`source` `fit`, ADR 0026).
 
 **Settled in stage P3-2** (ADR 0023, `server/src/wellness/trimp.ts`, `activities.ts`, `forward.ts`; hand-worked golden numbers in
 `server/test/wellness-trimp.test.ts`):
@@ -857,6 +858,9 @@ path: everything is under `/v1`.
 | `GET /v1/metrics?from&to` | Companion | Load, form, power curve, FTP, drift. **Settled** (stage P3-1, below); the recovery state and baselines are `GET /v1/recovery` and `GET /v1/wellness` |
 | `POST /v1/ftp-suggestion/dismiss` | Companion | Hide an FTP suggestion. **Settled** (stage P3-1) |
 | `GET /v1/insights?from&to` | Companion | Written notes and alerts, each with its ride's discussion topic. **Settled** (stage P3-3, below) |
+| `POST /v1/activities/fit` | Companion, Telegram bot | An outdoor ride as a FIT file (`application/vnd.ant.fit`, up to 16 MiB): imported, or a duplicate of a ride already there. **Settled** (stage P3-7, below) |
+| `GET /v1/repeats`, `GET /v1/repeats/{hash}` | Companion | The sessions ridden more than once; every attempt at one side by side with its trend (§11.7). **Settled** (stage P3-7, below) |
+| `GET /v1/repeats/{hash}/previous?before=<rideId>` | Ride app (overlay line, stage v0.4.0) | The attempt before a ride with its step boundaries and heart rates. **Settled** (stage P3-7, below) |
 | `GET /v1/profile`, `PATCH /v1/profile` | Both | FTP, zones, physics settings. **Settled** (stage P2-3, below) |
 
 **Settled in stage P2-1a (ride intake; ADR 0014, `server/README.md`, schemas in `contracts/`):**
@@ -973,6 +977,14 @@ yet", and sent first by the next refresh; a `4xx` other than 401, 408 and 429 dr
   note's `{ id, text, openingQuestion, rideId, createdAt, status }` (§12.3). `stale` is always false: the notes are the service's own rows. The notes come from the model
   or the template (`source` is stored, not sent). The ride detail has no `insightId`: find a ride's note by its `rideId`.
 
+**Settled in stage P3-7 (repeat sessions and outdoor rides; ADR 0026, `contracts/schema/repeats-response.schema.json`, `repeat-detail-response.schema.json`, `repeat-previous-response.schema.json`, `activity-import-response.schema.json`, `activity.schema.json`, Kotlin `RepeatsApiJson`, `ActivityImportJson`):**
+
+- `POST /v1/activities/fit` takes the FIT file's bytes as `application/vnd.ant.fit`, **at most 16 MiB** (`413 payload_too_large`, `415 unsupported_media_type`), with a device token. It checks the framing and both CRCs, decodes the file, reads its **cycling** sessions and answers `{ status, id, kind, reason, summary }` (`activity-import-response.schema.json`): **`201` `imported`** (`id` is `fit-<16 hex of the file's SHA-256>`, `kind` `activity`) or **`200` `duplicate`** (`id` is the ride, imported ride or watch session it is the same as, `kind` `ride` or `activity`, `reason` `same-file`, `same-start-and-duration` or `overlap`; the rules are in §11.8). `summary` describes the ride in the file: `name` ("Outdoor ride"), `start`, `end`, `startDate`, `durationSeconds`, `distanceMeters` and `elevationGainMeters` (null when the file does not say), `averageHeartRate`, `maxHeartRate`, and, only for an imported ride, the heart-rate `load` (null while no maximum and threshold heart rate are known) with `loadApproximate`. Two new codes of the closed list, both `422`: `unsupported_sport` (a valid FIT file whose sport is not cycling) and `empty_activity` (no ride in it); a file that is broken, cut off, has a wrong CRC or is not an activity file is `422 invalid_fit` with the reason in the message, which never quotes a value.
+- The ride is an **activity** like a workout from the watch (§6.7): `GET /v1/activities/{id}` answers it for an id `fit-<16 hex>` (`activity.schema.json`: `source` `fit`, `type` `cycling-outdoor`, and the optional `distanceMeters` and `elevationGainMeters`, absent when not known and **optional on read**), and `GET /v1/rides` lists it with `kind: "activity"` and `sport: "cycling-outdoor"`. `GET /v1/rides/{id}` is the tablet's rides only.
+- `GET /v1/repeats` answers `{ generatedAt, repeats: [{ hash, name, routeKey, attempts, firstDate, lastDate, latest, previous, comparison }] }`: the workouts ridden at least twice, most recently ridden first. `hash` is 16 hex characters (the structure of the workout, §11.7); `routeKey` is the hook for routes (stage v0.4.0), `null` today; `latest` and `previous` are `{ rideId, date, startTime }`; `comparison` has `heartRateAtPower` (bpm), `driftPercent` and `compliance` (percent of the planned time ridden), each `{ latest, previous, difference, reason }` with the difference latest minus previous, or a null difference and the reason.
+- `GET /v1/repeats/{hash}` answers one session in detail (`404 not_found` for a hash that is not a session ridden twice): `{ generatedAt, hash, name, routeKey, note, definition, steps, comparedSteps, attempts, trends }`. `note` is the standing caution (heart rate also moves with heat, sleep and caffeine: read the trend over several attempts); `definition` states `powerTolerancePercent` 3, `skipSeconds` 60, `minStepSeconds` 120, `minTrendAttempts` 3; `steps` are the fixed-power steps (1-based position in the flattened workout, label, length, target as a fraction of FTP); `comparedSteps` the steps the overall figure is taken over. Each attempt, oldest first, has `rideId`, `number`, `date`, `startTime`, `durationSeconds`, `ftp`, `averagePower`, `averageHeartRate`, `effortRating` (reserved, `null`), `heartRateAtPower` `{ value, seconds, reason }`, `stepHeartRates` (per step: `targetWatts`, `averagePower`, `averageHeartRate`, counted `seconds`, `reason`), `driftPercent` `{ value, reason }` and `compliance` `{ percent, stepsCompleted, stepsPlanned, powerDeltaPercent }`. `trends` has one per measure (`heartRateAtPower`, `driftPercent`, `compliance`): `unit`, `betterWhen`, `attempts` (with a figure), `minAttempts` 3, `direction` (`improving`, `worsening`, `steady`, or `unknown` below 3), `slopePerAttempt`, `change`, `steadyBelow`, `reason`.
+- `GET /v1/repeats/{hash}/previous[?before=<rideId>]` answers `{ generatedAt, hash, before, previous }`: `previous` is the attempt before the ride (the latest of all without `before`), or `null`: `{ rideId, date, startTime, durationSeconds, ftp, attempt, heartRateAtPower, steps: [{ step, label, startSeconds, endSeconds, targetWatts, averageHeartRate }] }` with the boundaries in seconds from the start of that ride. `before` may be a ride that is not stored yet if its id is `ride-<start millis>`; any other unknown id is `404 ride_not_found`, one that is not a ride id `400 invalid_ride_id`. The overlay line that will use it is stage v0.4.0.
+
 ### 8.4 MCP tools
 
 | Tool | Kind | Purpose |
@@ -984,6 +996,8 @@ yet", and sent first by the next refresh; a `4xx` other than 401, 408 and 429 dr
 | `list_rides` | Read | Completed rides with summaries |
 | `get_ride` | Read | One ride: laps, power and heart-rate statistics, compliance with plan |
 | `get_fitness` | Read | Load, fitness, fatigue, form series |
+| `list_repeats` | Read | The sessions ridden more than once, each latest against previous |
+| `get_repeat` | Read | Every attempt at one session side by side, with the trend |
 | `get_wellness` | Read | Daily wellness metrics and baselines |
 | `get_recovery` | Read | Today's state and the facts behind it |
 | `list_insights` | Read | The written notes, newest first, with how each was written |
@@ -1034,6 +1048,8 @@ rider has already been told. `get_facts` takes a `kind` and a day, a ride id or 
 the note when one exists (`stored: true`, with the note's id, how it was written and the hash), else worked out now. `list_discussion_topics` (open by default,
 newest first) gives each topic's text, opening question, ride (id, name, day) and the rule that found it; `mark_discussion_topic` sets `discussed` and nothing else (an
 expired topic stays expired). Every number is computed by the server; nothing here can change the plan or the profile.
+
+**Settled in stage P3-7 (ADR 0026):** `list_repeats` gives the sessions ridden more than once (hash, name, attempts, first and last day, the latest and the previous attempt and the comparison of heart rate at the same power, drift and compliance, with the standing caution in its description) and `get_repeat` takes a hash and gives every attempt side by side with the trends; `get_ride` gains `repeatOf` (`{ hash, attemptNumber, attempts, previous: { rideId, date, heartRateAtSamePower: { thisRide, previous, difference, reason } } | null, note }`, null when the ride has no workout copy or its session has been ridden once). `list_activities` and `get_activity` cover the outdoor rides imported from FIT files (`source` `fit`, `type` `cycling-outdoor`; `list_activities` can filter on `source` `fit`; an id `fit-…`). Every number is computed by the server.
 
 ## 9. Risks and open checks
 
@@ -1206,6 +1222,14 @@ Riding the same session again is the cleanest measure of progress. The system de
 - Heart rate at fixed power as a fitness marker is standard coaching practice. Day-to-day heart rate also moves with heat, sleep and caffeine, so the trend over several attempts matters, not one comparison.
 - Repeats become available to the game as metrics, and to the agent through `get_ride`.
 
+**Settled in stage P3-7** (ADR 0026, `server/src/repeats/`, `contracts/src/repeats.ts`; golden numbers in `contracts/fixtures/repeats/workout-hash.json`, `server/test/repeats-figures.test.ts`, `repeats-api.test.ts`):
+
+- *Detection by hash:* two rides match when the workouts they were played from have the same **structure**: the SHA-256 (16 hex) of the steps with repeats expanded, each as `s<seconds>@<permille of FTP>` (steady), `r<seconds>@<from>-<to>` (ramp) or `f<seconds>` (free), joined by commas, preceded by a version line. **In it:** step type, duration, targets, order. **Not in it:** the workout's id, name and description, every label, every cadence target. A renamed copy, a copy with other labels or cadence, and a repeat written out step by step match; one changed target, duration, count, order or step type does not. A ride without a workout copy never matches. Routes are stage v0.4.0: `routeKey` is in the schemas, `null` today.
+- *Heart rate at the same power*, per steady step: the mean heart rate over the seconds that are **not paused**, have a power **within 3%** of the step's target (its fraction of FTP times the ride's FTP) and a heart rate, **after the first 60 s** of each stretch of the step (the minute after a resume is left out too), and only with **at least 120 such seconds**; otherwise none, with the reason in words. A ramp and a free step have no fixed power and no figure.
+- *Per attempt:* the overall figure is the mean over the **compared steps** (those in which the latest attempt with a figure has one), weighted by their planned length; an attempt at another FTP (a target power differing by more than 3%) or one that stopped before a compared step has none and says why. Also the average power and heart rate, the aerobic drift (§6.3) where there is one, the compliance (percent of the planned time ridden, steps completed, power against plan) and `effortRating`, reserved and null.
+- *Trend:* a least-squares line over the attempts that have a figure, in the order ridden: the slope per attempt and the fitted change; `steady` below a stated band (2 bpm, 1 point of drift, 5 points of compliance), else `improving` or `worsening` by which way is better; **at least 3 attempts with a figure**, otherwise `unknown`. Every answer carries the plain `note` that day-to-day heart rate also moves with heat, sleep and caffeine, so the trend over several attempts matters and not one comparison.
+- *Not built:* the overlay line on the tablet (stage v0.4.0). What it will need is `GET /v1/repeats/{hash}/previous?before=<rideId>` (§8.3): the previous attempt's per-step heart rate and step boundaries.
+
 ### 11.8 Outdoor rides
 
 From spring the load picture must include rides outside, recorded on a Geoid CC600 with a speed sensor and a heart-rate strap, without power or cadence.
@@ -1217,6 +1241,15 @@ From spring the load picture must include rides outside, recorded on a Geoid CC6
 - **Limits:** outdoor rides do not feed the power curve or FTP estimate. A cadence sensor would add nothing to load. A power meter would lift both limits and is not required.
 - Duplicate protection: the same ride arriving by both paths is recognised by start time and duration.
 - Confirmed by the rider on 2026-11-18: OnelapFit shares FIT files to other Android apps, so Path A needs only a share target in the companion.
+
+**Settled in stage P3-7** (ADR 0026, `server/src/fit-decode.ts`, `server/src/outdoor/`, `docs/deploy.md` section 18):
+
+- *Path A is built:* `POST /v1/activities/fit` (§8.3) for the companion's share target and the Telegram bot (the owner sends a FIT document; the bot downloads it, imports it through the same function and answers with a short summary or in plain words; Telegram lets a bot download up to 20 MB, the service takes up to 16 MiB). **Path B is not built** and needs nothing from the service (OnelapFit to Strava, intervals.icu imports from Strava); the service never reads Strava, and a ride that reaches intervals.icu by both paths is found there by its start time and not sent twice.
+- *The FIT decoder is our own,* for the few messages needed (`file_id`, `sport`, `session`, `lap`, `record`, `activity`), not Garmin's `@garmin/fitsdk`, whose licence forbids redistribution and does not fit a public repository (ADR 0026, `docs/references-licences.md` section 4).
+- *Stored:* an activity (`fit-<hash>`, sport `cycling-outdoor`) with start, duration, distance, average and maximum heart rate, the climb, the heart rate at most every 5 s and the raw FIT bytes, idempotent. Only **cycling** sessions are read; another sport is `422 unsupported_sport`, a file with no ride `422 empty_activity`. Power, cadence and position in the file are ignored.
+- *Load:* from heart rate with the same TRIMP as the watch's workouts (§6.7: one hour at threshold heart rate is 100), registered as the `other` kind: it feeds fatigue, form and recovery and **never** the power curve, the FTP estimate or aerobic drift, even when the file carries power. `loadApproximate` when a threshold, the maximum or the resting heart rate is an estimate, or the readings are thin. A bike computer stops writing while its timer is stopped, so a reading holds at most 30 s (a stop is not heart rate that went on).
+- *Duplicate protection,* in this order: the same bytes; a start within **60 s** and a length within **2%** of any stored ride, imported ride or watch session; an overlap of **half of the file or more** with a ride on the tablet, a watch session or another imported ride. The answer is `duplicate` with the id of the existing record. Where several records of one ride exist, one counts: a tablet ride beats an imported ride, which beats a watch session.
+- *Forwarded* to intervals.icu as the file, unchanged, through the activity queue (idempotent by external id and by start time; off without a key); nothing goes to Strava.
 
 ## 12. Additions, second round
 
