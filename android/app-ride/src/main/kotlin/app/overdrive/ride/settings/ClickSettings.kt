@@ -22,7 +22,10 @@ enum class ClickKeepAlive(
     Every60("60 s", 60.seconds),
 }
 
-/** How long a Click that answered the handshake may send nothing before it counts as locked (`ClickOptions.noEventTimeout`). */
+/**
+ * How long a Click that answered the handshake may send nothing before it counts as locked (`ClickOptions.noEventTimeout`).
+ * Only with [ClickSettings.silentMeansLocked] on.
+ */
 enum class ClickSilence(
     val label: String,
     val timeout: Duration,
@@ -74,6 +77,11 @@ data class ClickSettings(
     /** Write `FF 04 00` after the handshake (CK 6). */
     val sendPostHandshake: Boolean = true,
     val keepAlive: ClickKeepAlive = ClickKeepAlive.Off,
+    /**
+     * A Click that answered and then sends nothing within [noEventTimeout] counts as locked (`ClickOptions.silentMeansLocked`).
+     * **Off by default**: a real Click sends nothing until a button is pressed (first bench, ADR 0013).
+     */
+    val silentMeansLocked: Boolean = false,
     val noEventTimeout: ClickSilence = ClickSilence.Normal,
     val mtu: ClickMtu = ClickMtu.Medium,
     /** Write the handshake with a response instead of without (CK 2). */
@@ -102,6 +110,7 @@ data class ClickSettings(
             handshakeReply = replyCheck.check,
             sendPostHandshake = sendPostHandshake,
             keepAliveInterval = keepAlive.interval,
+            silentMeansLocked = silentMeansLocked,
             noEventTimeout = noEventTimeout.timeout,
             requireAdvertisedService = requireAdvertisedService,
             acceptedSides = pucks.sides,

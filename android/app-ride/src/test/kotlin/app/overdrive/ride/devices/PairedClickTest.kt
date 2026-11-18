@@ -49,7 +49,7 @@ class PairedClickTest {
             val click = checkNotNull(world.devices.click.value)
             assertEquals("Zwift Click (right)", click.remembered.name)
             assertEquals(ClickState.Active, click.device.state.value)
-            assertEquals(87, click.device.battery.value)
+            assertEquals("read at set-up: 0x64, the real puck sends no battery frame", 100, click.device.battery.value)
             assertNotNull(world.devices.controls(DeviceRole.Click))
 
             world.fakeClick.press(ClickBits.PLUS)

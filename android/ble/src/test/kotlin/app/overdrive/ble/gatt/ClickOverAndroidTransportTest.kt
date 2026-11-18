@@ -95,7 +95,7 @@ class ClickOverAndroidTransportTest {
             rig.fake.release(ClickBits.PLUS)
             rig.advance(100)
             assertEquals(listOf(ClickBits.PLUS, 0), changes.map { it.held })
-            assertEquals(87, click.battery.value)
+            assertEquals("read at set-up: the real puck sends no battery frame", 100, click.battery.value)
             rig.assertLegal()
         }
 
@@ -138,12 +138,13 @@ class ClickOverAndroidTransportTest {
     fun `a locked click is explained, not failed, and an unlock is picked up`() =
         runTest {
             val rig = rig(FakeClick().also { it.lock = FakeClickLock.SILENT })
-            val click = rig.click(ClickOptions(noEventTimeout = 5.seconds))
+            val click = rig.click(ClickOptions(silentMeansLocked = true, noEventTimeout = 5.seconds))
             click.start()
             rig.advance(3_000)
             rig.advance(6_000)
             assertEquals(ClickState.NeedsUnlock(UnlockSignal.NO_EVENTS), click.state.value)
             rig.fake.unlock()
+            rig.fake.press(ClickBits.A) // unlocked, a real Click still says nothing until a button is pressed
             rig.advance(6_000)
             assertEquals(ClickState.Active, click.state.value)
             rig.assertLegal()

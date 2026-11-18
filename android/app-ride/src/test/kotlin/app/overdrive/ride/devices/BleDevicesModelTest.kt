@@ -5,6 +5,7 @@ import app.overdrive.core.ble.fake.FakeClickLock
 import app.overdrive.core.ble.link.LinkFailure
 import app.overdrive.core.ble.link.LinkFailureKind
 import app.overdrive.core.ble.link.LinkStatus
+import app.overdrive.core.click.ClickOptions
 import app.overdrive.core.click.ClickState
 import app.overdrive.core.click.UnlockSignal
 import app.overdrive.ride.host.DeviceRowUi
@@ -12,6 +13,7 @@ import app.overdrive.ride.host.DevicesUi
 import app.overdrive.ride.host.RadioIssue
 import app.overdrive.uikit.DeviceStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -284,7 +286,7 @@ class BleDevicesModelTest {
             world.advance(1_000)
             val last = seen.last().click
             assertEquals(DeviceStatus.Connected, last.status)
-            assertEquals("Zwift Click (right) · battery 87%", last.subtitle)
+            assertEquals("Zwift Click (right) · battery 100%", last.subtitle)
             assertTrue("it went through connecting", seen.any { it.click.status == DeviceStatus.Searching })
             assertEquals(DeviceStatus.Connected, seen.last().trainer.status)
         }
@@ -311,14 +313,30 @@ class BleDevicesModelTest {
         }
 
     @Test
-    fun aLockedClickShowsTheSignalThatGaveItAway() =
+    fun aClickThatSaysNothingIsConnectedByDefaultBecauseARealOneWaitsForAPress() =
         runTest {
             val world = BleWorld(this)
             world.fakeClick.lock = FakeClickLock.SILENT
             val seen = collect(model(world))
             world.launchPaired(withClick = true)
-            // Past the no-event time (30 s by default): until then the row says it is checking.
             world.advance(35_000)
+            assertEquals(DeviceStatus.Connected, seen.last().click.status)
+            assertNull(seen.last().click.locked)
+            assertTrue(seen.none { it.click.subtitle.contains("press any button") })
+        }
+
+    @Test
+    fun withTheSilenceRuleOnALockedClickShowsTheSignalThatGaveItAway() =
+        runTest {
+            val world = BleWorld(this, clickOptions = flowOf(ClickOptions(silentMeansLocked = true)))
+            world.fakeClick.lock = FakeClickLock.SILENT
+            val seen = collect(model(world))
+            world.launchPaired(withClick = true)
+            world.advance(5_000)
+            assertEquals(DeviceStatus.Searching, seen.last().click.status)
+            assertEquals("Zwift Click (right) · press any button", seen.last().click.subtitle)
+            // Past the no-event time (30 s by default): until then the row says to press a button.
+            world.advance(30_000)
             assertEquals(DeviceStatus.Locked, seen.last().click.status)
             assertEquals(UnlockSignal.NO_EVENTS, seen.last().click.locked)
 
