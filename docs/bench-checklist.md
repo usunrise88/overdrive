@@ -389,12 +389,19 @@ the firmware version from the Companion app and the Zwift app version before eac
   for the ride. Settles: spec §4.8 (files can be shared or saved to any folder).
 - [ ] **7.2 Import into intervals.icu.** Upload the file to the owner's intervals.icu account. Expect: the activity
   appears. Settles: AC 6 (part), FIT 1 (protocol version byte: the import is accepted, or the error is written down).
+  If it is refused, the first suspect is `FitOptions.protocolVersion` (`0x20`; try `0x02`) and then the manufacturer
+  (`FitOptions.manufacturer`, 255 is `development`, FIT 5).
 - [ ] **7.3 Power, heart rate and cadence (AC 6).** Open the activity. Expect: the power, heart rate and cadence
   graphs all have data over the ride, and match the overlay roughly. Write down any graph that is empty. Settles:
-  AC 6, FIT 3 (speed fields), FIT 4 (HRV placement, if RR was captured in session 4).
+  AC 6, FIT 3 (speed fields: `FitOptions.speedFields`), FIT 4 (HRV placement: `FitOptions.hrvPlacement`, if RR was
+  captured in session 4). Paused seconds are in the file as records; a pause that intervals.icu counts as riding
+  time is a finding to write down (ADR 0007).
 - [ ] **7.4 Laps and sport.** Expect: one lap per workout step, as spec §4.8 says. The sport is cycling, and the
   sub-sport is virtual (spec §4.8). Write down how intervals.icu labels the activity: virtual, indoor or outdoor.
-  Settles: AC 6 (laps), FIT 2 (sub-sport), FIT 6 (which event and lap messages import needs).
+  Settles: AC 6 (laps), FIT 2 (sub-sport: `FitOptions.subSport`, 58 or 6), FIT 6 (which event and lap messages import
+  needs: `FitOptions.timerEvents`, `stepLapTrigger`). Also look at the start time of the activity: if it is off by
+  the UTC offset, `FitOptions.utcOffsetSeconds` is not set by the app; if the first or last second is off by one,
+  `FitOptions.recordStamp`.
 - [ ] **7.5 Distance and speed.** Expect: the distance matches the overlay's distance. Write down any warning on
   the import about distance and speed (FIT 7). Settles: FIT 7.
 - [ ] **7.6 Optional, Strava virtual ride and map.** Upload the same file from the Strava web page, manually (Phase
@@ -534,8 +541,9 @@ Read these before the bench, so a surprising result is not taken as a bug in the
   The right-puck mode comes later (6.4.0). The no-unlock handshake is in closed code.
 - **Where the no-unlock method comes from.** Spec §9 says it can be settled by reading the BikeControl
   repository. The implementation notes say it is not in the open-source code. Treat 5.2 as the only test.
-- **FIT writer status.** `docs/protocols/fit.md` says the writer is not written yet. The roadmap plans FIT export for
-  M2. Confirm which is current before session 7.
+- **FIT writer status.** The writer exists since M2b-1 (`app.overdrive.core.fit`, ADR 0007); the app's export button
+  arrives with M2b-2. Confirm that the release under test has it before session 7. Each open FIT question is a
+  field of `FitOptions`, so a finding in session 7 is a one-line change of its default.
 - **Heart-rate contact.** The SIG XML says only status 3 means contact is detected. pycycling reads any non-zero
   value as contact (ftms-hr §6.5). The codec follows the XML. Session 4.3 settles it.
 - **Overlay frame-stats output.** The `dumpsys gfxinfo` commands in acceptance criterion 7 come from overlay-notes

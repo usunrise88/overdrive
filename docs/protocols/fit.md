@@ -1,6 +1,9 @@
 # FIT activity file: protocol notes for our writer
 
-Status: research note for the FIT writer (spec §4.8, §8.2). The writer itself is not written yet.
+Status: research note for the FIT writer (spec §4.8, §8.2). **The writer is implemented** (stage M2b-1, ADR 0007,
+`app.overdrive.core.fit`): `FitWriter` reproduces the worked example of section 6 byte for byte (with one
+documented difference in `local_timestamp`, ADR 0007) and every open question of section 8 is a field of
+`FitOptions`, still open until a real import into intervals.icu.
 Read on 2026-11-18. Only facts from Garmin's published SDK files are used here; the SDK code is not copied.
 
 ## 0. Sources and versions
@@ -450,6 +453,29 @@ Sum check: 14 header + 360 data + 2 CRC = 376 bytes.
 
 Not checked: the JS SDK decoder on our file (I did not run downloaded JavaScript). Not checked: any real importer
 (intervals.icu, Strava).
+
+### 6.3 How the writer uses this example (stage M2b-1)
+
+`FitGoldenTest` feeds the three seconds of the example to `FitWriter` and compares the output with the listing above
+byte for byte. The mapping from the ride record that the example implies, and which the writer follows:
+
+- The sample of second *k* is stamped `start + k − 1` (the first record is at the start time), and a lap, the session,
+  the activity and the timer-stop event end at the timestamp of their last record (`t0 + 2` here), while the elapsed time
+  is the number of seconds (3 s). So `end − start + 1 s = elapsed`. `FitOptions.recordStamp` can stamp the end of the
+  second instead.
+- One difference, deliberately: the example's `activity.local_timestamp` is `t0` while its `timestamp` is `t0 + 2`. The
+  profile defines `local_timestamp` as the timestamp expressed in local time, so readers take the UTC offset to be
+  `local_timestamp − timestamp`, which here would be −2 s and for a one-hour ride about −1 h. The writer therefore
+  writes `timestamp + utcOffsetSeconds` (`FitOptions.utcOffsetSeconds`, UTC by default), and the golden test passes an
+  offset of −2 s to reproduce the document's bytes.
+- The example's `lap` and `session` have no speed or maximum-cadence fields and its `session` has no load fields;
+  the writer's layout is exactly that, and adds the four load fields (normalised power, TSS, intensity factor, work) to
+  the session only when the ride has a normalised power, which a 3 s ride does not.
+
+An independent reader written for the tests (`FitReader`, sharing no code with the writer) and, locally and opt-in,
+Garmin's Java decoder (`GarminFitOracleTest`, ADR 0007) both read the files the writer produces: the decoder reports
+the files as FIT with a valid integrity check and the same messages and values. That does not replace an import into
+intervals.icu (section 8).
 
 ## 7. Licence
 
