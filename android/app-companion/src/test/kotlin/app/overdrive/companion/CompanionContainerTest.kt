@@ -3,6 +3,7 @@ package app.overdrive.companion
 import android.app.Application
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import app.overdrive.core.profile.ProfileProblem
 import app.overdrive.core.remote.MetricsRange
 import app.overdrive.core.remote.ProblemKind
 import org.junit.After
@@ -215,6 +216,13 @@ class CompanionContainerTest {
                 .metricsFor(MetricsRange.DEFAULT)
                 .state.value.problem
                 ?.kind == ProblemKind.TOKEN_REJECTED
+        }
+        // Everything the start asked for is in flight at once: wait until each has its answer before counting what the service saw.
+        await("every resource of the start has been refused", diagnostics = diagnostics(c)) {
+            val refused = ProblemKind.TOKEN_REJECTED
+            c.workouts.state.value.problem?.kind == refused && c.recovery.state.value.problem?.kind == refused &&
+                c.insights.newest.state.value.problem?.kind == refused &&
+                c.profile.state.value.problem == ProfileProblem.TokenRejected
         }
         val asked = service.received.size
         c.screenOpened(RefreshTarget.Rides)
