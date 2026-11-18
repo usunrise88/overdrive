@@ -66,6 +66,7 @@ class PlannedReadyTest : ShotTest() {
     private val today = "2026-11-18"
     private val now = LocalDateTime.parse("2026-11-18T09:00:00").atZone(zone).toInstant().toEpochMilli()
     private val settings = AppSettings(ftp = 250)
+    private val localWorkouts = TestData.library.workouts.value
 
     private fun workout(
         id: String,
@@ -153,7 +154,7 @@ class PlannedReadyTest : ShotTest() {
         OverdriveTheme {
             ReadyScreen(
                 choice = choice,
-                workouts = TestData.library.workouts.value,
+                workouts = localWorkouts,
                 settings = settings,
                 devices = TestData.devicesOk,
                 startEnabled = true,
