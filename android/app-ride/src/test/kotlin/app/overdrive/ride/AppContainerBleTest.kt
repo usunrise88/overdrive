@@ -72,19 +72,34 @@ class AppContainerBleTest {
     private fun container(
         world: World,
         name: String,
+        devicesName: String = "devices-$name",
     ): AppContainer =
         AppContainer(
             context,
             directory,
             settingsName = name,
-            devicesName = "devices-of-the-test",
+            devicesName = devicesName,
             bleLogDirectory = File(logs, name),
             bleStack = { _, _ -> world.stack },
         ).also { containers += it }
 
+    /**
+     * What a restart finds: the devices file as the first run left it, under the name the next container uses. DataStore
+     * releases a file only when the scope of the closed one has fully completed, which is asynchronous, so two containers
+     * in one process never share a file name; a copy is exactly what a new process would read.
+     */
+    private fun deviceFileAfterRestart(
+        from: String,
+        to: String,
+    ) {
+        val directory = File(context.filesDir, "datastore")
+        File(directory, "$from.preferences_pb").copyTo(File(directory, "$to.preferences_pb"), overwrite = true)
+    }
+
     private fun await(
         what: String,
         timeoutMs: Long = 20_000,
+        diagnostics: () -> String = { "" },
         condition: () -> Boolean,
     ) {
         val end = System.nanoTime() + timeoutMs * 1_000_000
@@ -92,8 +107,16 @@ class AppContainerBleTest {
             if (condition()) return
             Thread.sleep(10)
         }
-        throw AssertionError("Timed out waiting for: $what")
+        throw AssertionError("Timed out waiting for: $what ${diagnostics()}")
     }
+
+    private fun describe(
+        world: World,
+        container: AppContainer,
+    ): String =
+        "[trainer ${container.pairedDevices.trainer.value?.device?.connection?.value}, " +
+            "link ${container.pairedDevices.controls(DeviceRole.Trainer)?.status?.value}, " +
+            "violations ${world.ble.violations}, events ${world.ble.events.takeLast(12).map { it.what }}]"
 
     @Test
     fun withNothingPairedTheRideIsIdleAndTheScreensSayNoTrainer() {
@@ -145,8 +168,12 @@ class AppContainerBleTest {
         val before = world.ble.transports.size
 
         // The next launch: nothing is tapped.
+        deviceFileAfterRestart(from = "devices-first", to = "devices-second")
         val second = container(world, "second")
-        await("the trainer is connected") { second.host.devices.value.trainer.status == DeviceStatus.Connected }
+        await(
+            "the trainer is connected",
+            diagnostics = { describe(world, second) },
+        ) { second.host.devices.value.trainer.status == DeviceStatus.Connected }
         await("the strap is connected") { second.host.devices.value.heartRate.status == DeviceStatus.Connected }
         await("the ride is ready") { second.host.snapshots.value.state == RideState.READY }
         assertEquals("D500", second.host.devices.value.trainer.subtitle)
@@ -176,8 +203,9 @@ class AppContainerBleTest {
         container.pairing.stop()
 
         await("the ride is ready over the new devices") { container.host.snapshots.value.state == RideState.READY }
-        assertEquals(DeviceStatus.Connected, container.host.devices.value.trainer.status)
-        assertEquals(DeviceStatus.Connected, container.host.devices.value.heartRate.status)
+        // The ride waits for the trainer only; the strap connects on its own clock.
+        await("the trainer row is connected") { container.host.devices.value.trainer.status == DeviceStatus.Connected }
+        await("the strap row is connected") { container.host.devices.value.heartRate.status == DeviceStatus.Connected }
         assertNotNull(container.pairedDevices.trainer.value)
         assertEquals(emptyList<String>(), world.ble.violations)
     }

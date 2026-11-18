@@ -135,8 +135,10 @@ nowhere else (section 9).
 **Devices are long-lived and owned by the container's scope, not by any ride.** `PairedDevices` holds an `FtmsTrainerDevice`
 and a `HeartRateStrapDevice`, each with its own reconnecting `LinkSupervisor`:
 
-- `start()` runs once from the container: it reads the store and **starts a device for everything remembered**, so the app
-  connects at launch with no tap. The supervisors wait by themselves for Bluetooth and the permission.
+- `start()` runs once from the container's `init` block, **after every property it reads is assigned** (a race found by the
+  container tests: the first transport opens on another thread within milliseconds and the log header reads the paired
+  device's name). It reads the store and **starts a device for everything remembered**, so the app connects at launch with
+  no tap. The supervisors wait by themselves for Bluetooth and the permission.
 - A ride session only *uses* them. The host throws a ready session away and builds another whenever the workout or a setting
   changes; none of that touches a link (a test counts the transports opened and closed).
 - `pair(role, device)` stores the choice and **replaces the old device cleanly**: the old one is closed (its transport and its

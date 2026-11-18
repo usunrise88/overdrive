@@ -153,7 +153,7 @@ class AppContainer(
                 ),
             environment = ble.environment,
             transports = { role -> if (role == DeviceRole.Trainer) trainerTransports else strapTransports },
-        ).also { it.start() }
+        )
 
     /** The Devices screen's scan, list and pairing. */
     val pairing: PairingController =
@@ -185,6 +185,13 @@ class AppContainer(
             persistence = rides,
             rideTriggers = pairedDevices.changes,
         )
+
+    init {
+        // Connect what is remembered, with no user action. Started **here, after the properties above are assigned**, and
+        // not where `pairedDevices` is declared: the first transport opens on another thread within milliseconds and its
+        // log header reads `pairedDevices` (the model name), which would still be null if the container were being built.
+        pairedDevices.start()
+    }
 
     val media: MediaController = AudioManagerMediaController(appContext)
 
