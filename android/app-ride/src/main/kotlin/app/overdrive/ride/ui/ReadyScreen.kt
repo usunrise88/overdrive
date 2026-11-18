@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import app.overdrive.core.workout.Workout
 import app.overdrive.ride.host.DevicesUi
 import app.overdrive.ride.host.RideChoice
+import app.overdrive.ride.overlay.OverlayAccess
 import app.overdrive.ride.settings.AppSettings
 import app.overdrive.ride.workouts.StepRow
 import app.overdrive.ride.workouts.WorkoutDescriber
@@ -49,6 +50,8 @@ class ReadyActions(
     val onStart: () -> Unit,
     val onOpenFile: () -> Unit,
     val onDismissError: () -> Unit,
+    /** The overlay row's **Allow**: asks for what the overlay needs (ADR 0006). */
+    val onAllowOverlay: () -> Unit = {},
 )
 
 /**
@@ -56,6 +59,7 @@ class ReadyActions(
  * the right the chosen workout's title, stats, profile and step table with the **Start** button.
  *
  * @param startEnabled false until the trainer is connected (the engine is `IDLE`); the button then says why.
+ * @param overlayAccess what the overlay may do; while "Display over other apps" is missing a row at the top asks for it.
  */
 @Composable
 fun ReadyScreen(
@@ -68,13 +72,22 @@ fun ReadyScreen(
     topBar: TopBarActions,
     actions: ReadyActions,
     modifier: Modifier = Modifier,
+    overlayAccess: OverlayAccess = OverlayAccess.Granted,
 ) {
     Column(modifier.fillMaxSize().background(OverdriveColors.bg)) {
         RideTopBar("Overdrive", TopBarChip.Calm(if (startEnabled) "Ready" else "Waiting for trainer"), devices, topBar)
         Row(Modifier.weight(1f).fillMaxWidth()) {
             WorkoutList(choice, workouts, settings, actions, Modifier.width(360.dp).fillMaxHeight())
             VerticalRule()
-            Detail(choice, settings, startEnabled, openError, actions, Modifier.weight(1f).fillMaxHeight())
+            Detail(
+                choice,
+                settings,
+                startEnabled,
+                openError,
+                overlayAccess,
+                actions,
+                Modifier.weight(1f).fillMaxHeight(),
+            )
         }
     }
 }
@@ -123,10 +136,12 @@ private fun Detail(
     settings: AppSettings,
     startEnabled: Boolean,
     openError: WorkoutFileError?,
+    overlayAccess: OverlayAccess,
     actions: ReadyActions,
     modifier: Modifier,
 ) {
     Column(modifier.padding(horizontal = 40.dp, vertical = 32.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        if (!overlayAccess.canDrawOverlays) OverlayPermissionNotice(actions.onAllowOverlay)
         if (openError != null) {
             Notice(
                 icon = OverdriveIcons.TriangleAlert,

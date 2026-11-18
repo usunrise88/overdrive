@@ -1,5 +1,6 @@
 package app.overdrive.ride
 
+import android.app.Application
 import android.content.Context
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.preferencesDataStoreFile
@@ -8,6 +9,11 @@ import app.overdrive.ride.host.MediaController
 import app.overdrive.ride.host.RideChoice
 import app.overdrive.ride.host.RideHost
 import app.overdrive.ride.host.SimulatedRideSessionFactory
+import app.overdrive.ride.overlay.AndroidOverlayController
+import app.overdrive.ride.overlay.AppVisibility
+import app.overdrive.ride.overlay.ContainerOverlayModel
+import app.overdrive.ride.overlay.OverlayController
+import app.overdrive.ride.overlay.OverlayModel
 import app.overdrive.ride.settings.AppSettings
 import app.overdrive.ride.settings.SettingsRepository
 import app.overdrive.ride.workouts.WorkoutLibrary
@@ -22,8 +28,8 @@ import kotlinx.coroutines.launch
 /**
  * What lives as long as the process (ADR 0005): the settings store, the workout library and the one [RideHost]. Built by
  * [OverdriveApp] on first use, so the activity can be destroyed and recreated (rotation, process kept alive behind a
- * video app) without touching the ride, and the overlay service of M1-B reads the same instances. No DI framework: this
- * is the whole object graph.
+ * video app) without touching the ride, and the overlay service reads the same instances through [overlayModel]. No DI
+ * framework: this is the whole object graph.
  */
 class AppContainer(
     context: Context,
@@ -57,6 +63,15 @@ class AppContainer(
         )
 
     val media: MediaController = AudioManagerMediaController(appContext)
+
+    /** Whether one of the activities is on screen: the overlay window shows only while the app is not. */
+    val visibility: AppVisibility = AppVisibility().also { (appContext as? Application)?.let(it::register) }
+
+    /** The activity's side of the overlay: permissions, the screens that grant them, starting the service. */
+    val overlay: OverlayController = AndroidOverlayController(appContext)
+
+    /** What the overlay service reads: this container's ride, settings and visibility (ADR 0006). */
+    val overlayModel: OverlayModel = ContainerOverlayModel(this)
 
     /** Changes the settings from the UI; validation happens in the repository. */
     fun updateSettings(change: (AppSettings) -> AppSettings) {

@@ -1,5 +1,6 @@
 package app.overdrive.ride.ui
 
+import android.Manifest
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,11 +28,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overdrive.core.ride.RideState
 import app.overdrive.ride.AppContainer
 import app.overdrive.ride.host.RideChoice
 import app.overdrive.ride.host.RideMapping
+import app.overdrive.ride.overlay.OverlayController
+import app.overdrive.ride.overlay.OverlayPolicy
 import app.overdrive.ride.settings.OverlayStartMode
 import app.overdrive.ride.settings.SimulatedClick
 import app.overdrive.ride.workouts.WorkoutFileError
@@ -72,6 +77,7 @@ private enum class Page {
 fun RideApp(
     container: AppContainer,
     modifier: Modifier = Modifier,
+    overlay: OverlayController = container.overlay,
 ) {
     val host = container.host
     val ui by host.ui.collectAsStateWithLifecycle()
@@ -86,8 +92,32 @@ fun RideApp(
     var openError by remember { mutableStateOf<WorkoutFileError?>(null) }
 
     val state = ui.snapshot.state
-    KeepScreenOn(state == RideState.RIDING || state == RideState.PAUSED)
+    val live = OverlayPolicy.isLive(state)
+    KeepScreenOn(live)
     BackHandler(enabled = screen != Screen.Ride) { screen = Screen.Ride }
+
+    // The overlay's permissions are granted on system screens that return no result: read them again on every resume.
+    var access by remember { mutableStateOf(overlay.access()) }
+    LifecycleResumeEffect(overlay) {
+        access = overlay.access()
+        onPauseOrDispose { }
+    }
+    // The service starts from this visible screen once a ride is live (so Android's background-start limits do not
+    // apply). It is idempotent and does nothing without the permission.
+    LifecycleStartEffect(live, overlay) {
+        if (live) overlay.ensureRunning()
+        onStopOrDispose { }
+    }
+    // Android 13 and later ask for notifications at runtime. The answer does not matter to the overlay, so the system
+    // screen for the overlay permission opens either way, right after the question.
+    val notifications =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { overlay.openOverlaySettings() }
+    val allowOverlay: () -> Unit = {
+        when (allowStep(access)) {
+            AllowStep.AskNotifications -> notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+            AllowStep.OpenOverlaySettings -> overlay.openOverlaySettings()
+        }
+    }
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -177,7 +207,9 @@ fun RideApp(
                                 onStart = host.actions::start,
                                 onOpenFile = { picker.launch(arrayOf("*/*")) },
                                 onDismissError = { openError = null },
+                                onAllowOverlay = allowOverlay,
                             ),
+                        overlayAccess = access,
                     )
                 }
 
@@ -223,7 +255,10 @@ fun RideApp(
                                 onBack = { screen = Screen.Ride },
                                 onChange = container::updateSettings,
                                 onResetOverlayPosition = container::resetOverlayPosition,
+                                onOpenOverlaySettings = overlay::openOverlaySettings,
+                                onOpenNotificationSettings = overlay::openNotificationSettings,
                             ),
+                        overlayAccess = access,
                     )
                 }
             }
@@ -245,8 +280,8 @@ fun RideApp(
 
 /**
  * The overlay drawn inside the app, top right under the top bar: tap it to switch compact and detailed, tap the overlay
- * button again to hide it. It is the same composable the overlay window of M1-B hosts, fed by the same ride; the
- * window, dragging and snapping come with that service.
+ * button again to hide it. It is the same composable the overlay window of `OverlayService` hosts, fed by the same
+ * ride, and it works without the "Display over other apps" permission. Dragging and snapping belong to the window.
  */
 @Composable
 private fun OverlayPreview(

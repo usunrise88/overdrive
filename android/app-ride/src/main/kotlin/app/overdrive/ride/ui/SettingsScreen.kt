@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.overdrive.ride.overlay.OverlayAccess
 import app.overdrive.ride.settings.AppSettings
 import app.overdrive.ride.settings.DemoSpeed
 import app.overdrive.ride.settings.OverlayStartMode
@@ -49,6 +50,10 @@ class SettingsActions(
     val onBack: () -> Unit,
     val onChange: ((AppSettings) -> AppSettings) -> Unit,
     val onResetOverlayPosition: () -> Unit,
+    /** Opens the system screen for "Display over other apps". */
+    val onOpenOverlaySettings: () -> Unit = {},
+    /** Opens the app's notification settings. */
+    val onOpenNotificationSettings: () -> Unit = {},
 )
 
 /**
@@ -61,6 +66,7 @@ fun SettingsScreen(
     settings: AppSettings,
     actions: SettingsActions,
     modifier: Modifier = Modifier,
+    overlayAccess: OverlayAccess = OverlayAccess.Granted,
 ) {
     Column(modifier.fillMaxSize().background(OverdriveColors.bg)) {
         BackTopBar("Settings", actions.onBack)
@@ -69,7 +75,7 @@ fun SettingsScreen(
             horizontalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                OverlayGroup(settings, actions)
+                OverlayGroup(settings, overlayAccess, actions)
                 DeveloperGroup(settings, actions)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -96,6 +102,7 @@ private fun Group(
 @Composable
 private fun OverlayGroup(
     settings: AppSettings,
+    access: OverlayAccess,
     actions: SettingsActions,
 ) {
     Group("Overlay") {
@@ -103,6 +110,31 @@ private fun OverlayGroup(
             settings.overlayOpacityPercent / PERCENT,
             Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 16.dp),
         )
+        SettingRow(
+            "Display over other apps",
+            description =
+                if (access.canDrawOverlays) {
+                    "Allowed. The overlay shows over other apps during a ride"
+                } else {
+                    "Needed for the overlay over other apps. The ride works without it"
+                },
+        ) {
+            OdButton(
+                if (access.canDrawOverlays) "Manage" else "Allow",
+                actions.onOpenOverlaySettings,
+                variant = if (access.canDrawOverlays) ButtonVariant.Ghost else ButtonVariant.Secondary,
+            )
+        }
+        SettingRow(
+            "Ride notification",
+            description = "Shown while a ride is on. The overlay works without it",
+        ) {
+            if (access.notificationsAllowed) {
+                OdText("On", style = OdType.label, color = OverdriveColors.textSecondary)
+            } else {
+                OdButton("Allow", actions.onOpenNotificationSettings)
+            }
+        }
         SettingRow("Mode", description = "Tap the overlay to switch") {
             SegmentedControl(
                 options = listOf("Compact", "Detailed"),
@@ -127,12 +159,15 @@ private fun OverlayGroup(
                 maxLines = 1,
             )
         }
-        SettingRow("Blur the video behind", description = "Easier to read over busy video. Uses more battery.") {
-            OdSwitch(settings.overlayBlur, { value ->
-                actions.onChange {
-                    it.copy(overlayBlur = value)
-                }
-            }, contentDescription = "Blur the video behind")
+        // Hidden where the system does not blur behind windows (design/system.md §5.5): the switch would do nothing.
+        if (access.blurAvailable) {
+            SettingRow("Blur the video behind", description = "Easier to read over busy video. Uses more battery.") {
+                OdSwitch(settings.overlayBlur, { value ->
+                    actions.onChange {
+                        it.copy(overlayBlur = value)
+                    }
+                }, contentDescription = "Blur the video behind")
+            }
         }
         SettingRow("Position", description = "Drag the overlay; it snaps to the nearest edge") {
             OdButton(
