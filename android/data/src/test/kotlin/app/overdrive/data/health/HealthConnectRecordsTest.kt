@@ -188,6 +188,32 @@ class HealthConnectRecordsTest {
     }
 
     @Test
+    fun `the exercise tokens follow the library's own constants`() {
+        val constants =
+            mapOf(
+                ExerciseSessionRecord.EXERCISE_TYPE_BIKING to "biking",
+                ExerciseSessionRecord.EXERCISE_TYPE_BIKING_STATIONARY to "biking_stationary",
+                ExerciseSessionRecord.EXERCISE_TYPE_RUNNING to "running",
+                ExerciseSessionRecord.EXERCISE_TYPE_WALKING to "walking",
+                ExerciseSessionRecord.EXERCISE_TYPE_HIKING to "hiking",
+                ExerciseSessionRecord.EXERCISE_TYPE_ROWING to "rowing",
+                ExerciseSessionRecord.EXERCISE_TYPE_YOGA to "yoga",
+                ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING to "strength_training",
+                ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_POOL to "swimming_pool",
+                ExerciseSessionRecord.EXERCISE_TYPE_HIGH_INTENSITY_INTERVAL_TRAINING to
+                    "high_intensity_interval_training",
+                ExerciseSessionRecord.EXERCISE_TYPE_OTHER_WORKOUT to "other_workout",
+            )
+        for ((type, token) in constants) assertEquals(token, exerciseToken(type))
+        assertEquals("other_workout", exerciseToken(-1))
+        assertTrue(
+            Regex(
+                "^[a-z][a-z0-9_]{0,39}$",
+            ).matches(exerciseToken(ExerciseSessionRecord.EXERCISE_TYPE_HIGH_INTENSITY_INTERVAL_TRAINING)),
+        )
+    }
+
+    @Test
     fun `every type has a record class, a read permission and a way back, and none is a write permission`() {
         val permissions = HealthDataType.entries.map { HealthPermissions.read(it) }
         assertEquals(HealthDataType.entries.size, permissions.toSet().size)

@@ -494,6 +494,51 @@ class HealthSyncTest {
         }
 
     @Test
+    fun `a run that begins while the state is being read waits for it and is not turned away`() =
+        runTest {
+            val rig = Rig()
+            rig.source.add(HealthSamples.resting("rhr-1", NOW - HOUR))
+            val gate = CompletableDeferred<Unit>()
+            val slow =
+                object : app.overdrive.core.remote.TextStore {
+                    override suspend fun read(): String? {
+                        gate.await()
+                        return null
+                    }
+
+                    override suspend fun write(text: String) = Unit
+                }
+            val sync = HealthSync(rig.source, rig.client, slow, rig.batches, { rig.now }, "Test phone")
+            val loading = async { sync.load() }
+            testScheduler.runCurrent()
+            val running = async { sync.run(RunReason.APP_OPENED) }
+            testScheduler.runCurrent()
+            gate.complete(Unit)
+            loading.await()
+            assertEquals(RunOutcome.DONE, running.await().outcome)
+            assertEquals(1, rig.service.ids().size)
+        }
+
+    @Test
+    fun `what is allowed is not overwritten by a run that began before the rider changed it`() =
+        runTest {
+            val rig = Rig()
+            rig.source.add(HealthSamples.resting("rhr-1", NOW - HOUR))
+            val gate = CompletableDeferred<Unit>()
+            rig.source.gate = gate
+            val sync = rig.sync()
+            val running = async { sync.run(RunReason.APP_OPENED) }
+            rig.source.entered.await()
+            // The rider takes a permission away in Health Connect while the read goes on, and the screen asks again.
+            rig.source.access =
+                HealthAccess(HealthDataType.entries.toSet() - HealthDataType.SLEEP, history = true, background = true)
+            sync.refreshAccess()
+            gate.complete(Unit)
+            running.await()
+            assertEquals(listOf(HealthDataType.SLEEP), sync.status().access.missingEssential)
+        }
+
+    @Test
     fun `nothing of a reading is in the saved state, the status or a failure`() =
         runTest {
             val rig = Rig()

@@ -25,7 +25,6 @@ import app.overdrive.uikit.OverdriveTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -139,6 +138,6 @@ class WatchFlowTest {
         rule.onNodeWithContentDescription("Increase maximum").performClick()
         waitForText("180 bpm")
         await("the service has it") { world.service.profile?.maxHeartRate == 180 }
-        assertNull(container.profile.state.value.pending)
+        await("the answer is taken in") { container.profile.state.value.pending == null }
     }
 }

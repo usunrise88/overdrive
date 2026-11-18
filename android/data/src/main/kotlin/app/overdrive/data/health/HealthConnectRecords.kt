@@ -170,15 +170,76 @@ fun Record.toHealthRecord(): HealthRecord? {
 private const val OTHER_WORKOUT = "other_workout"
 
 /**
- * The lower-case token of an exercise type. The library's own table calls type 0 `workout`; the service and its contract call it
- * `other_workout` (as Health Connect's constant does), so that one is named here. A type the table does not know is `other_workout`.
+ * The lower-case token of an exercise type, as the contract writes it (`biking`, `biking_stationary`, `other_workout`). The library
+ * keeps its own table private to itself, so this is Health Connect's `ExerciseSessionRecord.EXERCISE_TYPE_*` numbering (a platform
+ * constant) with the library's names, and type 0 is `other_workout`, as the contract and Health Connect's constant call it. A type
+ * the table does not know is `other_workout`.
  */
-internal fun exerciseToken(type: Int): String =
-    if (type == ExerciseSessionRecord.EXERCISE_TYPE_OTHER_WORKOUT) {
-        OTHER_WORKOUT
-    } else {
-        ExerciseSessionRecord.EXERCISE_TYPE_INT_TO_STRING_MAP[type] ?: OTHER_WORKOUT
-    }
+internal fun exerciseToken(type: Int): String = EXERCISE_TOKENS[type] ?: OTHER_WORKOUT
+
+private val EXERCISE_TOKENS: Map<Int, String> =
+    mapOf(
+        2 to "badminton",
+        4 to "baseball",
+        5 to "basketball",
+        8 to "biking",
+        9 to "biking_stationary",
+        10 to "boot_camp",
+        11 to "boxing",
+        13 to "calisthenics",
+        14 to "cricket",
+        16 to "dancing",
+        25 to "elliptical",
+        26 to "exercise_class",
+        27 to "fencing",
+        28 to "football_american",
+        29 to "football_australian",
+        31 to "frisbee_disc",
+        32 to "golf",
+        33 to "guided_breathing",
+        34 to "gymnastics",
+        35 to "handball",
+        36 to "high_intensity_interval_training",
+        37 to "hiking",
+        38 to "ice_hockey",
+        39 to "ice_skating",
+        44 to "martial_arts",
+        46 to "paddling",
+        47 to "para_gliding",
+        48 to "pilates",
+        50 to "racquetball",
+        51 to "rock_climbing",
+        52 to "roller_hockey",
+        53 to "rowing",
+        54 to "rowing_machine",
+        55 to "rugby",
+        56 to "running",
+        57 to "running_treadmill",
+        58 to "sailing",
+        59 to "scuba_diving",
+        60 to "skating",
+        61 to "skiing",
+        62 to "snowboarding",
+        63 to "snowshoeing",
+        64 to "soccer",
+        65 to "softball",
+        66 to "squash",
+        68 to "stair_climbing",
+        69 to "stair_climbing_machine",
+        70 to "strength_training",
+        71 to "stretching",
+        72 to "surfing",
+        73 to "swimming_open_water",
+        74 to "swimming_pool",
+        75 to "table_tennis",
+        76 to "tennis",
+        78 to "volleyball",
+        79 to "walking",
+        80 to "water_polo",
+        81 to "weightlifting",
+        82 to "wheelchair",
+        83 to "yoga",
+    )
 
 /** A Health Connect sleep stage by name (`SleepSessionRecord.STAGE_TYPE_*`). */
 internal fun stageOf(stage: Int): SleepStage =

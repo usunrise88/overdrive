@@ -334,7 +334,7 @@ class WatchContainerTest {
             service.profile?.maxHeartRate == 191 && service.profile?.thresholdHeartRate == 170
         }
         assertTrue("debounced: fewer requests than taps", service.requests("PATCH", "/v1/profile").size <= 2)
-        assertEquals(null, c.profile.state.value.pending)
+        await("the answer is taken in") { c.profile.state.value.pending == null }
     }
 
     // region secrecy

@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** How far the read of the last 60 days has come: [chunksDone] of [chunksTotal] windows, [records] read, [estimate] for all of them. */
@@ -98,25 +99,25 @@ public class HealthSync(
     private val pageGuard: Int = PAGE_GUARD,
 ) {
     private val lock = Mutex()
+    private val loading = Mutex()
     private val mutable = MutableStateFlow(HealthStatus())
 
     /** What the screens read. */
     public val status: StateFlow<HealthStatus> = mutable.asStateFlow()
 
-    // Touched only while holding [lock] (or before the first run, in load).
+    // Written by a run (holding [lock]) and by the first load (holding [loading]); read by the status.
+    @Volatile
     private var state = HealthSyncState()
+
+    @Volatile
     private var loaded = false
     private var queued = 0
 
     /** Reads what was kept on disk, so a screen shows what waits before the first run. */
     public suspend fun load() {
-        lock.lock()
-        try {
-            ensureLoaded()
-            publish()
-        } finally {
-            lock.unlock()
-        }
+        // Not under the run's lock: a run that begins while the files are being read must not be turned away as "already running".
+        ensureLoaded()
+        publish()
     }
 
     /** Asks Health Connect what is available and allowed now, for Settings and the first run's steps; reads nothing. */
@@ -158,6 +159,8 @@ public class HealthSync(
         val availability = source.availability()
         var access = HealthAccess(emptySet(), history = false, background = false)
         var outcome = RunOutcome.DONE
+        // What is allowed is published the moment it is known, not at the end: a refresh the rider triggers while the read goes on
+        // must not be overwritten by what this run saw when it began.
         if (availability != HealthAvailability.AVAILABLE) {
             outcome = RunOutcome.UNAVAILABLE
         } else {
@@ -167,6 +170,7 @@ public class HealthSync(
             } catch (e: HealthPermissionException) {
                 denied = true
             }
+            mutable.update { it.copy(checked = true, availability = availability, access = access) }
             when {
                 denied -> {
                     outcome = RunOutcome.PERMISSION_REVOKED
@@ -192,7 +196,9 @@ public class HealthSync(
         }
         if (outcome == RunOutcome.DONE) state = state.copy(readIssue = null)
         save()
-        mutable.update { it.copy(checked = true, availability = availability, access = access) }
+        if (availability != HealthAvailability.AVAILABLE) {
+            mutable.update { it.copy(checked = true, availability = availability, access = access) }
+        }
         val sent = flush(reason.ignoresBackoff)
         publish()
         return RunResult(outcome, queued, sent.records, mutable.value.waitingRecords, sent.failed)
@@ -596,8 +602,11 @@ public class HealthSync(
 
     private suspend fun ensureLoaded() {
         if (loaded) return
-        state = HealthSyncState.decode(runCatchingStore { stateStore?.read() })
-        loaded = true
+        loading.withLock {
+            if (loaded) return
+            state = HealthSyncState.decode(runCatchingStore { stateStore?.read() })
+            loaded = true
+        }
     }
 
     private suspend fun <T> runCatchingStore(block: suspend () -> T): T? =
