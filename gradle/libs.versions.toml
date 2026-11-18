@@ -5,6 +5,7 @@
 [versions]
 kotlin = "2.4.21"
 kotlinx-serialization = "1.13.0"
+kotlinx-coroutines = "1.11.0"
 spotless = "8.11.0"
 
 # Android. minSdk 31 (Android 12) gives the modern Bluetooth permission model; both target
@@ -20,6 +21,8 @@ junit = "4.13.2"
 
 [libraries]
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 
 # The shared core, substituted by the composite build in android/settings.gradle.kts.
 overdrive-core = { module = "app.overdrive:overdrive-core" }
