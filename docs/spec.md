@@ -653,7 +653,7 @@ Keeping `core` free of Android code costs almost nothing now and leaves an iOS p
 
 ## 8. Data model and interfaces
 
-Four contracts hold the system together: the workout file, the ride record, the sync API and the MCP tool set. Names and fields here are a first draft to be fixed during implementation.
+Four contracts hold the system together: the workout file, the ride record, the sync API and the MCP tool set. Names and fields were a first draft and are fixed during implementation: the workout file, the ride record, the Phase 2 sync API and the Phase 2 MCP tools are settled; the Phase 3 parts below stay a draft.
 
 *Status:* §8.1 (workout format) and §8.2 (ride record) are settled and live in `contracts/` with their
 fixtures, read and written by `core` and checked by the TypeScript side. §8.3 is settled for the Phase 2 endpoints, under the
