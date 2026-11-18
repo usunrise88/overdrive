@@ -15,6 +15,16 @@ jobs:
   typescript:
     name: TypeScript (contracts, server)
     runs-on: ubuntu-latest
+    # The server's tests run on PGlite; with TEST_DATABASE_URL they run on a real PostgreSQL as well.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 10
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6 # version comes from "packageManager" in package.json
@@ -27,6 +37,8 @@ jobs:
       - run: node design/tools/build-icons.mjs --check
       - run: node design/tools/check-contrast.mjs
       - run: pnpm check
+        env:
+          TEST_DATABASE_URL: postgres://postgres:ci@127.0.0.1:5432/postgres
       - run: pnpm build
 
   core:
@@ -64,15 +76,47 @@ jobs:
   server-image:
     name: Server image
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 10
     steps:
       - uses: actions/checkout@v7
       - run: docker build -f server/Dockerfile -t overdrive-server .
       - name: Smoke test the image
         run: |
-          docker run -d --name server -p 8080:8080 overdrive-server
+          TOKEN="$(openssl rand -base64 36)"
+          echo "::add-mask::$TOKEN"
+          docker run -d --name server --network host \
+            -e DATABASE_URL=postgres://postgres:ci@127.0.0.1:5432/postgres \
+            -e "DEVICE_TOKENS=ci:$TOKEN" \
+            overdrive-server
+          up=0
           for i in $(seq 1 20); do
-            curl -fsS http://127.0.0.1:8080/healthz && exit 0
+            if curl -fsS http://127.0.0.1:8080/healthz; then up=1; break; fi
             sleep 1
           done
-          docker logs server
-          exit 1
+          if [ "$up" != 1 ]; then docker logs server; exit 1; fi
+
+          # The ride intake end to end on the migrated database: a ride and its FIT go in once, a repeat is recognised.
+          expect() {
+            want="$1"; shift
+            got="$(curl -sS -o /tmp/body -w '%{http_code}' "$@")"
+            if [ "$got" != "$want" ]; then
+              echo "expected $want, got $got: $(cat /tmp/body)"; docker logs server; exit 1
+            fi
+          }
+          api=http://127.0.0.1:8080/v1/rides/fit-golden
+          auth="authorization: Bearer $TOKEN"
+          record=contracts/fixtures/rides/valid/fit-golden-3s.json
+          fit=contracts/fixtures/fit/fit-golden-3s.fit
+          expect 401 -X PUT "$api" -H 'content-type: application/json' --data-binary "@$record"
+          expect 201 -X PUT "$api" -H "$auth" -H 'content-type: application/json' --data-binary "@$record"
+          expect 200 -X PUT "$api" -H "$auth" -H 'content-type: application/json' --data-binary "@$record"
+          expect 201 -X PUT "$api/fit" -H "$auth" -H 'content-type: application/vnd.ant.fit' --data-binary "@$fit"
+          expect 200 -X PUT "$api/fit" -H "$auth" -H 'content-type: application/vnd.ant.fit' --data-binary "@$fit"

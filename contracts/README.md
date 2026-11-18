@@ -15,10 +15,25 @@ src/         @overdrive/contracts: the schema plus a validator for the TypeScrip
 |---|---|---|
 | Native workout (schema 1) | `schema/workout.schema.json` | §8.1 |
 | Ride record (schema 1) | `schema/ride-record.schema.json` | §8.2 |
+| Upload response (`{rideId, status}`) | `schema/sync-upload-response.schema.json` | §8.3, ADR 0014 |
+| API error (`{error: {code, message}}`) | `schema/api-error.schema.json` | §8.3, ADR 0014 |
 
-The sync API payloads and MCP tool inputs (spec §8.3–§8.4) get schemas here as they are fixed during
-implementation: **Phase 1 added none**. The sync outbox of the ride app (ADR 0012) is a local journal, not a wire format, and
-has no schema; what an upload sends is Phase 2's, and its schema and fixtures come here first.
+The remaining sync API payloads and the MCP tool inputs (spec §8.3–§8.4) get schemas here as they are fixed during
+implementation. The sync outbox of the ride app (ADR 0012) is a local journal, not a wire format, and has no schema.
+What an upload sends is two requests (ADR 0014): `PUT /v1/rides/{rideId}` with the ride record as the body (its schema is
+above) and `PUT /v1/rides/{rideId}/fit` with the FIT file's bytes (`application/vnd.ant.fit`, not JSON, so no schema; its
+fixtures are below). The service answers with the upload response, or on any failure with the API error, whose `code` is a
+closed list of stable names (each with its HTTP status in `API_ERROR_STATUS`).
+
+`fixtures/sync/` holds the golden files of those two answers, `upload-response/{valid,invalid}` and
+`api-error/{valid,invalid}`, run by `test/sync.test.ts` and, in Kotlin, by `SyncApiContractTest` (`SyncApiJson`, strict like
+the schemas). The ride id syntax the service accepts in a path (`RIDE_ID_PATTERN`) is stated in the response schema; the ride
+record's own schema only asks for a non-empty id.
+
+`fixtures/fit/` holds two FIT files for the upload's tests: `fit-golden-3s.fit`, the 376 bytes `FitWriter` writes for
+`rides/valid/fit-golden-3s.json` (the worked example of `docs/protocols/fit.md`; Kotlin's `FitFixturesTest` regenerates it
+and compares), and `minimal.fit`, the smallest file the service's framing check accepts (the 12-byte header, four bytes of
+records, the file CRC), which holds no real messages. Both are synthetic.
 
 `fixtures/rides/` holds the ride record's golden files: `valid/*.json` must be accepted and `invalid/*.json`
 rejected by every implementation, including the structural rules a schema cannot state (samples run 1, 2, 3, …; laps

@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "start_time_conflict",
+    "message": "A ride that started at 1794996000000 is already stored as ride-1794996000000"
+  }
+}

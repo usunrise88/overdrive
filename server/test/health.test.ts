@@ -1,23 +1,26 @@
-import { describe, expect, it } from "vitest";
-import { buildApp } from "../src/app.ts";
-import { loadConfig } from "../src/config.ts";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { Db } from "../src/db.ts";
+import { startApp } from "./helpers/app.ts";
+import { createPgliteDb } from "./helpers/db.ts";
 
-describe("GET /healthz", () => {
-  it("reports ok", async () => {
-    const app = buildApp({ LOG_LEVEL: "silent" });
-    const res = await app.inject({ method: "GET", url: "/healthz" });
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ status: "ok" });
-    await app.close();
-  });
+let db: Db;
+
+beforeAll(async () => {
+  db = await createPgliteDb();
 });
 
-describe("loadConfig", () => {
-  it("applies defaults", () => {
-    expect(loadConfig({})).toEqual({ HOST: "127.0.0.1", PORT: 8080, LOG_LEVEL: "info" });
-  });
+afterAll(async () => {
+  await db.close();
+});
 
-  it("rejects an invalid port", () => {
-    expect(() => loadConfig({ PORT: "70000" })).toThrow();
+describe("GET /healthz", () => {
+  it("reports ok without a token, and without any configured", async () => {
+    for (const devices of [undefined, []]) {
+      const { app } = startApp(db, devices === undefined ? {} : { devices });
+      const res = await app.inject({ method: "GET", url: "/healthz" });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ status: "ok" });
+      await app.close();
+    }
   });
 });
