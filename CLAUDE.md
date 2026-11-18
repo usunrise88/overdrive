@@ -53,6 +53,37 @@ Layout rationale: `docs/adr/0001-repository-layout-and-toolchain.md`.
   The key must never change: a different key forces uninstalling the app and loses its data.
 - Version code is the release workflow's run number; the version name is the tag.
 
+## Orchestration
+
+- **The main session orchestrates**: it plans stages (`docs/roadmap.md`), writes briefs, reviews and
+  merges results, cuts releases and answers the owner. It does not do bulk implementation itself.
+- **At most two subagents run at once**: one **Sonnet** for the main implementation work, one
+  **Haiku** for auxiliary work (mechanical, bounded, read-only or low-risk).
+- **Once at the start of each stage** the orchestrator may launch one **Opus** subagent to design
+  the interfaces of that stage, giving it the design skills (`artifact-design`, `dataviz`) and the
+  principles and references below. Its output (tokens, component specs, mock-ups) is what the Sonnet
+  agent then implements.
+- Subagents work in isolated git worktrees on their own branches. They commit there; they do not
+  push, tag or open PRs. The orchestrator merges into the development branch and pushes.
+- A brief is self-contained: goal, files to read first, constraints, what not to touch, and a
+  definition of done (which commands must pass).
+
+## Interface principles
+
+In priority order, when they conflict the earlier one wins:
+
+1. **Concision** — show only what the moment needs; no decoration that carries no information.
+2. **Clarity** — one glance tells what a number is and whether it is good; labels are plain words.
+3. **Convenience** — fewest taps, large targets, everything reachable from the Click as well as the
+   screen; the rider's hands are busy and eyes are on the video.
+4. **Aesthetics** — calm, precise, high-contrast dark UI with careful type and spacing.
+5. **Consistency** — one system of tokens and components across overlay, ride app and companion.
+
+Visual references: [raycast.com](https://www.raycast.com/), [gradium.ai](https://gradium.ai/) and
+[Vercel](https://vercel.com/) (restrained dark surfaces, crisp type, hairline borders, one accent,
+generous spacing). Spec §7.4 still applies: dark first, tabular figures, power-zone colours as the
+only accent, motion short and absent from the overlay at rest.
+
 ## Conventions
 
 - Kotlin: ktlint via Spotless (`./gradlew spotlessApply`), explicit API mode in `core`.
