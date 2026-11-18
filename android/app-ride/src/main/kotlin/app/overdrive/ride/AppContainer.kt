@@ -14,11 +14,15 @@ import app.overdrive.ble.log.BleSessionLogger
 import app.overdrive.core.ble.GattTransportFactory
 import app.overdrive.core.control.ActionRouter
 import app.overdrive.core.control.GestureTiming
+import app.overdrive.core.plan.PlanRefresh
+import app.overdrive.core.plan.PlanRepository
+import app.overdrive.core.sync.HttpGetTransport
 import app.overdrive.core.sync.HttpSyncProvider
 import app.overdrive.core.sync.HttpTransport
 import app.overdrive.core.sync.OutboxEntry
 import app.overdrive.core.sync.SyncConfig
 import app.overdrive.core.sync.SyncCoordinator
+import app.overdrive.data.plan.FilePlanCache
 import app.overdrive.data.rides.RideStore
 import app.overdrive.data.sync.FileOutbox
 import app.overdrive.data.sync.LastUploadFile
@@ -58,11 +62,13 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.IOException
+import java.time.LocalDate
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -78,6 +84,9 @@ import java.util.concurrent.atomic.AtomicLong
  * @param outboxFile the sync outbox's journal (ADR 0012); a test passes a temporary one.
  * @param lastUploadFile the one-line file that remembers when an upload last succeeded; beside the outbox by default.
  * @param syncTransport the network under the upload (`HttpURLConnection`); a test points it at a local server.
+ * @param planTransport the network under the planned workouts' `GET` (ADR 0017): the same `HttpURLConnection` class.
+ * @param planFile the planned workouts' cache (`filesDir/plan/workouts`); a test passes a temporary one.
+ * @param today the tablet's local date, `YYYY-MM-DD`, for the range asked of the service; a test fixes it.
  * @param syncSettleMillis how long the service address and token must stay as typed before the upload is tried again with
  * them, so that typing a token does not send one request per letter.
  * @param mediaFactory the media keys of the ride bar and of the Click; a test records them.
@@ -94,6 +103,9 @@ class AppContainer(
     outboxFile: File = File(context.applicationContext.filesDir, "sync/outbox.log"),
     lastUploadFile: File = File(outboxFile.absoluteFile.parentFile, "last-upload"),
     syncTransport: HttpTransport = UrlConnectionTransport(),
+    planTransport: HttpGetTransport = UrlConnectionTransport(),
+    planFile: File = File(context.applicationContext.filesDir, "plan/workouts"),
+    today: () -> String = { LocalDate.now().toString() },
     syncSettleMillis: Long = SYNC_SETTLE_MILLIS,
     mediaFactory: (Context) -> MediaController = { AudioManagerMediaController(it) },
     elapsedMillis: () -> Long = SystemClock::elapsedRealtime,
@@ -147,6 +159,21 @@ class AppContainer(
 
     val sync: SyncCoordinator =
         SyncCoordinator(scope, outbox, { syncProvider }, lastSuccessMillis = lastUploadAtStart).also { it.start() }
+
+    /**
+     * The planned workouts (spec §5.7, ADR 0017): fetched from the same service, with the same address and token, at start,
+     * when the Ready screen opens (at most once a minute) and when the rider asks; kept on disk so the list works offline.
+     * With no address or token nothing is asked and nothing is shown. The settings are read at every request.
+     */
+    val plan: PlanRepository =
+        PlanRepository(
+            config = { settings.value.let { SyncConfig(it.syncUrl, it.syncToken.value) } },
+            transport = planTransport,
+            cache = FilePlanCache(planFile),
+            today = today,
+            wallMillis = System::currentTimeMillis,
+            elapsedMillis = { System.nanoTime() / NANOS_PER_MILLI },
+        )
 
     /**
      * Wall-clock milliseconds for an entry's `enqueuedAtMillis`, **strictly increasing**: the coordinator queues each ride on
@@ -353,6 +380,30 @@ class AppContainer(
                     sync.kick(retryRefused = true)
                 }
         }
+        // The planned workouts: the cache first, so the list is there with no network, then a request once the settings have
+        // been read from disk (before that the address is empty and there is nothing to ask). After that, a changed address or
+        // token hides or shows the section at once and asks again once it has settled, like the upload above.
+        scope.launch {
+            plan.load()
+            val read = settingsRepository.settings.first()
+            settings.first { it == read }
+            val key = { s: AppSettings -> s.syncUrl to s.syncToken.value }
+            val atStart = key(read)
+            launch { plan.refresh(PlanRefresh.START) }
+            var first = true
+            settings
+                .map(key)
+                .distinctUntilChanged()
+                .collectLatest { changed ->
+                    if (first) {
+                        first = false
+                        if (changed == atStart) return@collectLatest
+                    }
+                    plan.settingsChanged()
+                    delay(syncSettleMillis)
+                    plan.refresh(PlanRefresh.SETTINGS_CHANGED)
+                }
+        }
         // The last success survives a restart; a disk that refuses the one-line file costs nothing but that.
         scope.launch(Dispatchers.IO) {
             var written = lastUploadAtStart
@@ -384,6 +435,16 @@ class AppContainer(
 
     /** What the overlay service reads: this container's ride, settings and visibility (ADR 0006). */
     val overlayModel: OverlayModel = ContainerOverlayModel(this)
+
+    /** The Ready screen came on screen: asks the service for the plan if it has not been asked in the last minute. */
+    fun planScreenOpened() {
+        scope.launch { plan.refresh(PlanRefresh.SCREEN_OPENED) }
+    }
+
+    /** The Planned section's refresh button: asks the service now, however recently it was asked. */
+    fun refreshPlan() {
+        scope.launch { plan.refresh(PlanRefresh.REQUESTED) }
+    }
 
     /** Changes the settings from the UI; validation happens in the repository. */
     fun updateSettings(change: (AppSettings) -> AppSettings) {
@@ -428,5 +489,6 @@ class AppContainer(
         const val SYNC_SETTLE_MILLIS = 1_500L
 
         private const val TAG = "OverdriveRides"
+        private const val NANOS_PER_MILLI = 1_000_000L
     }
 }

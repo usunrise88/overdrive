@@ -39,6 +39,15 @@ sealed interface SaveState {
     ) : SaveState
 }
 
+/**
+ * A stored ride that was made from a workout (`ride.workoutId`): which one, and when the ride started. What the Ready screen
+ * reads to mark a planned workout as done (spec §5.7, ADR 0017). Free rides are not listed.
+ */
+data class RiddenWorkout(
+    val workoutId: String,
+    val startEpochMillis: Long,
+)
+
 /** What the Ready screen shows about rides the app found on disk that were cut off (ADR 0008). */
 @Immutable
 sealed interface RecoveryState {
@@ -152,6 +161,16 @@ class RideLibrary(
     /** The interrupted ride the Ready screen asks about, if any. */
     val recovery: StateFlow<RecoveryState> = mutableRecovery.asStateFlow()
 
+    /** Touched on [scope]'s thread only: the stored rides that have a workout, by ride id. */
+    private val riddenByRide = HashMap<String, RiddenWorkout>()
+    private val mutableRidden = MutableStateFlow<List<RiddenWorkout>>(emptyList())
+
+    /**
+     * The stored rides that were made from a workout, from the scan at start and each ride as it is stored: which workout and
+     * when. The Ready screen marks a planned workout done when its id is here (ADR 0017). Empty until the scan has run.
+     */
+    val ridden: StateFlow<List<RiddenWorkout>> = mutableRidden.asStateFlow()
+
     /** The ride's FIT file, for share and save. May not exist; the caller checks. */
     fun fitFile(ride: StoredRide): File = store.fitFile(ride.id)
 
@@ -236,6 +255,10 @@ class RideLibrary(
 
     /** Tells [onSaved] about a stored ride; what it throws is reported and dropped. */
     private fun announce(ride: StoredRide) {
+        ride.workoutId?.let { workoutId ->
+            riddenByRide[ride.id] = RiddenWorkout(workoutId, ride.startEpochMillis)
+            mutableRidden.value = riddenByRide.values.toList()
+        }
         try {
             onSaved(ride)
         } catch (e: kotlinx.coroutines.CancellationException) {

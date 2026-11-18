@@ -1,6 +1,8 @@
 package app.overdrive.uikit
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,11 +13,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.overdrive.uikit.icons.OverdriveIcons
@@ -65,6 +72,160 @@ fun SelectableRow(
             )
         }
         if (selected) OdIcon(OverdriveIcons.Check)
+    }
+}
+
+/**
+ * A selection row with a value on the right (design/system.md §7.5): the title in body-strong over a one-line subtitle in
+ * the label style, and, when there is a [value], that value in the tabular numeral style over a [caption] in tertiary text,
+ * right-aligned ("65 min" over "IF 0.76"). The selected row is surface 2 with radius 8 and a check, like [SelectableRow].
+ *
+ * - [subtitleIcon] is a 16 dp icon before the subtitle: the check of "Done 18:04", the alert of a row that cannot be ridden.
+ * - A row that is not [enabled] has a tertiary title and an alert in primary text, takes no press and is skipped by keyboard
+ *   focus; its subtitle, still secondary text so that it can be read, says why.
+ * - **Focus** (a keyboard or any controller that moves focus): a 2 dp primary ring inside the row, as design/system.md §7.1
+ *   says for buttons. The key that activates a focused control (Enter, the d-pad centre) selects the row.
+ */
+@Composable
+fun ValueRow(
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    value: String? = null,
+    caption: String? = null,
+    selected: Boolean = false,
+    enabled: Boolean = true,
+    subtitleIcon: ImageVector? = null,
+) {
+    val source = rememberInteractionSource()
+    val pressed = source.pressed()
+    val focused by source.collectIsFocusedAsState()
+    val fill =
+        when {
+            pressed && enabled -> OverdriveColors.surface3
+            selected -> OverdriveColors.surface2
+            else -> Color.Transparent
+        }
+    val titleColour = if (enabled) OverdriveColors.textPrimary else OverdriveColors.textTertiary
+    Row(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = OverdriveDimens.sizeListRowTwoLine)
+            .background(fill, md)
+            .then(
+                if (focused) {
+                    Modifier.border(
+                        OverdriveDimens.strokeFocus,
+                        OverdriveColors.textPrimary,
+                        md,
+                    )
+                } else {
+                    Modifier
+                },
+            ).semantics { this.selected = selected }
+            .plainClickable(source, enabled = enabled, role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            OdText(
+                title,
+                style = OdType.bodyStrong,
+                color = titleColour,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (subtitleIcon != null) {
+                    OdIcon(
+                        subtitleIcon,
+                        size = InlineIconSize,
+                        tint = if (enabled) OverdriveColors.textSecondary else OverdriveColors.textPrimary,
+                    )
+                }
+                OdText(
+                    subtitle,
+                    style = OdType.label,
+                    color = OverdriveColors.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (value != null) {
+            Column(horizontalAlignment = Alignment.End) {
+                OdText(
+                    value,
+                    style = OdType.numXS,
+                    color = titleColour,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+                if (caption != null) {
+                    OdText(
+                        caption,
+                        style = OdType.captionNum,
+                        color = OverdriveColors.textTertiary,
+                        textAlign = TextAlign.End,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
+            }
+        }
+        if (selected) OdIcon(OverdriveIcons.Check)
+    }
+}
+
+/**
+ * A row that opens and closes the list under it (design/system.md §7.5): a single-line, 56 dp row with the [title] in
+ * body-strong and, at the right, a [detail] in the label style ("3 workouts") and a chevron that points down when
+ * [expanded] and right when not. Its state is also said to accessibility ("Expanded", "Collapsed"). The same press, focus
+ * ring and key behaviour as [ValueRow].
+ */
+@Composable
+fun DisclosureRow(
+    title: String,
+    detail: String?,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val source = rememberInteractionSource()
+    val pressed = source.pressed()
+    val focused by source.collectIsFocusedAsState()
+    Row(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = OverdriveDimens.sizeListRow)
+            .background(if (pressed) OverdriveColors.surface3 else Color.Transparent, md)
+            .then(
+                if (focused) {
+                    Modifier.border(
+                        OverdriveDimens.strokeFocus,
+                        OverdriveColors.textPrimary,
+                        md,
+                    )
+                } else {
+                    Modifier
+                },
+            ).semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
+            .plainClickable(source, role = Role.Button, onClick = onToggle)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OdText(title, Modifier.weight(1f), style = OdType.bodyStrong, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (detail != null) {
+            OdText(detail, style = OdType.label, color = OverdriveColors.textSecondary, maxLines = 1, softWrap = false)
+        }
+        OdIcon(
+            if (expanded) OverdriveIcons.ChevronDown else OverdriveIcons.ChevronRight,
+            tint = OverdriveColors.textSecondary,
+        )
     }
 }
 

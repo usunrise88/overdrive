@@ -19,7 +19,14 @@ object RideFixtures {
     fun header(
         id: String,
         start: Long,
-    ) = RideHeader(id = id, startEpochMillis = start, ftp = 250, devices = listOf("Test trainer"))
+        workoutId: String? = null,
+    ) = RideHeader(
+        id = id,
+        startEpochMillis = start,
+        workoutId = workoutId,
+        ftp = 250,
+        devices = listOf("Test trainer"),
+    )
 
     fun sample(second: Int) =
         RideSample(
@@ -35,9 +42,10 @@ object RideFixtures {
         id: String,
         start: Long,
         seconds: Int,
+        workoutId: String? = null,
     ): RideRecord =
         RideRecordBuilder.recover(
-            header(id, start),
+            header(id, start, workoutId),
             (1..seconds).map(::sample),
             endEpochMillis = start + seconds * 1000L,
         )
@@ -50,9 +58,10 @@ object RideFixtures {
         seconds: Int,
         finished: Boolean,
         title: String = "Sweet spot 3×10",
+        workoutId: String? = null,
     ) {
         val writer = RideLogWriter(store, title)
-        writer.onRideStarted(header(id, start))
+        writer.onRideStarted(header(id, start, workoutId))
         for (second in 1..seconds) writer.onSample(sample(second))
         if (finished) writer.onRideFinished(start + seconds * 1000L)
     }

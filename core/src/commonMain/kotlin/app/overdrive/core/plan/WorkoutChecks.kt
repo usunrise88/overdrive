@@ -67,13 +67,15 @@ public fun Workout.playability(): Playability {
  */
 public fun Workout.intensityFactor(): Double? {
     if (playability() !is Playability.Runnable) return null
-    val targets = ArrayList<Double>()
-    for (step in flatSteps()) {
-        if (step.targetFrom == null) continue
-        for (second in 0 until step.durationSeconds) targets += checkNotNull(step.targetFractionAt(second))
+    val flat = flatSteps().filter { it.targetFrom != null }
+    val targets = DoubleArray(flat.sumOf { it.durationSeconds })
+    var at = 0
+    for (step in flat) {
+        for (second in 0 until step.durationSeconds) targets[at++] = checkNotNull(step.targetFractionAt(second))
     }
     if (targets.size < NP_WINDOW_SECONDS) return null
-    var windowSum = targets.take(NP_WINDOW_SECONDS).sum()
+    var windowSum = 0.0
+    for (i in 0 until NP_WINDOW_SECONDS) windowSum += targets[i]
     var fourthPowerSum = 0.0
     var windows = 0
     for (end in NP_WINDOW_SECONDS..targets.size) {
