@@ -1,18 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- The overlay (spec §4.6, ADR 0006). Nothing here touches the network: the ride app works fully offline.
+    <!-- The overlay (spec §4.6, ADR 0006) and Bluetooth (spec §4.1, ADR 0010). Nothing here touches the network: the
+         ride app works fully offline, and there is no location permission.
          SYSTEM_ALERT_WINDOW: the "Display over other apps" special access, granted by the rider in system settings.
-         FOREGROUND_SERVICE and FOREGROUND_SERVICE_SPECIAL_USE: the service that owns the window and keeps the ride
-         alive behind other apps. M3 adds connectedDevice and BLUETOOTH_CONNECT when real Bluetooth arrives.
+         FOREGROUND_SERVICE, FOREGROUND_SERVICE_SPECIAL_USE and FOREGROUND_SERVICE_CONNECTED_DEVICE: the service that
+         owns the window and keeps the ride and its trainer and strap links alive behind other apps. On Android 14 and
+         later the connectedDevice type is only used while BLUETOOTH_CONNECT is granted (OverlayService).
+         BLUETOOTH_SCAN with neverForLocation: finding the trainer and the strap on the Devices screen; the app derives
+         no location from scan results, so no location permission is asked. BLUETOOTH_CONNECT: connecting to them.
          POST_NOTIFICATIONS: the service's "Ride in progress" notification is shown on Android 13 and later only if
          the rider allows it; the overlay works either way.
-         Rides (ADR 0008) are private app data and need no permission: they are shared through the FileProvider below
-         and saved through the system file picker. The app has no network permission, and allowBackup stays false. -->
+         Rides (ADR 0008) and Bluetooth logs (ADR 0010) are private app data and need no permission: they are shared
+         through the FileProvider below and saved through the system file picker. The app has no network permission, and
+         allowBackup stays false. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- Bluetooth LE is needed to ride, but the store listing and the installer do not need to hide the app from a
+         tablet that lacks it: the Devices screen says so and the simulated devices stay (ADR 0010). -->
+    <uses-feature
+        android:name="android.hardware.bluetooth_le"
+        android:required="false" />
 
     <application
         android:name=".OverdriveApp"
@@ -29,8 +45,9 @@
             </intent-filter>
         </activity>
 
-        <!-- Hands one FIT file at a time to the app the rider chose in the share sheet, read-only, through a URI the
-             sheet is granted. Not exported: nothing else can ask it for a file. Only filesDir/rides/ is served. -->
+        <!-- Hands one FIT file (or the Bluetooth log files) to the app the rider chose in the share sheet, read-only,
+             through a URI the sheet is granted. Not exported: nothing else can ask it for a file. Only
+             filesDir/rides/ and filesDir/ble-logs/ are served. -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"
@@ -44,10 +61,10 @@
         <service
             android:name=".overlay.OverlayService"
             android:exported="false"
-            android:foregroundServiceType="specialUse">
+            android:foregroundServiceType="connectedDevice|specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Keeps the ride session alive and draws its numbers in a small window over other apps while the rider watches video" />
+                android:value="Draws the ride's numbers in a small window over other apps while the rider watches video, and keeps the ride and its Bluetooth trainer and heart-rate links alive" />
         </service>
     </application>
 </manifest>

@@ -15,6 +15,18 @@ enum class DemoSpeed(
     Faster(60, "60×"),
 }
 
+/**
+ * Where a ride's trainer and strap come from (developer setting, ADR 0010). **Bluetooth is the default and a ride never
+ * falls back to the simulation by itself**: with no trainer paired the Ready screen says so, because a recorded ride of
+ * made-up numbers would be worse than no ride.
+ */
+enum class DeviceSource(
+    val label: String,
+) {
+    Bluetooth("Bluetooth"),
+    Simulated("Simulated"),
+}
+
 /** What the simulated Zwift Click reports on the Devices screen until M4 brings the real one (developer setting). */
 enum class SimulatedClick(
     val label: String,
@@ -52,6 +64,13 @@ data class AppSettings(
     val demoSpeed: DemoSpeed = DemoSpeed.Normal,
     val scriptedDropouts: Boolean = false,
     val simulatedClick: SimulatedClick = SimulatedClick.Connected,
+    /** Whether the ride uses the real devices or the simulated ones (developer setting). */
+    val deviceSource: DeviceSource = DeviceSource.Bluetooth,
+    /**
+     * Whether every Bluetooth connection is written to a text file on the tablet, for fixing the codecs without a bench
+     * machine (developer setting, **on** in the early builds; ADR 0010). The files hold the rider's heart rate.
+     */
+    val recordBleSessions: Boolean = true,
 ) {
     /** The neutral gear, the one that rides the flat: the middle, with the spare gear on the hard side. */
     val neutralGear: Int get() = (gearCount + 1) / 2
@@ -71,7 +90,8 @@ data class AppSettings(
         )
 
     /** Only the values a ride is built from; the rest can change without touching a ride that is ready. */
-    fun rideInputs(): List<Any> = listOf(ftp, gearCount, gradePerGear, massKg, cdA, crr, demoSpeed, scriptedDropouts)
+    fun rideInputs(): List<Any> =
+        listOf(ftp, gearCount, gradePerGear, massKg, cdA, crr, demoSpeed, scriptedDropouts, deviceSource)
 }
 
 /** A number setting: its range, step and how it is kept on the grid. */

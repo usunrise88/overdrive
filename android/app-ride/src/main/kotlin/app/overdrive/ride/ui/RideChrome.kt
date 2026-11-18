@@ -104,7 +104,7 @@ private fun DeviceStatus.iconState(): DeviceIconState =
     when (this) {
         DeviceStatus.Connected -> DeviceIconState.Ok
         DeviceStatus.NotPaired, DeviceStatus.Searching -> DeviceIconState.NotPaired
-        DeviceStatus.Lost, DeviceStatus.Locked -> DeviceIconState.Attention
+        DeviceStatus.Lost, DeviceStatus.Locked, DeviceStatus.Blocked -> DeviceIconState.Attention
     }
 
 /** A section label above a card or a column (label style, tertiary). */

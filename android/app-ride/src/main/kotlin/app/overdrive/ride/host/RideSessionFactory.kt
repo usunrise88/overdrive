@@ -16,7 +16,9 @@ import app.overdrive.core.ride.SimulatedSignal
 import app.overdrive.core.ride.SimulationScenario
 import app.overdrive.core.workout.Workout
 import app.overdrive.ride.settings.AppSettings
+import app.overdrive.ride.settings.DeviceSource
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.seconds
 
@@ -42,20 +44,55 @@ interface DeviceControls {
     fun retryHeartRate()
 }
 
-/** One ride's session with the devices behind it, as the host and the Devices screen see them. */
+/**
+ * One ride's session with the devices behind it, as the host and the Devices screen see them.
+ *
+ * @property devices the rows of the Devices screen when the device layer has richer ones than the three-state links of
+ * [trainer] and [heartRate] can give (the Bluetooth factory: link states, names, Bluetooth off); null for the simulation.
+ */
 class RideSessionHandle(
     val session: RideSession,
     val trainer: TrainerDevice,
     val heartRate: HeartRateDevice?,
     val controls: DeviceControls,
+    val devices: Flow<DevicesUi>? = null,
 )
 
 /**
- * Builds the ride session (ADR 0005). M1 uses [SimulatedRideSessionFactory], a `RideEngine` over `SimulatedBike`;
- * M3 adds one that wires the engine to the BLE adapters of the `ble` module, and nothing above this interface changes.
+ * Builds the ride session (ADR 0005). [SimulatedRideSessionFactory] is a `RideEngine` over `SimulatedBike`;
+ * [BleRideSessionFactory] wires the same engine to the long-lived Bluetooth devices (ADR 0010), and nothing above this
+ * interface changes. [DeviceSourceFactory] picks one by the developer setting.
  */
 fun interface RideSessionFactory {
     fun create(request: RideRequest): RideSessionHandle
+}
+
+/** The gears of a ride from the settings: count, neutral gear and grade per gear. */
+fun AppSettings.toGearSettings(): GearSettings =
+    GearSettings(gearCount = gearCount, neutralGear = neutralGear, gradePercentPerGear = gradePerGear)
+
+/** What the engine rides with, from the settings: FTP, the physics of speed and distance, and the gears. */
+fun AppSettings.toRideSettings(): RideSettings =
+    RideSettings(
+        ftp = ftp,
+        physics = PhysicsSettings(systemMassKg = massKg, cdA = cdA, crr = crr),
+        gears = toGearSettings(),
+    )
+
+/**
+ * Chooses the device layer of a ride by the developer setting "Devices" (ADR 0010): the real Bluetooth devices, which is
+ * the default, or the simulation. **There is no fallback between them**: a ride over Bluetooth that finds no trainer waits
+ * for one, it never quietly becomes a simulated ride.
+ */
+class DeviceSourceFactory(
+    private val bluetooth: RideSessionFactory,
+    private val simulated: RideSessionFactory,
+) : RideSessionFactory {
+    override fun create(request: RideRequest): RideSessionHandle =
+        when (request.settings.deviceSource) {
+            DeviceSource.Bluetooth -> bluetooth.create(request)
+            DeviceSource.Simulated -> simulated.create(request)
+        }
 }
 
 /**
@@ -70,18 +107,8 @@ class SimulatedRideSessionFactory : RideSessionFactory {
     override fun create(request: RideRequest): RideSessionHandle {
         val settings = request.settings
         val tick = 1.seconds / settings.demoSpeed.factor
-        val gears =
-            GearSettings(
-                gearCount = settings.gearCount,
-                neutralGear = settings.neutralGear,
-                gradePercentPerGear = settings.gradePerGear,
-            )
-        val rideSettings =
-            RideSettings(
-                ftp = settings.ftp,
-                physics = PhysicsSettings(systemMassKg = settings.massKg, cdA = settings.cdA, crr = settings.crr),
-                gears = gears,
-            )
+        val gears = settings.toGearSettings()
+        val rideSettings = settings.toRideSettings()
         val bike =
             SimulatedBike(
                 scope = request.scope,

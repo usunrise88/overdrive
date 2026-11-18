@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import app.overdrive.ride.overlay.OverlayAccess
 import app.overdrive.ride.settings.AppSettings
 import app.overdrive.ride.settings.DemoSpeed
+import app.overdrive.ride.settings.DeviceSource
 import app.overdrive.ride.settings.OverlayStartMode
 import app.overdrive.ride.settings.SettingsRules
 import app.overdrive.ride.settings.SimulatedClick
@@ -40,6 +41,7 @@ import app.overdrive.uikit.SegmentedControl
 import app.overdrive.uikit.SettingRow
 import app.overdrive.uikit.Stepper
 import app.overdrive.uikit.UiFormat
+import app.overdrive.uikit.icons.OverdriveIcons
 import app.overdrive.uikit.overlay.OverlayCompact
 import app.overdrive.uikit.overlay.OverlaySettings
 import app.overdrive.uikit.preview.PreviewSamples
@@ -58,7 +60,7 @@ class SettingsActions(
 
 /**
  * Settings (design/system.md §6.6): the overlay with a live preview, the rider and gears, the physics for speed and
- * distance, and a developer group for the simulated ride. The rules (ranges, steps) are [SettingsRules]; the
+ * distance, and a developer group (where the devices come from, the Bluetooth logs, the simulated ride). The rules (ranges, steps) are [SettingsRules]; the
  * steppers cannot leave them, and the repository sanitizes whatever arrives anyway.
  */
 @Composable
@@ -67,6 +69,7 @@ fun SettingsScreen(
     actions: SettingsActions,
     modifier: Modifier = Modifier,
     overlayAccess: OverlayAccess = OverlayAccess.Granted,
+    bleLogs: BleLogFiles = BleLogFiles.None,
 ) {
     Column(modifier.fillMaxSize().background(OverdriveColors.bg)) {
         BackTopBar("Settings", actions.onBack)
@@ -76,7 +79,7 @@ fun SettingsScreen(
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(24.dp)) {
                 OverlayGroup(settings, overlayAccess, actions)
-                DeveloperGroup(settings, actions)
+                DeveloperGroup(settings, actions, bleLogs)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(24.dp)) {
                 RiderGroup(settings, actions)
@@ -304,9 +307,40 @@ private fun PhysicsGroup(
 private fun DeveloperGroup(
     settings: AppSettings,
     actions: SettingsActions,
+    bleLogs: BleLogFiles,
 ) {
-    Group("Developer · simulated ride") {
-        SettingRow("Demo speed", description = "Runs the next ride faster than real time", first = true) {
+    Group("Developer") {
+        SettingRow(
+            "Devices",
+            description = "Bluetooth connects your trainer and strap. Simulated rides without them.",
+            first = true,
+        ) {
+            SegmentedControl(
+                options = DeviceSource.entries.map { it.label },
+                selectedIndex = settings.deviceSource.ordinal,
+                onSelect = { index -> actions.onChange { it.copy(deviceSource = DeviceSource.entries[index]) } },
+            )
+        }
+        SettingRow(
+            "Record Bluetooth sessions",
+            description = "Writes each connection to a file on the tablet, to fix the app without a bench",
+        ) {
+            OdSwitch(
+                settings.recordBleSessions,
+                { value -> actions.onChange { it.copy(recordBleSessions = value) } },
+                contentDescription = "Record Bluetooth sessions",
+            )
+        }
+        SettingRow("Share Bluetooth logs", description = bleLogs.message ?: bleLogs.summary.describe()) {
+            OdButton(
+                "Share",
+                bleLogs.actions::share,
+                enabled = bleLogs.summary.files > 0,
+                leadingIcon = OverdriveIcons.Share2,
+                height = 40.dp,
+            )
+        }
+        SettingRow("Demo speed", description = "Runs the next simulated ride faster than real time") {
             SegmentedControl(
                 options = DemoSpeed.entries.map { it.label },
                 selectedIndex = settings.demoSpeed.ordinal,

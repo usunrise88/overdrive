@@ -1,9 +1,11 @@
 package app.overdrive.ride.overlay
 
+import android.Manifest
+import android.app.Notification
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ServiceInfo
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.hardware.display.DisplayManager
 import android.os.Build
@@ -59,12 +61,7 @@ class OverlayService :
     override fun onCreate() {
         super.onCreate()
         OverlayNotification.ensureChannel(this)
-        val notification = OverlayNotification.build(this, finished = false)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(OverlayNotification.ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        } else {
-            startForeground(OverlayNotification.ID, notification)
-        }
+        enterForeground(OverlayNotification.build(this, finished = false))
         val provider = application as? OverlayModelProvider
         if (provider == null) {
             stopSelf()
@@ -95,6 +92,35 @@ class OverlayService :
             )
         watchRide()
         watchBlur(manager, density)
+    }
+
+    /**
+     * Goes to the foreground with the types [ForegroundServiceTypes] chooses: `specialUse` always, `connectedDevice` while
+     * "Nearby devices" is allowed. If the system refuses the pair all the same (the permission was revoked between the
+     * check and the call), it starts again with `specialUse` alone, so the overlay never depends on Bluetooth.
+     */
+    private fun enterForeground(notification: Notification) {
+        val sdk = Build.VERSION.SDK_INT
+        val granted = checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+        val types = ForegroundServiceTypes.choose(sdk, granted)
+        try {
+            startForegroundOf(notification, types)
+        } catch (error: SecurityException) {
+            val fallback = ForegroundServiceTypes.fallback(sdk, types) ?: throw error
+            Log.w(TAG, "Foreground service type refused (${error.javaClass.simpleName}); starting with specialUse only")
+            startForegroundOf(notification, fallback)
+        }
+    }
+
+    private fun startForegroundOf(
+        notification: Notification,
+        types: Int,
+    ) {
+        if (types == ForegroundServiceTypes.NONE) {
+            startForeground(OverlayNotification.ID, notification)
+        } else {
+            startForeground(OverlayNotification.ID, notification, types)
+        }
     }
 
     // The ride lives in this process, so there is nothing to restart into if the system kills it.

@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overdrive.core.ride.RideState
 import app.overdrive.ride.AppContainer
+import app.overdrive.ride.devices.DeviceRole
 import app.overdrive.ride.host.RideChoice
 import app.overdrive.ride.host.RideMapping
 import app.overdrive.ride.overlay.OverlayController
@@ -87,6 +88,9 @@ fun RideApp(
     val recovery by container.rides.recovery.collectAsStateWithLifecycle()
     val lastRide by container.rides.lastSaved.collectAsStateWithLifecycle()
     val rideFiles = rememberRideFiles(container.rides)
+    val pairing by container.pairing.state.collectAsStateWithLifecycle()
+    // One plain notice with one action for Bluetooth that cannot be used, re-read on every resume (ADR 0010).
+    val bluetooth = rememberBluetoothFix(devices.radio.takeIf { !devices.simulated }, container.bluetooth)
 
     var screen by rememberSaveable { mutableStateOf(Screen.Ride) }
     var overlayShown by rememberSaveable { mutableStateOf(false) }
@@ -202,12 +206,14 @@ fun RideApp(
                                 onAllowOverlay = allowOverlay,
                                 onRecoverySave = { container.rides.saveRecovered(it.id) },
                                 onRecoveryDiscard = { container.rides.discardRecovered(it.id) },
+                                onOpenDevices = { screen = Screen.Devices },
                             ),
                         overlayAccess = access,
                         recovery = recovery,
                         lastRide = lastRide,
                         files = rideFiles.actions,
                         fileMessage = rideFiles.message?.takeIf { it.rideId == lastRide?.id }?.text,
+                        bluetooth = bluetooth,
                     )
                 }
 
@@ -229,6 +235,8 @@ fun RideApp(
                 }
 
                 Page.Devices -> {
+                    // A scan runs only while this screen is on: leaving it ends the scan.
+                    DisposableEffect(container) { onDispose { container.pairing.stop() } }
                     DevicesScreen(
                         devices = devices,
                         actions =
@@ -250,11 +258,19 @@ fun RideApp(
                                         )
                                     }
                                 },
+                                onScan = container.pairing::scan,
+                                onStopScan = container.pairing::stop,
+                                onPick = container.pairing::pair,
+                                onForgetTrainer = { container.pairing.forget(DeviceRole.Trainer) },
+                                onForgetHeartRate = { container.pairing.forget(DeviceRole.Strap) },
                             ),
+                        pairing = pairing,
+                        bluetooth = bluetooth,
                     )
                 }
 
                 Page.Settings -> {
+                    val bleLogs = rememberBleLogFiles(container.bleLogs)
                     SettingsScreen(
                         settings = settings,
                         actions =
@@ -266,6 +282,7 @@ fun RideApp(
                                 onOpenNotificationSettings = overlay::openNotificationSettings,
                             ),
                         overlayAccess = access,
+                        bleLogs = bleLogs,
                     )
                 }
             }

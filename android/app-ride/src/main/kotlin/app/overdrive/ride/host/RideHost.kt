@@ -64,8 +64,21 @@ class RideHost(
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1),
     private val debounceMillis: Long = SETTINGS_DEBOUNCE_MS,
     private val persistence: RidePersistence = RidePersistence.None,
+    /**
+     * Anything besides the settings that a session is built from, such as which devices are paired (ADR 0010): the latest
+     * value is remembered with each prepared session, and a session that is ready or idle is rebuilt, after the same
+     * debounce as a setting, when it differs. A ride that has started is never replaced.
+     */
+    private val rideTriggers: Flow<Any> = flowOf(Unit),
 ) : AutoCloseable {
+    /** What a session was built from: the ride-affecting settings and the latest trigger. */
+    private data class Inputs(
+        val settings: List<Any>,
+        val trigger: Any?,
+    )
+
     private class Run(
+        val inputs: Inputs,
         val number: Int,
         val choice: RideChoice,
         val settings: AppSettings,
@@ -119,7 +132,12 @@ class RideHost(
     /** The action dispatcher behind every ride button; the Click's gesture layer (M4) uses the same one. */
     val actions: RideActions = RideActions({ active?.handle?.session }, { mutableSnapshots.value })
 
+    /** The latest of [rideTriggers]; null until the first one arrives. */
+    private val trigger = MutableStateFlow<Any?>(null)
+
     init {
+        // The trigger is collected first, so on the host's single thread it is known before the first session is built.
+        scope.launch { rideTriggers.collect { trigger.value = it } }
         scope.launch {
             currentSettings.value = settings.first()
             prepare(mutableChoice.value)
@@ -128,18 +146,21 @@ class RideHost(
         scope.launch { observeRideInputs() }
     }
 
+    /**
+     * Rebuilds the session when what it is built from has changed (a ride-affecting setting, a paired device) and the
+     * ride has not started. The comparison is with what the session was **built from**, not with the previous value, so a
+     * change that arrived while the first session was being built is never missed and one that was undone costs nothing.
+     */
     @OptIn(FlowPreview::class)
     private suspend fun observeRideInputs() {
-        settings
-            .map { it.rideInputs() }
-            .distinctUntilChanged()
-            .drop(1)
-            .debounce(debounceMillis)
-            .collect {
+        combine(settings.map { it.rideInputs() }.distinctUntilChanged(), trigger) { rideInputs, trigger ->
+            Inputs(rideInputs, trigger)
+        }.debounce(debounceMillis)
+            .collect { wanted ->
                 val run = active
-                if (run == null || run.handleState() == RideState.IDLE || run.handleState() == RideState.READY) {
-                    prepare(mutableChoice.value)
-                }
+                val rebuildable =
+                    run == null || run.handleState() == RideState.IDLE || run.handleState() == RideState.READY
+                if (rebuildable && run?.inputs != wanted) prepare(mutableChoice.value)
             }
     }
 
@@ -205,6 +226,7 @@ class RideHost(
         val steps = workout?.flatSteps().orEmpty()
         val run =
             Run(
+                inputs = Inputs(settings.rideInputs(), trigger.value),
                 number = number,
                 choice = choice,
                 settings = settings,
@@ -220,13 +242,32 @@ class RideHost(
         active = run
         runScope.launch { handle.session.snapshots.collect { publish(run, it) } }
         runScope.launch { disk.failed.collect { republish(run) } }
+        // The rows come from the device layer when it has its own (Bluetooth: link states, names, radio), else they are
+        // derived from the simulated devices' three-state links.
+        val rows: Flow<DevicesUi> =
+            handle.devices
+                ?: combine(
+                    handle.trainer.connection,
+                    handle.heartRate?.connection ?: flowOf(null),
+                    currentSettings.map { it.simulatedClick }.distinctUntilChanged(),
+                ) { trainer, strap, click ->
+                    DeviceRows
+                        .of(
+                            handle.trainer.name,
+                            trainer,
+                            handle.heartRate?.name,
+                            strap,
+                            click,
+                        ).copy(simulated = true)
+                }
+        // A ride that is live never changes its devices: pairing and forgetting are not offered meanwhile.
+        val rideIsLive = handle.session.snapshots.map { it.state == RideState.RIDING || it.state == RideState.PAUSED }
         runScope.launch {
-            combine(
-                handle.trainer.connection,
-                handle.heartRate?.connection ?: flowOf(null),
-                currentSettings.map { it.simulatedClick }.distinctUntilChanged(),
-            ) { trainer, strap, click ->
-                DeviceRows.of(handle.trainer.name, trainer, handle.heartRate?.name, strap, click)
+            combine(rows, rideIsLive.distinctUntilChanged()) { ui, rideLive ->
+                ui.copy(
+                    canChange =
+                        ui.canChange && !rideLive,
+                )
             }.collect { mutableDevices.value = it }
         }
     }
@@ -388,11 +429,14 @@ object DeviceRows {
                         DeviceRowUi(DeviceStatus.Lost, "Connection lost · retrying")
                     }
                 },
-            click =
-                when (click) {
-                    SimulatedClick.Connected -> DeviceRowUi(DeviceStatus.Connected, "Simulated Click")
-                    SimulatedClick.Locked -> DeviceRowUi(DeviceStatus.Locked, "Simulated Click · connected")
-                    SimulatedClick.NotPaired -> DeviceRowUi(DeviceStatus.NotPaired, "Not paired")
-                },
+            click = clickRow(click),
         )
+
+    /** The Click row: simulated until M4 brings the real one (developer setting), in Bluetooth mode as well. */
+    fun clickRow(click: SimulatedClick): DeviceRowUi =
+        when (click) {
+            SimulatedClick.Connected -> DeviceRowUi(DeviceStatus.Connected, "Simulated Click")
+            SimulatedClick.Locked -> DeviceRowUi(DeviceStatus.Locked, "Simulated Click · connected")
+            SimulatedClick.NotPaired -> DeviceRowUi(DeviceStatus.NotPaired, "Not paired")
+        }
 }

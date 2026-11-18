@@ -117,14 +117,40 @@ data class RideUi(
 data class DeviceRowUi(
     val status: DeviceStatus,
     val subtitle: String,
+    /** The row has a paired device that **Forget** can remove. */
+    val canForget: Boolean = false,
 )
 
-/** The three device rows of the Devices screen and top bar: trainer, heart-rate strap, Click. */
+/** Why Bluetooth cannot be used right now, as the rider can fix it (design/system.md §6.5). */
+enum class RadioIssue {
+    /** The adapter is off: "Turn on" opens the system's Bluetooth settings. */
+    BluetoothOff,
+
+    /** The Nearby-devices permission is missing: "Allow" asks for it. */
+    PermissionNeeded,
+
+    /** The tablet has no Bluetooth LE: nothing to fix, the simulated devices stay. */
+    Unsupported,
+}
+
+/**
+ * The three device rows of the Devices screen and top bar: trainer, heart-rate strap, Click; and what is true of all of
+ * them.
+ *
+ * @property radio why Bluetooth cannot be used, or null. Shown as one notice with one action on the Ready and Devices
+ * screens (the pattern of the overlay's permission notice).
+ * @property simulated the rows are the simulated devices of the developer setting, not Bluetooth.
+ * @property canChange pairing and forgetting are offered; false while a ride is live, because a ride never changes its
+ * devices.
+ */
 @Immutable
 data class DevicesUi(
     val trainer: DeviceRowUi,
     val heartRate: DeviceRowUi,
     val click: DeviceRowUi,
+    val radio: RadioIssue? = null,
+    val simulated: Boolean = false,
+    val canChange: Boolean = true,
 ) {
     companion object {
         val Unknown =

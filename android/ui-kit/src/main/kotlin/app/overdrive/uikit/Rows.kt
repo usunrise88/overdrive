@@ -84,12 +84,19 @@ enum class DeviceStatus {
 
     /** Linked, but the Click sends no presses: "No presses" and a notice below the row. */
     Locked,
+
+    /**
+     * Paired, but nothing can be tried until something outside the device is fixed (Bluetooth is off, the permission is
+     * missing): an alert in the subtitle and no button, because the notice above the list holds the one action.
+     */
+    Blocked,
 }
 
 /**
  * A device row (design/system.md §7.7): a 40 dp icon well, the role as title and the model and detail as the
- * subtitle. The trailing part follows [status]. A [Lost] row puts an alert icon before the subtitle in primary
- * text; [NotPaired] dims the icon. [notice] is shown below the row (the Click unlock notice).
+ * subtitle. The trailing part follows [status]. A [Lost] or [Blocked] row puts an alert icon before the subtitle in
+ * primary text; [NotPaired] dims the icon. [notice] is shown below the row (the Click unlock notice). [onForget], for a
+ * row that has a device, adds a ghost **Forget** button at the far right.
  */
 @Composable
 fun DeviceRow(
@@ -102,6 +109,7 @@ fun DeviceRow(
     onRetry: () -> Unit = {},
     divider: Boolean = false,
     notice: (@Composable () -> Unit)? = null,
+    onForget: (() -> Unit)? = null,
 ) {
     Column(modifier.fillMaxWidth()) {
         if (divider) HorizontalRule()
@@ -129,7 +137,7 @@ fun DeviceRow(
             }
             Column(Modifier.weight(1f)) {
                 OdText(title, style = OdType.bodyStrong, maxLines = 1)
-                if (status == DeviceStatus.Lost) {
+                if (status == DeviceStatus.Lost || status == DeviceStatus.Blocked) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -167,7 +175,12 @@ fun DeviceRow(
                 DeviceStatus.Locked -> {
                     OdText("No presses", style = OdType.label)
                 }
+
+                DeviceStatus.Blocked -> {
+                    Unit
+                }
             }
+            if (onForget != null) OdButton("Forget", onForget, variant = ButtonVariant.Ghost, height = 40.dp)
         }
         if (notice != null) Box(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 16.dp)) { notice() }
     }

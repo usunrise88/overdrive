@@ -23,6 +23,7 @@ import app.overdrive.ride.rides.RideLibrary
 import app.overdrive.ride.rides.SaveState
 import app.overdrive.ride.settings.AppSettings
 import app.overdrive.ride.settings.DemoSpeed
+import app.overdrive.ride.settings.DeviceSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -149,7 +150,12 @@ class AppContainerRecoveryTest {
         assertFalse(names().any { it.endsWith(".ridelog") })
 
         // ---- And the new container rides and stores a whole ride itself. ----
-        runBlocking { container.settingsRepository.update { it.copy(demoSpeed = DemoSpeed.Faster) } }
+        // The ride's devices are Bluetooth by default (ADR 0010) and there is no radio here: this ride is the simulated one.
+        runBlocking {
+            container.settingsRepository.update {
+                it.copy(demoSpeed = DemoSpeed.Faster, deviceSource = DeviceSource.Simulated)
+            }
+        }
         val first = container.host.ui.value.rideNumber
         container.host.select(RideChoice.Free)
         await("a new ride is prepared at the new speed") {

@@ -123,7 +123,7 @@ class RideFilesTest {
     }
 
     @Test
-    fun theProviderServesTheRidesFolderAndNothingElse() {
+    fun theProviderServesTheRidesAndTheBluetoothLogFoldersAndNothingElse() {
         val xml = context.resources.getXml(R.xml.file_paths)
         val paths = mutableListOf<Triple<String, String?, String?>>()
         while (xml.next() != XmlPullParser.END_DOCUMENT) {
@@ -131,7 +131,14 @@ class RideFilesTest {
                 paths += Triple(xml.name, xml.getAttributeValue(null, "name"), xml.getAttributeValue(null, "path"))
             }
         }
-        assertEquals(listOf(Triple("paths", null, null), Triple("files-path", "rides", "rides/")), paths)
+        assertEquals(
+            listOf(
+                Triple("paths", null, null),
+                Triple("files-path", "rides", "rides/"),
+                Triple("files-path", "ble_logs", "ble-logs/"),
+            ),
+            paths,
+        )
     }
 
     @Test
@@ -140,6 +147,11 @@ class RideFilesTest {
         val requested = info.requestedPermissions.orEmpty().toList()
         assertFalse(requested.contains(Manifest.permission.INTERNET))
         assertFalse(requested.contains(Manifest.permission.ACCESS_NETWORK_STATE))
+        // Bluetooth needs the Nearby-devices permissions only: a location permission would be a worse question to ask.
+        assertFalse(requested.contains(Manifest.permission.ACCESS_FINE_LOCATION))
+        assertFalse(requested.contains(Manifest.permission.ACCESS_COARSE_LOCATION))
+        assertTrue(requested.contains(Manifest.permission.BLUETOOTH_SCAN))
+        assertTrue(requested.contains(Manifest.permission.BLUETOOTH_CONNECT))
         assertEquals(0, context.applicationInfo.flags and ApplicationInfo.FLAG_ALLOW_BACKUP)
     }
 }

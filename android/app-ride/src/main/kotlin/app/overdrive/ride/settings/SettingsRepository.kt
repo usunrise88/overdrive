@@ -58,6 +58,8 @@ class SettingsRepository(
         val demoSpeed = stringPreferencesKey("dev_demo_speed")
         val scriptedDropouts = booleanPreferencesKey("dev_scripted_dropouts")
         val simulatedClick = stringPreferencesKey("dev_simulated_click")
+        val deviceSource = stringPreferencesKey("dev_device_source")
+        val recordBleSessions = booleanPreferencesKey("dev_record_ble_sessions")
     }
 
     private fun Preferences.toSettings(): AppSettings {
@@ -77,6 +79,8 @@ class SettingsRepository(
             demoSpeed = enumOr(this[Keys.demoSpeed], defaults.demoSpeed),
             scriptedDropouts = this[Keys.scriptedDropouts] ?: defaults.scriptedDropouts,
             simulatedClick = enumOr(this[Keys.simulatedClick], defaults.simulatedClick),
+            deviceSource = enumOr(this[Keys.deviceSource], defaults.deviceSource),
+            recordBleSessions = this[Keys.recordBleSessions] ?: defaults.recordBleSessions,
         ).sanitized()
     }
 
@@ -95,6 +99,8 @@ class SettingsRepository(
         this[Keys.demoSpeed] = settings.demoSpeed.name
         this[Keys.scriptedDropouts] = settings.scriptedDropouts
         this[Keys.simulatedClick] = settings.simulatedClick.name
+        this[Keys.deviceSource] = settings.deviceSource.name
+        this[Keys.recordBleSessions] = settings.recordBleSessions
     }
 
     private inline fun <reified E : Enum<E>> enumOr(

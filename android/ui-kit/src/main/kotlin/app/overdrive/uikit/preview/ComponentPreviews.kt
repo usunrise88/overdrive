@@ -93,6 +93,14 @@ fun DeviceRowStates(modifier: Modifier = Modifier) {
             divider = true,
         )
         DeviceRow(
+            OverdriveIcons.Bike,
+            "Trainer",
+            "D500 · Bluetooth is off",
+            DeviceStatus.Blocked,
+            divider = true,
+            onForget = {},
+        )
+        DeviceRow(
             OverdriveIcons.Gamepad2,
             "Click",
             "Zwift Click v2 · connected",

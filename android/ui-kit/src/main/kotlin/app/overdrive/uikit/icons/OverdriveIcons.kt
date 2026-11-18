@@ -30,6 +30,22 @@ object OverdriveIcons {
       )
     }
 
+    val BluetoothOff: ImageVector by lazy {
+      lucide(
+        "bluetooth-off",
+        "m17 17-5 5V12l-5 5",
+        "m2 2 20 20",
+        "M14.5 9.5 17 7l-5-5v4.5",
+      )
+    }
+
+    val Bluetooth: ImageVector by lazy {
+      lucide(
+        "bluetooth",
+        "m7 7 10 10-5 5V2l5 5L7 17",
+      )
+    }
+
     val Check: ImageVector by lazy {
       lucide(
         "check",
@@ -284,6 +300,8 @@ object OverdriveIcons {
         listOf(
             "activity" to Activity,
             "bike" to Bike,
+            "bluetooth-off" to BluetoothOff,
+            "bluetooth" to Bluetooth,
             "check" to Check,
             "chevron-down" to ChevronDown,
             "chevron-left" to ChevronLeft,

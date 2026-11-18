@@ -37,6 +37,7 @@ import app.overdrive.ride.workouts.WorkoutDescription
 import app.overdrive.ride.workouts.WorkoutFileError
 import app.overdrive.uikit.ButtonVariant
 import app.overdrive.uikit.ConfirmSheet
+import app.overdrive.uikit.DeviceStatus
 import app.overdrive.uikit.HorizontalRule
 import app.overdrive.uikit.Notice
 import app.overdrive.uikit.OdButton
@@ -64,13 +65,18 @@ class ReadyActions(
     val onRecoverySave: (StoredRide) -> Unit = {},
     /** The recovery notice's **Discard** for that ride, called once the rider has confirmed. */
     val onRecoveryDiscard: (StoredRide) -> Unit = {},
+    /** The "no trainer" line's **Pair a trainer**: opens the Devices screen (ADR 0010). */
+    val onOpenDevices: () -> Unit = {},
 )
 
 /**
  * The Ready screen (design/system.md §6.1): a selectable list of Free ride and the loaded workouts on the left, and on
  * the right the chosen workout's title, stats, profile and step table with the **Start** button.
  *
- * @param startEnabled false until the trainer is connected (the engine is `IDLE`); the button then says why.
+ * @param startEnabled false until the trainer is connected (the engine is `IDLE`); the button then says why: no trainer is
+ * paired (with a way to the Devices screen), Bluetooth cannot be used (with the one action that fixes it), or the trainer is
+ * still connecting. A ride never starts over a simulated trainer by itself.
+ * @param bluetooth the action of the Bluetooth notice shown while [DevicesUi.radio] is set.
  * @param overlayAccess what the overlay may do; while "Display over other apps" is missing a row at the top asks for it.
  * @param recovery an interrupted ride found on disk (ADR 0008): a notice at the top asks to save or discard it.
  * @param lastRide the ride saved last, with **Share** and **Save to folder** so its FIT file is reachable after the summary.
@@ -93,13 +99,20 @@ fun ReadyScreen(
     files: RideFileActions = RideFileActions.None,
     fileMessage: String? = null,
     forceDiscardConfirm: Boolean = false,
+    bluetooth: BluetoothFix = BluetoothFix.None,
 ) {
     var confirmDiscard by rememberSaveable { mutableStateOf(false) }
     Box(modifier.fillMaxSize().background(OverdriveColors.bg)) {
         Column(Modifier.fillMaxSize()) {
             RideTopBar(
                 "Overdrive",
-                TopBarChip.Calm(if (startEnabled) "Ready" else "Waiting for trainer"),
+                TopBarChip.Calm(
+                    when {
+                        startEnabled -> "Ready"
+                        !devices.simulated && devices.trainer.status == DeviceStatus.NotPaired -> "No trainer"
+                        else -> "Waiting for trainer"
+                    },
+                ),
                 devices,
                 topBar,
             )
@@ -114,6 +127,8 @@ fun ReadyScreen(
                     overlayAccess,
                     actions,
                     Modifier.weight(1f).fillMaxHeight(),
+                    devices = devices,
+                    bluetooth = bluetooth,
                     recovery = recovery,
                     onAskDiscard = { confirmDiscard = true },
                     lastRide = lastRide,
@@ -184,6 +199,8 @@ private fun Detail(
     overlayAccess: OverlayAccess,
     actions: ReadyActions,
     modifier: Modifier,
+    devices: DevicesUi,
+    bluetooth: BluetoothFix,
     recovery: RecoveryState,
     onAskDiscard: () -> Unit,
     lastRide: StoredRide?,
@@ -192,6 +209,8 @@ private fun Detail(
 ) {
     Column(modifier.padding(horizontal = 40.dp, vertical = 32.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         RecoveryNotice(recovery, onSave = { recovery.ride?.let(actions.onRecoverySave) }, onDiscard = onAskDiscard)
+        val radio = devices.radio
+        if (radio != null && !devices.simulated) BluetoothNotice(radio, bluetooth)
         if (!overlayAccess.canDrawOverlays) OverlayPermissionNotice(actions.onAllowOverlay)
         if (openError != null) {
             Notice(
@@ -217,16 +236,31 @@ private fun Detail(
                 minWidth = 240.dp,
                 enabled = startEnabled,
             )
-            if (!startEnabled) {
-                OdText(
-                    "Waiting for the trainer to connect.",
-                    style = OdType.body,
-                    color = OverdriveColors.textSecondary,
-                )
-            }
+            if (!startEnabled) StartHint(devices, actions.onOpenDevices)
         }
     }
 }
+
+/** Why **Start** is off, in one sentence, and the one thing to do about it when there is something to do. */
+@Composable
+private fun StartHint(
+    devices: DevicesUi,
+    onOpenDevices: () -> Unit,
+) {
+    OdText(startHint(devices), style = OdType.body, color = OverdriveColors.textSecondary)
+    if (!devices.simulated && devices.trainer.status == DeviceStatus.NotPaired) {
+        OdButton("Pair a trainer", onOpenDevices, leadingIcon = OverdriveIcons.Bluetooth)
+    }
+}
+
+/** The sentence beside a disabled **Start**. Never mentions a simulated trainer: nothing simulated starts by itself. */
+internal fun startHint(devices: DevicesUi): String =
+    when {
+        devices.simulated -> "Waiting for the trainer to connect."
+        devices.trainer.status == DeviceStatus.NotPaired -> "No trainer is paired."
+        devices.radio != null -> "Waiting for Bluetooth."
+        else -> "Waiting for the trainer to connect."
+    }
 
 @Composable
 private fun StatItem(
