@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "ride": {"id":"not-started","startEpochMillis":1794996000000,"ftp":200,"devices":[]},
+  "samples": [],
+  "rrIntervals": [],
+  "laps": [],
+  "summary": {"durationSeconds":0,"movingSeconds":0,"distanceMeters":0.0,"workKilojoules":0.0}
+}
