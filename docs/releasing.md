@@ -181,3 +181,30 @@ outbox).
 - Do not create a new keystore, change the alias, or change any key secret to make a build pass.
   If a secret is wrong, the owner fixes the secret; the key itself stays.
 - Compare every release's signer digest with the fingerprint in section 5.
+
+## 11. Tags the agent could not push
+
+The cloud sandbox where the orchestrating agent works may refuse to push tags: the egress policy answers
+`HTTP 403` on `git push origin <tag>` while pushes to the development branch work. That is a policy denial, not
+a fault, so the agent does not retry it and does not change `release.yml` to publish from branch pushes
+(that would let any push to the branch publish signed APKs). When it happens, the release is prepared (green CI on
+the commit, notes in `docs/releases/<tag>.md`, a local annotated tag) and the owner pushes the tag from a machine
+that may. Pushing the tag is all it takes: `release.yml` builds, signs, verifies and publishes.
+
+Do **not** create the release in the GitHub web UI: the workflow creates it with `gh release create`, which fails
+when a release for the tag already exists.
+
+Pending tags (commit, and the CI run that proved it green):
+
+| Tag | Commit | CI run | Status |
+|---|---|---|---|
+| `v0.1.0-alpha.1` | `3cfa3ca0d42db8498fb0bb7f0f03995764bb7a1f` | 44229751415 (success) | not pushed: 403 from the sandbox, 2026-11-18 |
+
+```bash
+git fetch origin claude/sleepy-gates-zqbtwq
+git tag -a v0.1.0-alpha.1 -m "Overdrive 0.1.0-alpha.1" 3cfa3ca0d42db8498fb0bb7f0f03995764bb7a1f
+git push origin v0.1.0-alpha.1
+```
+
+Tags can be placed on older commits, so later stages' tags are added to the table as they are prepared and the
+owner can push them in order. Remove a row when its tag is on GitHub.
