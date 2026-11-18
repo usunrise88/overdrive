@@ -6,9 +6,11 @@ import kotlin.time.Duration.Companion.seconds
 /** How strictly the reply to the `RideOn` handshake is checked (docs/protocols/click-v2.md §3.1, §3.2, bench questions 2 to 4). */
 public enum class HandshakeReplyCheck {
     /**
-     * The reply must be `RideOn` followed by `02 03`, as the notes say a Click v2 answers; anything after that (the public
-     * key) is ignored. A different version, a bare `RideOn` or other bytes fail the set-up with the bytes in the event, which
-     * is how an encrypted variant (`01 03`, Zwift Play's) would show itself instead of as garbage frames.
+     * The reply must be the bare six bytes `RideOn` (the plain, unencrypted path: what the right puck of the first bench
+     * answered, docs/bench-reports/2026-11-18-first-ride.md, with nothing after it) or `RideOn` followed by `02 03` (what the
+     * notes expected; anything after that, the public key, is ignored). Any other version (`01 03`, Zwift Play's encrypted
+     * variant), a reply of seven bytes (half a version) or other bytes fail the set-up with the bytes in the event, which is
+     * how an encrypted variant would show itself instead of as garbage frames.
      */
     EXPECTED_VERSION,
 
@@ -23,7 +25,9 @@ public enum class HandshakeReplyCheck {
  * Every choice about the Zwift Click that only the owner's bench can settle, in one place, each with the section of
  * `docs/protocols/click-v2.md` that justifies the default and the bench question of its §9 that settles it. The defaults are
  * the notes' recommendation; a bench result is applied by changing a default here, never by touching the adapter
- * (docs/adr/0011-click-gestures-and-sync-stub.md has the full table, the same way ADR 0009 has `FtmsOptions`'s).
+ * (docs/adr/0011-click-gestures-and-sync-stub.md has the full table, the same way ADR 0009 has `FtmsOptions`'s). The first bench
+ * (docs/bench-reports/2026-11-18-first-ride.md, ADR 0013) changed two of them: [handshakeReply] accepts a bare `RideOn`, and
+ * [silentMeansLocked] is off.
  *
  * The notes support the **plain path on the right puck** only (§7); nothing here encrypts, and nothing here unlocks a
  * controller. What a locked controller looks like is reported, not worked around.
@@ -49,7 +53,10 @@ public class ClickOptions(
      * handshake (§3.1). **CK 2.**
      */
     public val writeWithResponse: Boolean = false,
-    /** How the handshake reply is checked (§3.1: the notes expect `RideOn 02 03` and ignore a key after it). **CK 2, CK 3.** */
+    /**
+     * How the handshake reply is checked. The default accepts the bare `RideOn` that the first bench's right puck answered
+     * and the notes' `RideOn 02 03` (a key after it is ignored), and refuses any other version. **CK 2, CK 3, CK 4.**
+     */
     public val handshakeReply: HandshakeReplyCheck = HandshakeReplyCheck.EXPECTED_VERSION,
     /** How long to wait for the reply after writing `RideOn` (unmeasured); then the set-up fails and backs off. **CK 2.** */
     public val handshakeTimeout: Duration = 5.seconds,
@@ -80,12 +87,17 @@ public class ClickOptions(
     public val serviceHiddenMeansLocked: Boolean = true,
     /**
      * A controller that answered the handshake and then sent no frame at all (no button state, heartbeat, battery or any
-     * other type) within [noEventTimeout] counts as locked. The link stays up and a late frame clears it. **CK 2, CK 14.**
+     * other type) within [noEventTimeout] counts as locked. The link stays up and a late frame clears it. **Off by default:**
+     * the first bench found that a healthy, unlocked right puck sends **nothing until a button is pressed** (sessions of 15,
+     * 67 and 33 seconds had no frame before the first press), so this rule showed a false lock notice on an idle Click
+     * (docs/bench-reports/2026-11-18-first-ride.md §1). With it off an answered handshake is [ClickState.Active] at once. On
+     * it is an opt-in (Settings, Developer · Click, "Silence means locked") for a controller that is truly locked and
+     * silent, which has not been seen. **CK 2, CK 14.**
      */
-    public val silentMeansLocked: Boolean = true,
+    public val silentMeansLocked: Boolean = false,
     /**
-     * How long after the handshake with no frame at all before [silentMeansLocked] applies. The notes do not say how often a
-     * controller sends its heartbeat, so this is generous. **CK 7.**
+     * How long after the handshake with no frame at all before [silentMeansLocked] applies (only then). A healthy Click can
+     * be silent for minutes, so this is generous. **CK 7.**
      */
     public val noEventTimeout: Duration = 30.seconds,
     /** Bits of the bitmap that always read as released, for a bit that turns out to be stuck at 0 (§4). **CK 5.** */

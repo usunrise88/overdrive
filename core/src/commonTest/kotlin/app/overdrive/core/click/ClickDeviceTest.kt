@@ -5,13 +5,16 @@ import app.overdrive.core.ble.BleRig
 import app.overdrive.core.ble.ClickUuids
 import app.overdrive.core.ble.GattStatus
 import app.overdrive.core.ble.codec.DecodeErrorKind
+import app.overdrive.core.ble.codec.hex
 import app.overdrive.core.ble.fake.ClickEncoder
 import app.overdrive.core.ble.fake.ClickScript
 import app.overdrive.core.ble.fake.FakeClick
 import app.overdrive.core.ble.fake.FakeClickLock
 import app.overdrive.core.ble.fake.FakeClickOptions
+import app.overdrive.core.ble.fake.ReplayPeripheral
 import app.overdrive.core.ble.link.LinkFailureKind
 import app.overdrive.core.ble.link.LinkStatus
+import app.overdrive.core.ble.recording.BleSessionFormat
 import app.overdrive.core.device.ConnectionState
 import app.overdrive.core.device.collectAll
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,7 +43,7 @@ class ClickDeviceTest {
     // region set-up
 
     @Test
-    fun `set-up order is the notes' 3-1, from discovery to the optional steps`() =
+    fun `set-up order is the notes' 3-1, from discovery to the optional steps, as the real puck answers it`() =
         runTest {
             val rig = BleRig(this)
             val fake = rig.withClick()
@@ -66,11 +69,10 @@ class ClickDeviceTest {
                     "C $async 0100",
                     "C $tx 0200",
                     "W $rx 526964654F6E",
-                    "I $tx 526964654F6E0203",
+                    "I $tx 526964654F6E", // bare RideOn: the plain path, no version, no key
                     "W $rx FF0400",
                     "R 2A26 *",
-                    "R 2A19 57",
-                    "N $async 191057",
+                    "R 2A19 64", // the battery by read: 100 %, and no frame follows it
                 ),
                 recorded.compact(),
             )
@@ -84,7 +86,7 @@ class ClickDeviceTest {
     fun `the handshake is written without response, then FF 04 00, and the reply tail is ignored`() =
         runTest {
             val rig = BleRig(this)
-            val fake = rig.withClick(FakeClickOptions(replyTailLength = 64))
+            val fake = rig.withClick(FakeClickOptions.byNotes(replyTailLength = 64))
             val click = rig.click()
             val events = collectAll(click.events)
             click.startAndSettle(rig)
@@ -100,10 +102,10 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `the firmware and the battery are read once, and the battery frame updates it`() =
+    fun `the firmware and the battery are read once, and a battery frame updates it`() =
         runTest {
             val rig = BleRig(this)
-            rig.withClick()
+            rig.withClick(FakeClickOptions.byNotes(batteryPercent = 87))
             val click = rig.click()
             assertNull(click.battery.value)
             assertNull(click.firmware.value)
@@ -152,16 +154,18 @@ class ClickDeviceTest {
     @Test
     fun `a controller that needs FF 04 00 is silent without it and delivers with it (bench question 6)`() =
         runTest {
-            val needing = FakeClickOptions(needsPostHandshake = true)
+            // The silence rule is what tells the two apart, so it is on here; the fake sends frames once it delivers.
+            val needing = FakeClickOptions.byNotes(needsPostHandshake = true)
             val rig = BleRig(this)
             rig.withClick(needing)
-            val without = rig.click(ClickOptions(sendPostHandshake = false)).startAndSettle(rig)
+            val without =
+                rig.click(ClickOptions(sendPostHandshake = false, silentMeansLocked = true)).startAndSettle(rig)
             rig.advance(31_000)
             assertEquals(ClickState.NeedsUnlock(UnlockSignal.NO_EVENTS), without.state.value)
 
             val rig2 = BleRig(this)
             rig2.withClick(needing)
-            val with = rig2.click(ClickOptions(sendPostHandshake = true)).startAndSettle(rig2)
+            val with = rig2.click(ClickOptions(sendPostHandshake = true, silentMeansLocked = true)).startAndSettle(rig2)
             assertEquals(ClickState.Active, with.state.value)
         }
 
@@ -201,23 +205,26 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `a bare RideOn passes only the lenient check`() =
+    fun `a bare RideOn passes the default check, RideOn 02 03 too, and any other version does not`() =
         runTest {
-            val bare = FakeClickOptions(replyVersion = null)
-            val rig = BleRig(this)
-            rig.withClick(bare)
-            assertIs<ClickState.SetupFailed>(rig.click().startAndSettle(rig).state.value)
+            fun state(options: FakeClickOptions): ClickState {
+                val rig = BleRig(this)
+                rig.withClick(options)
+                return rig.click().startAndSettle(rig).state.value
+            }
+            assertEquals(ClickState.Active, state(FakeClickOptions(replyVersion = null)), "the real puck's reply")
+            assertEquals(ClickState.Active, state(FakeClickOptions(replyVersion = 0x0203)), "the notes' reply")
+            assertEquals(ClickState.Active, state(FakeClickOptions(replyVersion = 0x0203, replyTailLength = 64)))
+            assertIs<ClickState.SetupFailed>(state(FakeClickOptions(replyVersion = 0x0103)), "the encrypted variant")
+            assertIs<ClickState.SetupFailed>(state(FakeClickOptions(replyVersion = 0x0001)))
 
-            val rig2 = BleRig(this)
-            rig2.withClick(bare)
-            assertEquals(
-                ClickState.Active,
-                rig2
-                    .click(
-                        ClickOptions(handshakeReply = HandshakeReplyCheck.ANY_RIDE_ON),
-                    ).startAndSettle(rig2)
-                    .state.value,
-            )
+            // The lenient check still takes any version.
+            for (version in listOf(0x0103, 0x0001)) {
+                val rig = BleRig(this)
+                rig.withClick(FakeClickOptions(replyVersion = version))
+                val lenient = rig.click(ClickOptions(handshakeReply = HandshakeReplyCheck.ANY_RIDE_ON))
+                assertEquals(ClickState.Active, lenient.startAndSettle(rig).state.value)
+            }
         }
 
     @Test
@@ -235,9 +242,17 @@ class ClickDeviceTest {
 
             val rig2 = BleRig(this)
             rig2.withClick(mute)
-            val noWait = rig2.click(ClickOptions(handshakeReply = HandshakeReplyCheck.NONE)).startAndSettle(rig2)
+            val noWait =
+                rig2
+                    .click(ClickOptions(handshakeReply = HandshakeReplyCheck.NONE, silentMeansLocked = true))
+                    .startAndSettle(rig2)
             assertEquals(ConnectionState.CONNECTED, noWait.connection.value)
-            assertEquals(ClickState.Waiting, noWait.state.value, "connected, no frame yet")
+            assertEquals(ClickState.Waiting, noWait.state.value, "connected, no frame yet, and the silence rule is on")
+
+            val rig3 = BleRig(this)
+            rig3.withClick(mute)
+            val byDefault = rig3.click(ClickOptions(handshakeReply = HandshakeReplyCheck.NONE)).startAndSettle(rig3)
+            assertEquals(ClickState.Active, byDefault.state.value, "with the rule off a link that is up is active")
         }
 
     @Test
@@ -249,7 +264,7 @@ class ClickDeviceTest {
             val events = collectAll(click.events)
             click.startAndSettle(rig)
             assertEquals(ClickState.Active, click.state.value)
-            assertTrue(events.any { it == ClickEvent.HandshakeAnswered("02 03", 0) })
+            assertTrue(events.any { it == ClickEvent.HandshakeAnswered(null, 0) })
         }
 
     @Test
@@ -332,7 +347,7 @@ class ClickDeviceTest {
     // region what the UI can explain (spec §4.7)
 
     @Test
-    fun `connecting, waiting for the first frame, then active`() =
+    fun `connecting, then active as soon as the handshake is answered, with no frame at all`() =
         runTest {
             val rig = BleRig(this)
             rig.withClick()
@@ -340,6 +355,21 @@ class ClickDeviceTest {
             val states = collectAll(click.state)
             click.start()
             rig.advance(1_000)
+            assertEquals(listOf(ClickState.Stopped, ClickState.Connecting(1), ClickState.Active), states.toList())
+        }
+
+    @Test
+    fun `with the silence rule on it waits for the first frame, a press makes it active`() =
+        runTest {
+            val rig = BleRig(this)
+            val fake = rig.withClick()
+            val click = rig.click(ClickOptions(silentMeansLocked = true))
+            val states = collectAll(click.state)
+            click.start()
+            rig.advance(1_000)
+            assertEquals(listOf(ClickState.Stopped, ClickState.Connecting(1), ClickState.Waiting), states.toList())
+            fake.press(ClickBits.A)
+            rig.advance(100)
             assertEquals(
                 listOf(ClickState.Stopped, ClickState.Connecting(1), ClickState.Waiting, ClickState.Active),
                 states.toList(),
@@ -347,11 +377,11 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `answering and then sending nothing needs unlocking after the no-event time, a late frame clears it`() =
+    fun `with the silence rule on, silence after the handshake needs unlocking after the no-event time`() =
         runTest {
             val rig = BleRig(this)
             val fake = rig.withClick(lock = FakeClickLock.SILENT)
-            val click = rig.click()
+            val click = rig.click(ClickOptions(silentMeansLocked = true))
             click.startAndSettle(rig)
             assertEquals(ConnectionState.CONNECTED, click.connection.value)
             assertEquals(ClickState.Waiting, click.state.value)
@@ -362,24 +392,31 @@ class ClickDeviceTest {
             assertEquals(ConnectionState.CONNECTED, click.connection.value, "the link stays up")
             assertTrue(fake.isHandshaken)
 
-            fake.unlock() // the rider unlocked it through Zwift and a frame arrives
+            fake.unlock() // the rider unlocked it through Zwift; a real Click says nothing until a button is pressed
+            rig.advance(100)
+            assertEquals(ClickState.NeedsUnlock(UnlockSignal.NO_EVENTS), click.state.value)
+            fake.press(ClickBits.A) // and then a frame arrives
             rig.advance(100)
             assertEquals(ClickState.Active, click.state.value)
         }
 
     @Test
-    fun `the silent signal can be switched off, and the time is an option`() =
+    fun `the silence rule is off by default, and its time is an option when it is on`() =
         runTest {
+            assertFalse(ClickOptions().silentMeansLocked, "bench report 1: a healthy Click is silent until a press")
             val rig = BleRig(this)
             rig.withClick(lock = FakeClickLock.SILENT)
-            val off = rig.click(ClickOptions(silentMeansLocked = false)).startAndSettle(rig)
+            val off = rig.click().startAndSettle(rig)
             rig.advance(120_000)
-            assertEquals(ClickState.Waiting, off.state.value)
+            assertEquals(ClickState.Active, off.state.value)
 
             val rig2 = BleRig(this)
             rig2.withClick(lock = FakeClickLock.SILENT)
-            val quick = rig2.click(ClickOptions(noEventTimeout = 5.seconds)).startAndSettle(rig2)
-            rig2.advance(5_000)
+            val quick =
+                rig2.click(ClickOptions(silentMeansLocked = true, noEventTimeout = 5.seconds)).startAndSettle(rig2)
+            rig2.advance(4_000)
+            assertEquals(ClickState.Waiting, quick.state.value)
+            rig2.advance(1_000)
             assertEquals(ClickState.NeedsUnlock(UnlockSignal.NO_EVENTS), quick.state.value)
         }
 
@@ -389,7 +426,7 @@ class ClickDeviceTest {
             val quiet = FakeClickOptions(heartbeatInterval = null, batteryPercent = null)
             val rig = BleRig(this)
             val fake = rig.withClick(quiet)
-            val click = rig.click().startAndSettle(rig)
+            val click = rig.click(ClickOptions(silentMeansLocked = true)).startAndSettle(rig)
             assertEquals(ClickState.Waiting, click.state.value)
             fake.sendFrame(ClickEncoder.frame(0x3C, byteArrayOf(1, 2)))
             rig.advance(10)
@@ -397,7 +434,8 @@ class ClickDeviceTest {
 
             val rig2 = BleRig(this)
             rig2.withClick(FakeClickOptions(heartbeatInterval = 2.seconds, batteryPercent = null))
-            val beating = rig2.click().startAndSettle(rig2)
+            val beating = rig2.click(ClickOptions(silentMeansLocked = true)).startAndSettle(rig2)
+            assertEquals(ClickState.Waiting, beating.state.value)
             rig2.advance(2_000)
             assertEquals(ClickState.Active, beating.state.value)
         }
@@ -408,7 +446,7 @@ class ClickDeviceTest {
             val quiet = FakeClickOptions(heartbeatInterval = null, batteryPercent = null)
             val rig = BleRig(this)
             val fake = rig.withClick(quiet)
-            val click = rig.click()
+            val click = rig.click(ClickOptions(silentMeansLocked = true))
             val events = collectAll(click.events)
             click.startAndSettle(rig)
             fake.sendFrame(ClickEncoder.frame(0x23)) // a button frame without its bitmap
@@ -535,12 +573,15 @@ class ClickDeviceTest {
         runTest {
             val rig = BleRig(this)
             val fake = rig.withClick(lock = FakeClickLock.SILENT)
-            val click = rig.click().startAndSettle(rig)
+            val click = rig.click(ClickOptions(silentMeansLocked = true)).startAndSettle(rig)
             rig.advance(31_000)
             assertEquals(ClickState.NeedsUnlock(UnlockSignal.NO_EVENTS), click.state.value)
             fake.lock = FakeClickLock.NONE // unlocked through Zwift while we were connected and silent
             click.retryNow()
             rig.advance(3_000)
+            assertEquals(ClickState.Waiting, click.state.value, "reconnected, and nothing until a press")
+            fake.press(ClickBits.A)
+            rig.advance(100)
             assertEquals(ClickState.Active, click.state.value)
             assertEquals(2, fake.handshakeCount)
             assertEquals(2, rig.ble.transports.size)
@@ -681,13 +722,200 @@ class ClickDeviceTest {
 
     // endregion
 
+    // region the defaults of the first bench (docs/bench-reports/2026-11-18-first-ride.md)
+
+    @Test
+    fun `a bare RideOn goes connecting to active with no frame at all, and stays active for ten minutes`() =
+        runTest {
+            val rig = BleRig(this)
+            val fake = rig.withClick(FakeClickOptions.realPuck(announces = false))
+            val recorded = rig.recording(model = "Click")
+            val click = rig.click(factory = recorded.factory)
+            val states = collectAll(click.state)
+            val changes = collectAll(click.buttons)
+            val events = collectAll(click.events)
+            click.start()
+            rig.advance(1_000)
+            assertEquals(listOf(ClickState.Stopped, ClickState.Connecting(1), ClickState.Active), states.toList())
+
+            rig.advance(600_000)
+            assertEquals(ClickState.Active, click.state.value)
+            assertEquals(
+                listOf(ClickState.Stopped, ClickState.Connecting(1), ClickState.Active),
+                states.toList(),
+                "no change of state in ten minutes",
+            )
+            assertEquals(ConnectionState.CONNECTED, click.connection.value)
+            assertEquals(1, fake.handshakeCount, "the link was never dropped to try again")
+            rig.settle()
+            assertTrue(recorded.compact().none { it.startsWith("N ") }, "not one frame: ${recorded.compact()}")
+            assertTrue(changes.isEmpty())
+            assertEquals(
+                listOf(ClickEvent.HandshakeAnswered(null, 0)),
+                events.filterIsInstance<ClickEvent.HandshakeAnswered>(),
+            )
+            rig.assertNoViolations()
+        }
+
+    @Test
+    fun `RideOn 01 03, a seven byte reply and other bytes fail the default check, with the bytes in the event`() =
+        runTest {
+            val cases =
+                listOf(
+                    FakeClickOptions(replyVersion = 0x0103) to "526964654F6E0103",
+                    FakeClickOptions(rawReply = hex("52 69 64 65 4F 6E 02")) to "526964654F6E02",
+                    FakeClickOptions(rawReply = "Nothing".encodeToByteArray()) to "4E6F7468696E67",
+                )
+            for ((options, prefix) in cases) {
+                val rig = BleRig(this)
+                rig.withClick(options)
+                val click = rig.click()
+                val states = collectAll(click.state)
+                val events = collectAll(click.events)
+                click.startAndSettle(rig)
+                val failed = assertIs<ClickState.SetupFailed>(click.state.value, prefix)
+                assertEquals(LinkFailureKind.SETUP_FAILED, failed.failure.kind)
+                assertEquals(
+                    listOf(ClickEvent.HandshakeReplyRejected(prefix)),
+                    events.filterIsInstance<ClickEvent.HandshakeReplyRejected>(),
+                )
+                assertEquals(ConnectionState.DISCONNECTED, click.connection.value)
+                assertFalse(ClickState.Active in states, "never active: ${states.toList()}")
+            }
+        }
+
+    @Test
+    fun `a hidden service is still the unlock notice with the defaults, on the real puck's table`() =
+        runTest {
+            val rig = BleRig(this)
+            rig.withClick(FakeClickOptions.realPuck(), lock = FakeClickLock.HIDDEN)
+            val click = rig.click()
+            click.start()
+            rig.advance(500)
+            assertEquals(ClickState.NeedsUnlock(UnlockSignal.SERVICE_HIDDEN), click.state.value)
+            assertTrue(ClickOptions().serviceHiddenMeansLocked)
+        }
+
+    @Test
+    fun `the battery is read once at set-up, 0x64 is 100 percent, and no battery frame is needed`() =
+        runTest {
+            val rig = BleRig(this)
+            rig.withClick()
+            val recorded = rig.recording(model = "Click")
+            val click = rig.click(factory = recorded.factory)
+            assertNull(click.battery.value, "unknown until it is read")
+            click.startAndSettle(rig)
+            rig.settle()
+            assertEquals(100, click.battery.value)
+            assertTrue("R 2A19 64" in recorded.compact())
+            assertTrue(recorded.compact().none { it.startsWith("N ") }, "no 0x19 frame")
+        }
+
+    @Test
+    fun `an unknown 0x2A message before the reply does not break the set-up and is reported as unrecognised`() =
+        runTest {
+            val rig = BleRig(this)
+            rig.withClick(FakeClickOptions.realPuck(announces = true))
+            val recorded = rig.recording(model = "Click")
+            val click = rig.click(factory = recorded.factory)
+            val events = collectAll(click.events)
+            click.startAndSettle(rig)
+            rig.settle()
+            assertEquals(ClickState.Active, click.state.value)
+
+            // 23 bytes, opcode 0x2A: one type byte and 22 of body.
+            assertEquals(
+                listOf(ClickEvent.UnrecognisedFrame(0x2A, 22)),
+                events.filterIsInstance<ClickEvent.UnrecognisedFrame>(),
+            )
+            assertTrue(events.none { it is ClickEvent.MalformedFrame })
+            assertEquals(1, events.filterIsInstance<ClickEvent.HandshakeAnswered>().size)
+
+            val lines = recorded.compact()
+            val announcement = "N ${ClickUuids.ASYNC} 2A0803121212100818100018D8042205FFFFFFFF1F2800"
+            val reply = "I ${ClickUuids.SYNC_TX} 526964654F6E"
+            assertTrue(announcement in lines, "$lines")
+            assertTrue(lines.indexOf(announcement) < lines.indexOf(reply), "it arrived before the reply")
+            assertTrue("S - mtu=251" in lines, "the MTU the real puck grants for the 128 that was asked")
+        }
+
+    @Test
+    fun `a recording of the real puck's button frames decodes with the existing bit table`() =
+        runTest {
+            // Synthetic: the frames are the ones the first bench reported (23 08 <varint>; a clear bit is a pressed button),
+            // with the all-released frames that follow a press, which are repeats and change nothing.
+            val async = ClickUuids.ASYNC
+            val released = "2308FFFFFFFF0F"
+            val frames =
+                listOf(
+                    3_000 to "2308EFFFFFFF0F", // A
+                    3_095 to released,
+                    3_200 to released,
+                    5_000 to "2308DFFFFFFF0F", // B
+                    5_110 to released,
+                    7_000 to "2308BFFFFFFF0F", // Y
+                    7_100 to released,
+                    9_000 to "2308FFFDFFFF0F", // Minus
+                    9_100 to released,
+                    11_000 to "2308FFBFFFFF0F", // Plus, shift down
+                    11_120 to released,
+                    11_230 to released,
+                )
+            val session =
+                buildString {
+                    appendLine("# overdrive-ble-session 1")
+                    appendLine("# model Click")
+                    appendLine("0 S - - connecting")
+                    appendLine("200000000 S - 0 connected")
+                    appendLine("220000000 D $async - FC82/N")
+                    appendLine("220000000 D ${ClickUuids.SYNC_RX} - FC82/Ww")
+                    appendLine("220000000 D ${ClickUuids.SYNC_TX} - FC82/RI")
+                    appendLine("260000000 C $async 0 0100")
+                    appendLine("280000000 C ${ClickUuids.SYNC_TX} 0 0200")
+                    appendLine("300000000 W ${ClickUuids.SYNC_RX} 0 526964654F6E")
+                    appendLine("350000000 I ${ClickUuids.SYNC_TX} - 526964654F6E")
+                    appendLine("370000000 W ${ClickUuids.SYNC_RX} 0 FF0400")
+                    for ((millis, bytes) in frames) appendLine("${millis * 1_000_000L} N $async - $bytes")
+                    appendLine("15000000000 S - 0 disconnected")
+                    appendLine("15000000000 S - - closed")
+                }
+            val rig = BleRig(this)
+            rig.ble.add(CLICK_ID, ReplayPeripheral(BleSessionFormat.parse(session)))
+            val click = rig.click()
+            val changes = collectAll(click.buttons)
+            val events = collectAll(click.events)
+            click.start()
+            rig.advance(14_000)
+
+            assertEquals(
+                listOf(
+                    ClickBits.A,
+                    0,
+                    ClickBits.B,
+                    0,
+                    ClickBits.Y,
+                    0,
+                    ClickBits.MINUS,
+                    0,
+                    ClickBits.PLUS_SHIFT_DOWN,
+                    0,
+                ),
+                changes.map { it.held },
+            )
+            assertTrue(changes.all { it.pressed.countOneBits() <= 1 }, "no press set two bits")
+            assertTrue(events.none { it is ClickEvent.MalformedFrame || it is ClickEvent.UnrecognisedFrame })
+            assertEquals(ClickState.Active, click.state.value)
+        }
+
+    // endregion
+
     // region recording (privacy)
 
     @Test
     fun `a recorded Click session keeps no key, no firmware and no address, and the length of the reply`() =
         runTest {
             val rig = BleRig(this)
-            rig.withClick(FakeClickOptions(replyTailLength = 64))
+            rig.withClick(FakeClickOptions.byNotes(replyTailLength = 64))
             val recorded = rig.recording(model = "Click")
             val click = rig.click(factory = recorded.factory).startAndSettle(rig)
             assertEquals(ClickState.Active, click.state.value)

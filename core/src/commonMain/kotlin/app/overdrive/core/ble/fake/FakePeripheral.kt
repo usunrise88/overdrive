@@ -78,6 +78,12 @@ public abstract class FakePeripheral(
     /** How long a connect to an absent peripheral takes to fail with 133; null (the default) means it never answers. */
     public var absentFailsAfter: Duration? = null
 
+    /**
+     * The ATT MTU this peripheral answers a request with, whatever was asked, or null to grant what was asked. Android lets
+     * the peripheral decide: the first bench asked for 128 and got 251 from a Click and from a trainer.
+     */
+    public var negotiatedMtu: Int? = null
+
     /** The live link, or null. */
     public var connection: FakeConnection? = null
         internal set

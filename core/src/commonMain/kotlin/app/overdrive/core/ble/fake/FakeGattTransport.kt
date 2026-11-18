@@ -104,7 +104,8 @@ public class FakeGattTransport internal constructor(
             GattResult.Ok(GattServices(peripheral.characteristics))
         }
 
-    override suspend fun requestMtu(mtu: Int): GattResult<Int> = operation("requestMtu") { GattResult.Ok(mtu) }
+    override suspend fun requestMtu(mtu: Int): GattResult<Int> =
+        operation("requestMtu") { GattResult.Ok(peripheral.negotiatedMtu ?: mtu) }
 
     override suspend fun read(characteristic: GattCharacteristicInfo): GattResult<ByteArray> =
         operation("read ${characteristic.characteristic}") {

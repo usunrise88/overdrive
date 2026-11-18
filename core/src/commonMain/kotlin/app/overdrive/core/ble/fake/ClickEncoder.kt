@@ -34,6 +34,12 @@ public object ClickEncoder {
     /** The disconnect notice: `FE`. */
     public fun disconnectNotice(): ByteArray = byteArrayOf(ClickCodec.TYPE_DISCONNECT.toByte())
 
+    /**
+     * The one message of an unknown type that the first bench saw: opcode `0x2A` on ASYNC right after the host enabled its
+     * notifications (docs/bench-reports/2026-11-18-first-ride.md §1, CK 9). 23 bytes, nothing the codec needs.
+     */
+    public fun unknownAnnouncement(): ByteArray = UNKNOWN_ANNOUNCEMENT.copyOf()
+
     /** A frame of any [type] with [body] after it, for the types the codec reports as unrecognised. */
     public fun frame(
         type: Int,
@@ -71,4 +77,31 @@ public object ClickEncoder {
     public const val DEFAULT_VERSION: Int = 0x0203
 
     private const val BITS_PER_BYTE = 8
+
+    private val UNKNOWN_ANNOUNCEMENT =
+        intArrayOf(
+            0x2A,
+            0x08,
+            0x03,
+            0x12,
+            0x12,
+            0x12,
+            0x10,
+            0x08,
+            0x18,
+            0x10,
+            0x00,
+            0x18,
+            0xD8,
+            0x04,
+            0x22,
+            0x05,
+            0xFF,
+            0xFF,
+            0xFF,
+            0xFF,
+            0x1F,
+            0x28,
+            0x00,
+        ).let { ints -> ByteArray(ints.size) { ints[it].toByte() } }
 }

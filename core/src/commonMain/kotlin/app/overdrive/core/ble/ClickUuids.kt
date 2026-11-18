@@ -24,6 +24,15 @@ public object ClickUuids {
     /** Indicate (and read): the handshake reply (§2). */
     public val SYNC_TX: GattUuid = vendor(0x0004)
 
+    /** Vendor characteristic `…0100` in the Zwift service of the right puck of the first bench; the app does not use it. */
+    public val VENDOR_0100: GattUuid = vendor(0x0100)
+
+    /** Vendor characteristic `…0101` (write, write without response, notify); the app does not use it. */
+    public val VENDOR_0101: GattUuid = vendor(0x0101)
+
+    /** Vendor characteristic `…0102` (write without response, notify); the app does not use it. */
+    public val VENDOR_0102: GattUuid = vendor(0x0102)
+
     private fun vendor(number: Int): GattUuid =
         requireNotNull(
             GattUuid.parse("0000${number.toString(HEX_RADIX).padStart(HEX_DIGITS, '0')}-19CA-4651-86E5-FA29DCDD09D1"),
