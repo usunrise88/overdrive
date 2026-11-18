@@ -5,8 +5,8 @@ Process): a tagged, signed APK the owner can install and try. Order follows risk
 can only be learned on the real tablet come first, the hardware-dependent things only once the
 rest is solid.
 
-**Where we are: M1 to M4 are done. The bench is next, then Phase 2.** `v0.1.0` is the MVP: everything automatic is green and
-nothing has touched real hardware.
+**Where we are: M1 to M4 are done, and Phase 2 is under way.** `v0.1.0` is the MVP: everything automatic is green and
+nothing has touched real hardware. The bench (below) runs alongside Phase 2 and is still open.
 
 | Stage | Release | Goal | What the owner tests | State |
 |---|---|---|---|---|
@@ -22,10 +22,24 @@ nothing has touched real hardware.
    the numbered questions of the protocol notes, and produces the Bluetooth session logs that fix the codecs. Defects go to
    `v0.1.x`; a switch in Settings, Developer · Click, or one default in `FtmsOptions`, `HeartRateOptions`, `ClickOptions` or
    `FitOptions` is most of the likely fixes.
-2. **Phase 2** (spec §5; handoff and a proposed split into stages in `docs/phase2-kickoff.md`): the web service with planned workouts, the MCP server, the calendar,
+2. **Phase 2** (spec §5; the stages are in the table below, the handoff in `docs/phase2-kickoff.md`): the web service with planned workouts, the MCP server, the calendar,
    the Telegram bot, ride upload (the outbox of Phase 1 is where it starts) and the ride app's changes. It begins, as every
    wire-format change does, in `contracts/`: the sync API's schemas and fixtures come first. Phase 3 (statistics, the companion
    app) follows.
+
+## Phase 2 stages
+
+Phase 2 (spec §5) is cut into five stages, done in this order. The stages do not each end in an alpha: the owner decided
+on 2026-11-18 that Phase 2 has one release, `v0.2.0`, after the last stage.
+
+| Stage | Goal | State |
+|---|---|---|
+| **P2-1 Rides leave the tablet** (ADR 0014) | The intake API on the server, and the tablet's upload of each ride's record and FIT, both idempotent. Then the FIT goes on to intervals.icu with no manual step | Intake API and tablet upload: done, merged. intervals.icu upload: in progress |
+| **P2-2 Planned workouts reach the tablet** | A plan cache from intervals.icu; `GET /v1/workouts`; the list on the ready screen; starting a planned workout links the ride to it | Not started |
+| **P2-3 MCP server and planning** | The MCP server (spec §5.2) and the tools Phase 2 needs from §8.4: planned workouts (create, read, update, delete), `list_rides`, `get_ride`, `get_profile`, `update_profile`. OAuth for the server | Not started |
+| **P2-4 Google Calendar and Telegram** | Planned workouts pushed to Google Calendar (§5.3); the Telegram bot (§5.4) | Not started |
+| **P2-5 Strava upload and description** | Rides uploaded to Strava, with their description written (§5.5, §5.6). Strava is write-only | Not started |
+| **Release `v0.2.0`** | Notes from `docs/releases/TEMPLATE.md`. The owner publishes the tag in the GitHub web UI (`docs/releasing.md`, section 11) | Not started. No alphas are required for Phase 2 (owner, 2026-11-18) |
 
 ## Last: multiple users
 

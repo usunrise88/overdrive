@@ -79,6 +79,8 @@ set `TEST_DATABASE_URL`: **the `public` schema of that database is dropped**, so
 
 ## Deployment
 
+The runbook for the owner's host, with every variable the server reads: [`docs/deploy.md`](../docs/deploy.md).
+
 `docker compose up -d --build` from the repository root builds `server/Dockerfile` (the build
 context is the repo root) and starts PostgreSQL next to it; the server waits for the database,
 migrates it and listens on `127.0.0.1:8080`. Set `POSTGRES_PASSWORD` (URL-safe: `openssl rand -hex 24`)

@@ -40,6 +40,7 @@ make server-dev      # http://127.0.0.1:8080/healthz
 
 Self-hosted deployment is `docker compose up -d --build` (see [`compose.yaml`](compose.yaml) and
 [`.env.example`](.env.example)).
+The runbook for the owner's host (Caddy, tokens, backups, updates) is [`docs/deploy.md`](docs/deploy.md).
 
 ## Status
 
