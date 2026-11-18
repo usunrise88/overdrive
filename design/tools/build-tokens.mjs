@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Reads design/tokens.json and writes design/mockups/tokens.css (CSS custom properties).
-// No dependencies. Run: node design/tools/build-tokens.mjs
+// Also writes the Compose tokens (android/ui-kit), the copied Geist fonts and their licence.
+// No dependencies. Run: node design/tools/build-tokens.mjs   (--check: exit 1 if anything is stale)
 // 1 dp = 1 px and 1 sp = 1 px in the mock-ups; screenshots are taken at device scale factor 2.
-// A Kotlin (Compose) output is to be added by the ui-kit implementation.
 
-import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const designDir = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -99,6 +99,302 @@ ${fontFaces}
 }
 `;
 
-const out = join(designDir, "mockups", "tokens.css");
-writeFileSync(out, css);
-console.log(`wrote ${out} (${lines.filter((l) => l.startsWith("  --")).length} properties)`);
+// ---- Kotlin (Compose) output, copied fonts and licence -------------------------------------
+
+const repoRoot = join(designDir, "..");
+const uikitMain = join(repoRoot, "android", "ui-kit", "src", "main");
+const kotlinFile = join(uikitMain, "kotlin", "app", "overdrive", "uikit", "tokens", "OverdriveTokens.kt");
+const fontDir = join(uikitMain, "res", "font");
+const licenceFile = join(uikitMain, "assets", "licenses", "geist-OFL.txt");
+const licenceSource = join(designDir, "fonts", "OFL.txt");
+
+const HEX = /^#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;
+// Kotlin keywords that could appear as a token name.
+const RESERVED = new Set([
+  "as", "class", "do", "else", "false", "fun", "if", "in", "interface", "is", "null", "object",
+  "package", "return", "super", "this", "throw", "true", "try", "typealias", "val", "var", "when",
+  "while", "for", "break", "continue", "typeof",
+]);
+// Maps a font weight to its Android resource name and Compose FontWeight constant.
+const FONT_BY_WEIGHT = {
+  400: { resource: "geist_regular", weight: "Normal" },
+  500: { resource: "geist_medium", weight: "Medium" },
+  600: { resource: "geist_semibold", weight: "SemiBold" },
+};
+
+const fail = (message) => {
+  throw new Error(`build-tokens: ${message}`);
+};
+// Every token the Kotlin output reads is recorded here; the audit below rejects any left over.
+const consumed = new Set();
+const at = (path) => {
+  consumed.add(path);
+  let node = tokens;
+  for (const key of path.split(".")) node = node?.[key];
+  if (node === undefined) fail(`tokens.json has no value at "${path}"`);
+  return node;
+};
+// camelCase identifier from JSON key parts, e.g. ("overlay", "padding") -> "overlayPadding".
+const ident = (...parts) => {
+  const words = parts.join(" ").split(/[^A-Za-z0-9]+/).filter(Boolean);
+  const name = words
+    .map((w, i) => (i === 0 ? w[0].toLowerCase() : w[0].toUpperCase()) + w.slice(1))
+    .join("");
+  if (!/^[a-z][A-Za-z0-9]*$/.test(name) || RESERVED.has(name)) {
+    fail(`cannot map JSON key "${parts.join(".")}" to a Kotlin identifier`);
+  }
+  return name;
+};
+const dbl = (n) => (Number.isInteger(n) ? `${n}.0` : `${n}`);
+const dp = (n) => `${n}.dp`;
+const sp = (n) => `${n}.sp`;
+const flt = (n) => `${n}f`;
+const em = (n) => `${n < 0 ? `(${dbl(n)})` : dbl(n)}.em`;
+const argb = (hex, path) => {
+  if (typeof hex !== "string" || !HEX.test(hex)) fail(`"${path}" is not a hex colour: ${hex}`);
+  const digits = hex.slice(1).toUpperCase();
+  const alpha = digits.length === 8 ? digits.slice(6) : "FF";
+  return `0x${alpha}${digits.slice(0, 6)}`;
+};
+const parseEasing = (text, path) => {
+  if (text === "linear") return [0, 0, 1, 1];
+  const match = /^cubic-bezier\(([^)]*)\)$/.exec(text);
+  const nums = match ? match[1].split(",").map((x) => Number(x.trim())) : [];
+  if (nums.length !== 4 || nums.some((x) => Number.isNaN(x))) {
+    fail(`"${path}" is not a cubic-bezier or linear easing: ${text}`);
+  }
+  return nums;
+};
+
+const members = { colors: new Map(), dimens: new Map(), motion: new Map(), typography: new Map() };
+const put = (object, name, lines) => {
+  if (members[object].has(name)) fail(`two tokens map to the Kotlin name "${name}"`);
+  members[object].set(name, lines);
+};
+const single = (name, type, expr) => [`    public val ${name}: ${type} = ${expr}`];
+const multi = (name, type, lines) => [
+  `    public val ${name}: ${type} =`,
+  ...lines.map((line) => `        ${line}`),
+];
+const listOf = (name, type, items) => {
+  const one = single(name, type, `listOf(${items.join(", ")})`);
+  if (one[0].length <= 120) return one;
+  return multi(name, type, ["listOf(", ...items.map((item) => `    ${item},`), ")"]);
+};
+const isNumberOrBool = (value) => typeof value === "number" || typeof value === "boolean";
+// Every leaf of a JSON subtree as { path, value }; strings are prose or references, not values.
+const leaves = (node, path = []) =>
+  Object.entries(node).flatMap(([key, value]) => {
+    if (key.startsWith("$") || key === "use") return [];
+    const here = [...path, key];
+    if (typeof value === "object" && value !== null) return leaves(value, here);
+    if (isNumberOrBool(value) || (typeof value === "string" && HEX.test(value))) {
+      return [{ path: here, value }];
+    }
+    return [];
+  });
+
+// Colours
+const colorToken = (name, path) =>
+  put("colors", name, single(name, "Color", `Color(${argb(at(`${path}.value`), path)})`));
+for (const key of Object.keys(tokens.color.neutral)) {
+  if (isToken(key)) colorToken(ident(key), `color.neutral.${key}`);
+}
+for (const key of Object.keys(tokens.color.text)) {
+  if (isToken(key)) colorToken(ident("text", key), `color.text.${key}`);
+}
+for (const key of ["backing", "border"]) colorToken(ident("overlay", key), `color.overlay.${key}`);
+colorToken(ident("scrim"), "color.scrim");
+
+const zoneKeys = Object.keys(tokens.color.zone).filter((k) => /^z[1-7]$/.test(k));
+if (zoneKeys.join() !== "z1,z2,z3,z4,z5,z6,z7") fail("color.zone must hold exactly z1 to z7");
+for (const key of zoneKeys) colorToken(key, `color.zone.${key}`);
+put("colors", "zones", listOf("zones", "List<Color>", zoneKeys));
+put(
+  "colors",
+  "zoneNames",
+  listOf(
+    "zoneNames",
+    "List<String>",
+    zoneKeys.map((k) => JSON.stringify(at(`color.zone.${k}.name`))),
+  ),
+);
+put(
+  "colors",
+  "zoneFromPctFtp",
+  listOf(
+    "zoneFromPctFtp",
+    "List<Int>",
+    zoneKeys.map((k) => String(at(`color.zone.${k}.fromPctFtp`))),
+  ),
+);
+put(
+  "colors",
+  "zoneToPctFtp",
+  listOf(
+    "zoneToPctFtp",
+    "List<Int?>",
+    zoneKeys.map((k) => {
+      const v = at(`color.zone.${k}.toPctFtp`);
+      return v === null ? "null" : String(v);
+    }),
+  ),
+);
+put("colors", "zonePastAlpha", single("zonePastAlpha", "Float", flt(at("color.zone.rules.pastAlpha"))));
+
+// Dimensions: space, radius, stroke, size as Dp; overlay and chart metrics by their JSON path.
+for (const group of ["space", "radius", "stroke", "size"]) {
+  for (const key of Object.keys(tokens[group])) {
+    if (!isToken(key)) continue;
+    const name = ident(group, key);
+    put("dimens", name, single(name, "Dp", dp(at(`${group}.${key}`))));
+  }
+}
+// Overlay and chart: numeric leaves, typed by their place in the JSON.
+for (const leaf of [...leaves(tokens.overlay, ["overlay"]), ...leaves(tokens.chart, ["chart"])]) {
+  const { path, value } = leaf;
+  const dotted = path.join(".");
+  consumed.add(dotted);
+  const last = path.at(-1);
+  const isSlotWidth = path[1] === "compact" && path[2] === "slots" && last === "width";
+  const name = isSlotWidth ? ident("overlay", "slot", path[3]) : ident(...path);
+  if (typeof value === "boolean") {
+    put("dimens", name, single(name, "Boolean", String(value)));
+  } else if (path[1] === "opacity" || last === "pastAlpha") {
+    put("dimens", name, single(name, "Float", flt(value)));
+  } else if (last === "yMaxPctFtp") {
+    put("dimens", name, single(name, "Int", String(value)));
+  } else if (last === "durationMs" || last === "longPressMs") {
+    put("motion", name, single(name, "Int", String(value)));
+  } else if (typeof value === "number") {
+    put("dimens", name, single(name, "Dp", dp(value)));
+  } else {
+    fail(`"${dotted}" has an unsupported value type`);
+  }
+}
+
+// Motion: durations as Int milliseconds, easings as CubicBezierEasing.
+for (const key of Object.keys(tokens.motion.duration)) {
+  if (!isToken(key)) continue;
+  const name = ident("duration", key);
+  put("motion", name, single(name, "Int", String(at(`motion.duration.${key}`))));
+}
+for (const key of Object.keys(tokens.motion.easing)) {
+  if (!isToken(key)) continue;
+  const name = ident("easing", key);
+  const nums = parseEasing(at(`motion.easing.${key}`), `motion.easing.${key}`);
+  put(
+    "motion",
+    name,
+    single(name, "CubicBezierEasing", `CubicBezierEasing(${nums.map(flt).join(", ")})`),
+  );
+}
+
+// Typography: GeistFamily must be declared before the styles that use it (object init order).
+const fontFiles = Object.entries(tokens.typography.family.sans.files);
+const fontLines = fontFiles.map(([weight]) => {
+  const font = FONT_BY_WEIGHT[weight];
+  if (!font) fail(`no Android font resource for weight ${weight}`);
+  return `Font(R.font.${font.resource}, FontWeight.${font.weight}),`;
+});
+put(
+  "typography",
+  "GeistFamily",
+  multi("GeistFamily", "FontFamily", ["FontFamily(", ...fontLines.map((l) => `    ${l}`), ")"]),
+);
+const tnum = at("typography.numerals.fontFeatureSettings");
+for (const key of Object.keys(tokens.typography.scale)) {
+  if (!isToken(key)) continue;
+  const base = `typography.scale.${key}`;
+  const weight = at(`${base}.weight`);
+  const fontWeight = { 400: "Normal", 500: "Medium", 600: "SemiBold" }[weight];
+  if (!fontWeight) fail(`"${base}.weight" must be 400, 500 or 600, got ${weight}`);
+  const body = [
+    "TextStyle(",
+    "    fontFamily = GeistFamily,",
+    `    fontSize = ${sp(at(`${base}.size`))},`,
+    `    lineHeight = ${sp(at(`${base}.lineHeight`))},`,
+    `    fontWeight = FontWeight.${fontWeight},`,
+    `    letterSpacing = ${em(at(`${base}.tracking`))},`,
+    // Every token named num* holds numbers that change: tabular figures (system.md section 3).
+    ...(key.startsWith("num") ? [`    fontFeatureSettings = "${tnum}",`] : []),
+    ")",
+  ];
+  put("typography", ident(key), multi(ident(key), "TextStyle", body));
+}
+
+// Audit: every number, boolean and hex colour in tokens.json must have been mapped above.
+const unmapped = leaves(tokens)
+  .map((leaf) => leaf.path.join("."))
+  .filter((path) => path !== "version" && !consumed.has(path));
+if (unmapped.length > 0) {
+  fail(`no Kotlin mapping for ${unmapped.join(", ")}; add it to design/tools/build-tokens.mjs`);
+}
+
+const objectText = (name, object) =>
+  `public object ${name} {\n${[...members[object].values()].map((m) => m.join("\n")).join("\n\n")}\n}`;
+const body = [
+  objectText("OverdriveColors", "colors"),
+  objectText("OverdriveDimens", "dimens"),
+  objectText("OverdriveMotion", "motion"),
+  objectText("OverdriveTypography", "typography"),
+].join("\n\n");
+const IMPORTS = [
+  ["androidx.compose.animation.core.CubicBezierEasing", /\bCubicBezierEasing\(/],
+  ["androidx.compose.ui.graphics.Color", /\bColor\b/],
+  ["androidx.compose.ui.text.TextStyle", /\bTextStyle\b/],
+  ["androidx.compose.ui.text.font.Font", /\bFont\(/],
+  ["androidx.compose.ui.text.font.FontFamily", /\bFontFamily\b/],
+  ["androidx.compose.ui.text.font.FontWeight", /\bFontWeight\b/],
+  ["androidx.compose.ui.unit.Dp", /\bDp\b/],
+  ["androidx.compose.ui.unit.dp", /\.dp\b/],
+  ["androidx.compose.ui.unit.em", /\.em\b/],
+  ["androidx.compose.ui.unit.sp", /\.sp\b/],
+  ["app.overdrive.uikit.R", /\bR\.font\./],
+];
+const imports = IMPORTS.filter(([, used]) => used.test(body))
+  .map(([fqn]) => `import ${fqn}`)
+  .sort();
+const kotlin = [
+  "// GENERATED by design/tools/build-tokens.mjs from design/tokens.json. Do not edit.",
+  "",
+  "package app.overdrive.uikit.tokens",
+  "",
+  ...imports,
+  "",
+  body,
+  "",
+].join("\n");
+
+const copies = [
+  ...fontFiles.map(([weight, file]) => ({
+    path: join(fontDir, `${FONT_BY_WEIGHT[weight].resource}.ttf`),
+    data: readFileSync(join(repoRoot, file)),
+  })),
+  { path: licenceFile, data: readFileSync(licenceSource) },
+];
+
+const outputs = [
+  { path: join(designDir, "mockups", "tokens.css"), data: css },
+  { path: kotlinFile, data: kotlin },
+  ...copies,
+];
+
+if (process.argv.includes("--check")) {
+  const stale = outputs.filter((o) => {
+    if (!existsSync(o.path)) return true;
+    return !readFileSync(o.path).equals(Buffer.from(o.data));
+  });
+  if (stale.length > 0) {
+    for (const o of stale) console.error(`stale: ${relative(repoRoot, o.path)}`);
+    console.error("run: node design/tools/build-tokens.mjs");
+    process.exit(1);
+  }
+  console.log("tokens up to date");
+} else {
+  for (const o of outputs) {
+    mkdirSync(dirname(o.path), { recursive: true });
+    writeFileSync(o.path, o.data);
+    console.log(`wrote ${relative(repoRoot, o.path)}`);
+  }
+}

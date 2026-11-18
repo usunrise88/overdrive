@@ -23,6 +23,8 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: node design/tools/build-tokens.mjs --check
+      - run: node design/tools/check-contrast.mjs
       - run: pnpm check
       - run: pnpm build
 
