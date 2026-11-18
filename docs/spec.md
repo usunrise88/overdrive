@@ -509,3 +509,25 @@ Cited from memory during planning. Verify titles and details before quoting them
 - [intervals.icu pricing](https://www.intervals.icu/pricing): the core platform is free; API access does not need a subscription.
 - [Strava API changes, 2026](https://forum.intervals.icu/t/strava-api-update-new-terms-subs-required-for-api-access/130240): a Strava subscription is required for standard-tier API access.
 - [Strava upload documentation](https://developers.strava.com/docs/uploads/): lists VirtualRide as an activity type.
+
+---
+
+## Implementation notes (added in the repository, not part of the owner's spec)
+
+Corrections and findings from research during implementation. The owner may want to fold them into the
+live spec document.
+
+- **§9, Click v2 unlock bypass.** The no-unlock method is *not* in BikeControl's open-source code. It
+  first appears in the post-`gpl3` (Non-Commercial licence) versions; its handshake lives in a closed
+  `prop` submodule and `prop_public` only holds a stub. §2 says "BikeControl 6.0.0 reports the right
+  controller working without unlock": per BikeControl's own changelog, 6.0.0 only dropped the 24-hour
+  unlock for Pro users, and the "right side only" mode came later. Consequence: Phase 1 implements the
+  documented path (discovery, the `RideOn` write, the button bitmap) and falls back to the unlock
+  notice of §4.7; the no-unlock handshake is a bench-test item. Details: `docs/protocols/click-v2.md`.
+- **§10, prior-art licences.** `intervals-icu-health-sync` is AGPL-3.0 (not GPLv3) and
+  `intervals-mcp-server` is GPL-3.0. BikeControl is GPL-3.0 up to tag `gpl3` and under a
+  Non-Commercial licence after it, so nothing from later versions may be copied. See
+  `docs/references-licences.md`.
+- **§4.8, FIT export.** Garmin's FIT SDK is under a proprietary agreement that does not allow
+  redistributing it inside an APK under a source-disclosure licence. The FIT writer is therefore our own
+  implementation of the published format; the SDK is used only as a test-time decoder.
