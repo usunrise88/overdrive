@@ -11,7 +11,7 @@ const token = (seed: string) => seed.repeat(MIN_TOKEN_LENGTH).slice(0, MIN_TOKEN
 
 describe("loadConfig", () => {
   it("applies defaults: no devices, so the API is closed", () => {
-    expect(loadConfig({ DATABASE_URL })).toEqual({
+    expect(loadConfig({ DATABASE_URL })).toMatchObject({
       HOST: "127.0.0.1",
       PORT: 8080,
       LOG_LEVEL: "info",

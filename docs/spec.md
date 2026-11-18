@@ -428,6 +428,17 @@ Phase 2 connects the ride app to a plan: an AI agent schedules workouts, they ap
 - One-way push of planned workouts to a dedicated calendar: title, duration, short description of the session.
 - Changes and deletions in the plan are mirrored. Edits made in Google Calendar are not read back.
 - Calendar reminders come free with the events.
+- *Settled in stage P2-4 (ADR 0019, `server/src/gcal/`):* the service pushes the planned workouts the tablet can play (today onwards, from
+  the plan cache) into the calendar named by `GOOGLE_CALENDAR_ID`, one event each: the workout's name as the title, the date at
+  `GCAL_WORKOUT_START` (default 07:00, in `TIMEZONE`) as the start, the workout's duration as the length, and its steps in plain words
+  as the description (`10 min warm-up (45% to 70% FTP), 3 x 8 min at 95% FTP, 10 min cool-down. Total 1 h 15 min.`, written by code).
+  Events carry no reminders of their own, so the calendar's notification settings apply. Creating is idempotent (the event id is derived
+  from the planned id), changes become updates and removals become deletions, a day that has passed is left alone, and a start-up
+  sweep deletes our events whose workout has gone. Failed pushes are retried with persisted backoff (1, 2, 4 … minutes up to 6 hours).
+  The credentials are an OAuth client and a refresh token in the server environment (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+  `GOOGLE_REFRESH_TOKEN`, `GOOGLE_CALENDAR_ID`; all four or the calendar is off); the owner gets the refresh token once with
+  `pnpm --filter @overdrive/server run google-auth`, which prints it to the terminal and writes no file. Nothing is read back from
+  Google. What only a real account can confirm is listed in ADR 0019.
 
 ### 5.4 Telegram bot
 
@@ -436,6 +447,17 @@ Phase 2 connects the ride app to a plan: an AI agent schedules workouts, they ap
 - **Weekly:** planned against completed, load trend.
 - **Commands:** today, week, skip, move to another day.
 - The bot answers only the owner's Telegram account.
+- *Settled in stage P2-4 (ADR 0019, `server/src/telegram/`):* long polling (`getUpdates`), no inbound webhook; `TELEGRAM_BOT_TOKEN` turns the
+  bot on and `TELEGRAM_OWNER_CHAT_ID` is the one chat it answers: any other chat is ignored silently and logged by chat id, never by
+  content. Without the chat id the bot only listens and logs the chat ids that write to it (setup mode), which is how the owner finds
+  theirs. Reminders: the evening before (`REMINDER_EVENING_TIME`, 20:00) and `REMINDER_LEAD_MINUTES` (60) before the same start time as the
+  calendar, each sent once and persisted, so a restart repeats and loses none; both carry Skip and Move buttons. After a ride: duration,
+  average and normalised power, average and maximum heart rate and load from the stored summary, and planned against ridden duration when
+  the ride is linked to a plan. Weekly (`WEEKLY_SUMMARY_DAY` and `_TIME`, Sunday 18:00): sessions planned against done and skipped, the
+  missed ones, rides and time, and the load (sum of the rides' training stress) against the week before up to the same weekday. Commands:
+  `/today`, `/week` (the next seven days), `/skip` (asks to confirm, deletes the event in intervals.icu), `/move` (buttons for the next
+  seven days, updates the event's date), `/help`; with no plan source they say so. All numbers are computed by code and no model is used:
+  written insight is Phase 3 (§6.5, §6.6). What only a real bot can confirm is listed in ADR 0019.
 
 ### 5.5 Ride upload
 

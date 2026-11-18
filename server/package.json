@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "hash-passphrase": "node src/hash-passphrase.ts",
+    "google-auth": "node src/gcal/auth-cli.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { integrationsShape } from "./config-integrations.ts";
 import { parsePassphraseHash } from "./oauth/passphrase.ts";
 import { isTimeZone } from "./time.ts";
 
@@ -217,6 +218,8 @@ const schema = z.object({
       .default("UTC")
       .refine(isTimeZone, "TIMEZONE must be an IANA time zone such as Europe/Paris or UTC"),
   ),
+  // Google Calendar and Telegram (ADR 0019): see config-integrations.ts.
+  ...integrationsShape,
 });
 
 export type Config = z.infer<typeof schema>;

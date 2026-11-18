@@ -1,7 +1,9 @@
 import type { Config } from "./config.ts";
 import { DEFAULT_INTERVALS_BASE_URL } from "./config.ts";
+import type { IntegrationsSettings } from "./config-integrations.ts";
 import type { Db } from "./db.ts";
 import { createEventBus, type EventBus } from "./events.ts";
+import { type CalendarMirror, createCalendar } from "./gcal/index.ts";
 import { createIntervalsClient, type IntervalsClient } from "./intervals/client.ts";
 import {
   createUploadWorker,
@@ -14,6 +16,7 @@ import { createPlanStore, type PlanStore } from "./plan/store.ts";
 import { createProfileStore, type ProfileStore } from "./profile/store.ts";
 import { createRideStore, type RideStore } from "./ride-store.ts";
 import { createRideWorkoutResolver, type RideWorkoutResolver } from "./ride-workout.ts";
+import { createTelegram, type TelegramBot } from "./telegram/index.ts";
 import type { Timers } from "./timers.ts";
 
 /** The part of the configuration the integrations read; all optional, with the defaults of `config.ts`. */
@@ -26,7 +29,8 @@ export type ServicesConfig = Partial<
     | "PLAN_REFRESH_MINUTES"
     | "TIMEZONE"
   >
->;
+> &
+  IntegrationsSettings;
 
 /**
  * What the other modules (MCP tools, Telegram, Google Calendar, Strava) are given: the event bus,
@@ -52,7 +56,11 @@ export interface Services {
   destinations: readonly string[];
   /** The rider's time zone (IANA). */
   timezone: string;
-  /** Starts the refresher and the upload worker. */
+  /** The Google Calendar mirror (ADR 0019); null when the GOOGLE_* settings are not all set. */
+  calendar: CalendarMirror | null;
+  /** The Telegram bot (ADR 0019); null when TELEGRAM_BOT_TOKEN is not set. */
+  telegram: TelegramBot | null;
+  /** Starts the refresher, the upload worker, the calendar mirror and the bot. */
   start(): void;
   /** Stops them and waits for what is in flight. */
   stop(): Promise<void>;
@@ -124,6 +132,35 @@ export function createServices(options: ServicesOptions): Services {
     if (header?.workoutId != null) await rideWorkouts.resolve(header);
   });
 
+  const planSource = refresher !== null;
+  const calendar = createCalendar({
+    config,
+    db,
+    plan,
+    bus,
+    log,
+    timezone,
+    planSource,
+    now,
+    fetch: options.fetch,
+    sleep: options.sleep,
+    timers: options.timers,
+  });
+  const telegram = createTelegram({
+    config,
+    db,
+    plan,
+    bus,
+    intervals,
+    refresher,
+    log,
+    timezone,
+    now,
+    fetch: options.fetch,
+    sleep: options.sleep,
+    timers: options.timers,
+  });
+
   return {
     bus,
     plan,
@@ -136,12 +173,16 @@ export function createServices(options: ServicesOptions): Services {
     // Queued either way, so a key added later also sends the rides that came before it.
     destinations: [INTERVALS_DESTINATION],
     timezone,
+    calendar,
+    telegram,
     start() {
       void uploads?.start();
       refresher?.start(config.PLAN_REFRESH_MINUTES ?? 15);
+      void calendar?.start();
+      telegram?.start();
     },
     async stop() {
-      await Promise.all([uploads?.stop(), refresher?.stop()]);
+      await Promise.all([uploads?.stop(), refresher?.stop(), calendar?.stop(), telegram?.stop()]);
     },
   };
 }

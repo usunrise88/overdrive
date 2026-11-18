@@ -5,7 +5,7 @@ bot, insights. One deployable with internal modules. Today it has the ride intak
 the tablet's rides arrive here and are stored), the PostgreSQL schema behind it, the intervals.icu
 integration (ADR 0016: rides are forwarded, the planned workouts are read, converted, cached and
 served to the tablet), the rider's profile (`GET`/`PATCH /v1/profile`), the MCP server with its
-OAuth server for AI clients (ADR 0018) and `GET /healthz`.
+OAuth server for AI clients (ADR 0018), the Google Calendar mirror and the Telegram bot (ADR 0019) and `GET /healthz`.
 
 ```bash
 pnpm --filter @overdrive/server dev      # node --watch src/main.ts, http://127.0.0.1:8080 (needs DATABASE_URL)
@@ -38,6 +38,14 @@ and names the variable, never its value):
 | `PUBLIC_BASE_URL` | unset | The service's public address, `https://overdrive.llmto.day` (http only for `localhost`): the OAuth issuer and the origin of the MCP endpoint's addresses. **With `OWNER_PASSPHRASE_HASH`, turns the MCP server on** |
 | `OWNER_PASSPHRASE_HASH` | unset | The owner's passphrase as a scrypt hash, `scrypt:…`, made by `hash-passphrase` (below). **With `PUBLIC_BASE_URL`, turns the MCP server on.** The plain passphrase is never configured |
 | `MCP_STATIC_TOKENS` | empty | `name:token,name:token`: fixed bearer tokens for MCP clients that cannot do OAuth, at least 32 characters each. Open `/mcp` only. Ignored while the MCP server is off |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_CALENDAR_ID` | unset | Google Calendar (ADR 0019). **On only when all four are set**; with some set the calendar stays off and the log names the missing ones. The refresh token comes from `pnpm --filter @overdrive/server run google-auth` |
+| `GCAL_WORKOUT_START` | `07:00` | `HH:MM` in `TIMEZONE`: when a planned workout starts, for the calendar event and the lead reminder |
+| `TELEGRAM_BOT_TOKEN` | unset | The bot is on when this is set (BotFather) |
+| `TELEGRAM_OWNER_CHAT_ID` | unset | The one chat the bot answers, a number (a private chat's is positive). Unset with the token set: setup mode, the bot only logs the chat ids that write to it |
+| `REMINDER_EVENING_TIME` | `20:00` | The evening-before reminder, `HH:MM` or `off` |
+| `REMINDER_LEAD_MINUTES` | `60` | The second reminder, this many minutes before the start; `0` is off, at most 1440 |
+| `WEEKLY_SUMMARY_DAY`, `WEEKLY_SUMMARY_TIME` | `sun`, `18:00` | A day (`mon` … `sun`, or the full name) and `HH:MM`, or the time `off` |
+| `GOOGLE_API_BASE_URL`, `GOOGLE_TOKEN_URL`, `TELEGRAM_BASE_URL` | the real ones | For a proxy or a test; the tests point them at fakes |
 
 Empty values mean the defaults (compose passes `${VAR:-}`). Secrets for intervals.icu, Strava,
 Google, Telegram and the LLM endpoint live in the server environment only, never in the repo; a
@@ -93,7 +101,8 @@ FIT, drained by the upload worker below. `planned_workouts` is the plan cache an
 says how the last refreshes went (migration 0002, ADR 0016). Migration 0003 (ADR 0018) adds `profile`
 (one row), `ride_workouts` (the workout each ride was played from, kept when the ride is stored) and the
 OAuth tables `oauth_clients`, `oauth_codes` and `oauth_tokens`, in which codes, tokens and client secrets
-are only ever digests.
+are only ever digests. `calendar_events`, `plan_history`, `bot_notifications` and `bot_state` belong to the
+calendar mirror and the bot (migration 0004, ADR 0019).
 
 Tests run on PGlite and need nothing installed. To run them on a real PostgreSQL as well (CI does),
 set `TEST_DATABASE_URL`: **the `public` schema of that database is dropped**, so point it at a scratch one.
@@ -179,6 +188,38 @@ DELETE FROM oauth_tokens;               -- every client must ask for approval ag
 **Seeing what happens.** The log names the client at registration, approval and denial, a wrong passphrase (never its value), a code
 used twice and a refresh token reused (a family revoked), and each write tool (`workout planned through the MCP`, …). Tokens,
 codes, secrets, the passphrase and its hash are never logged.
+## Google Calendar and Telegram (ADR 0019)
+
+Both start with `app.services.start()` and are off (null, one log line) without their settings.
+
+- **Calendar mirror** (`src/gcal/`). A pass compares the plan cache (today onwards, workouts the tablet can play) with the
+  `calendar_events` table and creates, updates or deletes events in the dedicated calendar: title the workout's name, start at
+  `GCAL_WORKOUT_START` in `TIMEZONE`, length the workout's, the steps in plain words as the description (by code, `src/plan/workout-summary.ts`).
+  The event id is derived from the planned id, so a repeated create is a `409` and a patch, never a duplicate. Passes run on
+  `plan-changed`, every minute and at start, when the start-up sweep also deletes our events whose workout is gone (it waits until
+  the plan has been read once). Retries and their waits (1, 2, 4 … minutes to 6 hours, 20 tries) are in the table; wrong credentials
+  stop it for six hours with one error line; a day that has passed is left alone. Google Calendar is never read back.
+  `calendar_events`: `state`, `attempts`, `last_error`, `next_attempt_at` say how it is going.
+- **`google-auth`** (`src/gcal/auth-cli.ts`). `pnpm --filter @overdrive/server run google-auth`: the OAuth loopback flow with PKCE
+  in the owner's terminal; prints `GOOGLE_REFRESH_TOKEN=…` and writes no file. Steps: `docs/deploy.md`, section 14.
+- **Bot** (`src/telegram/`). Long polling (`getUpdates`), the next offset kept in `bot_state`; answers **only**
+  `TELEGRAM_OWNER_CHAT_ID`, logs any other chat's id and never its content. Commands `/today`, `/week`, `/skip` and `/move` (buttons,
+  confirmation before a skip; they write through `PlanStore` and the intervals.icu client, and say so plainly when there is no plan
+  source), `/help`. By itself: reminders (the evening before, and `REMINDER_LEAD_MINUTES` before the start), a summary after each
+  stored ride, a weekly summary. Each is claimed in `bot_notifications` before it is sent and marked after, so a restart neither
+  repeats nor loses one. Numbers are computed by code; no model is involved. `plan_history` keeps the planned workouts after the
+  plan cache has dropped their day, for the weekly "planned against done". Steps: `docs/deploy.md`, section 13.
+
+Looking at what they hold:
+
+```sql
+SELECT planned_id, google_event_id, state, attempts, last_error, next_attempt_at FROM calendar_events;
+SELECT kind, key, state, attempts, last_error, sent_at FROM bot_notifications ORDER BY created_at DESC LIMIT 20;
+```
+
+The tests never touch Google or Telegram: `test/helpers/fake-google.ts` and `fake-telegram.ts` are fakes (Node HTTP servers on free
+ports; everything in them is invented), and `test/helpers/integrations.ts` builds the whole service against them with a clock and
+timers the test moves. What the real services must still confirm is listed in ADR 0019.
 
 ## Modules (for the next ones)
 
@@ -191,6 +232,7 @@ Other modules (the MCP tools, Telegram, Google Calendar, Strava) plug in without
 | Plan store | `src/plan/store.ts` | `list`, `get`, `entries` (also the ones that cannot be played), `upsert`, `remove`, `mirror`; any write that changes something emits `plan-changed` |
 | Refresh now | `services.refresher?.refresh()` | after a write to the calendar; never throws, joins a refresh already running |
 | intervals.icu | `services.intervals` | `createEvent`, `updateEvent`, `deleteEvent`, `listEvents`; `null` when the key is not set. `workoutToEventPayload(workout, date)` in `src/intervals/workout-convert.ts` makes the payload from a native workout |
+| Calendar, bot | `services.calendar`, `services.telegram` | `null` when off. They only read the plan and the events; the commands' writes are `doSkip` and `doMove` in `src/telegram/commands.ts` (plan store plus intervals.icu client), to be moved onto a shared function if the MCP tools need the same |
 | Destinations | `services.destinations` | the destinations a stored ride is queued for; a new one (Strava) adds its name and runs its own worker over `ride_destinations` like `src/intervals/uploads.ts` |
 | Profile | `services.profile` (`src/profile/store.ts`) | `get()` the FTP, zones, availability, goals and physics; `update(patch)` (validated, atomic); a change emits `profile-changed` (`{ fields }`) |
 | Rides | `services.rides` (`src/ride-store.ts`), `services.rideWorkouts` | `list`, `getRecord` of the stored rides; the workout a ride was played from, copied when it was stored. `src/ride-stats.ts` has the pure statistics, series and compliance (`rideStatistics`, `rideSeries`, `rideCompliance`) a ride summary for Telegram can reuse |
