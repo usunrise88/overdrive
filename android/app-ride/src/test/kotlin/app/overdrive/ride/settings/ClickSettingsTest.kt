@@ -1,5 +1,6 @@
 package app.overdrive.ride.settings
 
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -36,6 +37,8 @@ class ClickSettingsTest {
         val options = settings.toOptions()
         assertEquals(core.sendPostHandshake, options.sendPostHandshake)
         assertEquals(core.keepAliveInterval, options.keepAliveInterval)
+        assertEquals(core.silentMeansLocked, options.silentMeansLocked)
+        assertFalse("silence is not a lock by default (first bench, ADR 0013)", settings.silentMeansLocked)
         assertEquals(core.noEventTimeout, options.noEventTimeout)
         assertEquals(core.requestedMtu, options.requestedMtu)
         assertEquals(core.writeWithResponse, options.writeWithResponse)
@@ -56,6 +59,7 @@ class ClickSettingsTest {
             ClickSettings(
                 sendPostHandshake = false,
                 keepAlive = ClickKeepAlive.Every30,
+                silentMeansLocked = true,
                 noEventTimeout = ClickSilence.Long,
                 mtu = ClickMtu.System,
                 writeWithResponse = true,
@@ -65,6 +69,7 @@ class ClickSettingsTest {
             ).toOptions()
         assertFalse(options.sendPostHandshake)
         assertEquals(30.seconds, options.keepAliveInterval)
+        assertTrue(options.silentMeansLocked)
         assertEquals(60.seconds, options.noEventTimeout)
         assertNull(options.requestedMtu)
         assertTrue(options.writeWithResponse)
@@ -121,6 +126,7 @@ class ClickSettingsTest {
                 ClickSettings(
                     sendPostHandshake = false,
                     keepAlive = ClickKeepAlive.Every60,
+                    silentMeansLocked = true,
                     noEventTimeout = ClickSilence.VeryLong,
                     mtu = ClickMtu.Large,
                     writeWithResponse = true,
@@ -132,6 +138,44 @@ class ClickSettingsTest {
                 )
             repository.update { it.copy(click = chosen) }
             assertEquals(chosen, repository.settings.first().click)
+        }
+
+    @Test
+    fun theSilenceSwitchIsStoredOnItsOwnKeyAndReadBackEitherWay() =
+        runTest {
+            val store = InMemoryPreferences()
+            val repository = SettingsRepository(store)
+            assertFalse(repository.settings.first().click.silentMeansLocked)
+            repository.update { it.copy(click = it.click.copy(silentMeansLocked = true)) }
+            assertEquals(true, store.data.first()[booleanPreferencesKey("dev_click_silent_means_locked")])
+            assertTrue(repository.settings.first().click.silentMeansLocked)
+            repository.update { it.copy(click = it.click.copy(silentMeansLocked = false)) }
+            assertFalse(repository.settings.first().click.silentMeansLocked)
+        }
+
+    @Test
+    fun settingsStoredBeforeTheSilenceSwitchExistedStillLoadAndTheSwitchIsOff() =
+        runTest {
+            // What v0.1.0 wrote: the owner had changed Reply check at the bench; the silence rule had no key of its own.
+            val store = InMemoryPreferences()
+            store.edit {
+                it[stringPreferencesKey("dev_click_reply_check")] = "Lenient"
+                it[booleanPreferencesKey("dev_click_post_handshake")] = false
+                it[stringPreferencesKey("dev_click_keep_alive")] = "Every30"
+                it[stringPreferencesKey("dev_click_no_event_timeout")] = "Long"
+                it[stringPreferencesKey("dev_click_mtu")] = "Large"
+                it[hold] = 600
+            }
+            val read = SettingsRepository(store).settings.first().click
+            assertEquals(ClickReplyCheck.Lenient, read.replyCheck)
+            assertFalse(read.sendPostHandshake)
+            assertEquals(ClickKeepAlive.Every30, read.keepAlive)
+            assertEquals(ClickSilence.Long, read.noEventTimeout)
+            assertEquals(ClickMtu.Large, read.mtu)
+            assertEquals(600, read.holdThresholdMillis)
+            assertFalse("no stored value: the new default", read.silentMeansLocked)
+            assertFalse(read.toOptions().silentMeansLocked)
+            assertEquals(HandshakeReplyCheck.ANY_RIDE_ON, read.toOptions().handshakeReply)
         }
 
     @Test

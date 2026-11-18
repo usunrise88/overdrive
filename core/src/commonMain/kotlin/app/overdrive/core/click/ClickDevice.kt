@@ -65,8 +65,9 @@ import kotlin.time.TimeSource
  * §3.3), and nothing here unlocks a controller. Every guess is an option of [ClickOptions].
  *
  * **What the UI can explain** ([state]): connected and delivering ([ClickState.Active]), **needs unlocking through Zwift**
- * ([ClickState.NeedsUnlock]: the service is hidden, or the handshake was answered and then nothing came within
- * [ClickOptions.noEventTimeout]; both are options), not found, Bluetooth unavailable, set-up failed.
+ * ([ClickState.NeedsUnlock]: the service is hidden, or, only with [ClickOptions.silentMeansLocked] on (off by default:
+ * a real Click sends nothing until a button is pressed), the handshake was answered and then nothing came within
+ * [ClickOptions.noEventTimeout]), not found, Bluetooth unavailable, set-up failed. An answered handshake is [ClickState.Active].
  *
  * **Buttons.** [buttons] is a hot flow of [ButtonChange]s: edges from successive bitmaps, repeats ignored, all five buttons
  * at once. When a link ends while buttons are down the adapter **releases them itself** with a synthetic change, so a
@@ -362,12 +363,16 @@ public class ClickDevice(
             }
             handshakeFailure()?.let { return SessionOutcome.Failed(it) }
 
-            probe.update { if (it == Probe.HANDSHAKING) Probe.WAITING else it }
             if (options.silentMeansLocked) {
+                // Opt-in: no frame within the time counts as locked (a real Click is silent until a press, bench report 1).
+                probe.update { if (it == Probe.HANDSHAKING) Probe.WAITING else it }
                 sessionScope.launch {
                     delay(options.noEventTimeout)
                     probe.update { if (it == Probe.WAITING) Probe.SILENT else it }
                 }
+            } else {
+                // An answered handshake is a working link: the Click sends nothing until a button is pressed.
+                probe.update { if (it == Probe.HANDSHAKING) Probe.ACTIVE else it }
             }
 
             if (options.sendPostHandshake) {
@@ -415,6 +420,7 @@ public class ClickDevice(
                 parsed is DecodeResult.Ok &&
                     (
                         options.handshakeReply == HandshakeReplyCheck.ANY_RIDE_ON ||
+                            parsed.value.version == null ||
                             parsed.value.version == EXPECTED_VERSION
                     )
             if (accepted && parsed is DecodeResult.Ok) {

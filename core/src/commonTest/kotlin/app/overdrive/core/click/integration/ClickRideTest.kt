@@ -5,6 +5,7 @@ import app.overdrive.core.ble.fake.FakeClickLock
 import app.overdrive.core.ble.fake.FakeClickOptions
 import app.overdrive.core.ble.integration.BleRide
 import app.overdrive.core.click.ClickBits
+import app.overdrive.core.click.ClickOptions
 import app.overdrive.core.click.ClickState
 import app.overdrive.core.click.UnlockSignal
 import app.overdrive.core.click.addClick
@@ -271,9 +272,14 @@ class ClickRideTest {
         }
 
     @Test
-    fun `a Click that is silent after the handshake is reported after thirty seconds and does nothing to the ride`() =
+    fun `with the opt-in silence rule a silent Click is reported after thirty seconds and does nothing to the ride`() =
         runTest {
-            val rig = ClickRide(this, fake = FakeClick().also { it.lock = FakeClickLock.SILENT })
+            val rig =
+                ClickRide(
+                    this,
+                    fake = FakeClick().also { it.lock = FakeClickLock.SILENT },
+                    clickOptions = ClickOptions(silentMeansLocked = true),
+                )
             rig.ride.start()
             rig.ride.rig.advance(31_000)
             assertEquals(ClickState.NeedsUnlock(UnlockSignal.NO_EVENTS), rig.click.state.value)
@@ -283,6 +289,19 @@ class ClickRideTest {
             rig.fake.release(ClickBits.PLUS)
             assertEquals(emptyList(), rig.actions)
             rig.ride.rig.assertNoViolations()
+        }
+
+    @Test
+    fun `by default a Click that says nothing is active, and does nothing to the ride either`() =
+        runTest {
+            val rig = ClickRide(this)
+            rig.ride.rig.advance(600_000)
+            assertEquals(ClickState.Active, rig.click.state.value, "ten minutes without a press is a healthy Click")
+            assertEquals(emptyList(), rig.actions)
+            rig.ride.start()
+            rig.ride.rig.advance(2_000)
+            rig.tap(ClickBits.PLUS)
+            assertEquals(105, rig.ride.now.intensityPercent)
         }
 
     // endregion

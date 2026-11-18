@@ -163,9 +163,10 @@ controls.start()
 - **Set-up** (§3.1): discover, ASYNC notify, SYNC_TX indicate, `RideOn` written without response, the reply, optionally
   `FF 04 00`, firmware and battery. **Everything the notes leave open is a `ClickOptions` field** with the bench question that
   settles it (the table is in ADR 0011 §9): the device-type bytes, whether to write `FF 04 00`, how strict the reply check is,
-  the keep-alive (none by default) and its frame, the no-event timeout, what a hidden service means.
-- **Unlock handling** is a state, `ClickState.NeedsUnlock`, for a hidden service or a controller that answers and then sends no
-  frame at all. **A release lost in a drop never leaves a button held**: the adapter releases what was down with a synthetic
+  the keep-alive (none by default) and its frame, the no-event timeout, what a hidden service means. The default reply check accepts a
+  bare `RideOn` and `RideOn 02 03` (the first bench's right puck answers the former).
+- **Unlock handling** is a state, `ClickState.NeedsUnlock`, for a hidden service or, **only with `silentMeansLocked` on (off by
+  default: a real Click is silent until a button is pressed, ADR 0013)**, a controller that answers and then sends no frame at all. **A release lost in a drop never leaves a button held**: the adapter releases what was down with a synthetic
   `ButtonChange`, and the gesture layer forgets those presses without firing anything.
 - **The gestures** (`GestureDetector`, pure, virtual-time tests): Plus, Button 2 and Button 3 fire their press **on release**
   (under 500 ms) and their hold **once at 500 ms**; Button 4 and 5 fire a volume step **on press** and repeat from 500 ms every
@@ -178,8 +179,10 @@ controls.start()
   on-screen button and a handlebar button cannot diverge. In an ERG step the gear actions change intensity by 5 points, the pause
   toggle works while riding or paused. `ActionRouter({ session }, media) { snapshotOf(it) }` takes an optional accessor for a host that
   keeps its own copy of the state; the default reads the session's own snapshot.
-- **The fake in your tests.** `FakeClick` (`world.add(id, FakeClick())`) answers `RideOn 02 03`, delivers frames, and can be
-  `lock = HIDDEN` or `SILENT`; `fake.script { tap(ClickBits.PLUS, at = 3.seconds); hold(...); drop(...); silence(...); unlock(...) }`.
+- **The fake in your tests.** `FakeClick` (`world.add(id, FakeClick())`) behaves like the right puck of the first bench: it answers the
+  bare `RideOn` and sends nothing until a press; `FakeClickOptions.byNotes()` is the old `RideOn 02 03` puck with a heartbeat and
+  a battery frame, `FakeClickOptions.realPuck()` adds the real GATT table, MTU 251 and the unknown `0x2A` message. It can be
+  `lock = HIDDEN` or `SILENT` (silence counts as a lock only with `ClickOptions(silentMeansLocked = true)`); `fake.script { tap(ClickBits.PLUS, at = 3.seconds); hold(...); drop(...); silence(...); unlock(...) }`.
   See `ClickDeviceTest`, `ClickRideTest` (all ten actions through the real engine) and the sessions in
   `../contracts/fixtures/ble/click-*.click.session.txt`.
 

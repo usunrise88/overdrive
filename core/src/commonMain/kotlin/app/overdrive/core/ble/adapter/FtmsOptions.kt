@@ -48,10 +48,20 @@ public class FtmsOptions(
     public val operationFailedBackoff: Duration = 500.milliseconds,
     /** The wait before taking control back after the trainer reports it lost (Status `0x01` or `0xFF`, §5). */
     public val controlRecoveryDelay: Duration = 1.seconds,
+    /**
+     * A Reset status (`0x01`) that arrives within this long after a Request Control **this connection just completed** is
+     * the trainer's own answer to it, not a loss of control, and is ignored. The Van Rysel D500 follows every Request
+     * Control with a Reset, which made the adapter take control again at once: five Request Control and Start pairs in the
+     * first 1.5 seconds of the first bench ride (docs/bench-reports/2026-11-18-first-ride.md §2, FT 10). A Reset outside the
+     * window, and a Control Permission Lost (`0xFF`) at any time, still count as lost control and are recovered; a real
+     * loss is also caught by the next command failing and the engine's retry. Zero turns the grace off. **FT 10.**
+     */
+    public val selfResetGrace: Duration = 1500.milliseconds,
 ) {
     init {
         require(requestedMtu >= MIN_MTU) { "The MTU request must be at least $MIN_MTU, got $requestedMtu" }
         require(operationFailedRetries >= 0) { "Retries must not be negative, got $operationFailedRetries" }
+        require(!selfResetGrace.isNegative()) { "The self-reset grace must not be negative, got $selfResetGrace" }
     }
 
     private companion object {
@@ -64,7 +74,10 @@ public sealed interface TrainerEvent {
     /** Control of the trainer was granted. */
     public data object ControlGranted : TrainerEvent
 
-    /** The trainer says control is gone (Status `0x01` or `0xFF`); the adapter takes it back and re-sends the last target. */
+    /**
+     * The trainer says control is gone (Status `0xFF`, or `0x01` outside [FtmsOptions.selfResetGrace] of our own Request
+     * Control); the adapter takes it back and re-sends the last target.
+     */
     public data class ControlLost(
         val status: FitnessMachineStatus,
     ) : TrainerEvent

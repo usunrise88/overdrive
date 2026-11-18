@@ -30,8 +30,11 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+
+private const val NANOS_PER_MILLI = 1_000_000L
 
 /**
  * The FTMS trainer adapter over the fake peripheral: set-up in the order of docs/protocols/ftms-hr.md §4.1, the Control
@@ -641,6 +644,134 @@ class FtmsTrainerDeviceTest {
             assertEquals(LinkStatus.Stopped, trainer.status.value)
             rig.advance(30_000)
             assertEquals(1, rig.ble.transports.size)
+        }
+
+    // endregion
+
+    // region the D500's Reset after Request Control (bench report 1, FT 10)
+
+    /** The Van Rysel D500 as the first bench saw it: a Reset after every Request Control, its last status repeated. */
+    private val d500 =
+        FakeFtmsTrainerOptions(resetsAfterRequestControl = true, statusRepeatInterval = 240.milliseconds)
+
+    private fun FakeFtmsTrainer.firstRequestControlMillis(): Long = commands.first().timeNanos / NANOS_PER_MILLI
+
+    @Test
+    fun `a trainer that answers Request Control with a Reset gets one Request Control and one Start at connect`() =
+        runTest {
+            val rig = BleRig(this, trainerOptions = d500)
+            val trainer = rig.trainer()
+            val events = collectAll(trainer.events)
+            trainer.start()
+            rig.advance(10_000)
+            assertEquals(listOf("RC", "START"), rig.fakeTrainer.opcodes)
+            assertEquals(ConnectionState.CONNECTED, trainer.connection.value)
+            assertTrue(rig.fakeTrainer.hasControl)
+            assertTrue(
+                TrainerEvent.StatusReceived(FitnessMachineStatus.Reset) in events,
+                "the Reset did arrive, and is only not taken for a loss",
+            )
+            assertTrue(events.none { it is TrainerEvent.ControlLost })
+            assertEquals(1, events.count { it is TrainerEvent.ControlGranted })
+            rig.assertNoViolations()
+        }
+
+    @Test
+    fun `with the grace off the fake D500's Reset makes the adapter ask for control again, as on the bench`() =
+        runTest {
+            val rig = BleRig(this, trainerOptions = d500)
+            val trainer = rig.trainer(FtmsOptions(selfResetGrace = Duration.ZERO))
+            trainer.start()
+            rig.advance(5_000)
+            assertEquals(listOf("RC", "START", "RC", "START"), rig.fakeTrainer.opcodes)
+            trainer.setTargetPower(200) // the last Reset left the adapter believing it had no control
+            assertEquals(listOf("RC", "START", "RC", "START", "RC", "START", "TARGET 200"), rig.fakeTrainer.opcodes)
+        }
+
+    @Test
+    fun `the grace is an option, a Reset inside it is ignored and one past it is lost control`() =
+        runTest {
+            val rig = BleRig(this)
+            val trainer = rig.trainer(FtmsOptions(selfResetGrace = 3.seconds))
+            val events = collectAll(trainer.events)
+            trainer.start()
+            rig.advance(1_000)
+            val trainerLink = assertNotNull(rig.fakeTrainer.connection)
+            trainerLink.push(FtmsUuids.STATUS, byteArrayOf(0x01))
+            rig.advance(3_000)
+            assertTrue(events.none { it is TrainerEvent.ControlLost }, "inside a grace of three seconds")
+            assertEquals(listOf("RC", "START"), rig.fakeTrainer.opcodes)
+
+            trainerLink.push(FtmsUuids.STATUS, byteArrayOf(0x01)) // now past it
+            rig.advance(2_000)
+            assertEquals(1, events.count { it is TrainerEvent.ControlLost })
+            assertEquals(listOf("RC", "START", "RC", "START"), rig.fakeTrainer.opcodes)
+        }
+
+    @Test
+    fun `a Reset five seconds after control was granted is still lost control, and is recovered`() =
+        runTest {
+            val rig = BleRig(this, trainerOptions = d500)
+            val trainer = rig.trainer()
+            val events = collectAll(trainer.events)
+            trainer.start()
+            rig.advance(5_000)
+            assertEquals(listOf("RC", "START"), rig.fakeTrainer.opcodes)
+
+            assertNotNull(rig.fakeTrainer.connection).push(FtmsUuids.STATUS, byteArrayOf(0x01))
+            rig.settle()
+            assertEquals(
+                FitnessMachineStatus.Reset,
+                events.filterIsInstance<TrainerEvent.ControlLost>().single().status,
+            )
+            rig.advance(1_500)
+            assertEquals(listOf("RC", "START", "RC", "START"), rig.fakeTrainer.opcodes)
+            assertTrue(rig.fakeTrainer.hasControl)
+            rig.advance(5_000)
+            assertEquals(listOf("RC", "START", "RC", "START"), rig.fakeTrainer.opcodes, "and then it settles again")
+        }
+
+    @Test
+    fun `Control Permission Lost inside the window still recovers`() =
+        runTest {
+            val rig = BleRig(this, trainerOptions = d500)
+            val trainer = rig.trainer()
+            val events = collectAll(trainer.events)
+            trainer.start()
+            rig.advance(1_000)
+            val sinceRequestControl = rig.nowMillis - rig.fakeTrainer.firstRequestControlMillis()
+            assertTrue(
+                sinceRequestControl < FtmsOptions().selfResetGrace.inWholeMilliseconds,
+                "still inside the grace window of the first Request Control: $sinceRequestControl ms",
+            )
+            rig.fakeTrainer.revokeControl()
+            rig.settle()
+            assertEquals(
+                FitnessMachineStatus.ControlPermissionLost,
+                events.filterIsInstance<TrainerEvent.ControlLost>().single().status,
+            )
+            rig.advance(1_500)
+            assertEquals(listOf("RC", "START", "RC", "START"), rig.fakeTrainer.opcodes)
+            assertTrue(rig.fakeTrainer.hasControl)
+        }
+
+    @Test
+    fun `with the D500's Resets the ERG target power still reaches the trainer and the rider's power follows`() =
+        runTest {
+            val rig = BleRig(this, trainerOptions = d500)
+            val trainer = rig.trainer()
+            val readings = collectAll(trainer.data)
+            trainer.start()
+            rig.advance(1_000)
+            trainer.setTargetPower(220)
+            rig.advance(3_000)
+            assertEquals(220, rig.fakeTrainer.targetPowerWatts)
+            assertEquals(220, readings.last().power)
+            trainer.setTargetPower(160)
+            rig.advance(3_000)
+            assertEquals(listOf("RC", "START", "TARGET 220", "TARGET 160"), rig.fakeTrainer.opcodes)
+            assertEquals(160, readings.last().power)
+            rig.assertNoViolations()
         }
 
     // endregion

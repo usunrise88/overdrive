@@ -87,13 +87,33 @@ class ClickSessionFixturesTest {
     }
 
     @Test
-    fun `the handshake reply in a fixture carries only RideOn and its version`() {
-        val text = file(SyntheticClick.BUTTONS).readText()
-        val replies =
+    fun `the handshake reply in a fixture carries only RideOn, and its version only for the notes' Click`() {
+        fun replies(scenario: SyntheticClick) =
             BleSessionFormat
-                .parse(text)
+                .parse(file(scenario).readText())
                 .events
                 .filter { it.direction == BleDirection.INDICATION && it.characteristic == ClickUuids.SYNC_TX }
-        assertEquals(listOf("526964654F6E0203"), replies.map { it.data })
+                .map { it.data }
+        assertEquals(listOf("526964654F6E0203"), replies(SyntheticClick.BUTTONS), "the notes' variant: RideOn 02 03")
+        assertEquals(listOf("526964654F6E"), replies(SyntheticClick.REAL_PUCK), "the real puck: a bare RideOn")
+        for (scenario in SyntheticClick.entries - SyntheticClick.BUTTONS) {
+            assertTrue(replies(scenario).all { it == "526964654F6E" }, "${scenario.stem}: ${replies(scenario)}")
+        }
+    }
+
+    @Test
+    fun `the real puck's fixture has its GATT table, its MTU and the unknown message, and the rest nothing`() {
+        val events = BleSessionFormat.parse(file(SyntheticClick.REAL_PUCK).readText()).events
+        val discovered = events.filter { it.direction == BleDirection.DISCOVERY }.mapNotNull { it.characteristic }
+        assertTrue(
+            listOf(ClickUuids.VENDOR_0100, ClickUuids.VENDOR_0101, ClickUuids.VENDOR_0102).all { it in discovered },
+            "the three vendor characteristics: $discovered",
+        )
+        assertTrue(events.any { it.direction == BleDirection.STATE && it.data == "mtu=251" })
+        val writes = events.filter { it.direction == BleDirection.WRITE && it.characteristic == ClickUuids.SYNC_RX }
+        assertEquals(listOf("526964654F6E", "FF0400"), writes.map { it.data })
+        val frames = events.filter { it.direction == BleDirection.NOTIFICATION }.map { it.data }
+        assertEquals("2A0803121212100818100018D8042205FFFFFFFF1F2800", frames.first(), "right after the notifications")
+        assertTrue(frames.drop(1).all { it.startsWith("2308") }, "then only button frames, each after a press: $frames")
     }
 }

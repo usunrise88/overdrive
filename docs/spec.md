@@ -46,7 +46,7 @@ The system is built for one fixed set of devices. Each row lists what the device
 |---|---|---|---|
 | Van Rysel D500 (Zwift Cog and Click edition) | Smart trainer | Bluetooth FTMS, ANT+, Zwift protocol | 1500 W max, 15% max simulated grade, ±2.5% accuracy. The app is the only BLE client, so the number of BLE channels does not matter. Firmware updates through Onelap Fit. |
 | Zwift Cog | Single sprocket | None | No mechanical shifting. All gearing is virtual. |
-| Zwift Click v2 | Handlebar controller | BLE, Zwift proprietary encrypted protocol | Firmware 1.3+ needs a daily unlock through Zwift. BikeControl 6.0.0 reports the right controller working without unlock. Never update the Click firmware. |
+| Zwift Click v2 | Handlebar controller | BLE, Zwift proprietary encrypted protocol | Firmware 1.3+ needs a daily unlock through Zwift. BikeControl 6.0.0 reports the right controller working without unlock. **First bench (2026-11-18): the right puck connected and delivered buttons over a plain handshake with no unlock through Zwift (one puck; its firmware and the time since Zwift last touched it were not recorded).** Never update the Click firmware. |
 | Coospo HR7 chest strap | Heart rate | BLE Heart Rate Service | RR intervals expected from a chest strap, not yet verified. |
 | Lenovo Xiaoxin Pad Pro 2025 | Ride device | Android, China ROM | No dependency on Google Play Services. APK is sideloaded. |
 | Xiaomi 14 Ultra | Companion device | Android, global ROM | Health Connect available. Needs autostart and a battery exemption for background sync. |
@@ -232,10 +232,10 @@ One controller, the right Click v2, drives everything with two gestures: press a
 - Physical buttons are assigned once their identifiers are observed on the device. The mapping is a setting.
 - Volume uses the system media volume. Play and pause is sent as a media key and reaches whichever app is playing.
 - Every action also has an on-screen control in the app, so a ride never depends on the Click.
-- **Unlock handling.** On connect the app detects whether the controller is delivering events. If not, it tells the user to unlock it through Zwift once and continues without the Click.
+- **Unlock handling.** On connect the app detects whether the controller is delivering events. If not, it tells the user to unlock it through Zwift once and continues without the Click. *First bench (2026-11-18): a healthy Click delivers nothing until a button is pressed, so "delivering" means the handshake was answered; the sign of a lock the app acts on by default is the hidden Zwift service, and "answered and then silent" is an opt-in rule.*
 
 **Settled in stage M4-1** (`app.overdrive.core.click`, `app.overdrive.core.control`, ADR 0011, `docs/protocols/click-v2.md` §10;
-**nothing run on a Click yet**):
+**first run on a Click: the bench ride of 2026-11-18, below**):
 
 - *When each action fires.* There are no double clicks, so for Plus, Button 2 and Button 3 the **press fires on release** if
   the button was down less than 500 ms, and the **hold fires once at 500 ms** while the button is still down, with nothing on
@@ -249,13 +249,14 @@ One controller, the right Click v2, drives everything with two gestures: press a
 - *The mapping* is a setting, `ButtonMapping`, role to the Click's bits. The default is a guess (Plus gear up, B gear down, Y play
   and pause, A volume up, Z volume down; ADR 0011 §5 says why) until the buttons are learned on the device: `ButtonLearner`
   asks for one press per role in order, and refuses a duplicate or a combo.
-- *Unlock handling* is `ClickDevice.state`: **connected and delivering events** (`Active`), **needs unlocking through Zwift**
-  (`NeedsUnlock`: the Zwift service is hidden, or the handshake was answered and then no frame at all came within 30 s; each
-  signal is an option), not found, Bluetooth unavailable, set-up failed. A release lost in a dropped link is made by the adapter,
+- *Unlock handling* is `ClickDevice.state`: **connected, the handshake answered** (`Active`), **needs unlocking through Zwift**
+  (`NeedsUnlock`: the Zwift service is hidden, or, **opt-in and off by default since the first bench**, the handshake was answered
+  and then no frame at all came within 30 s; each signal is an option), not found, Bluetooth unavailable, set-up failed. The
+  default reply check accepts the bare `RideOn` a real right puck answers as well as `RideOn 02 03`. A release lost in a dropped link is made by the adapter,
   so no button is left held. The ride never depends on any of it.
 
-**Settled in stage M4-2** (`android/ble`, `android/app-ride`, ADR 0012; **nothing run on a Click yet, and the tablet's Bluetooth
-stack has not been run on a radio either**):
+**Settled in stage M4-2** (`android/ble`, `android/app-ride`, ADR 0012; **first run on a Click and on the tablet's Bluetooth stack: the
+bench ride of 2026-11-18, informal, below; no acceptance criterion is confirmed by it**):
 
 - *The Click is a long-lived device of the app, like the trainer and the strap.* It is paired from the **Devices** scan
   (listed under "Handlebar controllers" as "Zwift Click (right)": told by its manufacturer data and its service, never by its
@@ -269,19 +270,26 @@ stack has not been run on a radio either**):
   app on screen does. The foreground service of a live ride is what keeps the process alive; **that it does so with the
   screen off on this tablet, and that a media key from a background process reaches a video app, are bench items** (ADR 0012).
 - *The Click's row* says what it is doing in plain words: Connected (with the battery once the Click has said), Connecting,
-  "press any button", "Not found · retrying in N s", "Connection lost · …", "Could not connect · …", Bluetooth off or
+  "press any button" (only with the silence rule on), "Not found · retrying in N s", "Connection lost · …", "Could not connect · …", Bluetooth off or
   Nearby devices missing, and **locked**. A locked Click gets one notice, in two wordings by the sign that gave it away: the
   Zwift service is hidden ("Click is locked": "Zwift has it locked. Unlock it through Zwift once; the ride continues without
-  it.") or it answered and says nothing ("Click sends no presses": "Press any button on it. If that does nothing, unlock it through Zwift once;
+  it.") or, only with the silence rule on, it answered and says nothing ("Click sends no presses": "Press any button on it. If that does nothing, unlock it through Zwift once;
   the ride continues without it."). Neither is ever an error of the ride.
 - *Learn buttons* (Devices, offered with a connected Click and no live ride) asks for the five roles in turn, rejects a
   combination and a duplicate with a plain message, can be cancelled, and saves the mapping (`ButtonMapping.serialize`) in the
   settings; a stored value that is not a valid mapping reads as the default. **Reset to default** puts it back. The Click does
   nothing while the lesson runs, so a press made to be learned never moves the ride, and a ride that goes live ends the lesson.
 - *Developer settings for the bench* (Settings, **Developer · Click**, persisted and sanitised, a change reconnects only the
-  Click): the setup message `FF 04 00`, the handshake with response, the reply check, the keep-alive, the silence limit, the
-  message size, whether a scan result must list the service, which pucks a scan lists, and the two gesture timings (hold
+  Click): the setup message `FF 04 00`, the handshake with response, the reply check, the keep-alive, the silence rule (**Silence means
+  locked**, off) and its limit, the message size, whether a scan result must list the service, which pucks a scan lists, and the two gesture timings (hold
   threshold 250 to 1000 ms, volume repeat 50 to 500 ms; the spec's 500 ms and 150 ms are the defaults), with **Reset**.
+
+**First bench (2026-11-18)** (`docs/bench-reports/2026-11-18-first-ride.md`, `docs/protocols/click-v2.md` §11, ADR 0013; informal, not the
+checklist's steps, **no acceptance criterion confirmed**). The right puck answered the handshake with the bare `RideOn` (the default
+check now accepts it), sent nothing until a button was pressed (so silence is not a lock, and the rule that said it was is now an
+opt-in), delivered buttons with no unlock through Zwift, and showed the bits A, B, Y, Minus and Plus (as `0x2000`). The D500 answered
+every Request Control with a Reset, which the adapter no longer takes for lost control. Still open: the Click's advertisement, the
+left puck, what it does after about three minutes, and every acceptance criterion.
 
 ### 4.8 FIT export
 
@@ -645,9 +653,9 @@ One risk can change how a ride starts: the Click v2 unlock. The rest are small c
 
 | Item | What is unknown | How it gets resolved | Fallback | Bench step |
 |---|---|---|---|---|
-| Click v2 unlock bypass | Whether the no-unlock method from BikeControl 6.0.0 is in the open-source code or only in the paid build | Read the BikeControl repository before starting the Click module. **Answered by research: it is not in the open code** (implementation notes below); the plain path is built, and only the bench can say whether a right puck delivers without an unlock | Unlock once through Zwift before a ride. On-screen controls always work. | 5.2, 5.3, 5.4 |
+| Click v2 unlock bypass | Whether the no-unlock method from BikeControl 6.0.0 is in the open-source code or only in the paid build | Read the BikeControl repository before starting the Click module. **Answered by research: it is not in the open code** (implementation notes below); the plain path is built. **First bench (2026-11-18): one right puck connected and delivered buttons with no unlock through Zwift** (firmware and time since Zwift unknown); bench 5.2 to 5.4 still to run on purpose, with the left puck and a Zwift-unlocked one | Unlock once through Zwift before a ride. On-screen controls always work. | 5.2, 5.3, 5.4 |
 | Click firmware | A firmware update could break the bypass | Never update the Click. Decline the prompt in Zwift Companion. | Same as above | 5.1 (record the version) |
-| Click v2 reliability | Zwift forum users report random disconnects | Watch for it during the first rides | Auto-reconnect; on-screen controls | 5.8, 5.10, 5.11 |
+| Click v2 reliability | Zwift forum users report random disconnects | Watch for it during the first rides. **First bench: three linked sessions ended with status 8 (link supervision timeout) after 135, 183 and 210 s and the app reconnected each time; why is not known** | Auto-reconnect; on-screen controls | 5.8, 5.10, 5.11 |
 | RR intervals from the Coospo strap | Whether the strap sends them | Visible in the first build, or in nRF Connect | Ride HRV data is simply absent | 4.2 |
 | Sleep stages in Health Connect | Whether OHealth writes stages or only session duration | First companion build reads the record | Sleep analysis uses duration and timing only | none (Phase 3) |
 | HRV from the watch | Whether Wear OS passive monitoring exposes HRV on the OnePlus Watch 3 | One-evening probe on the watch, optional | Recovery model without HRV, already the baseline | none (Phase 3) |

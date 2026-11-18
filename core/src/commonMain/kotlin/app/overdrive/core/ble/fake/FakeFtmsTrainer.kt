@@ -81,6 +81,17 @@ public class FakeFtmsTrainerOptions(
     public val featureBytes: ByteArray = DEFAULT_FEATURE,
     /** How much of the gap to the target power the rider closes per notification: 1.0 is instant, 0.5 a ~2 s lag. */
     public val ergResponse: Double = 1.0,
+    /**
+     * True: every Request Control is followed by a Fitness Machine Status Reset (`01`) a few milliseconds **after** its
+     * Response Code, as the Van Rysel D500 does (docs/bench-reports/2026-11-18-first-ride.md §2, FT 10). The Started status
+     * (`04`) after Start or Resume is sent by every fake trainer.
+     */
+    public val resetsAfterRequestControl: Boolean = false,
+    /**
+     * Not null: the last status is sent again this often, as the D500 does about every 240 ms (§2); null (the default)
+     * sends each status once.
+     */
+    public val statusRepeatInterval: Duration? = null,
 ) {
     public companion object {
         /** Vectors FMF1 and FMF2 of docs/protocols/ftms-hr.md §8.6, joined. */
@@ -104,6 +115,7 @@ public class FakeFtmsTrainer(
 ) : FakePeripheral(advertisedName, setOf(FtmsUuids.SERVICE)) {
     private val written = mutableListOf<FakeTrainerCommand>()
     private var currentPower = 0.0
+    private var lastStatus: ByteArray? = null
 
     /** Every Control Point write received, oldest first, across connections. */
     public val commands: List<FakeTrainerCommand> get() = written
@@ -159,11 +171,20 @@ public class FakeFtmsTrainer(
         started = false
         targetPowerWatts = null
         simulation = null
+        lastStatus = null
         currentPower = 0.0
         connection.scope.launch {
             while (true) {
                 delay(options.notifyInterval)
                 sendBikeData(connection)
+            }
+        }
+        options.statusRepeatInterval?.let { interval ->
+            connection.scope.launch {
+                while (true) {
+                    delay(interval)
+                    lastStatus?.let { status(connection, it) }
+                }
             }
         }
     }
@@ -174,6 +195,7 @@ public class FakeFtmsTrainer(
         started = false
         targetPowerWatts = null
         simulation = null
+        lastStatus = null
     }
 
     override fun onRead(characteristic: GattUuid): ByteArray? =
@@ -257,6 +279,15 @@ public class FakeFtmsTrainer(
         when (command) {
             is FakeTrainerCommand.RequestControl -> {
                 hasControl = true
+                if (options.resetsAfterRequestControl) {
+                    // After the Response Code, so the adapter has already taken the control it is told it lost.
+                    answer(link, opcode, ControlPointResult.SUCCESS.code)
+                    link.scope.launch {
+                        delay(RESET_AFTER_RESPONSE)
+                        status(link, byteArrayOf(STATUS_RESET.toByte()))
+                    }
+                    return
+                }
             }
 
             is FakeTrainerCommand.Reset -> {
@@ -312,7 +343,9 @@ public class FakeFtmsTrainer(
         link: FakeConnection,
         bytes: ByteArray,
     ) {
-        if (options.sendsStatus) link.push(FtmsUuids.STATUS, bytes)
+        if (!options.sendsStatus) return
+        lastStatus = bytes
+        link.push(FtmsUuids.STATUS, bytes)
     }
 
     private fun parse(
@@ -356,6 +389,7 @@ public class FakeFtmsTrainer(
     }
 
     private companion object {
+        val RESET_AFTER_RESPONSE = 20.milliseconds
         const val DEFAULT_CADENCE = 90
         const val DEFAULT_SIMULATION_POWER = 110
         const val SPEED_PER_RPM = 0.3

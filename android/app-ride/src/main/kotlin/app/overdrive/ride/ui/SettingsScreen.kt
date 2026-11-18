@@ -539,7 +539,20 @@ private fun ClickDeveloperGroup(
                 { index -> change { it.copy(keepAlive = ClickKeepAlive.entries[index]) } },
             )
         }
-        SettingRow("Silence limit", description = "Without a message for this long, the Click counts as locked") {
+        SettingRow(
+            "Silence means locked",
+            description = "Answered, then sent nothing: counts as locked. A healthy Click waits for a press",
+        ) {
+            OdSwitch(
+                click.silentMeansLocked,
+                { value -> change { it.copy(silentMeansLocked = value) } },
+                contentDescription = "Silence means locked",
+            )
+        }
+        SettingRow(
+            "Silence limit",
+            description = "With the switch above: how long without a message counts as locked",
+        ) {
             SegmentedControl(
                 ClickSilence.entries.map { it.label },
                 click.noEventTimeout.ordinal,

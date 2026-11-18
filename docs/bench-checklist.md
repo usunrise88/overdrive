@@ -359,11 +359,16 @@ the firmware revision at set-up (`ClickDevice.firmware`) and keeps it out of eve
 |---|---|
 | Not paired, **Pair** | nothing remembered |
 | Connecting to Zwift Click (right)… | the app is connecting or setting up |
-| Zwift Click (right) · press any button | connected, handshake done, no message yet. First bench (2026-11-18): a real Click sends nothing until a button is pressed, so the row says to press any button (up to the silence limit) |
+| Zwift Click (right) · press any button | connected, handshake done, no message yet, **only with Silence means locked on** (off by default). First bench (2026-11-18): a real Click sends nothing until a button is pressed, so with the rule off an answered Click is simply **Connected** |
 | Zwift Click (right) · battery 87% | delivering messages; the battery once the Click has said |
 | Not found · retrying in 8 s / Connection lost · … / Could not connect · … | it is off, asleep, out of range or held by another app / the link dropped / a set-up step failed; **Retry now** tries at once |
-| Zwift Click (right) · locked, with a notice below | the Zwift service is hidden, or it answered and says nothing (5.3) |
+| Zwift Click (right) · locked, with a notice below | the Zwift service is hidden, or, only with Silence means locked on, it answered and says nothing (5.3) |
 | Zwift Click (right) · Bluetooth is off / needs Nearby devices | the same notice and fix as the others |
+
+**The defaults now fit the Click of the first bench** (2026-11-18, `docs/bench-reports/2026-11-18-first-ride.md`, ADR 0013): its reply
+to `RideOn` is the bare six bytes, which **Reply check: Exact** accepts (it still refuses `01 03` and other versions), and it
+sends nothing until a button is pressed, which is why **Silence means locked** is off. A fresh install therefore connects such a
+Click and shows it as Connected. Settings stored before this change load as they were (the Reply check you changed stays).
 
 **The developer settings** (Settings, right column, **Developer · Click**) are the bench's switches. Each is one option
 of `ClickOptions` or `GestureTiming` (table in ADR 0011 §9). A change replaces the Click's device (a reconnect of a few
@@ -373,9 +378,10 @@ seconds) and never touches a ride; **Reset** puts them all back and keeps the le
 |---|---|---|---|
 | Setup message | `sendPostHandshake` (writes `FF 04 00`) | on | CK 6 |
 | Handshake with response | `writeWithResponse` | off | CK 2 |
-| Reply check | `handshakeReply`: Exact (`RideOn 02 03`) or Any RideOn | Exact | CK 2 to 4 |
+| Reply check | `handshakeReply`: Exact (the bare `RideOn` the first bench saw, or `RideOn 02 03`; any other version fails) or Any RideOn | Exact | CK 2 to 4 |
 | Keep-alive | `keepAliveInterval`: Off, 10 s, 30 s, 60 s | Off | CK 7 |
-| Silence limit | `noEventTimeout`: 15 s, 30 s, 60 s, 2 min | 30 s | CK 7, CK 14 |
+| Silence means locked | `silentMeansLocked`: an answered Click that sends nothing counts as locked | **off** (first bench: a healthy Click is silent until a press) | CK 14 |
+| Silence limit | `noEventTimeout`: 15 s, 30 s, 60 s, 2 min; only with the switch above on | 30 s | CK 7, CK 14 |
 | Message size | `requestedMtu`: System, 128, 247 | 128 | CK 3 |
 | Needs its service listed | `requireAdvertisedService` | on | CK 12 |
 | Pucks found by Scan | `acceptedSides`: Right or Either | Right | CK 1 |
@@ -383,7 +389,7 @@ seconds) and never touches a ride; **Reset** puts them all back and keeps the le
 | Volume repeat | `GestureTiming.repeatIntervalMillis`, 50 to 500 ms | 150 | AC 3 |
 
 Not a switch (change the default in `ClickOptions` and build again): the two device-type bytes `rightSideByte` and
-`leftSideByte`, `serviceHiddenMeansLocked`, `silentMeansLocked`, `acceptLegacyService`, `ignoredBits`,
+`leftSideByte`, `serviceHiddenMeansLocked`, `acceptLegacyService`, `ignoredBits`,
 `handshakeTimeout`, `operationTimeout`, `readStandardCharacteristics`, and `GestureTiming.bounceMillis`.
 
 - [ ] **5.1 Discovery and pairing.** On **Devices**, **Scan for devices**. Expect: under "Handlebar controllers" the right
@@ -398,23 +404,28 @@ Not a switch (change the default in `ClickOptions` and build again): the two dev
   Close the app and relaunch: the Click connects by itself, as the trainer does (3.1). Settles: CK 1, CK 12.
 - [ ] **5.2 Plain handshake, locked right puck.** Use a right puck with no Zwift connection in the last day. Pair it. The
   app subscribes to ASYNC, then to SYNC_TX, writes `RideOn` (`52 69 64 65 4F 6E`) without response, waits for the reply
-  and by default writes `FF 04 00`. Expect: unknown. Write down the state the row reaches, the reply to the handshake and
-  its length (the Click's session file shows both: the reply is `RideOn`, two version bytes and a tail, **the tail is
+  and by default writes `FF 04 00`. **First bench, informally (report 1, not this step):** the right puck answered the bare
+  `RideOn` within about 50 ms, accepted the write without response and `FF 04 00` (status 0), and delivered buttons with no
+  unlock through Zwift; the defaults now accept that reply. Run the step anyway, with the puck's firmware and the time since
+  Zwift last touched it written down, and with the left puck and a puck unlocked through Zwift. Expect: the row goes to
+  Connected. Write down the state the row reaches, the reply to the handshake and
+  its length (the Click's session file shows both: the reply is `RideOn`, optionally two version bytes and a tail, **the tail is
   zeroed in the file but its length is kept**), and whether buttons arrive without any unlock. Also write down whether
   the custom service is listed in GATT discovery (the row says **locked** with the "Click is locked" notice if not). If the
   row says **Could not connect** after a reply, the Click's session file has the first eight bytes of the reply: a reply
-  other than `RideOn 02 03` is what **Reply check: Any RideOn** is for, and `01 03` would be the encrypted variant of the
+  other than the bare `RideOn` or `RideOn 02 03` is what **Reply check: Any RideOn** is for, and `01 03` would be the encrypted variant of the
   notes' §3.3 (**not implemented**; nothing here encrypts or unlocks). If the write fails, switch **Handshake with
   response** on. If the reply never comes, `handshakeTimeout` (5 s) is the number. Settles: CK 2, CK 3, CK 4, CK 12, CK 14,
   spec §9 "Click v2 unlock bypass" and spec §2 ("right controller working without unlock").
 - [ ] **5.3 Unlock notice.** When the controller is locked, the app tells you to unlock it through Zwift once and goes on
   without it (spec §4.7). Two signs, two texts, one promise. The service is hidden from discovery: the row says "locked"
   and the notice **Click is locked**, "Zwift has it locked. Unlock it through Zwift once; the ride continues without it."
-  (the app backs off and tries again by itself, at most every 30 s). The Click answers the handshake and then sends
-  nothing for the silence limit: the notice **Click sends no presses**, "Press any button on it. If that does nothing, unlock it through
+  (the app backs off and tries again by itself, at most every 30 s). **Only with Silence means locked switched on** (off by
+  default: the first bench's healthy Click was silent until a press, so silence is not a sign of a lock): the Click answers
+  the handshake and then sends nothing for the silence limit: the notice **Click sends no presses**, "Press any button on it. If that does nothing, unlock it through
   Zwift once; the ride continues without it." (the link stays up and a late message clears the notice by itself).
   **Check again** retries now; for a silent Click it drops the link and starts over. Expect: the notice shows with the
-  right text for the sign, and the on-screen ride controls keep working. Write down the exact notice and which sign fired.
+  right text for the sign, and the on-screen ride controls keep working. Write down the exact notice and which sign fired (with the switch off only the hidden service can).
   Then unlock through Zwift as the notice says, close Zwift, and write down the time: the Click should be picked up at the
   next attempt without a restart. Settles: spec §4.7 (unlock handling), CK 8, CK 12.
 - [ ] **5.4 Unlock duration.** Check the controller after 1 hour, 12 hours, 25 hours, and after a phone reboot (CK 8).
@@ -463,8 +474,9 @@ Not a switch (change the default in `ClickOptions` and build again): the two dev
   any disconnect and how long it stays down (CK 7). Expect: unknown. Expect the app reconnects without a restart: the row
   says "Connection lost · retrying in N s" and counts down, then "Connected". If the puck falls asleep or disconnects, set
   **Keep-alive** to 30 s (the neutral frame `23 08 FF FF FF FF 0F`) and note whether it changes anything. Note whether the
-  controller sends heartbeats (`15`) and how often: if it does not, **Silence limit** is the only thing that can call a
-  working puck locked, so lengthen it. Settles: CK 7, SP9 "Click v2 reliability".
+  controller sends heartbeats (`15`) and how often: if it does not (the first bench's right puck sent
+  nothing at rest), keep **Silence means locked** off: with it on, **Silence limit** is the only thing that can call a working
+  puck locked, so lengthen it. Settles: CK 7, SP9 "Click v2 reliability".
 - [ ] **5.9 Message types and the battery.** In the Click's session file or the snoop log, note when type `0x3C` appears and
   what follows it (CK 10; the app reports it as an unrecognised frame with its length, the bytes are in the file). The
   Devices row shows "battery N%" once the Click has said: compare it with Zwift Companion and note whether it changes as the
@@ -754,7 +766,7 @@ Everything a ride is, once, on all three devices, then the file it leaves.
 | 4 reply version | 5.2 | 11 battery | 5.9 |
 | 5 button bits | 5.5 | 12 service hidden, advertised | 5.1, 5.2, 5.3 |
 | 6 `FF 04 00` | 5.2, 5.9 | 13 | 5.6 (the ten actions) |
-| 7 heartbeat, keep-alive | 5.8, 5.10 | 14 silent means locked | 5.2, 5.3 |
+| 7 heartbeat, keep-alive | 5.8, 5.10 | 14 silent means locked (opt-in since the first bench) | 5.2, 5.3 |
 
 ---
 
@@ -769,8 +781,13 @@ written, so no row of the table is filled in from it and no acceptance criterion
 media buttons work. The Click first showed **Could not connect** and retried; after changes in **Developer · Click**
 (which one was needed was not noted; the Click's session file, step 9.2, would show the reply to `RideOn`) the link came
 up and the row then sat on "checking it answers" **until any button was pressed**: a real Click sends nothing before
-the first press, which is not the silence of a locked one. The row now says "press any button" and the silent notice starts
-with that hint (this change is in the release after `v0.1.0`). Not reported, so still open: numbers and logs, hold timing,
+the first press, which is not the silence of a locked one. **Both causes are now known from the Bluetooth session files**
+(`docs/bench-reports/2026-11-18-first-ride.md`, ADR 0013): the Click's reply to `RideOn` is the bare six bytes, which the default
+**Exact** check refused (twenty attempts), and a healthy Click is silent until a press. **The defaults now fit the observed Click:**
+Exact accepts the bare `RideOn` (and still `RideOn 02 03`), **Silence means locked** is off, so an answered Click is Connected at
+once, and the "press any button" row and the "Click sends no presses" notice appear only with that switch on (this change is in
+the release after `v0.1.0`). The same files show the D500 answering every Request Control with a Reset, which the adapter no longer
+takes for lost control, and settle FT 1 (bit 2 is cadence). Not reported, so still open: numbers and logs, hold timing,
 the app in the background and with the screen off, a 60-minute ride, FIT export and import, crash recovery.
 
 | Item | Pass / fail | Date | Notes |

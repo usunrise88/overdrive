@@ -1,6 +1,6 @@
 # ADR 0009: The BLE transport boundary, the device adapters and the session recorder
 
-Status: accepted (stage M3-1, 2026-11-18)
+Status: accepted (stage M3-1, 2026-11-18). **Amended after the first bench (ADR 0013):** section 8 has a new option, `FtmsOptions.selfResetGrace`, and FT 1 is settled.
 
 ## Context
 
@@ -208,7 +208,7 @@ The constants are in the codec objects (a one-line change that applies everywher
 
 | Choice | Name | Default | Evidence | Settled by |
 |---|---|---|---|---|
-| Bit 1 / bit 2 of Indoor Bike Data flags: Average Speed or Instantaneous Cadence | `IndoorBikeFlagMap.DEFAULT` (`DECODERS`; the other is `SIG_XML_LABELS`), `FtmsOptions.flagMap` | bit 1 average speed, bit 2 cadence | pycycling and Ewoc agree, against the SIG XML's labels (ftms-hr §2.4) | **FT 1**, bench 3.8 |
+| Bit 1 / bit 2 of Indoor Bike Data flags: Average Speed or Instantaneous Cadence | `IndoorBikeFlagMap.DEFAULT` (`DECODERS`; the other is `SIG_XML_LABELS`), `FtmsOptions.flagMap` | bit 1 average speed, bit 2 cadence | pycycling and Ewoc agree, against the SIG XML's labels (ftms-hr §2.4). **Settled by the first bench (2026-11-18): the D500 sets bit 2 for cadence, flags `0x0044`** | **FT 1** (settled), bench 3.8 |
 | Is the simulation status echo signed | `FitnessMachineStatusCodec.DEFAULT_SIMULATION_SIGNED`, `FtmsOptions.simulationStatusSigned` | signed | the Control Point field is signed; pycycling's status parser reads it unsigned (§5) | **FT 8**, bench 3.7 |
 | Contact bits of the heart-rate flags | `HeartRateContactRule.DEFAULT` (`SIG_XML`; the other is `ANY_NONZERO`), `HeartRateOptions.contactRule` | only `3` is contact detected | SIG XML against pycycling's `flags & 0x06` (§6.5) | **FT 11**, bench 4.3 |
 | Off the chest reads as no signal | `HeartRateOptions.noSignalWithoutContact` | on: 0 bpm and no RR | ADR 0004 (0 bpm is "no signal") | **FT 11**, bench 4.3 |
@@ -218,6 +218,7 @@ The constants are in the codec objects (a one-line change that applies everywher
 | Requested ATT MTU | `FtmsOptions.requestedMtu` | 64 | a 30-byte Indoor Bike Data does not fit the default 23 (§7) | **FT 12**, bench 4.5 |
 | Retries after "operation failed", and their wait | `FtmsOptions.operationFailedRetries` 2, `operationFailedBackoff` 500 ms | 2 and 500 ms | our reading of §4.4's "a small fixed number" | bench 3.4 |
 | Wait before taking control back after a loss | `FtmsOptions.controlRecoveryDelay` | 1 s | Status `0x01` and `0xFF` (§5) | **FT 4**, bench 3.3 |
+| A Reset status right after our own Request Control is not a loss | `FtmsOptions.selfResetGrace` | 1500 ms (zero turns it off); a Reset outside the window and `0xFF` at any time are still a loss | the D500 answers every Request Control with Reset `0x01`, which made the adapter ask again: five Request Control and Start pairs in 1.5 s (bench report 1 §2, ADR 0013) | **FT 4**, bench 3.3 |
 | Per-operation timeout | `FtmsOptions.operationTimeout`, `HeartRateOptions.operationTimeout` | 10 s | a platform callback that never comes | none |
 | An implausible heart rate | `HeartRateOptions.maxPlausibleBpm` | 250 (reported as 0) | a 16-bit field can say 65535 | none |
 | Reconnect schedule | `BackoffPolicy` (section 5) | 1 s, ×2, 30 s cap, ±20 %, stable 30 s | spec §4.1 asks for backoff, not for numbers | bench 3.11, 3.12 |
@@ -245,10 +246,19 @@ is 0), power is sint16, distance is uint24, RR intervals run to the end of the p
   in a row on the same opcode could therefore mis-pair a response. The adapter forgets control after a timeout, so the next
   command starts over with Request Control, which narrows the window; the bench's FT 6 timings tell whether it matters.
 
+## First bench (2026-11-18)
+
+The first ride (`docs/bench-reports/2026-11-18-first-ride.md`, `docs/protocols/ftms-hr.md` §11) settled **FT 1** (bit 2 is cadence) and showed the D500
+answering every Request Control with a Reset, handled by `selfResetGrace` above and ADR 0013. It also saw, without settling
+them: every Control Point command answered with success within about 60 ms (FT 6, FT 7: Start accepted, whether it is needed
+is open), Status `0x08` and `0x12` after the commands and `0x04` after Start (FT 4; `0xFF` not seen), an MTU of 251 for the 64
+asked (FT 12) and Indoor Bike Data notifications of 22 bytes whose last 14 the flags do not announce (the codec ignores them,
+FT 3). No acceptance criterion is confirmed by it.
+
 ## Unverified until the bench
 
 Everything above was built from the notes and tested against a fake that is written from the same notes, so **a green
-test proves consistency with the notes, not with the D500 or the HR7**. In particular: the flag bits (FT 1), distance units
+test proves consistency with the notes, not with the D500 or the HR7** (FT 1 is the first thing the bench settled, see above). In particular: the flag bits (FT 1, settled), distance units
 (FT 2), the "More Data" bit and splitting (FT 3: each notification is treated as a complete record and `MoreDataSeen` is
 reported), which Status opcodes the D500 sends (FT 4), the grade resolution and the `0x2AD5` range (FT 5: the adapter does not
 read it; the gear model keeps the grade within ±15 %), response timing (FT 6), whether Start or Resume is needed (FT 7),

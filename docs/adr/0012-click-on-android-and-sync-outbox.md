@@ -1,6 +1,8 @@
 # ADR 0012: The Click in the app, Learn buttons, developer settings for the bench, and the persistent sync outbox
 
-Status: accepted (stage M4-2, 2026-11-18)
+Status: accepted (stage M4-2, 2026-11-18). **Amended after the first bench (ADR 0013):** the Reply check's default accepts a bare `RideOn`,
+the silence rule is off by default with its own switch, and the "press any button" row and "Click sends no presses" notice (section 4)
+appear only with that rule on.
 
 ## Context
 
@@ -82,7 +84,8 @@ with its own reconnecting supervisor.
 ### 4. The Click's row and the unlock notice
 
 `BleDeviceRows.clickRow` maps `ClickState`, the battery, the radio and the retry countdown to words (table in the KDoc and
-in bench session 5): Not paired; Connecting; "press any button" (connected, nothing yet); Connected with "battery 87%" once
+in bench session 5): Not paired; Connecting; "press any button" (connected, nothing yet: **only with the silence rule on**, otherwise an answered
+Click is Connected at once); Connected with "battery 87%" once
 known (a value outside 0 to 100 is not shown); "Not found · retrying in N s", "Connection lost · …" and "Could not connect · …"
 with **Retry now**; **locked**; and the same blocked rows as the other devices when Bluetooth is off or the permission is
 missing. The countdown ticks once a second **only while a retry waits**; at rest nothing is emitted, and a battery report never
@@ -93,7 +96,7 @@ A locked Click gets **one notice with two wordings**, chosen by the sign that ga
 | Sign | Title | Text |
 |---|---|---|
 | The Zwift service is hidden from discovery | Click is locked | Zwift has it locked. Unlock it through Zwift once; the ride continues without it. |
-| The handshake was answered and then nothing came | Click sends no presses | Press any button on it. If that does nothing, unlock it through Zwift once; the ride continues without it. |
+| The handshake was answered and then nothing came (**only with Silence means locked on**) | Click sends no presses | Press any button on it. If that does nothing, unlock it through Zwift once; the ride continues without it. |
 
 Spec §4.7 says "tell the user to unlock it through Zwift once and continue without the Click"; the notice does, in one short
 sentence each, and **Check again** retries now. Neither state is ever an error of the ride.
@@ -124,9 +127,10 @@ not a rebuild.
 |---|---|---|---|
 | Setup message | `sendPostHandshake` | on | on, off |
 | Handshake with response | `writeWithResponse` | off | on, off |
-| Reply check | `handshakeReply` | Exact (`RideOn 02 03`) | Exact, Any RideOn |
+| Reply check | `handshakeReply` | Exact (the bare `RideOn` or `RideOn 02 03`) | Exact, Any RideOn |
 | Keep-alive | `keepAliveInterval` | off | off, 10 s, 30 s, 60 s |
-| Silence limit | `noEventTimeout` | 30 s | 15 s, 30 s, 60 s, 2 min |
+| Silence means locked | `silentMeansLocked` | off (ADR 0013) | on, off |
+| Silence limit (only with the switch on) | `noEventTimeout` | 30 s | 15 s, 30 s, 60 s, 2 min |
 | Message size | `requestedMtu` | 128 | system, 128, 247 |
 | Needs its service listed | `requireAdvertisedService` | on | on, off |
 | Pucks found by Scan | `acceptedSides` | right | right, either |
@@ -137,7 +141,7 @@ The first five of the brief were the keep-alive, the silence limit, the setup me
 **four more are exposed because each blocks first contact** if the guess is wrong and a rebuild at the bench is the slow way to
 find out: the write type of the handshake (CK 2), the strictness of the reply check (CK 2 to 4), whether the scan needs the
 service in the advertisement (CK 12) and which pucks a scan lists (CK 1). The others (`rightSideByte`, `leftSideByte`,
-`serviceHiddenMeansLocked`, `silentMeansLocked`, `acceptLegacyService`, `ignoredBits`, `handshakeTimeout`, `operationTimeout`,
+`serviceHiddenMeansLocked`, `acceptLegacyService`, `ignoredBits`, `handshakeTimeout`, `operationTimeout`,
 `readStandardCharacteristics`, `bounceMillis`) stay one line of code each (ADR 0011 section 9). Every default equals `core`'s
 (`ClickSettingsTest`), every value is brought into a range `ClickOptions` and `GestureTiming` accept (the whole grid of the two
 timings is built in a test and never throws), and a damaged file reads as defaults.
@@ -233,11 +237,11 @@ Xiaoxin Pad.**
 |---|---|---|---|
 | K1 | The Click's manufacturer data (company `0x094A`, first byte `0x0A` right, `0x0B` left) appears in `ScanRecord.manufacturerSpecificData` and the first byte says the side | `ScanMapping.manufacturerData`, `ClickAdvertisements` | 5.1 |
 | K2 | A scan filtered on the Click's service finds it, i.e. it advertises `FC82` in its advertisement (not only in GATT) | `PairingController` filter | 5.1 |
-| K3 | A write without response to SYNC_RX is accepted and its callback arrives; on Android 13 and later through the three-argument call, before through `setWriteType` | `BluetoothGattShim`, `AndroidGattTransport` | 5.2 |
-| K4 | The plain handshake needs no unlock on a right puck, and the reply is `RideOn 02 03` | `ClickOptions` (CK 2 to 4) | 5.2 |
-| K5 | A hidden service shows as no characteristic in discovery, and a silent Click as no message within the silence limit; both are what "locked" means | `ClickDevice`, `BleDeviceRows.clickRow` | 5.2, 5.3 |
-| K6 | The button bits of click-v2 §4 are right, and a button is one bit | `ClickBits`, `ButtonLearner` | 5.5 |
-| K7 | A Click needs no keep-alive and survives five idle minutes | `ClickOptions.keepAliveInterval` | 5.8 |
+| K3 | A write without response to SYNC_RX is accepted and its callback arrives; on Android 13 and later through the three-argument call, before through `setWriteType`. **First bench: accepted, status 0** | `BluetoothGattShim`, `AndroidGattTransport` | 5.2 |
+| K4 | The plain handshake needs no unlock on a right puck, and the reply is `RideOn 02 03`. **First bench: no unlock was needed, and the reply is the bare `RideOn`** (the default check accepts both) | `ClickOptions` (CK 2 to 4) | 5.2 |
+| K5 | A hidden service shows as no characteristic in discovery (**not seen yet**), and a silent Click as no message within the silence limit. **First bench: a healthy Click is silent until a press, so only the first is a sign of a lock by default** | `ClickDevice`, `BleDeviceRows.clickRow` | 5.2, 5.3 |
+| K6 | The button bits of click-v2 §4 are right, and a button is one bit. **First bench: they hold for A, B, Y, Minus and Plus (as `0x2000`), and no press set two bits; Z and `0x1000` were not pressed** | `ClickBits`, `ButtonLearner` | 5.5 |
+| K7 | A Click needs no keep-alive and survives five idle minutes. **First bench: no keep-alive was sent and links stayed up for three minutes (three ended with status 8 at 135, 183 and 210 s); open** | `ClickOptions.keepAliveInterval` | 5.8 |
 | B1 | The overlay's foreground service keeps the process, and with it the Click's link and the handlebar chain, alive behind another app and with the screen off | `HandlebarService`, ADR 0006 | 5.6, 5.11 |
 | B2 | With no ride live (no foreground service) Android may stop the process; the Click reconnects at the next start | `PairedDevices` | 5.11 |
 | B3 | `AudioManager.dispatchMediaKeyEvent` from a background process reaches the video app, and a volume step shows the system volume bar | `AudioManagerMediaController` | 5.6 |

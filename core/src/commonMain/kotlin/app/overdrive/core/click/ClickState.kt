@@ -10,7 +10,10 @@ public enum class UnlockSignal {
     /** The Zwift service is not in GATT discovery: the controller is hiding it (§6.1, `ClickOptions.serviceHiddenMeansLocked`). */
     SERVICE_HIDDEN,
 
-    /** The handshake was answered and then nothing at all came (`ClickOptions.silentMeansLocked`, `noEventTimeout`). */
+    /**
+     * The handshake was answered and then nothing at all came (`ClickOptions.silentMeansLocked`, `noEventTimeout`). **Opt-in:**
+     * the first bench found a healthy Click that sends nothing until a button is pressed (docs/bench-reports/2026-11-18-first-ride.md).
+     */
     NO_EVENTS,
 }
 
@@ -44,10 +47,16 @@ public sealed interface ClickState {
         val wasConnected: Boolean,
     ) : ClickState
 
-    /** Connected and set up, no frame yet, still inside the no-event time. Normal for a moment after the handshake. */
+    /**
+     * Connected and set up, no frame yet, still inside the no-event time. **Only with `ClickOptions.silentMeansLocked` on**:
+     * by default an answered handshake is [Active] at once, because a real Click is silent until a button is pressed.
+     */
     public data object Waiting : ClickState
 
-    /** Connected and delivering: at least one frame has arrived since the handshake. */
+    /**
+     * Connected and set up: the handshake was answered (by default), or, with the silence rule on, a frame has arrived since.
+     * A healthy Click says nothing until a button is pressed.
+     */
     public data object Active : ClickState
 
     /**

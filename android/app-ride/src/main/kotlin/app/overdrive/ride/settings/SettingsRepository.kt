@@ -64,6 +64,7 @@ class SettingsRepository(
         val buttonMapping = stringPreferencesKey("click_button_mapping")
         val clickPostHandshake = booleanPreferencesKey("dev_click_post_handshake")
         val clickKeepAlive = stringPreferencesKey("dev_click_keep_alive")
+        val clickSilentMeansLocked = booleanPreferencesKey("dev_click_silent_means_locked")
         val clickNoEventTimeout = stringPreferencesKey("dev_click_no_event_timeout")
         val clickMtu = stringPreferencesKey("dev_click_mtu")
         val clickWriteWithResponse = booleanPreferencesKey("dev_click_write_with_response")
@@ -108,6 +109,8 @@ class SettingsRepository(
         ClickSettings(
             sendPostHandshake = this[Keys.clickPostHandshake] ?: defaults.sendPostHandshake,
             keepAlive = enumOr(this[Keys.clickKeepAlive], defaults.keepAlive),
+            // Absent in the settings of v0.1.0: off, as on a fresh install.
+            silentMeansLocked = this[Keys.clickSilentMeansLocked] ?: defaults.silentMeansLocked,
             noEventTimeout = enumOr(this[Keys.clickNoEventTimeout], defaults.noEventTimeout),
             mtu = enumOr(this[Keys.clickMtu], defaults.mtu),
             writeWithResponse = this[Keys.clickWriteWithResponse] ?: defaults.writeWithResponse,
@@ -139,6 +142,7 @@ class SettingsRepository(
         val click = settings.click
         this[Keys.clickPostHandshake] = click.sendPostHandshake
         this[Keys.clickKeepAlive] = click.keepAlive.name
+        this[Keys.clickSilentMeansLocked] = click.silentMeansLocked
         this[Keys.clickNoEventTimeout] = click.noEventTimeout.name
         this[Keys.clickMtu] = click.mtu.name
         this[Keys.clickWriteWithResponse] = click.writeWithResponse
