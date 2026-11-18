@@ -788,7 +788,7 @@ Exact accepts the bare `RideOn` (and still `RideOn 02 03`), **Silence means lock
 once, and the "press any button" row and the "Click sends no presses" notice appear only with that switch on (this change is in
 the release after `v0.1.0`). The same files show the D500 answering every Request Control with a Reset, which the adapter no longer
 takes for lost control, and settle FT 1 (bit 2 is cadence). Not reported, so still open: numbers and logs, hold timing,
-the app in the background and with the screen off, a 60-minute ride, FIT export and import, crash recovery.
+the app in the background and with the screen off, a 60-minute ride, the laps and the heart-rate variability of the FIT in intervals.icu (the activity itself imported as a Virtual Ride with the right start time, power, heart rate and cadence: `docs/bench-reports/2026-11-18-first-ride.md` §4), crash recovery.
 
 | Item | Pass / fail | Date | Notes |
 |---|---|---|---|

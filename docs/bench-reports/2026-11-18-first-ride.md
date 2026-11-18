@@ -60,7 +60,13 @@ Advertised model **H6M** (the owner expected an HR7). Standard Heart Rate servic
 
 ## 4. The exported FIT file
 
-224 records, one per second, a 3 minutes 44 seconds activity; one session, two laps (one per workout step), a start and a stop event. Power, cadence, heart rate (14 seconds invalid, as the strap's gaps), speed, distance 1137 m. Structure and fields as `docs/protocols/fit.md` §6. **Not yet imported into intervals.icu** (FIT 1 to FIT 8, acceptance criterion 6 stay open).
+224 records, one per second, a 3 minutes 44 seconds activity; one session, two laps (one per workout step), a start and a stop event. Power, cadence, heart rate (14 seconds invalid, as the strap's gaps), speed, distance 1137 m. Structure and fields as `docs/protocols/fit.md` §6.
+
+**Imported into intervals.icu by the owner** (as an activity; a first try through the "workout" import failed with "No workout_step messages found", which is the wrong door, not a defect of the file). Seen on the activity page: recognised as a **Virtual Ride**; start time 11:42, the local time that is in the file name (no time-zone shift); distance 1.13 km; elapsed 3:44 and **moving time 2:26** (intervals.icu counts the seconds with speed above zero: 146 of 224; the ride starts and ends with idle seconds); average heart rate 137, maximum 155 (the 14 invalid heart-rate samples at the end are treated as missing); average power 89 W (over all 224 seconds), normalised power 130 W, maximum 257 W; cadence 68 (moving average), maximum 82; power, heart-rate and cadence traces drawn. **Not seen on the screenshot:** the laps (the Intervals panel was collapsed) and any heart-rate variability.
+
+**One observation for later:** the FIT's own session message carries average power 125 W, average cadence 64 and average heart rate 140, which count only the seconds that have a value, while intervals.icu recomputes from the records (89 W, 68, 137). intervals.icu ignores the session figures, so nothing is wrong there; a consumer that trusts the session message would show the higher average power. Whether the writer should average over all seconds is a question for `FitOptions` (docs/protocols/fit.md §8).
+
+Open: FIT 1 to FIT 8 except what the above answers (sport and sub-sport, start time and the invalid-value handling look right); laps and HRV not yet seen; acceptance criterion 6 stays unconfirmed until the laps are checked.
 
 ## 5. What changed in the code because of this report
 
