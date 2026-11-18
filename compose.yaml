@@ -22,6 +22,19 @@ services:
       PLAN_REFRESH_MINUTES: ${PLAN_REFRESH_MINUTES:-}
       # The rider's time zone (IANA name): which day is "today" for the plan and for a ride.
       TIMEZONE: ${TIMEZONE:-}
+      # Google Calendar (ADR 0019): on only when all four are set. docs/deploy.md, section 13.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REFRESH_TOKEN: ${GOOGLE_REFRESH_TOKEN:-}
+      GOOGLE_CALENDAR_ID: ${GOOGLE_CALENDAR_ID:-}
+      GCAL_WORKOUT_START: ${GCAL_WORKOUT_START:-}
+      # Telegram bot (ADR 0019): off while the token is empty. docs/deploy.md, section 12.
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_OWNER_CHAT_ID: ${TELEGRAM_OWNER_CHAT_ID:-}
+      REMINDER_EVENING_TIME: ${REMINDER_EVENING_TIME:-}
+      REMINDER_LEAD_MINUTES: ${REMINDER_LEAD_MINUTES:-}
+      WEEKLY_SUMMARY_DAY: ${WEEKLY_SUMMARY_DAY:-}
+      WEEKLY_SUMMARY_TIME: ${WEEKLY_SUMMARY_TIME:-}
     ports:
       - "127.0.0.1:${SERVER_PORT:-8080}:8080"
 

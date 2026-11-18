@@ -202,15 +202,116 @@ Values in `.env` are never in the repository.
 | `HOST` | `0.0.0.0` | Inside the container; outside Docker the default is `127.0.0.1` |
 | `PORT` | `8080` | Inside the container; compose publishes it as `SERVER_PORT` on loopback |
 
+### Integrations: optional, each off while its variables are empty
+
+All set in `.env` (compose passes them as `${VAR:-}`, so an empty value means the default or off). Never paste their values into
+a chat, an issue or a commit. The invalid ones stop the start with the variable's name and never its value.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `INTERVALS_API_KEY` | unset (off) | intervals.icu personal API key: rides are uploaded there and the plan is read from its calendar (ADR 0016) |
+| `INTERVALS_ATHLETE_ID` | `0` | `i12345`; `0` is the athlete the key belongs to |
+| `INTERVALS_BASE_URL` | `https://intervals.icu` | Only to go through a proxy |
+| `PLAN_REFRESH_MINUTES` | `15` | How often the plan is read, 1 to 1440 |
+| `TIMEZONE` | `UTC` | Your IANA time zone: which day is "today", what "07:00" and "Sunday 18:00" mean |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | unset | The OAuth client you create in Google Cloud (section 13) |
+| `GOOGLE_REFRESH_TOKEN` | unset | Printed once by `google-auth` (section 13) |
+| `GOOGLE_CALENDAR_ID` | unset | The dedicated calendar's id, `….@group.calendar.google.com`. The calendar is **on only when all four `GOOGLE_*` are set** |
+| `GCAL_WORKOUT_START` | `07:00` | The time a workout starts, in `TIMEZONE`: the calendar event's start and the reference of the lead reminder |
+| `TELEGRAM_BOT_TOKEN` | unset (off) | From BotFather (section 12) |
+| `TELEGRAM_OWNER_CHAT_ID` | unset | The one chat the bot answers; without it the bot only listens and logs chat ids (section 12) |
+| `REMINDER_EVENING_TIME` | `20:00` | The evening-before reminder, `HH:MM`, or `off` |
+| `REMINDER_LEAD_MINUTES` | `60` | The second reminder this long before the start; `0` is off |
+| `WEEKLY_SUMMARY_DAY`, `WEEKLY_SUMMARY_TIME` | `sun`, `18:00` | When the weekly summary comes; the time can be `off` |
+| `GOOGLE_API_BASE_URL`, `GOOGLE_TOKEN_URL`, `TELEGRAM_BASE_URL` | the real ones | Only for tests and proxies |
+
 ### Planned: not read yet (marked planned, names as the stages settle them)
 
 | Variable | Added by stage | Meaning |
 |---|---|---|
-| `INTERVALS_API_KEY`, `INTERVALS_ATHLETE_ID` | planned: P2-1, the intervals.icu upload | intervals.icu access (ADR 0014, section 5) |
-| `TELEGRAM_*` (names not fixed) | planned: P2-4, the Telegram bot | Telegram bot token and chat settings (spec §5.4) |
-| `GOOGLE_*` (names not fixed) | planned: P2-4, Google Calendar | Google OAuth client for the calendar (spec §5.3) |
 | `STRAVA_*` (names not fixed) | planned: P2-5, Strava upload | Strava access; write-only (spec §5.5) |
 | LLM endpoint (name not fixed) | planned: insights, not yet in the roadmap | Endpoint and key of the model that writes insight text (spec §7.2) |
+
+## 12. The Telegram bot
+
+The bot (spec §5.4, ADR 0019) sends reminders, a summary after each ride and a weekly summary, and answers `/today`, `/week`,
+`/skip`, `/move` and `/help`. It answers **only your chat** and ignores everyone else without a word. The token and the chat id
+stay in `.env`: you type them into the file on the host and never into a chat.
+
+1. **Make the bot.** In Telegram open `@BotFather`, send `/newbot`, give it a name and a user name ending in `bot`. BotFather
+   answers with a token that looks like `123456789:AA…`. Put it in `.env` with an editor on the host:
+
+   ```
+   TELEGRAM_BOT_TOKEN=<the token BotFather gave you>
+   ```
+
+2. **Start with the token only.** `docker compose up -d server`, then `docker compose logs --tail 20 server`: it says `Telegram bot
+   started in setup mode`. In this mode the bot listens and replies to nobody.
+3. **Find your chat id.** In Telegram open your new bot and send it any message (for example `/start`). It does not answer. Read
+   your chat id from the server's log:
+
+   ```bash
+   docker compose logs --tail 50 server | grep 'TELEGRAM_OWNER_CHAT_ID is not set' | grep -o '"chatId":-\?[0-9]*'
+   # "chatId":123456789
+   ```
+
+   Use the id of your own private chat (a positive number). Other people who find the bot get the same log line, and nothing else.
+4. **Make that chat the owner.** Put `TELEGRAM_OWNER_CHAT_ID=123456789` in `.env`, then `docker compose up -d server`. Send `/help`:
+   the bot now answers.
+5. **Optional.** Set `REMINDER_EVENING_TIME`, `REMINDER_LEAD_MINUTES`, `WEEKLY_SUMMARY_DAY`, `WEEKLY_SUMMARY_TIME` and
+   `GCAL_WORKOUT_START` (the time a workout is assumed to start, shared with the calendar). Reminders and summaries are in
+   `TIMEZONE`, so set that too.
+
+Check: with a workout planned for tomorrow, the evening reminder arrives at `REMINDER_EVENING_TIME` with **Skip** and **Move**
+buttons. `/today` and `/week` need the plan source (`INTERVALS_API_KEY`); without it the bot says so.
+
+To change the token, send `/revoke` to BotFather, update `.env` and `docker compose up -d server`. If the bot stays silent, look in
+the log for `another chat ignored` (the chat id there is not the one in `.env`) and for `polling failed` (network or token).
+
+## 13. Google Calendar
+
+The server pushes your planned workouts one way into a calendar of its own (spec §5.3, ADR 0019). Nothing is read back from Google.
+You do this once, in a browser and a terminal of your own. The client secret and the refresh token go from your terminal into
+`.env` and nowhere else.
+
+1. **The calendar.** In Google Calendar make a new calendar (Other calendars, plus, Create new calendar), for example
+   "Overdrive". Open its settings, **Integrate calendar**, and copy the **Calendar ID** (`…@group.calendar.google.com`) into `.env`
+   as `GOOGLE_CALENDAR_ID`. While there, under **Event notifications** add the reminder you want (the events carry none of their
+   own, the calendar's apply).
+2. **The Google Cloud project.** At `console.cloud.google.com` create a project, then APIs and services, **Library**, enable
+   **Google Calendar API**.
+3. **The consent screen.** APIs and services, OAuth consent screen: user type **External**, an app name, your own address as
+   support and contact. Add the scope `…/auth/calendar.events`. Then **publish the app** ("In production"): an app left in
+   *Testing* gets refresh tokens that stop working after seven days. An unpublished-to-the-public (unverified) app is fine for your
+   own use: Google shows a warning when you allow it, choose Advanced and continue.
+4. **The OAuth client.** APIs and services, Credentials, Create credentials, **OAuth client ID**, application type **Desktop app**.
+   Copy the client ID and the client secret into `.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+5. **The refresh token.** On a computer with this repository, Node 24 and pnpm (`pnpm install` once), run in a terminal:
+
+   ```bash
+   pnpm --filter @overdrive/server run google-auth
+   ```
+
+   It asks for the client ID and secret (the secret is not shown) unless they are in the environment, prints an address, and waits.
+   Open the address in a browser, sign in with the account that owns the calendar and allow access. If the terminal and the browser
+   are on the same computer the helper picks the answer up by itself. If the page then cannot be reached (the browser is on another
+   computer), copy the **whole address** from the browser's address bar and paste it into the terminal. It then prints one line:
+
+   ```
+   GOOGLE_REFRESH_TOKEN=1//0…
+   ```
+
+   Nothing is written to a file. Put that line into `.env` with an editor.
+
+   To run it on the host instead, from the repository root: `docker compose run --rm -it server node dist/gcal/auth-cli.js`
+   (compose hands it the client ID and secret from `.env`; use the paste-the-address way).
+6. **Start.** `docker compose up -d server`. The log says `calendar event created` for each workout, and the calendar shows the
+   next 14 days' workouts at `GCAL_WORKOUT_START` (default 07:00 in `TIMEZONE`) for as long as each one lasts, with the steps in the
+   description. Change or delete a workout in intervals.icu (or skip it from Telegram) and the event follows within a minute or two.
+
+If Google refuses the credentials the log has one error line telling you to run `google-auth` again, and nothing more is tried for
+six hours (a restart tries at once). Revoke the access any time at `myaccount.google.com/permissions`. Edits you make to the events
+in Google Calendar are not read back and are overwritten the next time that workout changes.
 
 ## Troubleshooting
 

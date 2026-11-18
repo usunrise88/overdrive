@@ -443,6 +443,12 @@ export function createNotifier(options: NotifierOptions): Notifier {
         }),
       );
       stopTicking = timers.every(pollMs, kick);
+      // A few rows a day: a quarter of a year is more history than anything reads.
+      void db
+        .query("DELETE FROM bot_notifications WHERE created_at < now() - interval '120 days'")
+        .catch((error: unknown) => {
+          log.warn({ err: error }, "could not tidy the old Telegram notifications");
+        });
       kick();
     },
     async stop() {
