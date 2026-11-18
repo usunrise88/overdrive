@@ -671,9 +671,12 @@ Everything a ride is, once, on all three devices, then the file it leaves.
   goes to "0 rides", **Last upload** says "Today" and the time, and the rides are on the server (`rides` table, or the
   server's log line "ride record" and "ride fit file" per ride) and, once the intervals.icu step exists, there. Try the failures:
   a wrong token says "The service did not accept the token. Check the token above" and sends nothing more until the token
-  changes or **Send now**; flight mode says "Service unreachable. Trying again soon", and the ride goes by itself (or at once
-  with **Send now**) when the network is back. Finish a new ride and watch it upload with the app in the background. Write
-  down the time from the end of the ride to the server's log line, and anything the Settings line said that was not plain.
+  changes or **Send now**; flight mode says why in plain words and a technical hint in brackets, for example "No network
+  connection (SocketException · ENETUNREACH)" or "Cannot find the service address (DNS) (UnknownHostException)", then "Trying
+  again soon", and the ride goes by itself (or at once with **Send now**) when the network is back. If the line says "The
+  system blocks this app's network access", the system, not the service, refuses the app the network. Finish a new ride and
+  watch it upload with the app in the background. Write down the time from the end of the ride to the server's log line, the
+  exact words and hint the Settings line showed in each case, and anything it said that was not plain.
   Settles: ADR 0014 section 8 (what only the tablet can show).
 - [ ] **7.10 Planned workouts (stage P2-2b, ADR 0017).** Needs 7.9 done (address and token set) and the server reading your
   intervals.icu calendar, with one workout planned for today and one or two later this week (the AI agent, or by hand in
@@ -683,7 +686,8 @@ Everything a ride is, once, on all three devices, then the file it leaves.
     planned for another day is not under today. With no address or token (clear them first, then put them back) there is no
     section and no error text. Write down how long it took to appear after the app opened.
   - **Offline.** Put the tablet in flight mode and force-stop and reopen the app (8.2): the same list is there, with "Out of
-    date · updated <time>" and "Service unreachable" under **Planned**. Turn flight mode off and press the refresh button: the
+    date · updated <time>" and the reason with its hint ("No network connection (…)" or "Cannot find the service address
+    (DNS) (UnknownHostException)") under **Planned**. Turn flight mode off and press the refresh button: the
     line says "Updating…" and then "Updated <time>". Leave and re-enter the Ready screen (Settings, back) twice within a
     minute: nothing is asked the second time (watch the server's log).
   - **Right word, wrong token.** Type a wrong token in Settings, Sync: the section says "The service did not accept the token.

@@ -269,15 +269,37 @@ class HttpSyncProviderTest {
         runTest {
             val expected =
                 mapOf(
+                    TransportFailure.NameNotFound to "Cannot find the service address (DNS)",
+                    TransportFailure.NetworkBlocked to "The system blocks this app's network access",
+                    TransportFailure.NoNetwork to "No network connection",
+                    TransportFailure.Refused to "The service refused the connection",
+                    TransportFailure.Dropped to "The connection to the service was cut",
                     TransportFailure.Unreachable to "Service unreachable",
                     TransportFailure.TimedOut to "The service did not answer in time",
                     TransportFailure.SecureConnection to "Secure connection failed",
                     TransportFailure.Other to "Could not talk to the service",
                 )
+            assertEquals(TransportFailure.entries.toSet(), expected.keys, "every kind has its words")
+            assertEquals(expected.values.size, expected.values.toSet().size, "and no two kinds share them")
             for ((failure, reason) in expected) {
                 val transport = ScriptedTransport(TransportException(failure))
                 assertEquals(SyncResult.RetryLater(reason), provider(transport).upload(entry), "$failure")
             }
+        }
+
+    @Test
+    fun `the technical hint follows the words in brackets, for the owner to read`() =
+        runTest {
+            val blocked = TransportException(TransportFailure.NetworkBlocked, hint = "SocketException · EACCES")
+            assertEquals(
+                SyncResult.RetryLater("The system blocks this app's network access (SocketException · EACCES)"),
+                provider(ScriptedTransport(blocked)).upload(entry),
+            )
+            val dns = TransportException(TransportFailure.NameNotFound, hint = "UnknownHostException")
+            assertEquals(
+                SyncResult.RetryLater("Cannot find the service address (DNS) (UnknownHostException)"),
+                provider(ScriptedTransport(dns)).upload(entry),
+            )
         }
 
     @Test
@@ -479,7 +501,16 @@ class HttpSyncProviderTest {
             val request = HttpRequest("https://h.example/x", "application/json", token, ByteArrayBody(recordBytes))
             everything += request.toString()
             everything += TransportException(TransportFailure.Other).message.orEmpty()
+            // Every kind of failure, even with a cause that carries the address and the token in its message: what the owner
+            // reads (the result's reason) and the exception's own message name neither.
+            for (failure in TransportFailure.entries) {
+                val cause = IllegalStateException("failed to connect to overdrive.example.org/203.0.113.7 with $token")
+                val exception = TransportException(failure, cause, hint = "SocketException · EACCES")
+                everything += exception.message.orEmpty()
+                everything += provider(ScriptedTransport(exception)).upload(entry).toString()
+            }
             for (text in everything) assertFalse(text.contains(token), "the token leaked into: $text")
+            for (text in everything) assertFalse(text.contains("203.0.113.7"), "the address leaked into: $text")
             assertTrue(everything.any { "••••" in it }, "the config prints a mask where the token would be")
         }
 

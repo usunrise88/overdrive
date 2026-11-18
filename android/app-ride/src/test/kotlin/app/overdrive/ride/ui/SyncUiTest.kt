@@ -80,6 +80,17 @@ class SyncUiTest {
             "Service unreachable. Trying again soon",
             ui(SyncStatus.WaitingToRetry(1, 5_000, "Service unreachable")).line,
         )
+        // The reason arrives with the transport's technical hint in brackets, and the line keeps it whole.
+        assertEquals(
+            "The system blocks this app's network access (SocketException · EACCES). Trying again soon",
+            ui(
+                SyncStatus.WaitingToRetry(
+                    1,
+                    5_000,
+                    "The system blocks this app's network access (SocketException · EACCES)",
+                ),
+            ).line,
+        )
         assertEquals("Could not send. Trying again soon", ui(SyncStatus.WaitingToRetry(1, 5_000, null)).line)
     }
 

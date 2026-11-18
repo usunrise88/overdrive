@@ -407,17 +407,45 @@ class PlanRepositoryTest {
     @Test
     fun `a failed transport names the kind of failure and never the request`() =
         runTest {
-            for ((failure, reason) in listOf(
-                TransportFailure.Unreachable to "Service unreachable",
-                TransportFailure.TimedOut to "The service did not answer in time",
-                TransportFailure.SecureConnection to "Secure connection failed",
-                TransportFailure.Other to "Could not talk to the service",
-            )) {
+            val expected =
+                listOf(
+                    TransportFailure.NameNotFound to "Cannot find the service address (DNS)",
+                    TransportFailure.NetworkBlocked to "The system blocks this app's network access",
+                    TransportFailure.NoNetwork to "No network connection",
+                    TransportFailure.Refused to "The service refused the connection",
+                    TransportFailure.Dropped to "The connection to the service was cut",
+                    TransportFailure.Unreachable to "Service unreachable",
+                    TransportFailure.TimedOut to "The service did not answer in time",
+                    TransportFailure.SecureConnection to "Secure connection failed",
+                    TransportFailure.Other to "Could not talk to the service",
+                )
+            assertEquals(
+                TransportFailure.entries.toSet(),
+                expected.map { it.first }.toSet(),
+                "every kind has its words",
+            )
+            for ((failure, reason) in expected) {
                 val repository = repository(ScriptedGetTransport(TransportException(failure)))
                 repository.refresh(PlanRefresh.START)
                 assertEquals(PlanProblem.Failed(reason), repository.state.value.problem)
                 assertFalse(repository.state.value.toString().contains(token))
             }
+        }
+
+    @Test
+    fun `the technical hint is part of the problem line, and a cause's message is not`() =
+        runTest {
+            val cause = IllegalStateException("failed to connect to 203.0.113.7 with $token")
+            val exception =
+                TransportException(TransportFailure.NetworkBlocked, cause, hint = "SocketException · EACCES")
+            val repository = repository(ScriptedGetTransport(exception))
+            repository.refresh(PlanRefresh.START)
+            assertEquals(
+                PlanProblem.Failed("The system blocks this app's network access (SocketException · EACCES)"),
+                repository.state.value.problem,
+            )
+            assertFalse(repository.state.value.toString().contains(token))
+            assertFalse(repository.state.value.toString().contains("203.0.113.7"))
         }
 
     // endregion

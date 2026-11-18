@@ -31,8 +31,20 @@ public interface HttpGetTransport {
 /** Why a request got no answer, in the plain words the settings and the Ready screen say. */
 internal fun TransportFailure.plainReason(): String =
     when (this) {
+        TransportFailure.NameNotFound -> "Cannot find the service address (DNS)"
+        TransportFailure.NetworkBlocked -> "The system blocks this app's network access"
+        TransportFailure.NoNetwork -> "No network connection"
+        TransportFailure.Refused -> "The service refused the connection"
+        TransportFailure.Dropped -> "The connection to the service was cut"
         TransportFailure.Unreachable -> "Service unreachable"
         TransportFailure.TimedOut -> "The service did not answer in time"
         TransportFailure.SecureConnection -> "Secure connection failed"
         TransportFailure.Other -> "Could not talk to the service"
     }
+
+/**
+ * What the owner reads when a request got no answer: the plain words of the [failure][TransportException.failure], then the
+ * technical [hint][TransportException.hint] in brackets when there is one ("The system blocks this app's network access
+ * (SocketException · EACCES)").
+ */
+internal fun TransportException.plainReason(): String = failure.plainReason() + (hint?.let { " ($it)" } ?: "")

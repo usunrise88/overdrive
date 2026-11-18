@@ -103,16 +103,24 @@ class UrlConnectionTransportTest {
     }
 
     @Test
-    fun `a server that is not there is unreachable`() {
+    fun `a port nobody listens on is a refused connection`() {
         val closed = ServerSocket(0).use { it.localPort }
         val failure = failureOf { put("/v1/rides/r", byteArrayOf(1), base = "http://127.0.0.1:$closed") }
-        assertEquals(TransportFailure.Unreachable, failure.failure)
+        assertEquals(TransportFailure.Refused, failure.failure)
+        assertTrue("the hint names the class: ${failure.hint}", failure.hint.orEmpty().startsWith("ConnectException"))
+        assertFalse("no address in the hint: ${failure.hint}", failure.hint.orEmpty().contains("127.0.0.1"))
+        assertFalse("no address in the message: ${failure.message}", failure.message.orEmpty().contains("127.0.0.1"))
     }
 
     @Test
-    fun `a name that does not resolve is unreachable`() {
-        val failure = failureOf { put("/v1/rides/r", byteArrayOf(1), base = "http://no-such-host.invalid") }
-        assertEquals(TransportFailure.Unreachable, failure.failure)
+    fun `a name that does not resolve is a missing address, not an unreachable service`() {
+        val failure = failureOf { put("/v1/rides/r", byteArrayOf(1), base = "http://nonexistent.invalid") }
+        assertEquals(TransportFailure.NameNotFound, failure.failure)
+        assertTrue(
+            "the hint names the class: ${failure.hint}",
+            failure.hint.orEmpty().startsWith("UnknownHostException"),
+        )
+        assertFalse("no host name in the hint: ${failure.hint}", failure.hint.orEmpty().contains("nonexistent"))
     }
 
     @Test

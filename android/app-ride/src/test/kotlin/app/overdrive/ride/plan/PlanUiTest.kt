@@ -237,16 +237,18 @@ class PlanUiTest {
 
     @Test
     fun `a failed refresh keeps the list, says it may be out of date and why`() {
-        val ui = ui(state(stale = true, problem = PlanProblem.Failed("Service unreachable")))
+        val reason = "The system blocks this app's network access (SocketException · EACCES)"
+        val ui = ui(state(stale = true, problem = PlanProblem.Failed(reason)))
         assertEquals("Out of date · updated 07:30", ui.status)
-        assertEquals("Service unreachable", ui.detail)
+        assertEquals(reason, ui.detail)
         assertTrue(ui.statusIsAlert)
     }
 
     @Test
-    fun `no list and no network says the reason alone`() {
-        val ui = ui(state(loaded = false, generatedAt = null, problem = PlanProblem.Failed("Service unreachable")))
-        assertEquals("Service unreachable", ui.status)
+    fun `no list and no network says the reason alone, with its technical hint`() {
+        val reason = "Cannot find the service address (DNS) (UnknownHostException)"
+        val ui = ui(state(loaded = false, generatedAt = null, problem = PlanProblem.Failed(reason)))
+        assertEquals(reason, ui.status)
         assertTrue(ui.statusIsAlert)
         assertNull(ui.detail)
     }

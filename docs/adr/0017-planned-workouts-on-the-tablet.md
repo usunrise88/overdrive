@@ -61,7 +61,7 @@ source). The tablet reads the service the ride upload already talks to (ADR 0014
 | 401, or a token that cannot be a header | "The service did not accept the token. Check the token in Settings" | the last good one stays |
 | 404 `not_found` (a service without the route) | "The service has no planned workouts" | the last good one stays |
 | other 4xx, 5xx, 408, 429, a redirect | "The service refused the request (n)", "Service error (n)", … | the last good one stays |
-| no answer (unreachable, timeout, TLS, an answer over 1 MiB) | "Service unreachable", … | the last good one stays |
+| no answer (no address, blocked, no network, refused, cut, timeout, TLS, an answer over 1 MiB) | the kind's words and a technical hint ("The system blocks this app's network access (SocketException · EACCES)", "Cannot find the service address (DNS) (UnknownHostException)", … ; ADR 0014 section 6) | the last good one stays |
 | no address or no token | **nothing, and nothing is asked** | none |
 
 - **A rejected token is remembered** with the address and token it was rejected for: nothing is asked again until either

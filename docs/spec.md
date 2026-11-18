@@ -370,8 +370,9 @@ outbox drains for real, and what M4-2 said about "no network code, no `INTERNET`
   `usesCleartextTraffic`, without which Android 9 and later refuse the plain `http://` address that Settings still accepts.
 - Settings, **Sync**: the address (a plain `http://` one is flagged "Not encrypted: the token is sent as plain text") and the
   token ("Sent only to this address"); **Waiting to upload** with the count and one line in plain words about the last
-  problem (not configured, "The service did not accept the token", "Service unreachable. Trying again soon", "1 ride refused:
-  <the service's message>"); **Last upload** (a time, or "Never") with **Send now**, which tries the queue at once.
+  problem (not configured, "The service did not accept the token", the reason there was no answer in plain words with a
+  technical hint, as "The system blocks this app's network access (SocketException · EACCES). Trying again soon", "1 ride
+  refused: <the service's message>"); **Last upload** (a time, or "Never") with **Send now**, which tries the queue at once.
 
 ### 4.10 Acceptance criteria
 
@@ -516,7 +517,9 @@ Phase 2 connects the ride app to a plan: an AI agent schedules workouts, they ap
     of description or else the step kinds, length in minutes, "IF 0.76" computed from the native steps), then **This week**,
     collapsed to a count, which holds tomorrow to six days on, by day. Below the label, one line says "Updated 07:30"; when the
     service says `stale` or the last request failed it says "Out of date · updated 07:30" with an alert and, for a failure, the
-    reason ("Service unreachable"); a 401 says "The service did not accept the token. Check the token in Settings" (the Sync
+    reason, in plain words with a technical hint ("Cannot find the service address (DNS) (UnknownHostException)", "The system
+    blocks this app's network access (SocketException · EACCES)", "The service refused the connection", "No network connection",
+    or the fallback "Service unreachable"); a 401 says "The service did not accept the token. Check the token in Settings" (the Sync
     settings' wording). **With no address or token, or when the service answers `configured: false`, the section is not drawn
     and nothing is said.** The list is read through the clock, so a cache read days later shows the days that are now ahead.
   - **Starting one.** A planned row is chosen like any workout and **Start** plays it in the existing workout player; the

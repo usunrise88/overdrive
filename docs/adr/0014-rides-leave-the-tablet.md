@@ -130,7 +130,27 @@ FIT from where the ride is stored; the outbox entry stays free of payload (ADR 0
   (it makes no other request). Removing the attribute makes the upload https-only; nothing else changes.
 - **Not decided here (the real tablet and server).** The Android `HttpURLConnection` is OkHttp underneath and may answer a streamed
   `401` differently from the JDK used in the tests (the status is read the same way; the body of a 401 is not needed).
-  Early-closed connections from a proxy that answers before it has read the body show as "Service unreachable" and are retried.
+  Early-closed connections from a proxy that answers before it has read the body show as "The connection to the service was cut"
+  and are retried.
+- **Why there was no answer is told, not guessed (v0.2.0 on the tablet said only "Service unreachable" while the tablet's browser
+  reached the service and the service saw no request).** `TransportFailure` has a kind for each cause the owner can act on, and
+  `TransportException.hint` carries a short technical hint, shown in brackets after the plain words:
+
+  | Kind | Words | Comes from |
+  |---|---|---|
+  | `NameNotFound` | "Cannot find the service address (DNS)" | `UnknownHostException` |
+  | `NetworkBlocked` | "The system blocks this app's network access" | `EACCES`, `EPERM` ("Permission denied") |
+  | `NoNetwork` | "No network connection" | `ENETUNREACH`, `ENETDOWN` |
+  | `Refused` | "The service refused the connection" | `ECONNREFUSED` |
+  | `Dropped` | "The connection to the service was cut" | `ECONNRESET`, `ECONNABORTED`, `EPIPE` |
+  | `Unreachable` | "Service unreachable" | any other socket error (the fallback) |
+  | `TimedOut`, `SecureConnection`, `Other` | as before | |
+
+  The system's error name is read from the `errno` of the `android.system.ErrnoException` in the cause chain, else from the text of
+  the chain's messages (`socket failed: EACCES (Permission denied)`), else from the error's plain phrase (the JVM says only
+  "Connection refused"). The hint is the exception's class and, if it is on a fixed whitelist of error names, that name:
+  `SocketException · EACCES`, `UnknownHostException · EAI_NODATA`. **Never an address, a host name or message text**: those messages
+  hold them. Code: `NetworkFailures` in `android/data`.
 
 ## Consequences
 

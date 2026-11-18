@@ -250,11 +250,11 @@ class PlannedReadyTest : ShotTest() {
                 generatedAt = "2026-11-17T20:15:00Z",
                 loaded = true,
                 stale = true,
-                problem = PlanProblem.Failed("Service unreachable"),
+                problem = PlanProblem.Failed("The system blocks this app's network access (SocketException · EACCES)"),
             )
         shot("ride--ready-planned-offline") { Ready(plan(offline), chosen) }
         rule.onNodeWithText("Out of date · updated 17 Nov 21:15").assertExists()
-        rule.onNodeWithText("Service unreachable").assertExists()
+        rule.onNodeWithText("The system blocks this app's network access (SocketException · EACCES)").assertExists()
         row("Threshold 2x20").assertExists()
     }
 

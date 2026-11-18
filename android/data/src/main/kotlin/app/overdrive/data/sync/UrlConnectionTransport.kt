@@ -21,11 +21,7 @@ import java.io.FileInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
-import java.net.SocketException
-import java.net.SocketTimeoutException
 import java.net.URL
-import java.net.UnknownHostException
-import javax.net.ssl.SSLException
 
 /**
  * [HttpTransport] over `HttpURLConnection` (ADR 0014 section 6): no new dependency, no Play Services. One `PUT` per call
@@ -37,7 +33,8 @@ import javax.net.ssl.SSLException
  * same bearer header and the same rules (no redirects, nothing logged), whose answer is read up to the request's `maxBytes`.
  *
  * **It logs nothing and keeps neither the token nor the body anywhere but the request being sent.** What went wrong without an
- * answer is a [TransportException] whose message names only the kind of failure.
+ * answer is a [TransportException] whose message names only the kind of failure; its hint for the owner is a fixed vocabulary
+ * (the exception's class and the system's error name, never an address), see [NetworkFailures].
  *
  * @param connectTimeoutMillis how long to wait for the connection (and, for TLS, the handshake).
  * @param readTimeoutMillis how long to wait for the server's answer once the body is sent, and between two of its bytes.
@@ -72,7 +69,7 @@ class UrlConnectionTransport(
                 HttpAnswer(status, stream?.use { readAtMost(it, request.maxBytes) }.orEmpty())
             } catch (e: IOException) {
                 currentCoroutineContext().ensureActive()
-                throw TransportException(failureOf(e), e)
+                throw NetworkFailures.exceptionOf(e)
             } finally {
                 connection.disconnect()
             }
@@ -114,7 +111,7 @@ class UrlConnectionTransport(
                 HttpAnswer(status, stream?.use(::readStart).orEmpty())
             } catch (e: IOException) {
                 currentCoroutineContext().ensureActive()
-                throw TransportException(failureOf(e), e)
+                throw NetworkFailures.exceptionOf(e)
             } finally {
                 connection.disconnect()
             }
@@ -150,14 +147,6 @@ class UrlConnectionTransport(
         }
         return out.toString(Charsets.UTF_8.name())
     }
-
-    private fun failureOf(e: IOException): TransportFailure =
-        when (e) {
-            is SocketTimeoutException -> TransportFailure.TimedOut
-            is SSLException -> TransportFailure.SecureConnection
-            is SocketException, is UnknownHostException -> TransportFailure.Unreachable
-            else -> TransportFailure.Other
-        }
 
     companion object {
         const val CONNECT_TIMEOUT_MILLIS = 10_000

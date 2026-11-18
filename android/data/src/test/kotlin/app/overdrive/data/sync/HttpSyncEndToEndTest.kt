@@ -133,14 +133,14 @@ class HttpSyncEndToEndTest {
     }
 
     @Test
-    fun `an unreachable server is a wait with a plain reason, and the ride goes when it is back`() {
+    fun `a refusing server is a wait with a plain reason and a hint, and the ride goes when it is back`() {
         val id = ride(1)
         val real = config
         config = SyncConfig("http://127.0.0.1:1", service.token) // nothing listens on port 1
         sync.start()
         await("it is waiting to retry") { sync.status.value is SyncStatus.WaitingToRetry }
         val waiting = sync.status.value as SyncStatus.WaitingToRetry
-        assertEquals("Service unreachable", waiting.reason)
+        assertEquals("The service refused the connection (ConnectException)", waiting.reason)
         assertEquals(listOf(id), queued())
         config = real
         sync.kick()

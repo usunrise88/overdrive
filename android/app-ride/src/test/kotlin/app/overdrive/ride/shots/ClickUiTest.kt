@@ -458,7 +458,13 @@ class ClickUiTest : ShotTest() {
                 SettingsScreen(
                     settings.copy(syncUrl = "https://overdrive.example.org", syncToken = SecretText("a-long-token")),
                     SettingsActions({}, {}, {}),
-                    sync = SyncUi(3, "Service unreachable. Trying again soon", "Today 18:04", canSendNow = true),
+                    sync =
+                        SyncUi(
+                            3,
+                            "The service refused the connection (ConnectException · ECONNREFUSED). Trying again soon",
+                            "Today 18:04",
+                            canSendNow = true,
+                        ),
                 )
             }
         }

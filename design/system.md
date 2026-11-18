@@ -236,7 +236,8 @@ chip, then right-aligned: device status icons (16 dp, see §7.7), overlay button
   a plan source); otherwise nothing is drawn and nothing is said. At the top of the left column, above "Ride", scrolling with it:
   a **Planned** label (label, text 3) with a 48 dp ghost refresh icon button (`refresh-cw`, "Refresh planned workouts", off while
   it asks); one line of state under it (label, text 2: "Updated 07:30", "Updating…"; with a 16 dp `triangle-alert` and text 1 when
-  there is a problem: "Out of date · updated 17 Nov 21:15" over the reason in text 2 ("Service unreachable"), or "The service did
+  there is a problem: "Out of date · updated 17 Nov 21:15" over the reason in text 2 (plain words and a technical hint in brackets: "The system blocks this app's network access
+  (SocketException · EACCES)"), or "The service did
   not accept the token. Check the token in Settings"); today's workouts as **value rows** (§7.5), or "Nothing planned today"
   (body, text 2); then **This week** as a disclosure row with its count, collapsed, and opened the days under it ("Tomorrow",
   "Sun 22 Nov": label, text 3) each with its value rows. A value row shows the name, one line of description, the length ("65 min")

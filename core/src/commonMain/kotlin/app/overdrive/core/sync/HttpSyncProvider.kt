@@ -68,9 +68,28 @@ public class HttpAnswer(
     public val body: String = "",
 )
 
-/** Why a request got no answer at all. */
+/**
+ * Why a request got no answer at all. The kinds that say where the connection broke are separate on purpose: "Service
+ * unreachable" alone cannot tell a missing name, a refused connection and the system blocking the app, and each wants a
+ * different fix.
+ */
 public enum class TransportFailure {
-    /** The server could not be reached: no network, unknown host, refused or dropped connection. */
+    /** The address could not be turned into a machine's address (a DNS failure, or no network to ask). */
+    NameNotFound,
+
+    /** The system forbids the app to use the network (`EACCES`, `EPERM`: a firewall, a data saver, a policy). */
+    NetworkBlocked,
+
+    /** The tablet has no network to send through (`ENETUNREACH`, `ENETDOWN`). */
+    NoNetwork,
+
+    /** The machine answered that nothing listens at that address and port (`ECONNREFUSED`). */
+    Refused,
+
+    /** The connection was made and then cut: reset, aborted or a broken pipe (`ECONNRESET`, `ECONNABORTED`, `EPIPE`). */
+    Dropped,
+
+    /** The server could not be reached for a reason not told apart from the others above (no route to the host, say). */
     Unreachable,
 
     /** The connection was made but the server was too slow. */
@@ -83,10 +102,18 @@ public enum class TransportFailure {
     Other,
 }
 
-/** Thrown by an [HttpTransport] that got no answer. The message never holds the request: the token and the body stay out. */
+/**
+ * Thrown by an [HttpTransport] that got no answer. The message never holds the request: the token, the body and the address stay
+ * out.
+ *
+ * @property hint a short technical hint for the owner, from a fixed vocabulary: the exception's class name and, when there is
+ * one, the operating system's error name, as `SocketException · EACCES`. It never holds an address, a host name or any message
+ * text; the transport builds it from a whitelist. Null when there is nothing to add.
+ */
 public class TransportException(
     public val failure: TransportFailure,
     cause: Throwable? = null,
+    public val hint: String? = null,
 ) : Exception("No answer from the server: $failure", cause)
 
 /**
@@ -196,7 +223,7 @@ public class HttpSyncProvider(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: TransportException) {
-                    return SyncResult.RetryLater(reasonFor(e.failure))
+                    return SyncResult.RetryLater(e.plainReason())
                 }
             val failure = failureOf(answer, ride.rideId, step.isFit, settings)
             if (failure != null) return failure
@@ -276,8 +303,6 @@ public class HttpSyncProvider(
         } catch (e: IllegalArgumentException) {
             null
         }
-
-    private fun reasonFor(failure: TransportFailure): String = failure.plainReason()
 
     /** The server's message as one short line of text for a row in Settings. */
     private fun oneLine(message: String): String {

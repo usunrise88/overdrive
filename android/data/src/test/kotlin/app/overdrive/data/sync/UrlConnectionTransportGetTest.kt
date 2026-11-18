@@ -85,13 +85,17 @@ class UrlConnectionTransportGetTest {
     }
 
     @Test
-    fun `a server that is not there is unreachable, and one that is too slow times out`() {
+    fun `a closed port is refused, a name that does not resolve is a missing address, and a slow server times out`() {
         val closed = ServerSocket(0).use { it.localPort }
-        assertEquals(TransportFailure.Unreachable, failureOf { get(base = "http://127.0.0.1:$closed") }.failure)
-        assertEquals(
-            TransportFailure.Unreachable,
-            failureOf { get(base = "http://no-such-host.invalid") }.failure,
-        )
+        val refused = failureOf { get(base = "http://127.0.0.1:$closed") }
+        assertEquals(TransportFailure.Refused, refused.failure)
+        assertTrue(refused.hint.orEmpty(), refused.hint.orEmpty().startsWith("ConnectException"))
+        val missing = failureOf { get(base = "http://nonexistent.invalid") }
+        assertEquals(TransportFailure.NameNotFound, missing.failure)
+        assertTrue(missing.hint.orEmpty(), missing.hint.orEmpty().startsWith("UnknownHostException"))
+        for (hint in listOf(refused.hint, missing.hint)) {
+            assertFalse(hint.orEmpty(), hint.orEmpty().contains("127.0.0.1") || hint.orEmpty().contains("nonexistent"))
+        }
         service.script += FakeService.Reply(200, "{}", delayMillis = 2_000)
         val impatient = UrlConnectionTransport(connectTimeoutMillis = 500, readTimeoutMillis = 300)
         assertEquals(TransportFailure.TimedOut, failureOf { get(transport = impatient) }.failure)

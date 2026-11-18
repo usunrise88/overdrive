@@ -215,7 +215,7 @@ public class PlanRepository(
                     throw e
                 } catch (e: TransportException) {
                     lastAsked.value = settings
-                    setInner(problem = PlanProblem.Failed(e.failure.plainReason()), refreshing = false)
+                    setInner(problem = PlanProblem.Failed(e.plainReason()), refreshing = false)
                     return
                 }
             lastAsked.value = settings
