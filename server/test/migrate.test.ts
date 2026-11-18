@@ -117,6 +117,52 @@ describe("the real migrations", () => {
     expect(results.flat()).toEqual([1, 2, 3]);
   });
 
+  it("give the profile one row and the OAuth tables their constraints (0003)", async () => {
+    await migrate(db);
+    const profile = (id: boolean, data: string) =>
+      db.query("INSERT INTO profile (id, data, updated_at) VALUES ($1, $2::jsonb, now())", [
+        id,
+        data,
+      ]);
+    await expect(profile(false, "{}")).rejects.toThrow(); // the row is the only row
+    await expect(profile(true, "[]")).rejects.toThrow(); // an object
+    await profile(true, "{}");
+    await expect(profile(true, "{}")).rejects.toThrow(); // and there is one
+
+    const client = (id: string, method: string, secret: string | null) =>
+      db.query(
+        `INSERT INTO oauth_clients (client_id, client_secret_sha256, client_name, redirect_uris,
+                                    token_endpoint_auth_method, created_at)
+         VALUES ($1, $3, 'c', '[]'::jsonb, $2, now())`,
+        [id, method, secret],
+      );
+    await client("public", "none", null);
+    await client("confidential", "client_secret_post", "digest");
+    await expect(client("bad1", "none", "digest")).rejects.toThrow(); // a public client has no secret
+    await expect(client("bad2", "client_secret_basic", null)).rejects.toThrow(); // a confidential one has
+    await expect(client("bad3", "private_key_jwt", "digest")).rejects.toThrow(); // only the methods we do
+
+    // Tokens and codes belong to a client, and go with it.
+    await db.query(
+      `INSERT INTO oauth_tokens (token_sha256, kind, family_id, client_id, scope, resource, expires_at, created_at)
+       VALUES ('t', 'access', 'f', 'public', 'mcp', 'r', now(), now())`,
+    );
+    await expect(
+      db.query(
+        `INSERT INTO oauth_tokens (token_sha256, kind, family_id, client_id, scope, resource, expires_at, created_at)
+         VALUES ('u', 'id', 'f', 'public', 'mcp', 'r', now(), now())`,
+      ),
+    ).rejects.toThrow(); // access or refresh
+    await expect(
+      db.query(
+        `INSERT INTO oauth_tokens (token_sha256, kind, family_id, client_id, scope, resource, expires_at, created_at)
+         VALUES ('v', 'access', 'f', 'nobody', 'mcp', 'r', now(), now())`,
+      ),
+    ).rejects.toThrow();
+    await db.query("DELETE FROM oauth_clients WHERE client_id = 'public'");
+    expect((await db.query("SELECT 1 FROM oauth_tokens")).rows).toHaveLength(0);
+  });
+
   it("make a table the data constraints hold", async () => {
     await migrate(db);
     const insert = (id: string, start: number) =>

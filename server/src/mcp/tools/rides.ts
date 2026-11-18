@@ -157,7 +157,7 @@ export function registerRideTools(server: McpServer, ctx: ToolContext): void {
       const ranges = powerZoneRanges(record.ride.ftp, zones);
       const { secondsInZone, ...power } = statistics.power;
 
-      const resolved = await services.rideWorkouts.resolve(record);
+      const resolved = await services.rideWorkouts.resolve(record.ride);
       const flat = resolved.workout === null ? [] : flattenWorkout(resolved.workout);
       const compliance =
         resolved.workout === null

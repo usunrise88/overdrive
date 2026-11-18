@@ -35,6 +35,8 @@ export interface RideStore {
   list(query: RideQuery): Promise<{ total: number; rides: RideListing[] }>;
   /** The whole record, with every sample, or null when there is no such ride. */
   getRecord(id: string): Promise<RideRecord | null>;
+  /** Only the ride's identity (its id, FTP and the workout it names), which is cheap even for a ride of many hours. */
+  getHeader(id: string): Promise<RideHeader | null>;
   /** The workout the ride was played from, as it was when it was captured. */
   workoutSnapshot(rideId: string): Promise<Workout | null>;
   saveWorkoutSnapshot(rideId: string, workout: Workout, at: Date): Promise<void>;
@@ -92,6 +94,14 @@ export function createRideStore(db: Db): RideStore {
         [id],
       );
       return result.rows[0]?.record ?? null;
+    },
+
+    async getHeader(id) {
+      const result = await db.query<{ ride: RideHeader }>(
+        "SELECT record->'ride' AS ride FROM rides WHERE id = $1",
+        [id],
+      );
+      return result.rows[0]?.ride ?? null;
     },
 
     async workoutSnapshot(rideId) {

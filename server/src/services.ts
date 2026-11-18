@@ -120,8 +120,8 @@ export function createServices(options: ServicesOptions): Services {
   });
   // A ride keeps the workout it was played from, whatever the plan does later.
   bus.on("ride-stored", async ({ rideId }) => {
-    const record = await rides.getRecord(rideId);
-    if (record?.ride.workoutId != null) await rideWorkouts.resolve(record);
+    const header = await rides.getHeader(rideId);
+    if (header?.workoutId != null) await rideWorkouts.resolve(header);
   });
 
   return {

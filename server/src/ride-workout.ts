@@ -1,4 +1,4 @@
-import type { RideRecord, Workout } from "@overdrive/contracts";
+import type { RideHeader, Workout } from "@overdrive/contracts";
 import { type IntervalsClient, IntervalsError } from "./intervals/client.ts";
 import { eventIdOf } from "./intervals/ids.ts";
 import type { Logger } from "./log.ts";
@@ -11,11 +11,11 @@ export type RideWorkout = { workout: Workout } | { workout: null; reason: string
 
 export interface RideWorkoutResolver {
   /**
-   * The workout behind `record.ride.workoutId`. The copy taken earlier if there is one; otherwise the
-   * plan cache, then intervals.icu, and whatever is found is kept, so the ride keeps its workout when
-   * the plan moves on or the event is deleted. Never throws.
+   * The workout behind `ride.workoutId`. The copy taken earlier if there is one; otherwise the plan
+   * cache, then intervals.icu, and whatever is found is kept, so the ride keeps its workout when the
+   * plan moves on or the event is deleted. Never throws.
    */
-  resolve(record: RideRecord): Promise<RideWorkout>;
+  resolve(ride: Pick<RideHeader, "id" | "workoutId">): Promise<RideWorkout>;
 }
 
 export interface RideWorkoutDeps {
@@ -32,18 +32,18 @@ export function createRideWorkoutResolver(deps: RideWorkoutDeps): RideWorkoutRes
   const none = (reason: string): RideWorkout => ({ workout: null, reason });
 
   return {
-    async resolve(record) {
-      const workoutId = record.ride.workoutId;
+    async resolve(ride) {
+      const workoutId = ride.workoutId;
       if (workoutId === undefined || workoutId === null) {
         return none("this was a free ride: no workout was linked");
       }
       try {
-        const kept = await rides.workoutSnapshot(record.ride.id);
+        const kept = await rides.workoutSnapshot(ride.id);
         if (kept !== null) return { workout: kept };
 
         const cached = await plan.get(workoutId);
         if (cached !== null) {
-          await rides.saveWorkoutSnapshot(record.ride.id, cached.workout, now());
+          await rides.saveWorkoutSnapshot(ride.id, cached.workout, now());
           return { workout: cached.workout };
         }
 
@@ -65,14 +65,14 @@ export function createRideWorkoutResolver(deps: RideWorkoutDeps): RideWorkoutRes
             }`,
           );
         }
-        await rides.saveWorkoutSnapshot(record.ride.id, reading.entry.workout, now());
+        await rides.saveWorkoutSnapshot(ride.id, reading.entry.workout, now());
         return { workout: reading.entry.workout };
       } catch (error) {
         const reason =
           error instanceof IntervalsError
             ? `intervals.icu could not be asked about the workout (${error.message})`
             : "the workout could not be looked up";
-        log.warn({ rideId: record.ride.id, err: error }, "ride workout lookup failed");
+        log.warn({ rideId: ride.id, err: error }, "ride workout lookup failed");
         return none(reason);
       }
     },
