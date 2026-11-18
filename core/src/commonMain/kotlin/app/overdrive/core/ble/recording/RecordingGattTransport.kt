@@ -125,6 +125,15 @@ public class RecordingGattTransport(
         return result
     }
 
+    override suspend fun writeWithoutResponse(
+        characteristic: GattCharacteristicInfo,
+        value: ByteArray,
+    ): GattResult<Unit> {
+        val result = delegate.writeWithoutResponse(characteristic, value)
+        recorder.recordBytes(BleDirection.WRITE, characteristic.characteristic, statusOf(result), value)
+        return result
+    }
+
     override suspend fun enable(
         characteristic: GattCharacteristicInfo,
         mode: ValueUpdate,

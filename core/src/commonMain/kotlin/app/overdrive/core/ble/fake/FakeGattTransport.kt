@@ -122,6 +122,20 @@ public class FakeGattTransport internal constructor(
             if (status == GattStatus.SUCCESS) GattResult.Ok(Unit) else statusFailure(status)
         }
 
+    override suspend fun writeWithoutResponse(
+        characteristic: GattCharacteristicInfo,
+        value: ByteArray,
+    ): GattResult<Unit> =
+        operation("writeWithoutResponse ${characteristic.characteristic}") {
+            peripheral.faults.takeWrite(characteristic.characteristic)?.let { return@operation statusFailure(it) }
+            val offered = peripheral.characteristics.firstOrNull { it.characteristic == characteristic.characteristic }
+            if (offered == null || GattProperty.WRITE_WITHOUT_RESPONSE !in offered.properties) {
+                return@operation statusFailure(WRITE_NOT_PERMITTED)
+            }
+            val status = peripheral.onWriteWithoutResponse(characteristic.characteristic, value)
+            if (status == GattStatus.SUCCESS) GattResult.Ok(Unit) else statusFailure(status)
+        }
+
     override suspend fun enable(
         characteristic: GattCharacteristicInfo,
         mode: ValueUpdate,

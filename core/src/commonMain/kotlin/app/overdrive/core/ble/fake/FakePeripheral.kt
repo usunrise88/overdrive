@@ -3,6 +3,7 @@ package app.overdrive.core.ble.fake
 import app.overdrive.core.ble.GattCharacteristicInfo
 import app.overdrive.core.ble.GattStatus
 import app.overdrive.core.ble.GattUuid
+import app.overdrive.core.ble.ManufacturerData
 import app.overdrive.core.ble.ValueUpdate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -62,6 +63,9 @@ public abstract class FakePeripheral(
     /** Everything this peripheral offers, as service discovery reports it. */
     public abstract val characteristics: List<GattCharacteristicInfo>
 
+    /** The manufacturer-specific data in its advertisement; empty for most peripherals. */
+    public var manufacturerData: List<ManufacturerData> = emptyList()
+
     /** Signal strength shown in scans. */
     public var rssi: Int = DEFAULT_RSSI
 
@@ -97,6 +101,15 @@ public abstract class FakePeripheral(
         characteristic: GattUuid,
         value: ByteArray,
     ): Int = GattStatus.SUCCESS
+
+    /**
+     * A write **without response** of [characteristic]; return the GATT status the stack would report. By default it is
+     * handled like a write with response, so a peripheral that does not care need not override it.
+     */
+    public open fun onWriteWithoutResponse(
+        characteristic: GattUuid,
+        value: ByteArray,
+    ): Int = onWrite(characteristic, value)
 
     /** The central wrote the CCCD of [characteristic]. */
     public open fun onSubscribed(

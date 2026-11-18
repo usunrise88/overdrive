@@ -22,7 +22,10 @@ import kotlin.time.Duration.Companion.nanoseconds
  * is a *segment*; one that goes straight to `S disconnected` is a failed connect, replayed as a connect that fails with
  * the recorded status. The *n*-th connect to this peripheral plays the *n*-th attempt, and a connect after the last one
  * gets an idle peripheral. A segment ends at the next `S disconnected` (the peripheral drops the link then, with the
- * recorded status) or `S closed` (the link stays up until the central closes it).
+ * recorded status) or `S closed` (the link stays up until the central closes it). **A `disconnected` with status 0 is
+ * the central closing the link** (or Bluetooth going off, which a replay cannot repeat), not the peripheral dropping it,
+ * so it ends the segment without a drop: the replayed central closes at the same moment, and a drop scheduled at that very
+ * moment could overtake the operation that led to the close.
  *
  * **What is played.** Notifications and indications (`N`, `I`) are pushed at their recorded time **since the connection
  * came up**, when the central subscribed to that characteristic. A read (`R`) returns the next recorded value for its
@@ -56,6 +59,8 @@ public class ReplayPeripheral(
         val cccdFailures: List<Pair<GattUuid, Int>>,
         val dropOffsetNanos: Long?,
         val dropStatus: Int,
+        /** What discovery found on this connection; empty when the segment holds no `D` lines. */
+        val discovered: List<GattCharacteristicInfo>,
     )
 
     private val attempts: List<Attempt> = attemptsOf(session)
@@ -64,7 +69,15 @@ public class ReplayPeripheral(
     private val readQueues = mutableMapOf<GattUuid, ArrayDeque<ByteArray>>()
     private val writeQueues = mutableMapOf<GattUuid, ArrayDeque<Int>>()
 
-    override val characteristics: List<GattCharacteristicInfo> = characteristicsOf(session)
+    private val allCharacteristics: List<GattCharacteristicInfo> = characteristicsOf(session)
+
+    /**
+     * What discovery offers: **the connection's own** characteristics when the recording of that connection has `D` lines
+     * (a controller that hid its service until it was unlocked offers different things on different connections), else
+     * everything the recording ever discovered.
+     */
+    override val characteristics: List<GattCharacteristicInfo>
+        get() = current?.discovered?.takeIf { it.isNotEmpty() } ?: allCharacteristics
 
     /** How many connections that came up the session holds. */
     public val segmentCount: Int get() = attempts.count { it.segment != null }
@@ -202,14 +215,13 @@ public class ReplayPeripheral(
                     BleStates.DISCONNECTED -> {
                         val open = builder
                         if (open != null) {
+                            val status = event.status ?: DEFAULT_DROP_STATUS
                             attempts +=
-                                Attempt(
-                                    null,
-                                    open.build(
-                                        event.timeNanos - open.startNanos,
-                                        event.status ?: DEFAULT_DROP_STATUS,
-                                    ),
-                                )
+                                if (status == GattStatus.SUCCESS) {
+                                    Attempt(null, open.build(null, 0))
+                                } else {
+                                    Attempt(null, open.build(event.timeNanos - open.startNanos, status))
+                                }
                             builder = null
                         } else if (connecting) {
                             attempts += Attempt(event.status ?: GattStatus.GATT_ERROR, null)
@@ -240,6 +252,7 @@ public class ReplayPeripheral(
         private val reads = mutableMapOf<GattUuid, MutableList<ByteArray>>()
         private val writes = mutableMapOf<GattUuid, MutableList<Int>>()
         private val cccd = mutableListOf<Pair<GattUuid, Int>>()
+        private val discovered = mutableListOf<GattCharacteristicInfo>()
 
         fun add(event: BleSessionEvent) {
             val characteristic = event.characteristic ?: return
@@ -264,7 +277,13 @@ public class ReplayPeripheral(
                     if (status != GattStatus.SUCCESS) cccd += characteristic to status
                 }
 
-                BleDirection.STATE, BleDirection.DISCOVERY -> {
+                BleDirection.DISCOVERY -> {
+                    parseDiscovery(event.data)?.let { (service, properties) ->
+                        discovered += GattCharacteristicInfo(service, characteristic, properties)
+                    }
+                }
+
+                BleDirection.STATE -> {
                     Unit
                 }
             }
@@ -273,6 +292,15 @@ public class ReplayPeripheral(
         fun build(
             dropOffset: Long?,
             dropStatus: Int,
-        ): Segment = Segment(pushes.sortedBy { it.offsetNanos }, reads, writes, cccd, dropOffset, dropStatus)
+        ): Segment =
+            Segment(
+                pushes.sortedBy { it.offsetNanos },
+                reads,
+                writes,
+                cccd,
+                dropOffset,
+                dropStatus,
+                discovered.toList(),
+            )
     }
 }

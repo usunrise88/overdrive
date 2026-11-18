@@ -423,30 +423,55 @@ Turn the HCI snoop log on for this whole session.
 
 ## Session 5: Click v2 (M4 build only)
 
-Skip this session in M3 builds. The Click is delivered with the gesture layer in M4.
+Skip this session in M3 builds. The Click is built in two parts: the protocol, the gestures and the router in `core` (stage
+M4-1, tested only against a fake Click written from `docs/protocols/click-v2.md`) and the wiring into the app (M4-2). **Run it
+with the M4 release.** Every guess below is a named option of `ClickOptions` (`core/.../click/ClickOptions.kt`, table in
+`docs/adr/0011-click-gestures-and-sync-stub.md` §9); the M4 release notes say which of them the Devices screen exposes as
+developer settings, the others are a one-line change and a new build.
 **Never update the Click's firmware.** If Zwift Companion offers an update, decline it (spec §9). Write down
-the firmware version from the Companion app and the Zwift app version before each run (click-v2 §9).
+the firmware version from the Companion app and the Zwift app version before each run (click-v2 §9); the app also reads the
+firmware revision at set-up (`ClickDevice.firmware`) and keeps it out of every recording.
+
+The Click's row on the Devices screen is `ClickDevice.state`: **Active** (delivering), **Waiting** (connected, no frame yet),
+**NeedsUnlock** (the Zwift service is hidden, or no frame at all came 30 s after the handshake), **NotFound**,
+**BluetoothUnavailable**, **SetupFailed**. The ride never depends on it.
 
 - [ ] **5.1 Discovery.** Scan with the app's pairing screen, or with nRF Connect. Scan the right puck, then the
-  left. Write down each puck's advertised services and the full manufacturer data. Expect: the Zwift custom
-  service is advertised. The byte that says which side the puck is (`0x0A` or `0x0B`) is unknown. Settles: CK 1.
+  left. Write down each puck's advertised services and the full manufacturer data (the app recognises a Click from the
+  service `FC82` or the older service **and** company `0x094A` with first byte `0x0A` right or `0x0B` left, never from the name:
+  `ClickAdvertisements.recognise`). Expect: the Zwift custom service is advertised, and the right puck is recognised. The byte
+  that says which side the puck is (`0x0A` or `0x0B`) is unconfirmed. If the two are swapped, set `rightSideByte` and
+  `leftSideByte`. If a puck advertises no service, `requireAdvertisedService` is the option. Settles: CK 1, CK 12.
 - [ ] **5.2 Plain handshake, locked right puck.** Use a right puck with no Zwift connection in the last day.
-  Start the app's connect step. Expect: unknown. Write down the reply to the handshake (`RideOn`) and its
-  length, and whether buttons arrive without any unlock. Also write down whether the custom service is listed
-  in GATT discovery. Settles: CK 2, CK 12, CK 14, spec §9 "Click v2 unlock bypass" and spec §2 ("right
-  controller working without unlock").
+  Pair it and start the connect step. The app subscribes to ASYNC, then to SYNC_TX, writes `RideOn` (`52 69 64 65 4F 6E`)
+  without response, waits for the reply and by default writes `FF 04 00`. Expect: unknown. Write down the state the row
+  reaches, the reply to the handshake and its length (a session recording shows both: the reply is `RideOn`, two version bytes
+  and a tail, **the tail is zeroed in the recording but its length is kept**), and whether buttons arrive without any unlock.
+  Also write down whether the custom service is listed in GATT discovery (**NeedsUnlock, service hidden** if not).
+  If the state is **SetupFailed** with a rejected reply, the event carries the first eight bytes: a reply other than
+  `RideOn 02 03` is what `handshakeReply` (`EXPECTED_VERSION`, `ANY_RIDE_ON`, `NONE`) is for, and `01 03` would be the
+  encrypted variant of the notes' §3.3 (**not implemented**). If the write fails, flip `writeWithResponse`. If the reply
+  never comes, `handshakeTimeout`. Settles: CK 2, CK 3, CK 4, CK 12, CK 14, spec §9 "Click v2 unlock bypass" and spec §2
+  ("right controller working without unlock").
 - [ ] **5.3 Unlock notice.** When the controller is locked, the app must tell you to unlock it through Zwift
-  once and continue without the Click (spec §4.7). Expect: the notice shows, and the on-screen controls keep
-  working. Write down the exact notice text. Then unlock through Zwift as the notice says, and write down the
-  time. Settles: spec §4.7 (unlock handling), CK 8.
+  once and continue without the Click (spec §4.7). Two signals, each an option: the service is hidden
+  (`serviceHiddenMeansLocked`, the row says **NeedsUnlock**, the app retries on its own with backoff, at most every 30 s) or the controller answers and then sends
+  nothing for 30 s (`silentMeansLocked`, `noEventTimeout`; the link stays up and a late frame clears the notice; **Retry**
+  drops the link and starts over). Expect: the notice shows, and the on-screen controls keep working. Write down the exact
+  notice text and which signal fired. Then unlock through Zwift as the notice says, and write down the time. Expect the
+  Click to be picked up at the next attempt without a restart. Settles: spec §4.7 (unlock handling), CK 8, CK 12.
 - [ ] **5.4 Unlock duration.** Check the controller after 1 hour, 12 hours, 25 hours, and after a phone reboot
   (CK 8). Expect: unknown. Write down when the service hides again, if it does. Settles: CK 8, spec §9 "Click
   firmware" context.
-- [ ] **5.5 Button bitmap.** In the log or the snoop capture, press each of the five buttons on each puck in
-  turn, one at a time. Expect: a pressed button clears its bit (0 = pressed, click-v2 §4). Write down the
-  bitmap for each press. The spec's five buttons are not yet mapped to the bitmap (the mapping is a setting,
-  spec §4.7). Write down the mapping you find, including the two Plus bits (`0x1000`, `0x2000`). Settles: CK 5,
-  spec §4.7 (assign buttons once observed).
+- [ ] **5.5 Button bitmap and Learn buttons.** Open **Learn buttons** and press, one at a time and in the order it asks,
+  the five buttons you want as Plus, Button 2, 3, 4 and 5. It refuses two buttons together (a combo) and a button that is
+  already another role's (a duplicate), and asks again. Then in the log or the snoop capture, press each of the five buttons on
+  each puck in turn, one at a time. Expect: a pressed button clears its bit (0 = pressed, click-v2 §4: A `0x0010`, B `0x0020`, Y
+  `0x0040`, Z `0x0080`, Plus `0x1000`). Write down the bitmap for each press, **including the second Plus bit `0x2000`** (if one
+  press sets two bits, Learn buttons refuses it as a combo: say so, `allowMultiBitButtons` accepts it) and any bit that reads
+  pressed all the time (that is `ignoredBits`). The default mapping is a guess: Plus gear up, B gear down, Y play and pause,
+  A volume up, Z volume down (ADR 0011 §5); write down the mapping you chose and whether the default was comfortable.
+  Settles: CK 5, spec §4.7 (assign buttons once observed).
 - [ ] **5.6 The ten actions (AC 3).** With the video app in the front (the app is in the background), do each
   action from the right Click and write pass or fail. Expect each row below.
 
@@ -458,18 +483,29 @@ the firmware version from the Companion app and the Zwift app version before eac
   | Button 4 | Volume up | Volume up, repeating |
   | Button 5 | Volume down | Volume down, repeating |
 
-  In ERG steps, the gear buttons change intensity by 5% instead (spec §4.7). Expect: the media key reaches
-  the video app. Its behaviour is unverified (overlay-notes §7). Write down whether the video app paused.
-  Volume: write down whether the system volume bar appears (unverified, OV 9.9).
+  In ERG steps, the gear buttons change intensity by 5% instead (spec §4.7). A press of Plus, Button 2 or Button 3 acts when
+  you **let go**, not when you touch it; a hold acts once, at 500 ms, while you are still pressing, and the release does
+  nothing. Button 4 and 5 act at once on touch. Two buttons down at the same time at the 500 ms mark fire no hold. Expect: the
+  media key reaches the video app. Its behaviour is unverified (overlay-notes §7). Write down whether the video app paused.
+  Volume: write down whether the system volume bar appears (unverified, OV 9.9). Also pull the Click's link (switch it off, or
+  walk away) while holding a volume button: the repeating must stop and no button may stay held after it comes back.
 - [ ] **5.7 Hold timing.** Time a hold of about 400 ms and one of about 600 ms on a button. Expect: the short hold
-  is a press and the long one is a hold (threshold 500 ms, spec §4.7). For the volume repeat, count the repeats in
-  a two-second hold. Expect about 13 (repeat every 150 ms). Settles: AC 3 (hold threshold, repeat).
+  is a press and the long one is a hold (`GestureTiming.HOLD_THRESHOLD_MILLIS` 500 ms, spec §4.7). For the volume repeat, hold
+  a volume button for two seconds and count the steps: expect **12** (one at the touch, then at 500 ms and every 150 ms,
+  `VOLUME_REPEAT_MILLIS`: eleven repeats). If a press ever fires twice, or a hold is lost in the middle, the controller bounces:
+  turn on `GestureTiming.bounceMillis` (30 is a start; it delays every release by that time). Settles: AC 3 (hold threshold,
+  repeat).
 - [ ] **5.8 Keep-alive and reconnect.** Stay connected and idle for 5 minutes, then 60 seconds, then 5 minutes
   again. Note any disconnect and how long it stays down (CK 7). Expect: unknown. Expect the app reconnects
-  without a restart. Settles: CK 7, SP9 "Click v2 reliability".
-- [ ] **5.9 Message types.** In the snoop log, note when type `0x3C` appears and what follows it (CK 10). Note
-  whether battery reports (`0x19`) change as the puck drains (CK 11). Optional: send `FF 04 00` after the
-  handshake, if the app allows, and record any reply (CK 6). Expect: unknown.
+  without a restart. If the puck falls asleep or disconnects, try `keepAliveInterval` (for example 30 s; the frame is the
+  neutral frame `23 08 FF FF FF FF 0F`, `keepAliveFrame`) and note whether it changes anything. Note whether the controller
+  sends heartbeats (`15`) and how often: if it does not, `noEventTimeout` is the only thing that can call a working puck
+  locked, so lengthen it. Settles: CK 7, SP9 "Click v2 reliability".
+- [ ] **5.9 Message types.** In the recording or the snoop log, note when type `0x3C` appears and what follows it (CK 10; the
+  app reports it as an unrecognised frame with its length, the bytes are in the recording). Note
+  whether battery reports (`0x19`) change as the puck drains (CK 11, `ClickDevice.battery`). The `FF 04 00` write is on by
+  default (`sendPostHandshake`): repeat 5.2 with it off and with it on and record any difference and any reply (CK 6).
+  Expect: unknown.
 - [ ] **5.10 Reliability in a ride.** Count the disconnects during the 60-minute ride in 2.8 (or any ride). Expect:
   reconnect without the ride stopping; the on-screen controls still work. Settles: SP9 "Click v2 reliability".
 
@@ -673,6 +709,9 @@ Read these before the bench, so a surprising result is not taken as a bug in the
   The right-puck mode comes later (6.4.0). The no-unlock handshake is in closed code.
 - **Where the no-unlock method comes from.** Spec §9 says it can be settled by reading the BikeControl
   repository. The implementation notes say it is not in the open-source code. Treat 5.2 as the only test.
+- **`FF 04 00` after the handshake.** trainer-control and the newer BikeControl write it to a Click v2, the GPL-3.0 tag does
+  not, and nobody knows what it means (click-v2 §3.1). The app writes it by default (`ClickOptions.sendPostHandshake`) so the
+  first run has every chance of working; 5.9 compares with and without.
 - **FIT writer status.** The writer exists since M2b-1 (`app.overdrive.core.fit`, ADR 0007) and the app's **Share FIT
   file** and **Save to folder** buttons since M2b-2 (ADR 0008). Confirm that the release under test has them (the finished
   screen and the Last ride row) before session 7. Each open FIT question is a field of `FitOptions`, so a finding in

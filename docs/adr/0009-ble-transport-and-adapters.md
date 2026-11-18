@@ -27,6 +27,9 @@ runs in plain JVM tests.
 | `GattScanner` | `scan(filter)`: a cold flow of `ScanEvent.Found(Advertisement(id, name, serviceUuids, rssi))` and at most one `Failed(reason)` | `BluetoothLeScanner` |
 | `BleEnvironment` | `availability: StateFlow<BleAvailability>` (`READY`, `BLUETOOTH_OFF`, `PERMISSION_DENIED`, `UNSUPPORTED`) | adapter state receiver and the "Nearby devices" permission |
 
+*Stage M4-1 added one method to `GattTransport`, `writeWithoutResponse`, with a default that writes with response, and
+manufacturer data to `Advertisement`, both for the Zwift Click (ADR 0011 §1); nothing else of this section changed.*
+
 Why a boundary this small and shaped like this:
 
 - **It is where the platform's rules are, so it is where the fake enforces them.** A transport is **single-use**: after a

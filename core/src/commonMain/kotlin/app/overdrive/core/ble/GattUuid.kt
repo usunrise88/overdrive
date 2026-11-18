@@ -85,6 +85,17 @@ public object HeartRateUuids {
     public val BODY_SENSOR_LOCATION: GattUuid = GattUuid.short(0x2A38)
 }
 
+/** The Battery Service and its level characteristic (percent, one byte). */
+public object BatteryUuids {
+    public val SERVICE: GattUuid = GattUuid.short(0x180F)
+    public val LEVEL: GattUuid = GattUuid.short(0x2A19)
+}
+
+/** The Device Information Service. Its identifying characteristics are listed in [IdentityUuids]. */
+public object DeviceInformationUuids {
+    public val SERVICE: GattUuid = GattUuid.short(0x180A)
+}
+
 /**
  * Device Information Service characteristics that identify a unit (serial number, system id, device name…). The session
  * recorder never writes their values (docs/protocols/ftms-hr.md §7.1, `CLAUDE.md`: the repository is public).

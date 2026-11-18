@@ -221,6 +221,20 @@ public interface GattTransport {
     ): GattResult<Unit>
 
     /**
+     * Writes a characteristic **without response** (`WRITE_TYPE_NO_RESPONSE`), returning when the stack has taken the
+     * value (on Android, the write callback; nothing says the peripheral saw it). The Zwift Click's handshake is written
+     * this way (docs/protocols/click-v2.md §3.1).
+     *
+     * **The default falls back to [write]**, a write with response, so a transport written before this existed keeps
+     * compiling and, on a characteristic that offers both (the Click's does), keeps working. A transport that can do it
+     * overrides this; M4-2's Android transport does. The fake, the recorder and the replay already do.
+     */
+    public suspend fun writeWithoutResponse(
+        characteristic: GattCharacteristicInfo,
+        value: ByteArray,
+    ): GattResult<Unit> = write(characteristic, value)
+
+    /**
      * Subscribes to a characteristic: enables local delivery and writes its CCCD with `0x0001` or `0x0002` according to
      * [mode], returning when the write was acknowledged.
      */

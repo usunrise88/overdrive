@@ -231,6 +231,26 @@ One controller, the right Click v2, drives everything with two gestures: press a
 - Every action also has an on-screen control in the app, so a ride never depends on the Click.
 - **Unlock handling.** On connect the app detects whether the controller is delivering events. If not, it tells the user to unlock it through Zwift once and continues without the Click.
 
+**Settled in stage M4-1** (`app.overdrive.core.click`, `app.overdrive.core.control`, ADR 0011, `docs/protocols/click-v2.md` §10;
+**nothing run on a Click yet**):
+
+- *When each action fires.* There are no double clicks, so for Plus, Button 2 and Button 3 the **press fires on release** if
+  the button was down less than 500 ms, and the **hold fires once at 500 ms** while the button is still down, with nothing on
+  the release after it. For Button 4 and Button 5 the **first volume step fires on press** and the repeats start after the
+  threshold: a step at 500 ms and then every 150 ms (a two-second hold is 12 steps). The thresholds are the named constants
+  `GestureTiming.HOLD_THRESHOLD_MILLIS` and `VOLUME_REPEAT_MILLIS`. A hold fires only if no other button is down at that moment
+  (a palm over the puck pauses nothing); a lost release (the link dropped) forgets the press and fires nothing.
+- *The ten actions* are `ClickAction` (`GEAR_UP`, `GEAR_DOWN`, `NEXT_INTERVAL`, `PREVIOUS_INTERVAL`, `PLAY_PAUSE_MEDIA`,
+  `TOGGLE_RIDE_PAUSE`, `VOLUME_UP`, `VOLUME_UP_REPEAT`, `VOLUME_DOWN`, `VOLUME_DOWN_REPEAT`); `ActionRouter` carries them out: in
+  an ERG step the gear actions change intensity by 5 points, and the pause toggle works only while riding or paused.
+- *The mapping* is a setting, `ButtonMapping`, role to the Click's bits. The default is a guess (Plus gear up, B gear down, Y play
+  and pause, A volume up, Z volume down; ADR 0011 §5 says why) until the buttons are learned on the device: `ButtonLearner`
+  asks for one press per role in order, and refuses a duplicate or a combo.
+- *Unlock handling* is `ClickDevice.state`: **connected and delivering events** (`Active`), **needs unlocking through Zwift**
+  (`NeedsUnlock`: the Zwift service is hidden, or the handshake was answered and then no frame at all came within 30 s; each
+  signal is an option), not found, Bluetooth unavailable, set-up failed. A release lost in a dropped link is made by the adapter,
+  so no button is left held. The ride never depends on any of it.
+
 ### 4.8 FIT export
 
 - One FIT activity file per ride. FIT is Garmin's published format, written with the FIT SDK profile.
@@ -267,6 +287,13 @@ One controller, the right Click v2, drives everything with two gestures: press a
 - A `SyncProvider` interface with a no-op implementation.
 - Finished rides go into a persistent outbox, so Phase 2 uploads them without touching ride code.
 - Settings hold the service URL and token, unused until Phase 2.
+
+**Settled in stage M4-1** (`app.overdrive.core.sync`, ADR 0011): `SyncProvider` (`upload(entry)` answers `Acknowledged`,
+`RetryLater` or `NotConfigured`) with `NoopSyncProvider`, which acknowledges nothing; `Outbox` (`enqueue`, `pending`, `markDone`,
+idempotent per ride id) with the in-memory `InMemoryOutbox`, the persistent one on the tablet's disk coming with the app in M4-2;
+`OutboxEntry` is the ride id and a few facts for a "waiting to upload" line, **no payload and no wire format** (Phase 2, §8.3);
+`SyncCoordinator` drains the outbox oldest first with the project's backoff (5 s, doubling, 15 minutes at most), and never
+blocks or fails a ride: finishing a ride only queues it. With the no-op provider every ride stays queued for Phase 2.
 
 ### 4.10 Acceptance criteria
 

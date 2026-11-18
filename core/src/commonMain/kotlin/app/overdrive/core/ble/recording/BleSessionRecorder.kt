@@ -17,7 +17,7 @@ public fun interface LineSink {
  * Writes a BLE session as text, one line per event (docs/protocols/ftms-hr.md §7.1, format in [BleSessionFormat]).
  *
  * It sees only what the transport sees (see [recording]) and writes what [BleRecordingPolicy] allows: no address, no
- * unit's name, no serial, no strap identity. It is a queue in front of a [LineSink]: [record] returns at once and one
+ * unit's name, no serial, no strap identity, no Click handshake key. It is a queue in front of a [LineSink]: [record] returns at once and one
  * coroutine in [scope] writes, so a slow disk never delays a BLE callback or the ride (spec §7.3), and a sink that throws
  * ends the recording without touching anything else ([failure]).
  *
@@ -86,7 +86,12 @@ public class BleSessionRecorder(
         bytes: ByteArray?,
         timeNanos: Long = nanoClock(),
     ) {
-        val data = if (bytes == null || bytes.isEmpty()) BleSessionEvent.NONE else Hex.encode(bytes)
+        val data =
+            if (bytes == null || bytes.isEmpty()) {
+                BleSessionEvent.NONE
+            } else {
+                Hex.encode(BleRecordingPolicy.scrub(characteristic, bytes))
+            }
         record(direction, characteristic, status, data, timeNanos)
     }
 

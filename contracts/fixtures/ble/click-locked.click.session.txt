@@ -1,0 +1,26 @@
+# overdrive-ble-session 1
+# model Click
+0 S - - connecting
+200000000 S - 0 connected
+220000000 D 2A26 - *
+220000000 D 2A19 - 180F/RN
+220000000 S - 0 disconnected
+220000000 S - - closed
+1220000000 S - - connecting
+1420000000 S - 0 connected
+1440000000 D 2A26 - *
+1440000000 D 2A19 - 180F/RN
+1440000000 S - 0 disconnected
+1440000000 S - - closed
+3440000000 S - - connecting
+3640000000 S - 0 connected
+3660000000 D 2A26 - *
+3660000000 D 2A19 - 180F/RN
+3660000000 S - 0 disconnected
+3660000000 S - - closed
+7660000000 S - - connecting
+7860000000 S - 0 connected
+7880000000 D 2A26 - *
+7880000000 D 2A19 - 180F/RN
+7880000000 S - 0 disconnected
+7880000000 S - - closed

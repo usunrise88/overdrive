@@ -4,6 +4,40 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
+ * The manufacturer-specific data of an advertisement: a Bluetooth company identifier and the bytes that follow it. The
+ * Zwift Click is recognised by company `0x094A` and the first byte of its payload (docs/protocols/click-v2.md §1).
+ *
+ * Equality is by content. [toString] prints the length only: the payload may carry a unit's own identifier, and nothing
+ * here may reach a log.
+ */
+public class ManufacturerData(
+    /** The 16-bit Bluetooth company identifier (`0x094A` for Zwift). */
+    public val companyId: Int,
+    payload: ByteArray,
+) {
+    private val bytes: ByteArray = payload.copyOf()
+
+    /** A copy of the bytes after the company identifier. */
+    public val payload: ByteArray get() = bytes.copyOf()
+
+    /** The first payload byte as 0 to 255, or null when the payload is empty. */
+    public val firstByte: Int? get() = bytes.firstOrNull()?.toInt()?.and(BYTE_MASK)
+
+    override fun equals(other: Any?): Boolean =
+        other is ManufacturerData && companyId == other.companyId && bytes.contentEquals(other.bytes)
+
+    override fun hashCode(): Int = companyId * HASH_FACTOR + bytes.contentHashCode()
+
+    override fun toString(): String = "ManufacturerData(0x${companyId.toString(HEX_RADIX)}, ${bytes.size} bytes)"
+
+    private companion object {
+        const val BYTE_MASK = 0xFF
+        const val HASH_FACTOR = 31
+        const val HEX_RADIX = 16
+    }
+}
+
+/**
  * One advertisement heard during a scan. [id] is the opaque handle the transport understands; there is no address, and
  * nothing here is written to a recorded session.
  */
@@ -15,6 +49,11 @@ public data class Advertisement(
     val serviceUuids: Set<GattUuid>,
     /** Signal strength in dBm, for sorting the list nearest first. */
     val rssi: Int,
+    /**
+     * Manufacturer-specific data, one entry per company identifier present. Empty for a device that sends none, and for a
+     * scanner that does not fill it in (the Click's recogniser then finds nothing; see `ClickAdvertisements`).
+     */
+    val manufacturerData: List<ManufacturerData> = emptyList(),
 )
 
 /** What to scan for. An empty set means everything. */

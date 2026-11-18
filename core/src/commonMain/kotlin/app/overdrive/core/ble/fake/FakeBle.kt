@@ -137,6 +137,7 @@ public class FakeBle(
                                         peripheral.advertisedName,
                                         peripheral.advertisedServices,
                                         peripheral.rssi,
+                                        peripheral.manufacturerData,
                                     ),
                                 ),
                             )
