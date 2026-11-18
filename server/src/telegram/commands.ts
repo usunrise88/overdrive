@@ -1,10 +1,14 @@
-import { addDaysToIsoDate, isIsoDate } from "@overdrive/contracts";
+import { ACTIVITY_FIT_MAX_BYTES, addDaysToIsoDate, isIsoDate } from "@overdrive/contracts";
 import { IntervalsError } from "../intervals/client.ts";
 import { eventIdOf } from "../intervals/ids.ts";
+import { ImportError } from "../outdoor/fit-ride.ts";
 import { shortDate, weekdayName } from "../zoned.ts";
-import type { InlineButton } from "./client.ts";
+import { type IncomingDocument, type InlineButton, TelegramError } from "./client.ts";
 import { type BotContext, findEntry, loadDays, nextOpenWorkouts, todayOf } from "./context.ts";
 import {
+  fitDocumentRefusedText,
+  fitImportedText,
+  fitNotImportedText,
   HELP_TEXT,
   NOT_CONNECTED,
   READ_ONLY,
@@ -30,6 +34,16 @@ export interface ChatIo {
 export interface Commands {
   onText(text: string, io: ChatIo): Promise<void>;
   onButton(data: string, io: ChatIo): Promise<void>;
+  /**
+   * A file the owner sent. A FIT file from the bike computer is imported as an outdoor ride (spec §11.8, ADR 0026): `download` fetches
+   * it (at most the given number of bytes), and the answer is a short summary, or a plain sentence when it is not a FIT file, is not
+   * valid, is not cycling or was imported before.
+   */
+  onDocument(
+    document: IncomingDocument,
+    download: (maxBytes: number) => Promise<Uint8Array>,
+    io: ChatIo,
+  ): Promise<void>;
 }
 
 /** Callback data, at most 64 bytes: what a button sends back. */
@@ -204,9 +218,54 @@ export function createCommands(ctx: BotContext): Commands {
     await io.edit(`Moved ${entry.name} from ${shortDate(entry.date)} to ${shortDate(date)}.`);
   }
 
+  // ---- A FIT file -------------------------------------------------------------------------------
+
+  /** A document that is plainly something else: it has a name that does not end in .fit and a type that is not FIT or "a file". */
+  function plainlyNotFit(document: IncomingDocument): boolean {
+    const name = document.fileName?.toLowerCase() ?? null;
+    const type = document.mimeType?.toLowerCase() ?? null;
+    if (name?.endsWith(".fit") === true) return false;
+    if (type === "application/vnd.ant.fit" || type === "application/octet-stream") return false;
+    return name !== null || type !== null;
+  }
+
+  async function importDocument(
+    document: IncomingDocument,
+    download: (maxBytes: number) => Promise<Uint8Array>,
+    io: ChatIo,
+  ): Promise<void> {
+    if (ctx.outdoor === null) return io.reply(fitDocumentRefusedText("unavailable"));
+    if (plainlyNotFit(document)) return io.reply(fitDocumentRefusedText("not-fit"));
+    if (document.fileSize !== null && document.fileSize > ACTIVITY_FIT_MAX_BYTES) {
+      return io.reply(fitDocumentRefusedText("too-large"));
+    }
+    let bytes: Uint8Array;
+    try {
+      bytes = await download(ACTIVITY_FIT_MAX_BYTES);
+    } catch (error) {
+      const reason = error instanceof TelegramError ? error.kind : "unknown";
+      log.warn({ reason }, "a FIT file could not be downloaded from Telegram");
+      return io.reply(fitDocumentRefusedText(reason === "too-large" ? "too-large" : "download"));
+    }
+    try {
+      const { response } = await ctx.outdoor.importFit(bytes, "telegram");
+      // Counts and the status, never a value.
+      log.info({ status: response.status, bytes: bytes.length }, "FIT file from Telegram");
+      await io.reply(fitImportedText(response, ctx.timezone));
+    } catch (error) {
+      if (error instanceof ImportError) {
+        log.info({ code: error.code, bytes: bytes.length }, "FIT file from Telegram refused");
+        return io.reply(fitNotImportedText(error));
+      }
+      throw error;
+    }
+  }
+
   // ---- Dispatch -------------------------------------------------------------------------------
 
   return {
+    onDocument: importDocument,
+
     async onText(text, io) {
       const match = /^\/([A-Za-z_]+)(?:@\w+)?(?:\s.*)?$/s.exec(text.trim());
       switch (match?.[1]?.toLowerCase()) {

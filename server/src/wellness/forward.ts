@@ -12,6 +12,8 @@ import { nameOf } from "./activities.ts";
 /**
  * Forwards the workouts of the watch to intervals.icu as activities of the matching sport (spec §6.7, ADR 0023): the way rides are
  * sent (the `ride_destinations` queue and its worker), through the same client, off without a key. **Nothing goes to Strava.**
+ * An outdoor ride imported from a FIT file (spec §11.8, ADR 0026) goes the same way, but as the file itself, unchanged
+ * (`POST activities` with the FIT bytes, as a ride from the tablet does), under the external id `overdrive-fit-<hash>`.
  *
  * The call is `POST activities/manual` with the start, the sport, the name, the duration and the average and maximum heart
  * rate, and the activity's id (`overdrive-watch-<record id>`) as `external_id`. It is idempotent here, not there: before
@@ -24,11 +26,17 @@ const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
 /** A ride on the tablet and the same ride on the watch are one ride: it is sent from the tablet only. */
 const OVERLAPS_A_RIDE = "the watch recorded a ride that the tablet sends";
+/** The same for an imported ride that a ride from the tablet turned out to overlap. */
+const FIT_OVERLAPS_A_RIDE = "the same ride is recorded on the tablet, which sends it";
+/** A watch workout that overlaps an imported ride: the file is sent, the workout is not. */
+const OVERLAPS_A_FIT_RIDE =
+  "the watch recorded a ride that was imported from a FIT file, which is sent";
 
 /** The intervals.icu sport of an exercise type (the phone's names, lower-case tokens); unknown ones are a generic workout. */
 export function intervalsTypeOf(type: string): string {
   if (type === "biking_stationary" || type === "stationary_biking") return "VirtualRide";
   if (type === "biking" || type === "cycling" || type === "cycling_outdoor") return "Ride";
+  if (type === "cycling-outdoor") return "Ride";
   if (type.startsWith("running") || type === "run") return "Run";
   if (type === "walking" || type === "walk") return "Walk";
   if (type === "hiking" || type === "hike") return "Hike";
@@ -51,9 +59,9 @@ export function localDateTime(instantMs: number, timezone: string): string {
 
 export interface ActivityForwarderOptions {
   db: Db;
-  client: Pick<IntervalsClient, "createManualActivity" | "findActivityId">;
+  client: Pick<IntervalsClient, "createManualActivity" | "findActivityId" | "uploadActivity">;
   bus: EventBus;
-  activities: Pick<ActivityStore, "get">;
+  activities: Pick<ActivityStore, "get" | "fitBytes">;
   timezone: string;
   now?: () => Date;
   log: Logger;
@@ -151,17 +159,31 @@ export function createActivityForwarder(options: ActivityForwarderOptions): Acti
 
   const externalIdOf = (activityId: string): string => `overdrive-${activityId}`;
 
-  async function post(row: ActivityRow): Promise<{ id: string; result: "created" | "existing" }> {
+  async function post(
+    row: ActivityRow,
+    fit: Uint8Array | null,
+  ): Promise<{ id: string | null; result: "created" | "existing" }> {
     const externalId = externalIdOf(row.id);
-    const found = await client
-      .findActivityId({
-        externalId,
-        startEpochMillis: row.startMs,
-        oldest: localDate(row.startMs - DAY, timezone),
-        newest: localDate(row.startMs + DAY, timezone),
-      })
-      .catch(() => null);
+    const lookup = {
+      externalId,
+      startEpochMillis: row.startMs,
+      oldest: localDate(row.startMs - DAY, timezone),
+      newest: localDate(row.startMs + DAY, timezone),
+    };
+    const found = await client.findActivityId(lookup).catch(() => null);
     if (found !== null) return { id: found, result: "existing" };
+    if (fit !== null) {
+      // An outdoor ride from a FIT file: the file as it came, which intervals.icu knows how to read.
+      const outcome = await client.uploadActivity({
+        fit,
+        filename: `${row.id}.fit`,
+        externalId,
+        name: nameOf(row),
+      });
+      if (outcome.status === "uploaded") return { id: outcome.activityId, result: "created" };
+      const known = outcome.activityId ?? (await client.findActivityId(lookup).catch(() => null));
+      return { id: known, result: "existing" };
+    }
     const id = await client.createManualActivity({
       externalId,
       startDateLocal: localDateTime(row.startMs, timezone),
@@ -191,13 +213,37 @@ export function createActivityForwarder(options: ActivityForwarderOptions): Acti
       return "failed";
     }
     if (activity.overlapsRideId !== null) {
-      await finish(row.activity_id, attempts, { state: "skipped", error: OVERLAPS_A_RIDE });
-      log.info({ activityId: activity.id }, "watch activity not forwarded: it overlaps a ride");
+      const reason =
+        activity.source === "fit"
+          ? FIT_OVERLAPS_A_RIDE
+          : activity.overlapsRideId.startsWith("fit-")
+            ? OVERLAPS_A_FIT_RIDE
+            : OVERLAPS_A_RIDE;
+      await finish(row.activity_id, attempts, { state: "skipped", error: reason });
+      log.info(
+        { activityId: activity.id },
+        "activity not forwarded: it overlaps another record of the ride",
+      );
       return "skipped";
     }
-    let sent: { id: string; result: "created" | "existing" };
+    let fit: Uint8Array | null = null;
+    if (activity.source === "fit") {
+      fit = await activities.fitBytes(activity.id);
+      if (fit === null) {
+        await finish(row.activity_id, attempts, {
+          state: "failed",
+          error: "The FIT file is not stored",
+        });
+        log.error(
+          { activityId: activity.id },
+          "intervals.icu forwarding given up: the FIT file is missing",
+        );
+        return "failed";
+      }
+    }
+    let sent: { id: string | null; result: "created" | "existing" };
     try {
-      sent = await post(activity);
+      sent = await post(activity, fit);
     } catch (error) {
       const known = error instanceof IntervalsError ? error : null;
       const reason = known?.message ?? "the forwarding failed unexpectedly";
@@ -230,8 +276,8 @@ export function createActivityForwarder(options: ActivityForwarderOptions): Acti
     }
     await finish(activity.id, attempts, { state: "done", externalId: sent.id });
     log.info(
-      { activityId: activity.id, attempts, result: sent.result },
-      "watch activity sent to intervals.icu",
+      { activityId: activity.id, attempts, result: sent.result, source: activity.source },
+      "activity sent to intervals.icu",
     );
     return "done";
   }

@@ -19,6 +19,12 @@ export const TRIMP_EXPONENT = 1.92;
 /** A sample holds until the next one, but not longer than this: a gap in the data is not heart rate. */
 export const HOLD_CAP_SECONDS = 300;
 
+/**
+ * The same cap for a ride imported from a FIT file (spec §11.8): a bike computer writes a record every second or every few, and
+ * stops writing while the timer is stopped (a traffic light, a café), so a longer gap is a stop and not heart rate that went on.
+ */
+export const FIT_HOLD_CAP_SECONDS = 30;
+
 /** Below this share of the session within reach of a sample, the load is flagged approximate. */
 export const MIN_COVERAGE = 0.8;
 
@@ -52,18 +58,22 @@ function median(sorted: readonly number[]): number | null {
  * How long each sample holds, in seconds: until the next sample, at most {@link HOLD_CAP_SECONDS}; the
  * last one for the median gap (or the cap) and no further than the end of the session.
  */
-export function holdSeconds(samples: readonly HrSample[], endMs: number): number[] {
+export function holdSeconds(
+  samples: readonly HrSample[],
+  endMs: number,
+  capSeconds: number = HOLD_CAP_SECONDS,
+): number[] {
   const gaps: number[] = [];
   for (let i = 1; i < samples.length; i++) {
     gaps.push(((samples[i] as HrSample).tMs - (samples[i - 1] as HrSample).tMs) / 1000);
   }
-  const typical = median([...gaps].sort((a, b) => a - b)) ?? HOLD_CAP_SECONDS;
+  const typical = median([...gaps].sort((a, b) => a - b)) ?? capSeconds;
   return samples.map((sample, i) => {
     const next = samples[i + 1];
     const hold =
       next === undefined
-        ? Math.min(HOLD_CAP_SECONDS, typical, Math.max(0, (endMs - sample.tMs) / 1000))
-        : Math.min(HOLD_CAP_SECONDS, (next.tMs - sample.tMs) / 1000);
+        ? Math.min(capSeconds, typical, Math.max(0, (endMs - sample.tMs) / 1000))
+        : Math.min(capSeconds, (next.tMs - sample.tMs) / 1000);
     return Math.max(0, hold);
   });
 }
@@ -73,6 +83,7 @@ export function summarizeSamples(
   samples: readonly HrSample[],
   startMs: number,
   endMs: number,
+  capSeconds: number = HOLD_CAP_SECONDS,
 ): HeartRateSummary {
   if (samples.length === 0) {
     return {
@@ -89,7 +100,7 @@ export function summarizeSamples(
     gaps.push(((samples[i] as HrSample).tMs - (samples[i - 1] as HrSample).tMs) / 1000);
   }
   gaps.sort((a, b) => a - b);
-  const holds = holdSeconds(samples, endMs);
+  const holds = holdSeconds(samples, endMs, capSeconds);
   const covered = holds.reduce((a, b) => a + b, 0);
   const weighted = samples.reduce((a, sample, i) => a + sample.bpm * (holds[i] as number), 0);
   const duration = Math.max(1, (endMs - startMs) / 1000);
@@ -120,11 +131,12 @@ export function trimpLoad(
   samples: readonly HrSample[],
   endMs: number,
   limits: HeartRateLimits,
+  capSeconds: number = HOLD_CAP_SECONDS,
 ): number | null {
   const { rest, max, threshold } = limits;
   if (samples.length === 0 || !(rest < threshold && threshold < max)) return null;
   const reserve = max - rest;
-  const holds = holdSeconds(samples, endMs);
+  const holds = holdSeconds(samples, endMs, capSeconds);
   let sum = 0;
   for (const [i, sample] of samples.entries()) {
     const x = Math.min(1, Math.max(0, (sample.bpm - rest) / reserve));

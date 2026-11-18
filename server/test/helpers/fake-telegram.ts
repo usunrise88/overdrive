@@ -3,8 +3,9 @@ import type { AddressInfo } from "node:net";
 
 /**
  * A fake Telegram Bot API for the tests: long polling `getUpdates`, `sendMessage`, `editMessageText`,
- * `answerCallbackQuery`, `deleteWebhook` and `setMyCommands`, as the public reference describes them
- * (ADR 0019), on a free local port. Everything in it is invented.
+ * `answerCallbackQuery`, `deleteWebhook`, `setMyCommands` and, for a file sent to the bot (ADR 0026), `getFile` and the download
+ * at `/file/bot<token>/<path>`, as the public reference describes them (ADR 0019), on a free local port. Everything in it is
+ * invented.
  */
 
 export const FAKE_BOT_TOKEN = "123456789:AAFakeTokenForTestsOnly_0123456789abcdefgh";
@@ -46,6 +47,16 @@ export interface FakeTelegram {
   pushText(chatId: number, text: string): number;
   /** Queues a press of a button under message `messageId`; returns its update id. */
   pushCallback(chatId: number, messageId: number, data: string): number;
+  /**
+   * Queues a document (a file) from a chat; returns its update id. `size` is what Telegram says the file is (default the bytes').
+   * The bytes are served by the download until `reset()`.
+   */
+  pushDocument(
+    chatId: number,
+    file: { bytes: Uint8Array; fileName?: string; mimeType?: string; size?: number },
+  ): number;
+  /** The paths downloaded so far. */
+  downloads: string[];
   /** The next `count` calls (of `method`, when given) are answered with `status`. */
   failNext(
     count: number,
@@ -85,7 +96,9 @@ export async function startFakeTelegram(): Promise<FakeTelegram> {
     [];
   let nextUpdate = 1;
   let nextMessage = 100;
+  let nextFile = 1;
   let unreachable = false;
+  const files = new Map<string, { path: string; bytes: Buffer; size: number }>();
 
   const wake = (): void => {
     for (const release of [...waiting]) release();
@@ -118,6 +131,32 @@ export async function startFakeTelegram(): Promise<FakeTelegram> {
       wake();
       return id;
     },
+    pushDocument(chatId, file) {
+      const id = nextUpdate++;
+      const fileId = `file-id-${nextFile++}`;
+      const path = `documents/${fileId}${file.fileName === undefined ? "" : `/${file.fileName}`}`;
+      const bytes = Buffer.from(file.bytes);
+      files.set(fileId, { path, bytes, size: file.size ?? bytes.length });
+      updates.push({
+        update_id: id,
+        message: {
+          message_id: nextMessage++,
+          date: 1_790_000_000,
+          chat: { id: chatId, type: "private" },
+          from: { id: chatId, is_bot: false, first_name: "Test" },
+          document: {
+            file_id: fileId,
+            file_unique_id: `u-${fileId}`,
+            ...(file.fileName === undefined ? {} : { file_name: file.fileName }),
+            ...(file.mimeType === undefined ? {} : { mime_type: file.mimeType }),
+            file_size: file.size ?? bytes.length,
+          },
+        },
+      });
+      wake();
+      return id;
+    },
+    downloads: [],
     pushCallback(chatId, messageId, data) {
       const id = nextUpdate++;
       updates.push({
@@ -148,6 +187,9 @@ export async function startFakeTelegram(): Promise<FakeTelegram> {
       state.answered.length = 0;
       state.commands.length = 0;
       state.offsets.length = 0;
+      state.downloads.length = 0;
+      files.clear();
+      nextFile = 1;
       state.webhookDeleted = 0;
       queued.length = 0;
       unreachable = false;
@@ -166,6 +208,24 @@ export async function startFakeTelegram(): Promise<FakeTelegram> {
       return;
     }
     const url = new URL(request.url ?? "/", "http://fake");
+    const download = /^\/file\/bot([^/]+)\/(.+)$/.exec(url.pathname);
+    if (download !== null && request.method === "GET") {
+      if (download[1] !== FAKE_BOT_TOKEN) {
+        return send(response, 401, { ok: false, error_code: 401, description: "Unauthorized" });
+      }
+      const path = decodeURIComponent(download[2] ?? "");
+      const found = [...files.values()].find((f) => f.path === path);
+      state.downloads.push(path);
+      if (found === undefined) {
+        return send(response, 404, { ok: false, error_code: 404, description: "Not Found" });
+      }
+      response.writeHead(200, {
+        "content-type": "application/octet-stream",
+        "content-length": String(found.bytes.length),
+      });
+      response.end(found.bytes);
+      return;
+    }
     const raw = await readBody(request);
     const match = /^\/bot([^/]+)\/([A-Za-z]+)$/.exec(url.pathname);
     if (match === null || request.method !== "POST") {
@@ -243,6 +303,20 @@ export async function startFakeTelegram(): Promise<FakeTelegram> {
       case "deleteWebhook":
         state.webhookDeleted++;
         return send(response, 200, { ok: true, result: true });
+      case "getFile": {
+        const found = files.get(String(body.file_id));
+        if (found === undefined) {
+          return send(response, 400, {
+            ok: false,
+            error_code: 400,
+            description: "Bad Request: wrong file_id",
+          });
+        }
+        return send(response, 200, {
+          ok: true,
+          result: { file_id: String(body.file_id), file_size: found.size, file_path: found.path },
+        });
+      }
       case "setMyCommands":
         state.commands = (body.commands ?? []) as typeof state.commands;
         return send(response, 200, { ok: true, result: true });

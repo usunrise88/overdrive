@@ -15,6 +15,7 @@ import {
 } from "./intervals/uploads.ts";
 import type { Logger } from "./log.ts";
 import { createMetricsService, type MetricsService } from "./metrics/service.ts";
+import { createOutdoor, type OutdoorService } from "./outdoor/service.ts";
 import { createPlanRefresher, type PlanRefresher } from "./plan/refresher.ts";
 import { createPlanStore, type PlanStore } from "./plan/store.ts";
 import { createProfileStore, type ProfileStore } from "./profile/store.ts";
@@ -83,6 +84,8 @@ export interface Services {
    * the forwarding of the watch's activities run only with one.
    */
   wellness: WellnessService;
+  /** Outdoor rides from FIT files, shared by the companion and sent to the Telegram bot (spec §11.8, ADR 0026). */
+  outdoor: OutdoorService;
   /**
    * The written insights, the alerts and the discussion topics (ADR 0025). Always present: without a language model the notes are
    * written from templates. The Telegram bot sends what it stores.
@@ -199,6 +202,7 @@ export function createServices(options: ServicesOptions): Services {
         : { nightsNeeded: config.WELLNESS_NIGHTS_NEEDED }),
     },
   });
+  const outdoor = createOutdoor({ db, bus, wellness, timezone, log });
   const planHistory = createPlanHistory({
     db,
     plan,
@@ -253,6 +257,7 @@ export function createServices(options: ServicesOptions): Services {
     timers: options.timers,
     history: planHistory,
     sources: [insights.notifications],
+    outdoor,
   });
   let strava: StravaUploads | null = null;
   const stravaMode = stravaSettings(config);
@@ -295,6 +300,7 @@ export function createServices(options: ServicesOptions): Services {
     calendar,
     telegram,
     wellness,
+    outdoor,
     insights,
     start() {
       void uploads?.start();

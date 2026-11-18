@@ -19,6 +19,8 @@ import { dayStartMillis, localDate } from "../time.ts";
 import type { Timers } from "../timers.ts";
 import {
   type ActivityLoad,
+  type ActivitySource,
+  type ActivityStore,
   activityLoad,
   createActivityStore,
   describeActivity,
@@ -59,6 +61,8 @@ export interface ActivityListQuery {
   toMs?: number;
   /** Leave out the sessions that overlap a ride on the tablet. */
   excludeOverlapping?: boolean;
+  /** Only the watch's workouts, or only the outdoor rides imported from FIT files (ADR 0026). */
+  source?: ActivitySource;
   limit: number;
   offset: number;
 }
@@ -71,6 +75,8 @@ export interface WellnessService {
   /** The upload of the watch's activities to intervals.icu; null without an API key. */
   readonly forwarder: ActivityForwarder | null;
   readonly heartRates: RideHeartRateIndex;
+  /** The activities table: the watch's workouts and the outdoor rides imported from FIT files (ADR 0026). */
+  readonly activities: ActivityStore;
   readonly store: WellnessStore;
   readonly settings: WellnessSettings;
   /** The daily figures from `from` to `to` with the baselines in force each day. */
@@ -221,6 +227,7 @@ export function createWellness(options: WellnessOptions): WellnessService {
     puller,
     forwarder,
     heartRates,
+    activities,
     store,
     settings,
 

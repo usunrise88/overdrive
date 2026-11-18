@@ -25,7 +25,9 @@ export type TelegramErrorKind =
   /** No answer: connection refused, DNS, TLS, timeout. */
   | "unreachable"
   /** A success status with a body this client cannot use. */
-  | "bad-response";
+  | "bad-response"
+  /** A file larger than the caller accepts. */
+  | "too-large";
 
 export class TelegramError extends Error {
   readonly kind: TelegramErrorKind;
@@ -58,13 +60,23 @@ export interface InlineButton {
   data: string;
 }
 
+/** A file sent to the bot as a document (a FIT file from the bike computer, spec §11.8). */
+export interface IncomingDocument {
+  /** Telegram's id of the file, for `getFile`. */
+  fileId: string;
+  fileName: string | null;
+  mimeType: string | null;
+  /** Bytes, when Telegram says. */
+  fileSize: number | null;
+}
+
 /** An update, reduced to what the bot reads. */
 export interface IncomingUpdate {
   updateId: number;
   /** The chat it came from, whatever the kind of update; null when it has none we understand. */
   chatId: number | null;
-  /** Set for a message. `text` is null for photos, stickers and the like. */
-  message: { text: string | null } | null;
+  /** Set for a message. `text` is null for photos, stickers and the like; `document` is set for a file. */
+  message: { text: string | null; document: IncomingDocument | null } | null;
   /** Set for a press of an inline button. */
   callback: { id: string; messageId: number | null; data: string | null } | null;
 }
@@ -104,6 +116,12 @@ export interface TelegramClient {
   deleteWebhook(): Promise<void>;
   /** The menu the Telegram client shows. */
   setCommands(commands: BotCommandInfo[]): Promise<void>;
+  /**
+   * Downloads a file the owner sent: `getFile` for its path, then the file itself. Telegram lets a bot download files of up to
+   * 20 MB; a larger one is refused by Telegram (`rejected`) and one over `maxBytes` here is refused before it is read
+   * (`too-large`).
+   */
+  downloadFile(fileId: string, maxBytes: number): Promise<Uint8Array>;
 }
 
 export interface TelegramClientOptions {
@@ -132,6 +150,14 @@ const updateSchema = z.looseObject({
     .looseObject({
       chat: z.looseObject({ id: z.number() }),
       text: z.string().optional(),
+      document: z
+        .looseObject({
+          file_id: z.string(),
+          file_name: z.string().optional(),
+          mime_type: z.string().optional(),
+          file_size: z.number().optional(),
+        })
+        .optional(),
     })
     .optional(),
   callback_query: z
@@ -327,7 +353,21 @@ export function createTelegramClient(options: TelegramClientOptions): TelegramCl
             update.callback_query?.message?.chat.id ??
             update.callback_query?.from?.id ??
             null,
-          message: update.message === undefined ? null : { text: update.message.text ?? null },
+          message:
+            update.message === undefined
+              ? null
+              : {
+                  text: update.message.text ?? null,
+                  document:
+                    update.message.document === undefined
+                      ? null
+                      : {
+                          fileId: update.message.document.file_id,
+                          fileName: update.message.document.file_name ?? null,
+                          mimeType: update.message.document.mime_type ?? null,
+                          fileSize: update.message.document.file_size ?? null,
+                        },
+                },
           callback:
             update.callback_query === undefined
               ? null
@@ -380,6 +420,50 @@ export function createTelegramClient(options: TelegramClientOptions): TelegramCl
 
     async setCommands(commands) {
       await send("setMyCommands", { commands });
+    },
+
+    async downloadFile(fileId, maxBytes) {
+      const info = (await send("getFile", { file_id: fileId })) as {
+        file_path?: unknown;
+        file_size?: unknown;
+      } | null;
+      const path = info?.file_path;
+      if (typeof path !== "string" || path === "" || path.includes("..")) {
+        throw new TelegramError("bad-response", "Telegram did not give a path for the file", 200);
+      }
+      if (typeof info?.file_size === "number" && info.file_size > maxBytes) {
+        throw new TelegramError("too-large", "The file is larger than this service takes", 200);
+      }
+      let response: Response;
+      try {
+        response = await doFetch(
+          `${options.baseUrl.replace(/\/+$/, "")}/file/bot${options.token}/${path}`,
+          // A redirect would carry the token somewhere we did not choose.
+          { method: "GET", redirect: "error", signal: AbortSignal.timeout(timeoutMs * 3) },
+        );
+      } catch (cause) {
+        throw new TelegramError(
+          "unreachable",
+          `Telegram did not answer (${describeFailure(cause)})`,
+          null,
+        );
+      }
+      if (!response.ok) {
+        throw new TelegramError(
+          response.status === 404 || response.status === 401 ? "unauthorized" : "rejected",
+          `Telegram would not give the file (HTTP ${response.status})`,
+          response.status,
+        );
+      }
+      const declared = Number(response.headers.get("content-length"));
+      if (Number.isFinite(declared) && declared > maxBytes) {
+        throw new TelegramError("too-large", "The file is larger than this service takes", 200);
+      }
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.length > maxBytes) {
+        throw new TelegramError("too-large", "The file is larger than this service takes", 200);
+      }
+      return bytes;
     },
   };
 }
