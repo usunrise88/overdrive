@@ -28,7 +28,7 @@ The core idea is that everything runs on the tablet in front of the bike. Video 
 
 - iOS. iOS has no system overlay; the shared core keeps the door open but nothing is built for it.
 - Virtual worlds, multiplayer, racing, video routes.
-- Multiple users, accounts, store distribution.
+- Store distribution. Multiple users and accounts are not built now; they are the **last stage of the project**, after Phase 3 (ADR 0015).
 - A custom training-plan database. intervals.icu is the plan backend.
 - Medical conclusions.
 

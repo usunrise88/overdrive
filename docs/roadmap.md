@@ -27,6 +27,13 @@ nothing has touched real hardware.
    wire-format change does, in `contracts/`: the sync API's schemas and fixtures come first. Phase 3 (statistics, the companion
    app) follows.
 
+## Last: multiple users
+
+Decision (owner, 2026-11-18, ADR 0015): multi-user support is the **final stage of the project**, after Phase 3. Until then the
+system is single-user (spec §1): one profile, one plan, one set of integration keys, device tokens that name devices, not people.
+It will need accounts and sign-in, a user id on every table, per-user integration keys and profile, and a review of the Strava
+terms for more than one person. Nothing of it is built earlier, and no earlier stage adds a user column "just in case".
+
 ## Hardware verification is deferred
 
 Decision (owner): M3 and M4 are built without access to the trainer, strap or Click. They are tested on
