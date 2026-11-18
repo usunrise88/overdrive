@@ -117,6 +117,9 @@ Phase 1 delivers a complete offline ride: connect the devices, ride free or play
   the seconds in between are still recorded, as paused samples with no power or cadence. The snapshot says why a ride
   is paused (trainer, manual or auto). A heart-rate dropout never pauses or stops anything; it is a gap.
 - **Crash safety.** Records are appended to disk every second. An interrupted ride is recovered on the next launch.
+  *Settled in stage M2b-1* (`RideLogRecorder`, `RideLog.recover`, ADR 0007): one checksummed line per record, in a
+  file of its own; a log cut off or damaged anywhere recovers up to its last intact record, and says whether the
+  ride had finished.
 
 ### 4.3 Free ride on the flat
 
@@ -187,6 +190,18 @@ One controller, the right Click v2, drives everything with two gestures: press a
 - One lap per workout step. Session sport is cycling, sub-sport virtual activity.
 - RR intervals are written as HRV messages when available.
 - Files are kept in app storage and can be shared or saved to any folder.
+
+**Settled in stage M2b-1** (`app.overdrive.core.fit`, ADR 0007, `docs/protocols/fit.md`):
+
+- The writer is our own, `FitWriter(FitOptions).write(RideRecord): ByteArray`, deterministic and free of Garmin's SDK.
+  The choices that only an import into intervals.icu can settle are the fields of `FitOptions`.
+- A sample of second *k* is a `record` stamped with the start of that second, `start + k − 1`; every second is
+  written, pauses included, as sampled, and elapsed and timer time are both the ride's length. Gaps are the base
+  types' invalid values.
+- One `lap` per lap of the record (a workout step), after its last record; `session` (sport cycling, sub-sport
+  virtual activity, with normalised power, TSS, intensity factor and work once there is a normalised power) and
+  `activity` last; timer start and stop `event`s around the records. RR intervals are `hrv` messages after the record of
+  the second they arrived in.
 
 ### 4.9 Sync stub
 
@@ -419,7 +434,7 @@ Native JSON, version-tagged. Targets are fractions of FTP. Durations are seconds
 
 The FIT file is generated from this record and can be regenerated at any time.
 
-**Settled in stage M2a** (`app.overdrive.core.record`, ADR 0004; the wire format is still to be fixed in `contracts/`):
+**Settled in stage M2a** (`app.overdrive.core.record`, ADR 0004; the wire format is below):
 
 - *Ride*: `id`, `startEpochMillis`, `endEpochMillis`, `workoutId`, `ftp`, `devices` (names). Sync state belongs to
   the outbox (§4.9), not the record.
@@ -433,6 +448,20 @@ The FIT file is generated from this record and can be regenerated at any time.
 - *Summary*: `durationSeconds` (pauses included), `movingSeconds`, `distanceMeters`, `averagePower`,
   `normalizedPower`, `maxPower`, `averageHeartRate`, `maxHeartRate`, `workKilojoules`, `intensityFactor`, and the load as
   `trainingStressScore`. Everything but the duration and distance is computed over the seconds that were not paused.
+
+**Wire format, settled in stage M2b-1** (`contracts/schema/ride-record.schema.json`, `RideRecordJson`, ADR 0007):
+
+- One JSON document, `schema: 1`, with `ride`, `samples`, `rrIntervals`, `laps` and `summary`, under exactly the
+  property names above (`ride` is the Ride entity; the sample's time offset is `timeOffsetSeconds`, the RR
+  series' `timeOffsetSeconds` and `intervalMs`). **A gap is an absent key**: a writer never emits `null`, a reader
+  accepts it. `speedKmh`, `distanceMeters`, `paused` and `devices` have defaults (0, 0, false, none) and are always
+  written by the Kotlin writer.
+- Beyond the schema, a record is valid only if its samples run 1, 2, 3, … in order, its laps follow each other from
+  0 to the last second with each ending after it starts, and `summary.durationSeconds` is the number of samples.
+  Kotlin and TypeScript both check this, against the same fixtures in `contracts/fixtures/rides/`.
+- The ride in progress is stored not as this document but as the append-only log of §4.2: a `header` line, a
+  `sample` line per second, an `rr` line when the strap sent intervals and a `finished` line, each one line of the
+  same JSON behind a CRC-32. The record is rebuilt from it with `RideRecordBuilder`.
 
 ### 8.3 Sync API
 

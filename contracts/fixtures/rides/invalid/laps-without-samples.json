@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "ride": {
+    "id": "free-ride-1",
+    "startEpochMillis": 1794996000000,
+    "endEpochMillis": 1794996003000,
+    "ftp": 220,
+    "devices": [
+      "Test trainer"
+    ]
+  },
+  "samples": [],
+  "rrIntervals": [],
+  "laps": [
+    {
+      "startSeconds": 0,
+      "endSeconds": 1
+    }
+  ],
+  "summary": {
+    "durationSeconds": 0,
+    "movingSeconds": 0,
+    "distanceMeters": 0,
+    "workKilojoules": 0
+  }
+}

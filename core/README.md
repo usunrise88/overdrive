@@ -22,9 +22,10 @@ Currently implemented:
 | `device` | `TrainerDevice` and `HeartRateDevice` (FTMS-shaped), simulated devices, `SimulatedBike` | §4.1, §7.5 |
 | `physics` | `FlatPhysicsSpeedModel`: virtual speed and distance on the flat | §4.3 |
 | `gear` | `GearSettings`: virtual gears as clamped grade offsets | §4.4 |
-| `record` | `RideRecord` (samples, laps, RR series, summary), `RideRecorder` | §8.2 |
+| `record` | `RideRecord` (samples, laps, RR series, summary), `RideRecorder`, its JSON wire format, the crash-safe ride log | §4.2, §8.2 |
+| `fit` | `FitWriter`: a ride record as a FIT activity file | §4.8 |
 
-Not yet: the BLE codecs (M3), the FIT writer and persistence (M2b), gesture detection (M4).
+Not yet: the BLE codecs (M3), the Android storage and share button (M2b-2), gesture detection (M4).
 
 The first section below is the real engine; the one after it is the UI's view of a session
 (`RideSession`, `RideSnapshot`), which the engine and the simulated session both provide.
@@ -97,6 +98,28 @@ and the 3 s ramp-in (`beginRampIn()`). Golden ZWO files are in `../contracts/fix
 fields, never zeros. A lap is one stretch in one workout step. The summary has duration, moving time, average and
 normalised power (Coggan: 30 s rolling mean, fourth-power mean), work in kJ, intensity factor, TSS, heart-rate
 average and maximum, all over the seconds that were not paused (`RideSummary.of(samples, ftp)` computes it).
+
+### Durable and exportable (`record`, `fit`; ADR 0007)
+
+```kotlin
+val live = InMemoryRideRecorder()
+val log = RideLogRecorder(FileByteSink(File(ridesDir, "$rideId.ridelog")))   // JVM file sink; ByteSink is the seam
+val engine = RideEngine(scope, trainer, strap, workout, settings, recorder = CompositeRideRecorder(log, live))
+
+// at the end, or on the next launch after a crash
+val record: RideRecord = live.record ?: RideLog.recover(FileByteSource(file))!!.toRecord()
+val fit: ByteArray = FitWriter(FitOptions(utcOffsetSeconds = tzOffset)).write(record)
+val json: String = RideRecordJson.encode(record)       // schema: contracts/schema/ride-record.schema.json
+```
+
+- **The log** is one line per record, `<crc32> <kind> <json>`: a `header`, a `sample` per second, an `rr` per notification,
+  a `finished` marker. `RideLog.recover` never throws and returns the intact beginning of whatever is on disk (cut off at
+  any byte, zero-filled, garbled), saying whether the ride `FINISHED` or was `INTERRUPTED`; `toRecord()` rebuilds laps and
+  summary with the live code. A failing sink is kept in `RideLogRecorder.failure` and never stops the ride.
+- **The FIT writer** is our own (no Garmin SDK), deterministic, and reproduces the worked example of
+  `docs/protocols/fit.md` section 6 byte for byte. What intervals.icu may disagree with is a field of `FitOptions`, with the
+  doc's recommendation as default. Pass the device's UTC offset: the record holds UTC only. An opt-in test decodes the files
+  with Garmin's decoder if you give it the jar (`-PfitOracleJar=...`, ADR 0007); the jar is never part of the build.
 
 ## Ride session (`app.overdrive.core.ride`)
 

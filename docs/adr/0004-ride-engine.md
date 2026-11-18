@@ -130,7 +130,8 @@ persistence, crash recovery and the FIT writer on top of the `RideRecorder` seam
   `t·NP·IF/(FTP·3600)·100`, with `t` the length of that series. All of it is computed incrementally by an internal accumulator,
   so memory is constant and a ride recovered from disk goes through the same code. Hand-computed series in the tests.
 - The record types are plain Kotlin with no `@Serializable` and there is no JSON schema yet: persistence in M2b and the
-  sync payload in Phase 2 decide the wire format, and by `CLAUDE.md` that starts in `contracts/`.
+  sync payload in Phase 2 decide the wire format, and by `CLAUDE.md` that starts in `contracts/`. (Settled in M2b-1:
+  ADR 0007.)
 
 ## What the next stages plug into
 

@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "ride": {"id":"fit-golden","startEpochMillis":1794996000000,"endEpochMillis":1794996003000,"ftp":250,"devices":[]},
+  "samples": [
+    {"timeOffsetSeconds":1,"power":200,"heartRate":120,"cadence":90,"speedKmh":28.8,"distanceMeters":0.0,"paused":false},
+    {"timeOffsetSeconds":2,"power":210,"heartRate":121,"cadence":91,"speedKmh":29.16,"distanceMeters":8.0,"paused":false},
+    {"timeOffsetSeconds":3,"power":220,"heartRate":122,"cadence":92,"speedKmh":29.52,"distanceMeters":16.1,"paused":false}
+  ],
+  "rrIntervals": [],
+  "laps": [
+    {"startSeconds":0,"endSeconds":3,"averagePower":210.0,"averageHeartRate":121.0}
+  ],
+  "summary": {"durationSeconds":3,"movingSeconds":3,"distanceMeters":16.1,"averagePower":210.0,"maxPower":220,"averageHeartRate":121.0,"maxHeartRate":122,"workKilojoules":0.63}
+}

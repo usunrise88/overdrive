@@ -4,8 +4,10 @@ import app.overdrive.core.device.SimulatedHeartRateDevice
 import app.overdrive.core.device.SimulatedTrainerDevice
 import app.overdrive.core.device.TrainerCommand
 import app.overdrive.core.device.collectAll
+import app.overdrive.core.record.CompositeRideRecorder
 import app.overdrive.core.record.InMemoryRideRecorder
 import app.overdrive.core.record.RideRecord
+import app.overdrive.core.record.RideRecorder
 import app.overdrive.core.workout.Workout
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
@@ -28,6 +30,8 @@ internal class EngineRig(
     connectTrainer: Boolean = true,
     connectStrap: Boolean = true,
     tickInterval: Duration = 1.seconds,
+    /** Another recorder that gets the same calls as [recorder], such as the crash-safe log. */
+    extraRecorder: RideRecorder? = null,
 ) {
     val trainer = SimulatedTrainerDevice(clock = { testScope.testScheduler.currentTime })
     val strap = SimulatedHeartRateDevice()
@@ -39,7 +43,7 @@ internal class EngineRig(
             heartRate = if (withStrap) strap else null,
             workout = workout,
             settings = settings,
-            recorder = recorder,
+            recorder = if (extraRecorder == null) recorder else CompositeRideRecorder(recorder, extraRecorder),
             tickInterval = tickInterval,
             rideId = "test-ride",
             clock = { ENGINE_TEST_START_MILLIS + testScope.testScheduler.currentTime },

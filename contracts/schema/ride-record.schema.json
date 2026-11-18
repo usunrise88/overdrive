@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive ride record, schema 1",
+  "description": "The record of one ride (spec §8.2): what the ride engine recorded, from which the FIT file is generated and which can be regenerated at any time. Times are offsets in whole seconds from the start of the ride; the first second is 1. A gap (a reading that was not measured) is an absent key; a null is read the same way. Beyond what a schema can say, a record must also have samples whose offsets run 1, 2, 3, … in order, laps that follow each other from 0 to the last second, and a summary whose durationSeconds is the number of samples; every implementation checks that too (see the invalid fixtures).",
+  "type": "object",
+  "required": ["schema", "ride", "samples", "rrIntervals", "laps", "summary"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": 1 },
+    "ride": { "$ref": "#/$defs/ride" },
+    "samples": {
+      "description": "One per second of the ride, in order, offsets 1..duration, pauses included.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/sample" }
+    },
+    "rrIntervals": {
+      "description": "Beat-to-beat intervals from the strap, in the order received; may be empty.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/rrInterval" }
+    },
+    "laps": {
+      "description": "One per maximal run of samples in the same workout step, in order; a ride without a workout is one lap with no step. Empty only for a ride without samples.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/lap" }
+    },
+    "summary": { "$ref": "#/$defs/summary" }
+  },
+  "$defs": {
+    "ride": {
+      "type": "object",
+      "required": ["id", "startEpochMillis", "ftp"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "startEpochMillis": {
+          "description": "Wall-clock start of the ride, milliseconds since the Unix epoch.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "endEpochMillis": {
+          "description": "Wall-clock end of the ride; absent while it is still going.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "workoutId": {
+          "description": "The workout that was played; absent for a free ride.",
+          "type": ["string", "null"]
+        },
+        "ftp": {
+          "description": "FTP in watts at the time of the ride, which the zones, the intensity factor and the load are based on.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "devices": {
+          "description": "Names of the devices the ride used, trainer first. Default: none.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "sample": {
+      "description": "The sensor readings at the end of the second, and the plan that was in force during it (target, gear, step).",
+      "type": "object",
+      "required": ["timeOffsetSeconds"],
+      "additionalProperties": false,
+      "properties": {
+        "timeOffsetSeconds": { "type": "integer", "minimum": 1 },
+        "power": {
+          "description": "Watts; absent when no power was measured.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "heartRate": {
+          "description": "Beats per minute; absent when there was no heart-rate signal.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "cadence": {
+          "description": "Revolutions per minute; absent when there was no cadence signal.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "speedKmh": {
+          "description": "Virtual speed from the physics model; 0 while paused or without power. Default 0.",
+          "type": "number",
+          "minimum": 0
+        },
+        "distanceMeters": {
+          "description": "Virtual distance since the start. Default 0.",
+          "type": "number",
+          "minimum": 0
+        },
+        "gear": {
+          "description": "The virtual gear (1-based) in a free-ride step.",
+          "type": ["integer", "null"],
+          "minimum": 1
+        },
+        "targetPower": {
+          "description": "The workout's target power in watts for this second, without the ramp-in after a pause; absent in a free-ride step and without a workout.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "stepIndex": {
+          "description": "Index of the workout step in the flattened workout (repeats expanded).",
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "paused": {
+          "description": "Whether the ride was paused during this second. Default false.",
+          "type": "boolean"
+        }
+      }
+    },
+    "rrInterval": {
+      "type": "object",
+      "required": ["timeOffsetSeconds", "intervalMs"],
+      "additionalProperties": false,
+      "properties": {
+        "timeOffsetSeconds": {
+          "description": "The second of the ride in which the strap's notification carrying it arrived.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "intervalMs": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "lap": {
+      "description": "The samples from startSeconds + 1 to endSeconds. Laps follow each other without gaps.",
+      "type": "object",
+      "required": ["startSeconds", "endSeconds"],
+      "additionalProperties": false,
+      "properties": {
+        "stepIndex": { "type": ["integer", "null"], "minimum": 0 },
+        "startSeconds": { "type": "integer", "minimum": 0 },
+        "endSeconds": { "type": "integer", "minimum": 1 },
+        "averagePower": {
+          "description": "Over the lap's non-paused seconds with a reading; absent if there were none.",
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "averageHeartRate": { "type": ["number", "null"], "minimum": 0 }
+      }
+    },
+    "summary": {
+      "description": "Computed over the seconds that were not paused, and per quantity those with a reading.",
+      "type": "object",
+      "required": ["durationSeconds", "movingSeconds", "distanceMeters", "workKilojoules"],
+      "additionalProperties": false,
+      "properties": {
+        "durationSeconds": {
+          "description": "Length of the ride, pauses included: the number of samples.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "movingSeconds": { "type": "integer", "minimum": 0 },
+        "distanceMeters": { "type": "number", "minimum": 0 },
+        "averagePower": { "type": ["number", "null"], "minimum": 0 },
+        "normalizedPower": {
+          "description": "Coggan; absent for under 30 s of power.",
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "maxPower": { "type": ["integer", "null"], "minimum": 0 },
+        "averageHeartRate": { "type": ["number", "null"], "minimum": 0 },
+        "maxHeartRate": { "type": ["integer", "null"], "minimum": 0 },
+        "workKilojoules": { "type": "number", "minimum": 0 },
+        "intensityFactor": { "type": ["number", "null"], "minimum": 0 },
+        "trainingStressScore": {
+          "description": "The load of spec §8.2: 100 is one hour at FTP.",
+          "type": ["number", "null"],
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
