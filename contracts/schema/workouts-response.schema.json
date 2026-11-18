@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive planned workouts response",
+  "description": "The service's answer to GET /v1/workouts?from=YYYY-MM-DD&to=YYYY-MM-DD (spec §5.1, §8.3, ADR 0016): the planned workouts of the rider's calendar between two local dates, inclusive, each already converted to the native workout format. The range is at most 62 days. The service serves its cache: stale is true when the plan source could not be reached at the last refresh (the list is then what was last known), and configured is false when no plan source is set up (the list is then empty and stale is false). Rules a schema cannot state, checked by every implementation: from is not after to and the range spans at most 62 days; every date is a real calendar date inside the range; ids are unique and each workout.id equals its entry's id (a ride recorded from it carries that id as ride.workoutId); a service that is not configured has no workouts, is not stale and has no generatedAt.",
+  "type": "object",
+  "required": ["from", "to", "generatedAt", "stale", "configured", "workouts"],
+  "additionalProperties": false,
+  "properties": {
+    "from": {
+      "description": "First day of the range as asked, in the rider's local time.",
+      "$ref": "#/$defs/date"
+    },
+    "to": {
+      "description": "Last day of the range as asked (inclusive).",
+      "$ref": "#/$defs/date"
+    },
+    "generatedAt": {
+      "description": "When the service last read the plan from its source successfully (UTC, ISO-8601 with a Z), or null when it never has (nothing is configured, or no refresh has succeeded yet). The tablet may say how old the list is.",
+      "type": ["string", "null"],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "stale": {
+      "description": "true when the last attempt to refresh from the plan source failed (or none has finished yet while one is configured): the workouts are the last known ones and may be out of date.",
+      "type": "boolean"
+    },
+    "configured": {
+      "description": "false when the service has no plan source (no intervals.icu key): the list is empty and there is nothing to wait for.",
+      "type": "boolean"
+    },
+    "workouts": {
+      "description": "Ordered by date, then id. Workouts the service cannot convert to the native format are left out (it logs why).",
+      "type": "array",
+      "items": { "$ref": "#/$defs/plannedWorkout" }
+    }
+  },
+  "$defs": {
+    "date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "plannedWorkout": {
+      "type": "object",
+      "required": ["id", "date", "name", "source", "workout"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Stable id of the planned workout, 1 to 128 characters from A-Z a-z 0-9 . _ -, starting with a letter or digit (intervals.icu event 123 is icu-123). Equals workout.id.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        },
+        "date": {
+          "description": "The day it is planned for, in the rider's local time.",
+          "$ref": "#/$defs/date"
+        },
+        "name": {
+          "description": "The calendar title; the same as workout.name today.",
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "description": "Where the plan lives.",
+          "enum": ["intervals.icu"]
+        },
+        "workout": {
+          "description": "The workout in the native format (workout.schema.json).",
+          "$ref": "workout.schema.json"
+        }
+      }
+    }
+  }
+}

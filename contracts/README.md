@@ -17,6 +17,7 @@ src/         @overdrive/contracts: the schema plus a validator for the TypeScrip
 | Ride record (schema 1) | `schema/ride-record.schema.json` | §8.2 |
 | Upload response (`{rideId, status}`) | `schema/sync-upload-response.schema.json` | §8.3, ADR 0014 |
 | API error (`{error: {code, message}}`) | `schema/api-error.schema.json` | §8.3, ADR 0014 |
+| Planned workouts (`GET /v1/workouts`) | `schema/workouts-response.schema.json` | §5.1, §8.3, ADR 0016 |
 
 The remaining sync API payloads and the MCP tool inputs (spec §8.3–§8.4) get schemas here as they are fixed during
 implementation. The sync outbox of the ride app (ADR 0012) is a local journal, not a wire format, and has no schema.
@@ -29,6 +30,15 @@ closed list of stable names (each with its HTTP status in `API_ERROR_STATUS`).
 `api-error/{valid,invalid}`, run by `test/sync.test.ts` and, in Kotlin, by `SyncApiContractTest` (`SyncApiJson`, strict like
 the schemas). The ride id syntax the service accepts in a path (`RIDE_ID_PATTERN`) is stated in the response schema; the ride
 record's own schema only asks for a non-empty id.
+
+`fixtures/plan/workouts-response/{valid,invalid}` hold the golden files of `GET /v1/workouts?from=YYYY-MM-DD&to=YYYY-MM-DD`
+(ADR 0016): the range (at most 62 days, both ends included), `generatedAt` (when the plan was last read from its source, or
+null), `stale` (the last refresh failed: the list is the last known one), `configured` (false: no plan source, the list is
+empty) and `workouts`, each `{ id, date, name, source, workout }` with the native workout inside. The schema refers to
+`workout.schema.json` by file name; what a schema cannot say (real calendar dates, the range's length, unique ids, `workout.id`
+equal to the entry's `id`, an unconfigured service being empty and not stale) is checked by `validateWorkoutsResponse` here and
+by `PlanApiJson` in Kotlin (`PlanApiContractTest`), against the same fixtures. The request also takes `refresh=true` (read the
+source first, wait at most ten seconds); that is a query parameter and has no schema. A malformed range is `400 invalid_range`.
 
 `fixtures/fit/` holds two FIT files for the upload's tests: `fit-golden-3s.fit`, the 376 bytes `FitWriter` writes for
 `rides/valid/fit-golden-3s.json` (the worked example of `docs/protocols/fit.md`; Kotlin's `FitFixturesTest` regenerates it

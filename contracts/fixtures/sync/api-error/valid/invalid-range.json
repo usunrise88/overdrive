@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "invalid_range",
+    "message": "The range spans 63 days; at most 62 are served"
+  }
+}

@@ -20,6 +20,7 @@ export const API_ERROR_STATUS = {
   unauthorized: 401,
   invalid_json: 400,
   invalid_ride_id: 400,
+  invalid_range: 400,
   invalid_record: 422,
   ride_id_mismatch: 422,
   invalid_fit: 422,
