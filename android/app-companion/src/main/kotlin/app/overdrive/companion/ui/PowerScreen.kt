@@ -110,9 +110,9 @@ fun PowerView(
     actions: PowerActions,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
+    curve: ChartSelection = remember(range) { ChartSelection() },
 ) {
     // Power's charts have different x axes: each selects on its own (design/companion.md §3.5).
-    val curve = remember(range) { ChartSelection() }
     val history = remember(range) { ChartSelection() }
     val drift = remember(range) { ChartSelection() }
     var table by remember { mutableStateOf<ValuesTable?>(null) }

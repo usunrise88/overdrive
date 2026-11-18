@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overdrive.companion.CompanionContainer
 import app.overdrive.companion.RefreshTarget
+import app.overdrive.companion.model.ActivityUi
 import app.overdrive.companion.model.ActivityWords
 import app.overdrive.companion.model.Body
 import app.overdrive.companion.model.CardPosition
@@ -308,10 +309,10 @@ fun RideDetailView(
     ui: ScreenUi<RideDetailContent>,
     actions: RideDetailActions,
     modifier: Modifier = Modifier,
+    selection: ChartSelection = remember { ChartSelection() },
 ) {
     val content = (ui.body as? Body.Content)?.value
     // One selection across the three plots (design/companion.md §3.5).
-    val selection = remember { ChartSelection() }
     var table by remember { mutableStateOf<ValuesTable?>(null) }
     Box(modifier.fillMaxSize().background(OverdriveColors.bg)) {
         Column(Modifier.fillMaxSize()) {
@@ -522,9 +523,18 @@ fun ActivityScreen(
 ) {
     val view by container.rides.view.collectAsStateWithLifecycle()
     val item = view.list.items.firstOrNull { it.kind == RideKind.ACTIVITY && it.id == id }
-    val ui = item?.let { ActivityWords.of(it, container.words) }
+    ActivityView(item?.let { ActivityWords.of(it, container.words) }, { container.nav.back() }, modifier)
+}
+
+/** The activity screen for a given [ui]. */
+@Composable
+fun ActivityView(
+    ui: ActivityUi?,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier.fillMaxSize().background(OverdriveColors.bg)) {
-        BackTopBar(ui?.name ?: "Activity", { container.nav.back() })
+        BackTopBar(ui?.name ?: "Activity", onBack)
         if (ui != null) {
             LazyColumn(
                 Modifier.fillMaxSize(),

@@ -68,9 +68,9 @@ fun FitnessView(
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
     initialSheet: ValuesTable? = null,
+    selection: ChartSelection = remember(range) { ChartSelection() },
 ) {
     // One selection for the screen: both line charts and the week that holds the day (design/companion.md §3.5).
-    val selection = remember(range) { ChartSelection() }
     var table by remember { mutableStateOf(initialSheet) }
     androidx.compose.foundation.layout.Box(modifier) {
         TabScreen(
