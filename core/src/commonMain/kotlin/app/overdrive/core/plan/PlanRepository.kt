@@ -1,12 +1,12 @@
 package app.overdrive.core.plan
 
-import app.overdrive.core.sync.ApiErrorCode
 import app.overdrive.core.sync.HttpGetRequest
 import app.overdrive.core.sync.HttpGetTransport
-import app.overdrive.core.sync.SyncApiJson
+import app.overdrive.core.sync.NOT_THE_SERVICE
 import app.overdrive.core.sync.SyncConfig
 import app.overdrive.core.sync.TransportException
 import app.overdrive.core.sync.plainReason
+import app.overdrive.core.sync.reasonForStatus
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -265,31 +265,7 @@ public class PlanRepository(
     private fun reasonFor(
         status: Int,
         body: String,
-    ): String =
-        when {
-            status == HTTP_REQUEST_TIMEOUT -> "The service timed out"
-
-            status == HTTP_TOO_MANY_REQUESTS -> "The service is busy"
-
-            status in HTTP_SERVER_ERRORS -> "Service error ($status)"
-
-            status in HTTP_REDIRECTS -> "The address redirects elsewhere"
-
-            status == HTTP_NOT_FOUND && errorCode(
-                body,
-            ) == ApiErrorCode.NOT_FOUND -> "The service has no planned workouts"
-
-            status in HTTP_CLIENT_ERRORS -> "The service refused the request ($status)"
-
-            else -> NOT_THE_SERVICE
-        }
-
-    private fun errorCode(body: String): ApiErrorCode? =
-        try {
-            SyncApiJson.decodeApiError(body).code
-        } catch (e: IllegalArgumentException) {
-            null
-        }
+    ): String = reasonForStatus(status, body, noRoute = "The service has no planned workouts")
 
     private fun setInner(
         problem: PlanProblem? = inner.value.problem,
@@ -332,14 +308,7 @@ public class PlanRepository(
         /** A fortnight of workouts is some hundred kilobytes at most; a longer answer is not the service's. */
         public const val MAX_ANSWER_BYTES: Int = 1 shl 20
 
-        private const val NOT_THE_SERVICE = "That is not the Overdrive service"
         private const val HTTP_OK = 200
         private const val HTTP_UNAUTHORIZED = 401
-        private const val HTTP_NOT_FOUND = 404
-        private const val HTTP_REQUEST_TIMEOUT = 408
-        private const val HTTP_TOO_MANY_REQUESTS = 429
-        private val HTTP_REDIRECTS = 300..399
-        private val HTTP_CLIENT_ERRORS = 400..499
-        private val HTTP_SERVER_ERRORS = 500..599
     }
 }

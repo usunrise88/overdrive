@@ -55,6 +55,13 @@ data class AppSettings(
     val massKg: Double = PhysicsSettings.DEFAULT_SYSTEM_MASS_KG,
     val cdA: Double = PhysicsSettings.DEFAULT_CDA,
     val crr: Double = PhysicsSettings.DEFAULT_CRR,
+    /**
+     * Air density in kg/m³. **Never stored and never set on the tablet**: it is the engine's standard value unless the rider's
+     * profile on the service says otherwise (see [withProfile], ADR 0021).
+     */
+    val airDensity: Double = PhysicsSettings.STANDARD_AIR_DENSITY,
+    /** Share of the measured power that reaches the wheel. Like [airDensity]: the service's profile or the engine's 1.0. */
+    val drivetrainEfficiency: Double = DEFAULT_DRIVETRAIN_EFFICIENCY,
     val overlayMode: OverlayStartMode = OverlayStartMode.Compact,
     /** Backing opacity in percent, 85 to 100 in steps of 5 (design/system.md §5.1). */
     val overlayOpacityPercent: Int = SettingsRules.DEFAULT_OPACITY_PERCENT,
@@ -107,7 +114,24 @@ data class AppSettings(
 
     /** Only the values a ride is built from; the rest can change without touching a ride that is ready. */
     fun rideInputs(): List<Any> =
-        listOf(ftp, gearCount, gradePerGear, massKg, cdA, crr, demoSpeed, scriptedDropouts, deviceSource)
+        listOf(
+            ftp,
+            gearCount,
+            gradePerGear,
+            massKg,
+            cdA,
+            crr,
+            airDensity,
+            drivetrainEfficiency,
+            demoSpeed,
+            scriptedDropouts,
+            deviceSource,
+        )
+
+    companion object {
+        /** The engine's: the measured power is taken as the power at the wheel. */
+        const val DEFAULT_DRIVETRAIN_EFFICIENCY: Double = 1.0
+    }
 }
 
 /** A number setting: its range, step and how it is kept on the grid. */

@@ -39,6 +39,9 @@ android {
             all {
                 // Roborazzi writes the screenshots to build/shots (never committed); no golden comparison.
                 it.systemProperty("roborazzi.test.record", "true")
+                // The JDK's HttpURLConnection refuses the verb PATCH that Android's accepts: the container tests that send the
+                // profile to a local service write it into the connection with reflection (JdkPatch), which needs this.
+                it.jvmArgs("--add-opens=java.base/java.net=ALL-UNNAMED")
             }
         }
     }

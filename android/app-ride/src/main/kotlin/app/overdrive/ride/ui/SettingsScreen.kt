@@ -29,6 +29,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.overdrive.ride.overlay.OverlayAccess
+import app.overdrive.ride.profile.ProfileUi
+import app.overdrive.ride.profile.ValueSource
 import app.overdrive.ride.settings.AppSettings
 import app.overdrive.ride.settings.ClickKeepAlive
 import app.overdrive.ride.settings.ClickMtu
@@ -70,6 +72,11 @@ class SettingsActions(
     val onBack: () -> Unit,
     val onChange: ((AppSettings) -> AppSettings) -> Unit,
     val onResetOverlayPosition: () -> Unit,
+    /**
+     * Changes FTP, mass, CdA or Crr: the function is given the settings as the screen shows them (the service's profile on top,
+     * ADR 0021), and the change goes to the profile when there is one, else to the tablet's settings.
+     */
+    val onRiderChange: ((AppSettings) -> AppSettings) -> Unit = onChange,
     /** Opens the system screen for "Display over other apps". */
     val onOpenOverlaySettings: () -> Unit = {},
     /** Opens the app's notification settings. */
@@ -91,6 +98,7 @@ fun SettingsScreen(
     overlayAccess: OverlayAccess = OverlayAccess.Granted,
     bleLogs: BleLogFiles = BleLogFiles.None,
     sync: SyncUi = SyncUi(),
+    profile: ProfileUi = ProfileUi(),
 ) {
     Column(modifier.fillMaxSize().background(OverdriveColors.bg)) {
         BackTopBar("Settings", actions.onBack)
@@ -103,8 +111,8 @@ fun SettingsScreen(
                 DeveloperGroup(settings, actions, bleLogs)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                RiderGroup(settings, actions)
-                PhysicsGroup(settings, actions)
+                RiderGroup(settings, actions, profile)
+                PhysicsGroup(settings, actions, profile)
                 SyncGroup(settings, actions, sync)
                 ClickDeveloperGroup(settings, actions)
             }
@@ -222,17 +230,34 @@ private fun OverlayPreview(
 
 // ---- Rider and physics -------------------------------------------------------------------------
 
+/**
+ * The small marker beside a value that is not the tablet's own (ADR 0021): "From service" for the rider's profile, "Not sent yet"
+ * for a change the service has not taken. Nothing for the tablet's own value. Quiet text, no colour: the zone colours are the only
+ * accent (design/system.md §2).
+ */
+@Composable
+private fun SourceMarker(source: ValueSource) {
+    val words = source.marker ?: return
+    OdText(words, style = OdType.label, color = OverdriveColors.textTertiary, maxLines = 1)
+}
+
 @Composable
 private fun RiderGroup(
     settings: AppSettings,
     actions: SettingsActions,
+    profile: ProfileUi,
 ) {
     Group("Rider and gears") {
-        SettingRow("FTP", description = "Sets power zones and workout targets", first = true) {
+        SettingRow(
+            "FTP",
+            description = profile.note ?: "Sets power zones and workout targets",
+            first = true,
+        ) {
+            SourceMarker(profile.ftp)
             Stepper(
                 "${settings.ftp} W",
-                onDecrement = { actions.onChange { it.copy(ftp = SettingsRules.ftp.stepped(it.ftp, -1)) } },
-                onIncrement = { actions.onChange { it.copy(ftp = SettingsRules.ftp.stepped(it.ftp, +1)) } },
+                onDecrement = { actions.onRiderChange { it.copy(ftp = SettingsRules.ftp.stepped(it.ftp, -1)) } },
+                onIncrement = { actions.onRiderChange { it.copy(ftp = SettingsRules.ftp.stepped(it.ftp, +1)) } },
                 canDecrement = SettingsRules.ftp.canStep(settings.ftp, -1),
                 canIncrement = SettingsRules.ftp.canStep(settings.ftp, +1),
                 label = "FTP",
@@ -289,33 +314,37 @@ private fun RiderGroup(
 private fun PhysicsGroup(
     settings: AppSettings,
     actions: SettingsActions,
+    profile: ProfileUi,
 ) {
     Group("Physics for speed and distance") {
         SettingRow("Rider and bike mass", first = true) {
+            SourceMarker(profile.mass)
             Stepper(
                 "${UiFormat.decimal(settings.massKg, 0)} kg",
-                onDecrement = { actions.onChange { it.copy(massKg = SettingsRules.mass.stepped(it.massKg, -1)) } },
-                onIncrement = { actions.onChange { it.copy(massKg = SettingsRules.mass.stepped(it.massKg, +1)) } },
+                onDecrement = { actions.onRiderChange { it.copy(massKg = SettingsRules.mass.stepped(it.massKg, -1)) } },
+                onIncrement = { actions.onRiderChange { it.copy(massKg = SettingsRules.mass.stepped(it.massKg, +1)) } },
                 canDecrement = SettingsRules.mass.canStep(settings.massKg, -1),
                 canIncrement = SettingsRules.mass.canStep(settings.massKg, +1),
                 label = "mass",
             )
         }
         SettingRow("Drag area (CdA)") {
+            SourceMarker(profile.cdA)
             Stepper(
                 "${UiFormat.decimal(settings.cdA, 2)} m²",
-                onDecrement = { actions.onChange { it.copy(cdA = SettingsRules.cdA.stepped(it.cdA, -1)) } },
-                onIncrement = { actions.onChange { it.copy(cdA = SettingsRules.cdA.stepped(it.cdA, +1)) } },
+                onDecrement = { actions.onRiderChange { it.copy(cdA = SettingsRules.cdA.stepped(it.cdA, -1)) } },
+                onIncrement = { actions.onRiderChange { it.copy(cdA = SettingsRules.cdA.stepped(it.cdA, +1)) } },
                 canDecrement = SettingsRules.cdA.canStep(settings.cdA, -1),
                 canIncrement = SettingsRules.cdA.canStep(settings.cdA, +1),
                 label = "drag area",
             )
         }
         SettingRow("Rolling resistance (Crr)") {
+            SourceMarker(profile.crr)
             Stepper(
                 UiFormat.decimal(settings.crr, 4),
-                onDecrement = { actions.onChange { it.copy(crr = SettingsRules.crr.stepped(it.crr, -1)) } },
-                onIncrement = { actions.onChange { it.copy(crr = SettingsRules.crr.stepped(it.crr, +1)) } },
+                onDecrement = { actions.onRiderChange { it.copy(crr = SettingsRules.crr.stepped(it.crr, -1)) } },
+                onIncrement = { actions.onRiderChange { it.copy(crr = SettingsRules.crr.stepped(it.crr, +1)) } },
                 canDecrement = SettingsRules.crr.canStep(settings.crr, -1),
                 canIncrement = SettingsRules.crr.canStep(settings.crr, +1),
                 label = "rolling resistance",

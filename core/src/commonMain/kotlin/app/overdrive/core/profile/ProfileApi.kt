@@ -39,6 +39,33 @@ public data class ProfilePatch(
     val goals: List<String>? = null,
     val physics: PhysicsPatch = PhysicsPatch(),
 ) {
+    /** Whether the patch changes nothing. */
+    public val isEmpty: Boolean
+        get() =
+            ftp == Change.Keep && zones == Change.Keep && weeklyAvailability.isEmpty() && goals == null &&
+                physics == PhysicsPatch()
+
+    /**
+     * The one patch that does what this one does and then [later] does: where both name a field, [later] wins (the last write
+     * wins), where only one does, that one stands. Applying the result to a profile gives the same profile as applying the two
+     * in turn.
+     */
+    public fun andThen(later: ProfilePatch): ProfilePatch =
+        ProfilePatch(
+            ftp = if (later.ftp == Change.Keep) ftp else later.ftp,
+            zones = if (later.zones == Change.Keep) zones else later.zones,
+            weeklyAvailability = weeklyAvailability + later.weeklyAvailability,
+            goals = later.goals ?: goals,
+            physics =
+                PhysicsPatch(
+                    systemMassKg = later.physics.systemMassKg ?: physics.systemMassKg,
+                    cdA = later.physics.cdA ?: physics.cdA,
+                    crr = later.physics.crr ?: physics.crr,
+                    airDensity = later.physics.airDensity ?: physics.airDensity,
+                    drivetrainEfficiency = later.physics.drivetrainEfficiency ?: physics.drivetrainEfficiency,
+                ),
+        )
+
     /**
      * The profile this patch makes of [profile], with `updatedAt` as it was.
      *
@@ -105,6 +132,35 @@ public object ProfileApiJson {
     }
 
     public fun encodeProfile(profile: Profile): String = json.encodeToString(Profile.serializer(), profile)
+
+    /** The JSON of [patch] as `PATCH /v1/profile` takes it: only the fields it changes, in the schema's shapes, on one line. */
+    public fun encodePatch(patch: ProfilePatch): String {
+        val body = LinkedHashMap<String, JsonElement>()
+        (patch.ftp as? Change.Set)?.let { body["ftp"] = it.value?.let(::JsonPrimitive) ?: JsonNull }
+        (patch.zones as? Change.Set)?.let { change ->
+            body["zones"] = change.value?.let { json.encodeToJsonElement(PowerZones.serializer(), it) } ?: JsonNull
+        }
+        if (patch.weeklyAvailability.isNotEmpty()) {
+            val days = LinkedHashMap<String, JsonElement>()
+            for (day in Weekday.entries) {
+                if (day in patch.weeklyAvailability) {
+                    days[day.name.lowercase()] = patch.weeklyAvailability[day]?.let(::JsonPrimitive) ?: JsonNull
+                }
+            }
+            body["weeklyAvailability"] = JsonObject(days)
+        }
+        patch.goals?.let { goals -> body["goals"] = JsonArray(goals.map(::JsonPrimitive)) }
+        val physics =
+            listOfNotNull(
+                patch.physics.systemMassKg?.let { "systemMassKg" to JsonPrimitive(it) },
+                patch.physics.cdA?.let { "cdA" to JsonPrimitive(it) },
+                patch.physics.crr?.let { "crr" to JsonPrimitive(it) },
+                patch.physics.airDensity?.let { "airDensity" to JsonPrimitive(it) },
+                patch.physics.drivetrainEfficiency?.let { "drivetrainEfficiency" to JsonPrimitive(it) },
+            )
+        if (physics.isNotEmpty()) body["physics"] = JsonObject(physics.toMap())
+        return json.encodeToString(JsonObject.serializer(), JsonObject(body))
+    }
 
     /** @throws IllegalArgumentException if [text] is not a patch of the schema. */
     public fun decodePatch(text: String): ProfilePatch = patchOf(json.parseToJsonElement(text))
