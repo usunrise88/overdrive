@@ -29,6 +29,13 @@ tile the ride; the summary's duration is the number of samples). Kotlin's `RideR
 `*.expected.json` beside it, the native workout it must convert to, and every `invalid/*.zwo` must be
 rejected. Kotlin's `ZwoFixturesTest` checks them; any other ZWO importer (the web service, later) should too.
 
+`fixtures/ble/` holds raw Bluetooth session recordings in the text format of `docs/protocols/ftms-hr.md` §7.1 (spec §7.5,
+ADR 0009 §6): a trainer and a strap file for each of two synthetic rides (`erg-workout`, `dropouts`). They are not a wire
+format of ours and have no schema; they are **generated** by running a ride over the fake Bluetooth with the recorder on
+(`BleSessionFixturesTest`, regenerate with `cd core && ./gradlew jvmTest -PregenerateBleFixtures=true`, then review the
+diff), and the same test replays each pair through the real adapters and engine into the ride that produced it. They hold
+synthetic bytes, no addresses and no real person's heart rate. **Never add a real recording here:** the repository is public.
+
 ## Changing a format
 
 1. Edit the schema and add fixtures: a valid one for anything newly allowed, an invalid one for

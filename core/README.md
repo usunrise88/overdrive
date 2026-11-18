@@ -24,8 +24,10 @@ Currently implemented:
 | `gear` | `GearSettings`: virtual gears as clamped grade offsets | §4.4 |
 | `record` | `RideRecord` (samples, laps, RR series, summary), `RideRecorder`, its JSON wire format, the crash-safe ride log | §4.2, §8.2 |
 | `fit` | `FitWriter`: a ride record as a FIT activity file | §4.8 |
+| `ble` | The Bluetooth boundary (`GattTransport`, scanner, environment), FTMS and Heart Rate codecs, the trainer and strap adapters, the reconnect supervisor, the session recorder, and a fake Bluetooth with replay | §4.1, §7.5 |
 
-Not yet: the BLE codecs (M3), gesture detection (M4). The Android storage, recovery and share buttons are in `android/` (M2b-2, ADR 0008).
+Not yet: the Android side of Bluetooth (M3-2: the `GattTransport` on `BluetoothGatt`, scanning, permissions, the device store and the Devices
+screen), the Click codec and gesture detection (M4). The Android storage, recovery and share buttons are in `android/` (M2b-2, ADR 0008).
 
 The first section below is the real engine; the one after it is the UI's view of a session
 (`RideSession`, `RideSnapshot`), which the engine and the simulated session both provide.
@@ -66,7 +68,7 @@ engine.start()                               // once snapshots.value.state == RE
 
 ### Devices (`app.overdrive.core.device`)
 
-`TrainerDevice` and `HeartRateDevice` are what the BLE adapters of M3 implement: a `connection` state flow, a hot
+`TrainerDevice` and `HeartRateDevice` are what the BLE adapters (`FtmsTrainerDevice`, `HeartRateStrapDevice`, below) implement: a `connection` state flow, a hot
 `data` flow of decoded notifications, and for the trainer `requestControl()`, `setTargetPower(watts)` and
 `setSimulation(SimulationParameters(gradePercent, crr, windResistance))`. The simulated devices are fakes you drive
 by hand (`connect()`, `disconnect()`, `powerOff()`, `emit(...)`, and for the trainer `received` and `failNextCommands`);
@@ -81,6 +83,56 @@ val engine = RideEngine(scope, bike.trainer, bike.heartRate, workout, RideSettin
 bike.start()
 engine.start()
 ```
+
+### Bluetooth (`app.overdrive.core.ble`; ADR 0009, `docs/protocols/ftms-hr.md`)
+
+Everything above the Bluetooth stack, with **no Android type**: Android (M3-2) implements four small interfaces, and the
+rest runs, and is tested, on a plain JVM against a fake radio. Written from the Bluetooth notes; **nothing is verified on
+the owner's trainer or strap yet**, and every guess is a named constant or option (ADR 0009 §8).
+
+| Package | What |
+|---|---|
+| `ble` | The boundary: `GattTransport` (one single-use GATT session; results are `GattResult`, never exceptions; one operation at a time), `GattTransportFactory`, `GattScanner`, `BleEnvironment` (Bluetooth off, permission), opaque `DeviceId` (its `toString` is a fingerprint, never an address), `GattUuid` |
+| `ble.codec` | Pure codecs, never throw: Indoor Bike Data, Fitness Machine Feature, Control Point (commands and Response Code), Fitness Machine Status, Heart Rate Measurement. All 44 vectors of `ftms-hr.md` §8 are tests |
+| `ble.adapter` | `FtmsTrainerDevice` (a `TrainerDevice`) and `HeartRateStrapDevice` (a `HeartRateDevice`), `FtmsOptions`, `HeartRateOptions` |
+| `ble.link` | `LinkSupervisor`: reconnect with backoff (`BackoffPolicy`), `retryNow()`, a fresh transport after every failure, `LinkStatus` for the Devices screen |
+| `ble.recording` | `BleSessionRecorder` and a `GattTransport` decorator: every GATT event as a text line (format in `ftms-hr.md` §7.1), no addresses, identity values redacted |
+| `ble.fake` | `FakeBle` (radio, factory, scanner, environment), `FakeFtmsTrainer`, `FakeHeartRateStrap`, `ReplayPeripheral` (plays a recording), scripted failures. Strict like Android: it records any contract violation |
+| `device.RrIntervals` | The domain rule for RR in milliseconds (1/1024 s, halves round up) |
+
+What M3-2 implements, and what it gets:
+
+```kotlin
+// Android implements these four (the only place an address or a BluetoothGatt exists):
+class AndroidTransports : GattTransportFactory { override fun open(device: DeviceId): GattTransport = ... }
+class AndroidScanner : GattScanner { override fun scan(filter: ScanFilter): Flow<ScanEvent> = ... }
+class AndroidEnvironment : BleEnvironment { override val availability: StateFlow<BleAvailability> = ... }
+
+// Optional: record every session. Wrap once; the adapters never know.
+val recorder = BleSessionRecorder(ioScope, sink = LineSink { file.appendLine(it) }, nanoClock = { SystemClock.elapsedRealtimeNanos() }, model = "D500")
+val transports = AndroidTransports().recording(recorder, ioScope)
+
+// The devices the unchanged RideEngine takes. Each reconnects on its own once started.
+val trainer = FtmsTrainerDevice(scope, trainerId, transports, environment, name = "trainer", options = FtmsOptions())
+val strap = HeartRateStrapDevice(scope, strapId, transports, environment, name = "strap", options = HeartRateOptions())
+trainer.start(); strap.start()                       // LinkControls: start(), retryNow(), close(), status
+val engine = RideEngine(scope, trainer, strap, workout, settings, recorder = rideRecorder)
+```
+
+- **Connected means commandable.** The trainer's `connection` becomes `CONNECTED` only after discovery, MTU, Feature, the
+  three subscriptions, Request Control and Start. A dropped link (status 133 included) closes that transport and opens a
+  fresh one after the backoff; `status` says why (`Connecting`, `WaitingToRetry`, `BluetoothUnavailable`, ...).
+- **Failures are typed.** A rejected or unanswered Control Point command throws `TrainerCommandException` (the engine retries
+  it after a second); a notification that cannot be decoded is dropped and reported as a `TrainerEvent`.
+- **The fake in your tests.** `FakeBle(scope, nanoClock)` with `world.add(id, FakeFtmsTrainer())` and
+  `world.add(id, FakeHeartRateStrap())`; the world is itself the `GattTransportFactory`, the `GattScanner` and the
+  `BleEnvironment`. See `BleTestSupport.kt` (`BleRig`), `BleRideTest` (the real engine over the fake) and
+  `LinkSupervisorTest`. Inject failures with `peripheral.faults` or `dropLink()`, Bluetooth off with
+  `world.setAvailability(...)`, and check `world.violations` is empty at the end. A fake's strictness is the point: a green
+  test also proves the code is a legal Android client.
+- **Recordings and fixtures.** `BleSessionFormat.parse` and `write` read and write the file; `ReplayPeripheral(session)` plays
+  one back on virtual time (failed connects and dropouts included). The files in `../contracts/fixtures/ble/` are generated
+  (`./gradlew jvmTest -PregenerateBleFixtures=true`), never real recordings; a test fails when they go stale.
 
 ### Workouts (`app.overdrive.core.workout`)
 
