@@ -201,6 +201,7 @@ Pending tags (commit, and the CI run that proved it green):
 | `v0.1.0-alpha.1` | `3cfa3ca0d42db8498fb0bb7f0f03995764bb7a1f` | 44229751415 (success) | not pushed: 403 from the sandbox, 2026-11-18 |
 | `v0.1.0-alpha.2` | `c393eeeafea57cf71cda672d03428ffd20b1b2dc` | 44238927474 (success) | not pushed: 403 from the sandbox, 2026-11-18 |
 | `v0.1.0-alpha.3` | `4b13573e01da50f8f8297f2e7f8c00d2786669c0` | 44255429021 (success) | not pushed: the sandbox refused tag pushes twice (403); not tried again |
+| `v0.1.0` | `c3b1f28a7e9fd001a15190dfebc7978359edd35a` | 44271684049 (success) | not pushed: not tried again after the 403s above |
 
 ```bash
 git fetch origin claude/sleepy-gates-zqbtwq
@@ -210,6 +211,8 @@ git tag -a v0.1.0-alpha.2 -m "Overdrive 0.1.0-alpha.2" c393eeeafea57cf71cda672d0
 git push origin v0.1.0-alpha.2
 git tag -a v0.1.0-alpha.3 -m "Overdrive 0.1.0-alpha.3" 4b13573e01da50f8f8297f2e7f8c00d2786669c0
 git push origin v0.1.0-alpha.3
+git tag -a v0.1.0 -m "Overdrive 0.1.0" c3b1f28a7e9fd001a15190dfebc7978359edd35a
+git push origin v0.1.0
 ```
 
 Push the tags in order, one at a time, and let each `release.yml` run finish first: the workflow's `concurrency`
