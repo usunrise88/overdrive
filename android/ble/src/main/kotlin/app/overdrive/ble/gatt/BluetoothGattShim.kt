@@ -53,6 +53,18 @@ private val PROPERTY_BITS =
 internal fun propertiesOf(bits: Int): Set<GattProperty> =
     PROPERTY_BITS.filter { (bit, _) -> bits and bit != 0 }.map { (_, property) -> property }.toSet()
 
+/**
+ * The platform's write type for a write with or without response: `WRITE_TYPE_DEFAULT` asks the peripheral to confirm,
+ * `WRITE_TYPE_NO_RESPONSE` sends a write command and the callback comes when the stack has taken it. The Click's
+ * handshake is the second kind (docs/protocols/click-v2.md §3.1).
+ */
+internal fun writeTypeOf(withResponse: Boolean): Int =
+    if (withResponse) {
+        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+    } else {
+        BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+    }
+
 /** How `writeCharacteristic` and `writeDescriptor` answer on Android 13 and later (`BluetoothStatusCodes`). */
 internal fun startOfStatusCode(code: Int): Start =
     when (code) {
@@ -88,20 +100,32 @@ internal class BluetoothGattShim(
             if (gatt.readCharacteristic(target)) Start.STARTED else Start.REFUSED
         }
 
-    @Suppress("DEPRECATION")
     override fun write(
         service: GattUuid,
         characteristic: GattUuid,
         value: ByteArray,
+    ): Start = writeWith(service, characteristic, value, writeTypeOf(withResponse = true))
+
+    override fun writeWithoutResponse(
+        service: GattUuid,
+        characteristic: GattUuid,
+        value: ByteArray,
+    ): Start = writeWith(service, characteristic, value, writeTypeOf(withResponse = false))
+
+    /** One `writeCharacteristic` of [writeType]: `WRITE_TYPE_DEFAULT` (with response) or `WRITE_TYPE_NO_RESPONSE`. */
+    @Suppress("DEPRECATION")
+    private fun writeWith(
+        service: GattUuid,
+        characteristic: GattUuid,
+        value: ByteArray,
+        writeType: Int,
     ): Start =
         start {
             val target = find(service, characteristic) ?: return@start Start.NOT_FOUND
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                startOfStatusCode(
-                    gatt.writeCharacteristic(target, value, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT),
-                )
+                startOfStatusCode(gatt.writeCharacteristic(target, value, writeType))
             } else {
-                target.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                target.writeType = writeType
                 target.value = value
                 if (gatt.writeCharacteristic(target)) Start.STARTED else Start.REFUSED
             }

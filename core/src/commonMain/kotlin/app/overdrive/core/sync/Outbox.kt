@@ -44,8 +44,8 @@ public data class OutboxEntry(
 }
 
 /**
- * Where finished rides wait for an upload (spec §4.9). The stage ships [InMemoryOutbox]; **a persistent one, on the tablet's
- * disk, comes with the Android side (M4-2)**, and it must survive the app being killed: an entry is removed only by
+ * Where finished rides wait for an upload (spec §4.9). [InMemoryOutbox] is the tests' stand-in; **the persistent one, on the tablet's
+ * disk, is `FileOutbox` in `android/data` (ADR 0012)**, and it survives the app being killed: an entry is removed only by
  * [markDone]. Functions may suspend for disk and may throw for a disk that fails; the [SyncCoordinator] catches that and
  * reports it, so a ride is never failed by its outbox.
  */

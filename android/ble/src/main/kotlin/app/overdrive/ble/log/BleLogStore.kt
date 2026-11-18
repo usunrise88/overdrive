@@ -11,6 +11,7 @@ public enum class BleLogRole(
 ) {
     TRAINER("trainer"),
     STRAP("strap"),
+    CLICK("click"),
 }
 
 /**

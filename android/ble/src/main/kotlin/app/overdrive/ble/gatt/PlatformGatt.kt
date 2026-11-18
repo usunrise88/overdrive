@@ -36,6 +36,20 @@ internal interface PlatformGatt {
     ): Start
 
     /**
+     * `writeCharacteristic` **without response** (`WRITE_TYPE_NO_RESPONSE`); the answer is the same
+     * [PlatformEvent.CharacteristicWritten], which the platform sends once the stack has taken the value (nothing says the
+     * peripheral saw it). The Zwift Click's handshake goes out this way (docs/protocols/click-v2.md §3.1).
+     *
+     * **The default is a write with response**, so a platform written before this existed keeps compiling and, on a
+     * characteristic that offers both, keeps working; [BluetoothGattShim] overrides it.
+     */
+    fun writeWithoutResponse(
+        service: GattUuid,
+        characteristic: GattUuid,
+        value: ByteArray,
+    ): Start = write(service, characteristic, value)
+
+    /**
      * `setCharacteristicNotification(…, true)` and the write of the Client Characteristic Configuration descriptor
      * (`0x0001` for a notification, `0x0002` for an indication); the answer is [PlatformEvent.CccdWritten].
      */

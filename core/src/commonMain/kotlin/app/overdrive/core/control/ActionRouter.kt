@@ -1,6 +1,7 @@
 package app.overdrive.core.control
 
 import app.overdrive.core.ride.RideSession
+import app.overdrive.core.ride.RideSnapshot
 import app.overdrive.core.ride.RideState
 import app.overdrive.core.ride.TrainerMode
 
@@ -21,9 +22,10 @@ public interface MediaKeys {
 }
 
 /**
- * What each [ClickAction] does to the ride and to the media (spec §4.7). The rules are those of the app's `RideActions`
- * (android `RideHost.kt`), restated here in `core` so that they are proved with the whole chain and not only with
- * screenshots:
+ * What each [ClickAction] does to the ride and to the media (spec §4.7): **the one routing rule of the system**. The
+ * Click's gesture layer calls it, and so does the app's `RideActions` (android `RideHost.kt`), which the ride screen's
+ * buttons call, so an on-screen button and a handlebar button can never diverge. It is proved with the whole chain and not
+ * only with screenshots:
  *
  * | Action | Does |
  * |---|---|
@@ -40,10 +42,13 @@ public interface MediaKeys {
  *
  * @param session the ride to drive, read at every action: the ride app's session changes from ride to ride. Null means no
  * ride, and the ride actions do nothing.
+ * @param snapshot where the two facts it reads come from, the session's own latest snapshot by default. A host that keeps
+ * its own copy of the state (a preview, a test) says so here; the rule is the same.
  */
 public class ActionRouter(
     private val session: () -> RideSession?,
     private val media: MediaKeys,
+    private val snapshot: (RideSession) -> RideSnapshot = { it.snapshots.value },
 ) {
     /** A router for one [session]. */
     public constructor(session: RideSession, media: MediaKeys) : this({ session }, media)
@@ -64,17 +69,17 @@ public class ActionRouter(
 
     private fun levelUp() {
         val ride = session() ?: return
-        if (ride.snapshots.value.mode == TrainerMode.ERG) ride.intensityUp() else ride.gearUp()
+        if (snapshot(ride).mode == TrainerMode.ERG) ride.intensityUp() else ride.gearUp()
     }
 
     private fun levelDown() {
         val ride = session() ?: return
-        if (ride.snapshots.value.mode == TrainerMode.ERG) ride.intensityDown() else ride.gearDown()
+        if (snapshot(ride).mode == TrainerMode.ERG) ride.intensityDown() else ride.gearDown()
     }
 
     private fun togglePause() {
         val ride = session() ?: return
-        when (ride.snapshots.value.state) {
+        when (snapshot(ride).state) {
             RideState.RIDING -> ride.pause()
             RideState.PAUSED -> ride.resume()
             else -> Unit

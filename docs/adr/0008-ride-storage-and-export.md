@@ -193,13 +193,13 @@ rides folder, no network permission). The screenshots are in `app-ride/build/sho
 
 | Claim | Settled by |
 |---|---|
-| Force-stopping the app mid-ride leaves a log the next launch recovers, within a few seconds of the stop | bench 6.1 to 6.3 |
-| The log writes and `fsync`s on the IO thread do not show in ride or overlay smoothness on the tablet's flash | bench 2.8 and 2.11 (the hour-long ride and its battery use) |
+| Force-stopping the app mid-ride leaves a log the next launch recovers, within a few seconds of the stop | bench 8.1 to 8.3 |
+| The log writes and `fsync`s on the IO thread do not show in ride or overlay smoothness on the tablet's flash | bench 6.8 and 6.11 (the hour-long ride and its battery use) |
 | `FileChannel.open` on a directory and `force` work on Android's file systems (the folder sync is best effort and silent) | not observable; the file-level `fsync` does not depend on it |
-| The share sheet offers the FIT file with its friendly name, and the receiving app can read it | bench 7.1 |
-| ZUI's file picker creates `YYYY-MM-DD HH-mm <title>.fit` without changing the extension for `application/octet-stream` | bench 7.1 |
-| intervals.icu accepts the file and the local start time is right (the offset is the tablet's) | bench 7.2 to 7.4 (ADR 0007) |
-| Swiping the app away from recents mid-ride leaves a recoverable log, not a lost ride | bench 6.4 |
+| The share sheet offers the FIT file with its friendly name, and the receiving app can read it | bench 7.2 |
+| ZUI's file picker creates `YYYY-MM-DD HH-mm <title>.fit` without changing the extension for `application/octet-stream` | bench 7.2 |
+| intervals.icu accepts the file and the local start time is right (the offset is the tablet's) | bench 7.3 to 7.5 (ADR 0007) |
+| Swiping the app away from recents mid-ride leaves a recoverable log, not a lost ride | bench 8.4 |
 
 ## Consequences
 

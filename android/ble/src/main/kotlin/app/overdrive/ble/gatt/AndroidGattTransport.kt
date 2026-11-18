@@ -6,6 +6,7 @@ import app.overdrive.core.ble.GattFailure
 import app.overdrive.core.ble.GattFailureKind
 import app.overdrive.core.ble.GattLinkState
 import app.overdrive.core.ble.GattNotification
+import app.overdrive.core.ble.GattProperty
 import app.overdrive.core.ble.GattResult
 import app.overdrive.core.ble.GattServices
 import app.overdrive.core.ble.GattStatus
@@ -267,6 +268,35 @@ internal class AndroidGattTransport(
             OpKind.WRITE,
             timings.operation,
             { it.write(characteristic.service, characteristic.characteristic, copy) },
+        ) { event ->
+            when {
+                event !is PlatformEvent.CharacteristicWritten -> unexpected()
+                event.status != GattStatus.SUCCESS -> statusFailure(event.status)
+                else -> GattResult.Ok(Unit)
+            }
+        }
+    }
+
+    /**
+     * A write **without response** (`WRITE_TYPE_NO_RESPONSE`): the Click's handshake goes out this way, and a Click may
+     * reject the same bytes written with a response (docs/protocols/click-v2.md §3.1). The result arrives as the same
+     * write callback, once the stack has taken the value, so it takes the same slot as a write with response.
+     */
+    override suspend fun writeWithoutResponse(
+        characteristic: GattCharacteristicInfo,
+        value: ByteArray,
+    ): GattResult<Unit> {
+        // The platform would send a write command to a characteristic that does not take one and never say so; the fake
+        // radio answers "write not permitted", so this does too, and the caller learns why nothing happened.
+        if (GattProperty.WRITE_WITHOUT_RESPONSE !in characteristic.properties) {
+            log.log("$device: ${characteristic.characteristic} does not offer write without response")
+            return statusFailure(WRITE_NOT_PERMITTED)
+        }
+        val copy = value.copyOf()
+        return operation(
+            OpKind.WRITE,
+            timings.operation,
+            { it.writeWithoutResponse(characteristic.service, characteristic.characteristic, copy) },
         ) { event ->
             when {
                 event !is PlatformEvent.CharacteristicWritten -> unexpected()
@@ -609,5 +639,8 @@ internal class AndroidGattTransport(
 
     private companion object {
         const val BUFFER = 256
+
+        /** `GATT_WRITE_NOT_PERMIT`: what the fake radio answers a write the characteristic does not offer. */
+        const val WRITE_NOT_PERMITTED = 3
     }
 }

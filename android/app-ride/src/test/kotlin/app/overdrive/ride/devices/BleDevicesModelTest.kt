@@ -1,16 +1,17 @@
 package app.overdrive.ride.devices
 
 import app.overdrive.core.ble.BleAvailability
+import app.overdrive.core.ble.fake.FakeClickLock
 import app.overdrive.core.ble.link.LinkFailure
 import app.overdrive.core.ble.link.LinkFailureKind
 import app.overdrive.core.ble.link.LinkStatus
+import app.overdrive.core.click.ClickState
+import app.overdrive.core.click.UnlockSignal
 import app.overdrive.ride.host.DeviceRowUi
 import app.overdrive.ride.host.DevicesUi
 import app.overdrive.ride.host.RadioIssue
-import app.overdrive.ride.settings.SimulatedClick
 import app.overdrive.uikit.DeviceStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -94,6 +95,81 @@ class BleDeviceRowsTest {
         )
     }
 
+    private fun clickRow(
+        state: ClickState?,
+        name: String? = "Zwift Click (right)",
+        battery: Int? = null,
+        availability: BleAvailability = BleAvailability.READY,
+        seconds: Int? = null,
+    ) = BleDeviceRows.clickRow(name, state, battery, availability, seconds)
+
+    @Test
+    fun aClickNotPairedIsNotPairedAndABlockedRadioComesFirst() {
+        assertEquals(DeviceRowUi(DeviceStatus.NotPaired, "Not paired"), clickRow(ClickState.Active, name = null))
+        val off = clickRow(ClickState.Active, availability = BleAvailability.BLUETOOTH_OFF)
+        assertEquals(
+            DeviceRowUi(DeviceStatus.Blocked, "Zwift Click (right) · Bluetooth is off", canForget = true),
+            off,
+        )
+        val denied = clickRow(ClickState.Waiting, availability = BleAvailability.PERMISSION_DENIED)
+        assertEquals(DeviceStatus.Blocked, denied.status)
+        assertEquals("Zwift Click (right) · needs Nearby devices", denied.subtitle)
+    }
+
+    @Test
+    fun anActiveClickIsConnectedAndShowsItsBatteryOnceKnown() {
+        assertEquals(
+            DeviceRowUi(DeviceStatus.Connected, "Zwift Click (right)", canForget = true),
+            clickRow(ClickState.Active),
+        )
+        assertEquals("Zwift Click (right) · battery 87%", clickRow(ClickState.Active, battery = 87).subtitle)
+        assertEquals("Zwift Click (right) · battery 0%", clickRow(ClickState.Active, battery = 0).subtitle)
+        // A number that is not a percentage is not shown.
+        assertEquals("Zwift Click (right)", clickRow(ClickState.Active, battery = 255).subtitle)
+        assertEquals("Zwift Click (right)", clickRow(ClickState.Active, battery = -1).subtitle)
+    }
+
+    @Test
+    fun aClickThatIsConnectingOrWaitingForItsFirstMessageSearches() {
+        for (state in listOf(
+            ClickState.Connecting(1),
+            ClickState.Stopped,
+            ClickState.BluetoothUnavailable(BleAvailability.READY),
+            null,
+        )) {
+            assertEquals(
+                DeviceRowUi(DeviceStatus.Searching, "Connecting to Zwift Click (right)…", canForget = true),
+                clickRow(state),
+            )
+        }
+        assertEquals(
+            DeviceRowUi(DeviceStatus.Searching, "Zwift Click (right) · checking it answers", canForget = true),
+            clickRow(ClickState.Waiting),
+        )
+    }
+
+    @Test
+    fun aClickThatIsNotThereSaysWhyAndHowLongTheRetryWaits() {
+        val notFound =
+            clickRow(ClickState.NotFound(failures = 1, retryInMillis = 8_000, wasConnected = false), seconds = 8)
+        assertEquals(DeviceRowUi(DeviceStatus.Lost, "Not found · retrying in 8 s", canForget = true), notFound)
+        val lost = clickRow(ClickState.NotFound(failures = 1, retryInMillis = 1_000, wasConnected = true), seconds = 1)
+        assertEquals("Connection lost · retrying in 1 s", lost.subtitle)
+        val failure = LinkFailure(LinkFailureKind.SETUP_FAILED)
+        val setup = clickRow(ClickState.SetupFailed(failure, retryInMillis = 2_000), seconds = 0)
+        assertEquals(DeviceRowUi(DeviceStatus.Lost, "Could not connect · retrying…", canForget = true), setup)
+    }
+
+    @Test
+    fun aLockedClickIsALockedRowThatCarriesTheSignalForTheNotice() {
+        for (signal in UnlockSignal.entries) {
+            assertEquals(
+                DeviceRowUi(DeviceStatus.Locked, "Zwift Click (right) · locked", canForget = true, locked = signal),
+                clickRow(ClickState.NeedsUnlock(signal)),
+            )
+        }
+    }
+
     @Test
     fun theRadioIssueIsTheOneThingToFix() {
         assertNull(BleDeviceRows.radioIssue(BleAvailability.READY))
@@ -106,10 +182,7 @@ class BleDeviceRowsTest {
 /** The rows for the paired devices of a world, live: link changes, the radio, the countdown that ticks only while waiting. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class BleDevicesModelTest {
-    private fun TestScope.model(
-        world: BleWorld,
-        click: MutableStateFlow<SimulatedClick> = MutableStateFlow(SimulatedClick.Connected),
-    ) = BleDevicesModel(world.devices, world.ble, click, testTimeSource)
+    private fun TestScope.model(world: BleWorld) = BleDevicesModel(world.devices, world.ble, testTimeSource)
 
     private fun TestScope.collect(model: BleDevicesModel): List<DevicesUi> {
         val seen = mutableListOf<DevicesUi>()
@@ -141,7 +214,7 @@ class BleDevicesModelTest {
                 DevicesUi(
                     trainer = DeviceRowUi(DeviceStatus.Connected, "D500", canForget = true),
                     heartRate = DeviceRowUi(DeviceStatus.Connected, "HR7", canForget = true),
-                    click = DeviceRowUi(DeviceStatus.Connected, "Simulated Click"),
+                    click = DeviceRowUi(DeviceStatus.NotPaired, "Not paired"),
                 ),
                 last,
             )
@@ -203,18 +276,84 @@ class BleDevicesModelTest {
         }
 
     @Test
-    fun theClickRowFollowsTheDeveloperSettingUntilM4() =
+    fun aPairedClickGoesFromConnectingToConnectedWithItsBattery() =
         runTest {
             val world = BleWorld(this)
-            val click = MutableStateFlow(SimulatedClick.Connected)
-            val seen = collect(model(world, click))
-            world.launchPaired()
-            click.value = SimulatedClick.Locked
-            world.advance(100)
+            val seen = collect(model(world))
+            world.launchPaired(withClick = true)
+            world.advance(1_000)
+            val last = seen.last().click
+            assertEquals(DeviceStatus.Connected, last.status)
+            assertEquals("Zwift Click (right) · battery 87%", last.subtitle)
+            assertTrue("it went through connecting", seen.any { it.click.status == DeviceStatus.Searching })
+            assertEquals(DeviceStatus.Connected, seen.last().trainer.status)
+        }
+
+    @Test
+    fun aClickThatIsOffCountsDownItsRetryAndComesBackWhenItIsSwitchedOn() =
+        runTest {
+            val world = BleWorld(this)
+            world.fakeClick.powered = false
+            world.fakeClick.absentFailsAfter = 100.milliseconds
+            val seen = collect(model(world))
+            world.launchPaired(withClick = true)
+            world.advance(6_000)
+            val texts = seen.map { it.click.subtitle }
+            assertTrue(texts.toString(), texts.any { it.startsWith("Not found · retrying in ") })
+            assertTrue(texts.toString(), texts.contains("Not found · retrying in 1 s"))
+
+            world.fakeClick.powered = true
+            world.advance(30_000)
+            assertEquals(DeviceStatus.Connected, seen.last().click.status)
+            val connected = seen.size
+            world.advance(120_000)
+            assertEquals("nothing is emitted at rest", connected, seen.size)
+        }
+
+    @Test
+    fun aLockedClickShowsTheSignalThatGaveItAway() =
+        runTest {
+            val world = BleWorld(this)
+            world.fakeClick.lock = FakeClickLock.SILENT
+            val seen = collect(model(world))
+            world.launchPaired(withClick = true)
+            // Past the no-event time (30 s by default): until then the row says it is checking.
+            world.advance(35_000)
             assertEquals(DeviceStatus.Locked, seen.last().click.status)
-            click.value = SimulatedClick.NotPaired
-            world.advance(100)
-            assertEquals(DeviceStatus.NotPaired, seen.last().click.status)
+            assertEquals(UnlockSignal.NO_EVENTS, seen.last().click.locked)
+
+            // Unlocked through Zwift: a late frame turns the row into a connected one by itself.
+            world.fakeClick.unlock()
+            world.advance(2_000)
+            world.fakeClick.press(1)
+            world.fakeClick.release(1)
+            world.advance(1_000)
+            assertEquals(DeviceStatus.Connected, seen.last().click.status)
+            assertNull(seen.last().click.locked)
+        }
+
+    @Test
+    fun aClickWithItsServiceHiddenIsLockedWithTheOtherSignal() =
+        runTest {
+            val world = BleWorld(this)
+            world.fakeClick.lock = FakeClickLock.HIDDEN
+            val seen = collect(model(world))
+            world.launchPaired(withClick = true)
+            world.advance(3_000)
+            assertEquals(DeviceStatus.Locked, seen.last().click.status)
+            assertEquals(UnlockSignal.SERVICE_HIDDEN, seen.last().click.locked)
+        }
+
+    @Test
+    fun theClickRowIsBlockedWithTheOthersWhenBluetoothIsOff() =
+        runTest {
+            val world = BleWorld(this)
+            val seen = collect(model(world))
+            world.launchPaired(withClick = true)
+            world.ble.setAvailability(BleAvailability.BLUETOOTH_OFF)
+            world.advance(500)
+            assertEquals(DeviceStatus.Blocked, seen.last().click.status)
+            assertEquals(RadioIssue.BluetoothOff, seen.last().radio)
         }
 
     @Test

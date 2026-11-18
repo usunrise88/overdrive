@@ -126,6 +126,11 @@ fun interface RidePersistence {
  * @param utcOffsetSeconds the device's offset from UTC at a given time, for the FIT file's local time.
  * @param minimumRecoverableSeconds an interrupted ride shorter than this is deleted without asking (ADR 0008).
  * @param report where the cause of a disk problem is written down (the log, never the screen).
+ * @param onSaved told about **every ride that is stored**, so the sync outbox can queue it (spec §4.9, ADR 0012): a ride
+ * that has just finished, a recovered one the rider kept, one completed silently at start, and, at each start, every ride
+ * already on disk (an outbox that has seen a ride ignores it, so this only catches a ride whose entry was lost between its
+ * last rename and the outbox's append). Called on [scope]'s thread; it must not block, and what it throws is reported and
+ * dropped, because a ride is never failed by its outbox.
  */
 class RideLibrary(
     private val store: RideStore,
@@ -133,6 +138,7 @@ class RideLibrary(
     private val utcOffsetSeconds: (startEpochMillis: Long) -> Int = ::deviceUtcOffsetSeconds,
     private val minimumRecoverableSeconds: Int = MINIMUM_RECOVERABLE_SECONDS,
     private val report: (String, Throwable) -> Unit = { _, _ -> },
+    private val onSaved: (StoredRide) -> Unit = {},
 ) : RidePersistence {
     private val mutableLastSaved = MutableStateFlow<StoredRide?>(null)
     private val mutableRecovery = MutableStateFlow<RecoveryState>(RecoveryState.None)
@@ -170,6 +176,7 @@ class RideLibrary(
                 is StoreResult.Ok -> {
                     pending = pending.filterNot { it.id == ride.id }
                     mutableLastSaved.value = result.value
+                    announce(result.value)
                     publishRecovery()
                 }
 
@@ -214,6 +221,8 @@ class RideLibrary(
                 is StoreResult.Failed -> report("Finishing a stored ride failed", result.cause)
             }
         }
+        // Everything that is stored is offered to the outbox, oldest first: it queues what it has not seen.
+        saved.sortedBy { it.startEpochMillis }.forEach(::announce)
         val interrupted = rides.filter { it.status == StoredRideStatus.Interrupted }
         for (ride in interrupted.filter { it.durationSeconds < minimumRecoverableSeconds }) store.delete(ride.id)
         pending =
@@ -223,6 +232,17 @@ class RideLibrary(
                 }.sortedByDescending { it.startEpochMillis }
         mutableLastSaved.value = saved.maxByOrNull { it.startEpochMillis }
         publishRecovery()
+    }
+
+    /** Tells [onSaved] about a stored ride; what it throws is reported and dropped. */
+    private fun announce(ride: StoredRide) {
+        try {
+            onSaved(ride)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            report("Queueing a stored ride for upload failed", e)
+        }
     }
 
     private fun publishRecovery() {
@@ -247,6 +267,7 @@ class RideLibrary(
                     when (val result = store.finalize(record, title, utcOffsetSeconds(record.ride.startEpochMillis))) {
                         is StoreResult.Ok -> {
                             mutableLastSaved.value = result.value
+                            announce(result.value)
                             SaveState.Saved(result.value)
                         }
 

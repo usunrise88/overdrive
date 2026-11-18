@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,6 +31,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overdrive.core.ride.RideState
+import app.overdrive.core.sync.SyncStatus
 import app.overdrive.ride.AppContainer
 import app.overdrive.ride.devices.DeviceRole
 import app.overdrive.ride.host.RideChoice
@@ -42,6 +44,7 @@ import app.overdrive.ride.settings.SimulatedClick
 import app.overdrive.ride.workouts.WorkoutFileError
 import app.overdrive.ride.workouts.WorkoutFileReader
 import app.overdrive.ride.workouts.WorkoutFileResult
+import app.overdrive.uikit.DeviceStatus
 import app.overdrive.uikit.LocalMotionEnabled
 import app.overdrive.uikit.overlay.OverlayContent
 import app.overdrive.uikit.overlay.OverlayMode
@@ -58,6 +61,9 @@ enum class Screen {
     Ride,
     Devices,
     Settings,
+
+    /** **Learn buttons**, entered from Devices while the flow runs (ADR 0012). */
+    Learn,
 }
 
 private enum class Page {
@@ -66,7 +72,18 @@ private enum class Page {
     Finished,
     Devices,
     Settings,
+    Learn,
 }
+
+/** How many rides wait to be uploaded, from whatever the sync is doing: the Settings row "Waiting to upload". */
+private fun SyncStatus.waiting(): Int =
+    when (this) {
+        is SyncStatus.Idle -> pending
+        is SyncStatus.Syncing -> pending
+        is SyncStatus.WaitingToRetry -> pending
+        is SyncStatus.NotConfigured -> pending
+        SyncStatus.Stopped, is SyncStatus.OutboxUnavailable -> 0
+    }
 
 /**
  * The root of the ride app: the current screen with a 200 ms crossfade, the system Back button, and the in-app preview
@@ -89,6 +106,8 @@ fun RideApp(
     val lastRide by container.rides.lastSaved.collectAsStateWithLifecycle()
     val rideFiles = rememberRideFiles(container.rides)
     val pairing by container.pairing.state.collectAsStateWithLifecycle()
+    val learn by container.learning.ui.collectAsStateWithLifecycle()
+    val sync by container.sync.status.collectAsStateWithLifecycle()
     // One plain notice with one action for Bluetooth that cannot be used, re-read on every resume (ADR 0010).
     val bluetooth = rememberBluetoothFix(devices.radio.takeIf { !devices.simulated }, container.bluetooth)
 
@@ -97,10 +116,25 @@ fun RideApp(
     var overlayDetailed by rememberSaveable { mutableStateOf(settings.overlayMode == OverlayStartMode.Detailed) }
     var openError by remember { mutableStateOf<WorkoutFileError?>(null) }
 
+    // The Learn buttons screen follows the flow: it opens when learning starts and closes when it ends (cancelled, done,
+    // or a ride went live), and a screen restored after the process died with no flow running is not stranded on it.
+    LaunchedEffect(learn != null) {
+        if (learn != null) {
+            screen = Screen.Learn
+        } else if (screen == Screen.Learn) {
+            screen = Screen.Devices
+        }
+    }
+
     val state = ui.snapshot.state
     val live = OverlayPolicy.isLive(state)
     KeepScreenOn(live)
-    BackHandler(enabled = screen != Screen.Ride) { screen = Screen.Ride }
+    BackHandler(enabled = screen != Screen.Ride) {
+        when (screen) {
+            Screen.Learn -> container.learning.cancel()
+            else -> screen = Screen.Ride
+        }
+    }
 
     val access = rememberOverlayAccess(overlay)
     EnsureOverlayService(live, overlay)
@@ -156,6 +190,10 @@ fun RideApp(
 
             Screen.Settings -> {
                 Page.Settings
+            }
+
+            Screen.Learn -> {
+                Page.Learn
             }
 
             Screen.Ride -> {
@@ -244,6 +282,8 @@ fun RideApp(
                                 onBack = { screen = Screen.Ride },
                                 onRetryTrainer = host::retryTrainer,
                                 onRetryHeartRate = host::retryHeartRate,
+                                // With simulated devices the Click's buttons are the simulated Click's; otherwise **Pair**
+                                // is a scan (the screen routes it) and **Check again** starts the real Click over.
                                 onPairClick = {
                                     container.updateSettings {
                                         it.copy(
@@ -252,10 +292,10 @@ fun RideApp(
                                     }
                                 },
                                 onCheckClick = {
-                                    container.updateSettings {
-                                        it.copy(
-                                            simulatedClick = SimulatedClick.Connected,
-                                        )
+                                    if (devices.simulated) {
+                                        container.updateSettings { it.copy(simulatedClick = SimulatedClick.Connected) }
+                                    } else {
+                                        container.retryClick()
                                     }
                                 },
                                 onScan = container.pairing::scan,
@@ -263,10 +303,30 @@ fun RideApp(
                                 onPick = container.pairing::pair,
                                 onForgetTrainer = { container.pairing.forget(DeviceRole.Trainer) },
                                 onForgetHeartRate = { container.pairing.forget(DeviceRole.Strap) },
+                                onRetryClick = container::retryClick,
+                                onForgetClick = { container.pairing.forget(DeviceRole.Click) },
+                                onLearnButtons = container.learning::begin,
+                                onResetButtons = container.learning::resetToDefault,
                             ),
                         pairing = pairing,
                         bluetooth = bluetooth,
+                        mapping = settings.buttonMapping,
                     )
+                }
+
+                Page.Learn -> {
+                    // The flow is the container's; this screen only shows it. Leaving by any route cancels it.
+                    learn?.let { flow ->
+                        LearnScreen(
+                            ui = flow,
+                            actions =
+                                LearnActions(
+                                    onCancel = container.learning::cancel,
+                                    onReset = container.learning::resetToDefault,
+                                ),
+                            clickReady = devices.click.status == DeviceStatus.Connected,
+                        )
+                    }
                 }
 
                 Page.Settings -> {
@@ -283,6 +343,7 @@ fun RideApp(
                             ),
                         overlayAccess = access,
                         bleLogs = bleLogs,
+                        waitingToUpload = sync.waiting(),
                     )
                 }
             }

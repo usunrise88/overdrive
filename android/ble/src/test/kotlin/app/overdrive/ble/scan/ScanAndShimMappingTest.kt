@@ -3,19 +3,26 @@ package app.overdrive.ble.scan
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothStatusCodes
+import android.util.SparseArray
 import app.overdrive.ble.gatt.Start
 import app.overdrive.ble.gatt.characteristicsOf
 import app.overdrive.ble.gatt.propertiesOf
 import app.overdrive.ble.gatt.startOfStatusCode
 import app.overdrive.ble.gatt.toGattUuid
 import app.overdrive.ble.gatt.toUuid
+import app.overdrive.ble.gatt.writeTypeOf
 import app.overdrive.core.ble.BleAvailability
+import app.overdrive.core.ble.ClickUuids
 import app.overdrive.core.ble.FtmsUuids
 import app.overdrive.core.ble.GattCharacteristicInfo
 import app.overdrive.core.ble.GattProperty
 import app.overdrive.core.ble.GattUuid
 import app.overdrive.core.ble.HeartRateUuids
+import app.overdrive.core.ble.ManufacturerData
 import app.overdrive.core.ble.ScanFailure
+import app.overdrive.core.click.ClickAdvertisements
+import app.overdrive.core.click.ClickOptions
+import app.overdrive.core.click.ClickSide
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -47,6 +54,80 @@ class ScanAndShimMappingTest {
         assertEquals("AA:BB:CC:DD:EE:02", advertisement.id.value)
         assertEquals("the id never prints the address", false, advertisement.id.toString().contains("AA:BB"))
         assertEquals("nor does the advertisement", false, advertisement.toString().contains("AA:BB"))
+    }
+
+    @Test
+    fun `manufacturer data of a scan record becomes core's list, by company id, and a click is recognised from it`() {
+        val records = SparseArray<ByteArray>()
+        records.put(0x094A, byteArrayOf(0x0A, 0x01, 0x02))
+        records.put(0x004C, byteArrayOf(0x10))
+        val data = ScanMapping.manufacturerData(records)
+        assertEquals(listOf(0x004C, 0x094A), data.map { it.companyId }.sorted())
+        val zwift = data.first { it.companyId == ClickUuids.MANUFACTURER_ID }
+        assertEquals(0x0A, zwift.firstByte)
+        assertEquals(listOf<Byte>(0x0A, 0x01, 0x02), zwift.payload.toList())
+        assertEquals("the payload never prints", "ManufacturerData(0x94a, 3 bytes)", zwift.toString())
+
+        val advertisement =
+            checkNotNull(
+                ScanMapping.advertisement(
+                    "AA:BB:CC:DD:EE:04",
+                    null,
+                    listOf(ClickUuids.SERVICE.toUuid()),
+                    -60,
+                    data,
+                ),
+            )
+        assertEquals(ClickSide.RIGHT, ClickAdvertisements.recognise(advertisement)?.side)
+        assertEquals(false, advertisement.toString().contains("AA:BB"))
+    }
+
+    @Test
+    fun `no manufacturer data, an empty record or a null array is an empty list, never a crash`() {
+        assertEquals(emptyList<ManufacturerData>(), ScanMapping.manufacturerData(null))
+        assertEquals(emptyList<ManufacturerData>(), ScanMapping.manufacturerData(SparseArray()))
+        val onlyCompany = SparseArray<ByteArray>()
+        onlyCompany.put(0x094A, ByteArray(0))
+        val data = ScanMapping.manufacturerData(onlyCompany)
+        assertEquals(null, data.single().firstByte)
+        val advertisement =
+            checkNotNull(
+                ScanMapping.advertisement("AA:BB:CC:DD:EE:05", null, listOf(ClickUuids.SERVICE.toUuid()), -60, data),
+            )
+        assertNull("an empty payload is no puck", ClickAdvertisements.recognise(advertisement))
+        // An advertisement mapped without manufacturer data (the old call) has none.
+        assertEquals(
+            emptyList<ManufacturerData>(),
+            ScanMapping.advertisement("AA:BB:CC:DD:EE:05", null, null, -60)!!.manufacturerData,
+        )
+    }
+
+    @Test
+    fun `a left puck is recognised as the left side and refused when only the right is wanted`() {
+        val records = SparseArray<ByteArray>()
+        records.put(0x094A, byteArrayOf(0x0B))
+        val advertisement =
+            checkNotNull(
+                ScanMapping.advertisement(
+                    "AA:BB:CC:DD:EE:06",
+                    null,
+                    listOf(ClickUuids.SERVICE.toUuid()),
+                    -60,
+                    ScanMapping.manufacturerData(records),
+                ),
+            )
+        assertNull(ClickAdvertisements.recognise(advertisement))
+        assertEquals(
+            ClickSide.LEFT,
+            ClickAdvertisements.recognise(advertisement, ClickOptions(acceptedSides = setOf(ClickSide.LEFT)))?.side,
+        )
+    }
+
+    @Test
+    fun `a write type is the platform's default with a response and no response without one`() {
+        assertEquals(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT, writeTypeOf(withResponse = true))
+        assertEquals(BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE, writeTypeOf(withResponse = false))
+        assertEquals(false, writeTypeOf(true) == writeTypeOf(false))
     }
 
     @Test

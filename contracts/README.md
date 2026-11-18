@@ -17,7 +17,8 @@ src/         @overdrive/contracts: the schema plus a validator for the TypeScrip
 | Ride record (schema 1) | `schema/ride-record.schema.json` | §8.2 |
 
 The sync API payloads and MCP tool inputs (spec §8.3–§8.4) get schemas here as they are fixed during
-implementation.
+implementation: **Phase 1 added none**. The sync outbox of the ride app (ADR 0012) is a local journal, not a wire format, and
+has no schema; what an upload sends is Phase 2's, and its schema and fixtures come here first.
 
 `fixtures/rides/` holds the ride record's golden files: `valid/*.json` must be accepted and `invalid/*.json`
 rejected by every implementation, including the structural rules a schema cannot state (samples run 1, 2, 3, …; laps

@@ -9,12 +9,17 @@ import app.overdrive.core.ble.DeviceId
 import app.overdrive.core.ble.GattScanner
 import app.overdrive.core.ble.GattTransportFactory
 import app.overdrive.core.ble.fake.FakeBle
+import app.overdrive.core.ble.fake.FakeClick
+import app.overdrive.core.ble.fake.FakeClickOptions
 import app.overdrive.core.ble.fake.FakeFtmsTrainer
 import app.overdrive.core.ble.fake.FakeHeartRateStrap
 import app.overdrive.core.ble.link.BackoffPolicy
+import app.overdrive.core.click.ClickOptions
+import app.overdrive.core.click.ClickSide
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -25,6 +30,8 @@ import org.junit.Assert.assertEquals
 internal val TRAINER_ID = DeviceId("test-trainer")
 internal val STRAP_ID = DeviceId("test-strap")
 internal val OTHER_TRAINER_ID = DeviceId("test-trainer-2")
+internal val CLICK_ID = DeviceId("test-click")
+internal val OTHER_CLICK_ID = DeviceId("test-click-2")
 
 private const val NANOS_PER_MILLI = 1_000_000L
 
@@ -54,16 +61,23 @@ internal class InMemoryPreferences(
 internal class BleWorld(
     val test: TestScope,
     val store: DeviceStore = DeviceStore(InMemoryPreferences()),
+    clickOptions: Flow<ClickOptions> = flowOf(ClickOptions()),
 ) {
     val ble = FakeBle(test.backgroundScope, nanoClock = { test.testScheduler.currentTime * NANOS_PER_MILLI })
     val fakeTrainer = FakeFtmsTrainer()
     val fakeStrap = FakeHeartRateStrap()
     val otherTrainer = FakeFtmsTrainer(advertisedName = "Other D500")
+    val fakeClick = FakeClick()
+
+    // The left puck: a scan lists it only when the developer setting asks for either side.
+    val otherClick = FakeClick(FakeClickOptions(side = ClickSide.LEFT), advertisedName = "Other Click")
 
     init {
         ble.add(TRAINER_ID, fakeTrainer)
         ble.add(STRAP_ID, fakeStrap)
         ble.add(OTHER_TRAINER_ID, otherTrainer)
+        ble.add(CLICK_ID, fakeClick)
+        ble.add(OTHER_CLICK_ID, otherClick)
     }
 
     val devices =
@@ -74,12 +88,17 @@ internal class BleWorld(
             transports = { ble },
             reconnect = BackoffPolicy.EXACT,
             timeSource = test.testTimeSource,
+            clickOptions = clickOptions,
         )
 
-    /** Pairs both devices in the store and starts, as a launch after the rider had paired them. */
-    suspend fun launchPaired() {
+    /**
+     * Pairs the trainer and the strap (and the Click, with [withClick]) in the store and starts, as a launch after the
+     * rider had paired them.
+     */
+    suspend fun launchPaired(withClick: Boolean = false) {
         store.remember(DeviceRole.Trainer, RememberedDevice(TRAINER_ID, "D500"))
         store.remember(DeviceRole.Strap, RememberedDevice(STRAP_ID, "HR7"))
+        if (withClick) store.remember(DeviceRole.Click, RememberedDevice(CLICK_ID, "Zwift Click (right)"))
         devices.start()
         advance(2_000)
     }

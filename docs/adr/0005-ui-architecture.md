@@ -112,7 +112,7 @@ stable parameters (checked once, the report configuration is not kept). The fram
   line before persistence and FIT (M2b). The finish sheet asks "Finish this ride?".
   (Settled in M2b-2: the finished screen shows the saved state with **Share FIT file** and **Save to folder**; see
   [ADR 0008](0008-ride-storage-and-export.md).)
-- "Change button mapping" on the Devices screen is disabled: remapping the Click is not in Phase 1's scope.
+- "Change button mapping" on the Devices screen is disabled: remapping the Click is not in Phase 1's scope. *(Replaced in stage M4-2 by **Learn buttons**, which the owner's brief put back in scope: ADR 0012.)*
 - The Ready screen's mode reads "ERG + gears" for a workout that contains a free step; the mock-up shows "ERG".
 - The device row's countdown ("Retry in 8 s") reads "retrying": the simulated devices do not publish their backoff.
 - The paused banner is 48 dp high as in spec §4.1; the mock-up CSS squeezed it to about 40 dp.

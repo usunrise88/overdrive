@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.io.IOException
 
-/** The two Bluetooth roles of a ride. The Click is the M4 stage. */
+/** The three Bluetooth roles: the trainer and the strap of a ride, and the Click on the handlebar (ADR 0012). */
 enum class DeviceRole(
     /** What the rider reads on the Devices screen. */
     val title: String,
@@ -22,6 +22,7 @@ enum class DeviceRole(
 ) {
     Trainer("Trainer", "Trainer"),
     Strap("Heart rate", "Heart-rate strap"),
+    Click("Click", "Zwift Click"),
 }
 
 /**
@@ -36,15 +37,17 @@ data class RememberedDevice(
     val name: String,
 )
 
-/** What is remembered: at most one trainer and one strap. */
+/** What is remembered: at most one trainer, one strap and one Click. */
 data class RememberedDevices(
     val trainer: RememberedDevice? = null,
     val strap: RememberedDevice? = null,
+    val click: RememberedDevice? = null,
 ) {
     operator fun get(role: DeviceRole): RememberedDevice? =
         when (role) {
             DeviceRole.Trainer -> trainer
             DeviceRole.Strap -> strap
+            DeviceRole.Click -> click
         }
 }
 
@@ -68,7 +71,7 @@ fun cleanDeviceName(
 private const val MAX_NAME_LENGTH = 40
 
 /**
- * The remembered trainer and strap in DataStore Preferences, in the app's private files. Reading is forgiving, like the
+ * The remembered trainer, strap and Click in DataStore Preferences, in the app's private files. Reading is forgiving, like the
  * settings: a value that is blank or damaged is "nothing paired", never a crash, and an unreadable file is the same as an
  * empty one. Pairing a device replaces the old one of that role; forgetting removes it.
  */
@@ -114,17 +117,20 @@ class DeviceStore(
 
     private val trainerKeys = Keys("trainer")
     private val strapKeys = Keys("strap")
+    private val clickKeys = Keys("click")
 
     private fun keys(role: DeviceRole) =
         when (role) {
             DeviceRole.Trainer -> trainerKeys
             DeviceRole.Strap -> strapKeys
+            DeviceRole.Click -> clickKeys
         }
 
     private fun Preferences.toDevices(): RememberedDevices =
         RememberedDevices(
             trainer = deviceOf(DeviceRole.Trainer),
             strap = deviceOf(DeviceRole.Strap),
+            click = deviceOf(DeviceRole.Click),
         )
 
     private fun Preferences.deviceOf(role: DeviceRole): RememberedDevice? {

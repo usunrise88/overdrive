@@ -6,9 +6,9 @@ One Gradle build for everything that runs on Android. The shared `core` is a sep
 | Module | Contents | Spec |
 |---|---|---|
 | `ble` | Android Bluetooth under core's four interfaces: GATT transport over a thin platform shim, scanner, radio and permission state, raw session logs (ADR 0010) | §4.1, §7.1 |
-| `data` | The rides folder: `RideStore` (log, record, FIT, atomic finalize, scan) and `RideLogWriter`; the outbox and sync client come with §4.9 | §4.2, §4.8, §4.9, §7.1 |
+| `data` | The rides folder: `RideStore` (log, record, FIT, atomic finalize, scan) and `RideLogWriter`; `FileOutbox`, the sync outbox on disk (ADR 0012) | §4.2, §4.8, §4.9, §7.1 |
 | `ui-kit` | Design system: theme on the generated tokens, components, charts, the overlay composables, Lucide icons | §7.4 |
-| `app-ride` | Tablet app: ride, devices and settings screens over the real trainer and strap (or a simulated ride); remembered devices and pairing; the overlay service and window | §4 |
+| `app-ride` | Tablet app: ride, devices and settings screens over the real trainer, strap and Click (or a simulated ride); remembered devices and pairing; Learn buttons; the handlebar; the overlay service and window; the sync outbox and settings | §4 |
 | `app-companion` | Phone app: statistics, Health Connect reader | §6.1 |
 
 Dependency direction: apps → `ui-kit`, `data`, `ble` → `core`.
@@ -43,7 +43,8 @@ Google Play Services, anywhere.
   Screens only read `StateFlow`s and call `RideActions`. `rides` (`RideLibrary`) owns the files (below).
 - **Previews.** `ui-kit/.../preview/` has `@Preview`s for every component and state, and the overlay in each mode.
 - **Developer settings** (end of the Settings screen): where the devices come from (Bluetooth or Simulated), recording
-  and sharing the Bluetooth logs, demo speed (10× and 60×), scripted sensor dropouts and the simulated Click state.
+  and sharing the Bluetooth logs, demo speed (10× and 60×), scripted sensor dropouts and the simulated Click state, and a
+  **Developer · Click** group with the Click's connection options and the two gesture timings (below).
 
 ## Bluetooth (ADR 0010)
 
@@ -65,6 +66,35 @@ through that action.
 Tests use no radio: `FakeBle` from `core` stands in for it (`BleWorld` in `app-ride`'s test sources), in virtual time.
 Container tests (`AppContainerBleTest`) take a `FakeBleStack` through `AppContainer(bleStack = ...)`. What only a bench can
 settle is the table in `docs/adr/0010-android-ble-and-pairing.md` section 10.
+
+## The Click, the handlebar and Learn buttons (ADR 0012)
+
+The Click is a long-lived device of `PairedDevices` (role `Click`) beside the trainer and the strap: paired from the Devices
+scan (`PairingController`; told by its manufacturer data, listed as "Zwift Click (right)"), remembered in `DeviceStore`,
+connected when the app starts, owned by the container and **not by any ride**, and never counted in `PairedDevices.changes`.
+`PairedDevices.clickButtons` is one hot flow of its buttons for the life of the container (a synthetic release is emitted when a
+Click is replaced or forgotten while a button is down).
+
+- **`handlebar/HandlebarService`** wires that flow through `HandlebarControls` (gestures) and `ActionRouter` (the one routing rule,
+  shared with `RideActions`) in the container's scope, **with no activity**; it can be suspended. The overlay's foreground service
+  keeps the process alive during a ride. **`handlebar/ButtonLearning`** is the *Learn buttons* flow (`ui/LearnScreen`).
+- **`devices/BleDeviceRows.clickRow`** is the Click's row in plain words; `ui/DevicesScreen` shows the unlock notice below a locked
+  Click and the button map with **Learn buttons** and **Reset to default**.
+- **Settings** (`settings/ClickSettings`, `SyncSettings`): the Click's connection options and gesture timings (every default is
+  `core`'s, every value is sanitised, a change replaces the Click's device only) and the sync address and token (stored, unused,
+  the token a `SecretText` that prints as dots). The manifest asks for no `INTERNET` permission and sets `allowBackup=false`.
+- **Container injection for tests:** `AppContainer(mediaFactory = ..., elapsedMillis = ..., outboxFile = ..., bleStack = ...)`.
+  Tests that write into `filesDir/rides` use a plain `Application` (`@Config(application = Application::class)`), like
+  `AppContainerClickTest` and `AppContainerSyncTest`, so the app's own container does not start beside them.
+- What only a bench can settle is the table in `docs/adr/0012-click-on-android-and-sync-outbox.md` section 11.
+
+## The sync outbox (ADR 0012, spec §4.9)
+
+`data/.../sync/FileOutbox` is `core`'s `Outbox` on disk (`filesDir/sync/outbox.log`): an append-only journal with a checksum per
+line, every append forced to storage, a torn last line ignored, compaction through a temporary file and an atomic rename, and a
+ride queued **once, ever**. `RideLibrary(onSaved = ...)` announces every stored ride (a finished one, a recovered one, one completed
+at start, and at each start every ride on disk, which the outbox ignores if it has seen it). The container runs a `SyncCoordinator`
+over `NoopSyncProvider`: **nothing is uploaded** and there is no network code. Settings, Sync, shows how many rides wait.
 
 ## Rides on disk (ADR 0008)
 

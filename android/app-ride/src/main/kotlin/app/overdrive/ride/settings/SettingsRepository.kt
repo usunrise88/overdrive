@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import app.overdrive.core.control.ButtonMapping
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -60,6 +61,19 @@ class SettingsRepository(
         val simulatedClick = stringPreferencesKey("dev_simulated_click")
         val deviceSource = stringPreferencesKey("dev_device_source")
         val recordBleSessions = booleanPreferencesKey("dev_record_ble_sessions")
+        val buttonMapping = stringPreferencesKey("click_button_mapping")
+        val clickPostHandshake = booleanPreferencesKey("dev_click_post_handshake")
+        val clickKeepAlive = stringPreferencesKey("dev_click_keep_alive")
+        val clickNoEventTimeout = stringPreferencesKey("dev_click_no_event_timeout")
+        val clickMtu = stringPreferencesKey("dev_click_mtu")
+        val clickWriteWithResponse = booleanPreferencesKey("dev_click_write_with_response")
+        val clickRequireService = booleanPreferencesKey("dev_click_require_service")
+        val clickPucks = stringPreferencesKey("dev_click_pucks")
+        val clickReplyCheck = stringPreferencesKey("dev_click_reply_check")
+        val clickHold = intPreferencesKey("dev_click_hold_ms")
+        val clickVolumeRepeat = intPreferencesKey("dev_click_volume_repeat_ms")
+        val syncUrl = stringPreferencesKey("sync_url")
+        val syncToken = stringPreferencesKey("sync_token")
     }
 
     private fun Preferences.toSettings(): AppSettings {
@@ -81,8 +95,28 @@ class SettingsRepository(
             simulatedClick = enumOr(this[Keys.simulatedClick], defaults.simulatedClick),
             deviceSource = enumOr(this[Keys.deviceSource], defaults.deviceSource),
             recordBleSessions = this[Keys.recordBleSessions] ?: defaults.recordBleSessions,
+            // A stored mapping that is not a valid one (cut, edited, two roles on one button) is the default, and never
+            // reaches the gesture layer.
+            buttonMapping = this[Keys.buttonMapping]?.let { ButtonMapping.parse(it) } ?: defaults.buttonMapping,
+            click = clickSettings(defaults.click),
+            syncUrl = this[Keys.syncUrl].orEmpty(),
+            syncToken = SecretText(this[Keys.syncToken].orEmpty()),
         ).sanitized()
     }
+
+    private fun Preferences.clickSettings(defaults: ClickSettings) =
+        ClickSettings(
+            sendPostHandshake = this[Keys.clickPostHandshake] ?: defaults.sendPostHandshake,
+            keepAlive = enumOr(this[Keys.clickKeepAlive], defaults.keepAlive),
+            noEventTimeout = enumOr(this[Keys.clickNoEventTimeout], defaults.noEventTimeout),
+            mtu = enumOr(this[Keys.clickMtu], defaults.mtu),
+            writeWithResponse = this[Keys.clickWriteWithResponse] ?: defaults.writeWithResponse,
+            requireAdvertisedService = this[Keys.clickRequireService] ?: defaults.requireAdvertisedService,
+            pucks = enumOr(this[Keys.clickPucks], defaults.pucks),
+            replyCheck = enumOr(this[Keys.clickReplyCheck], defaults.replyCheck),
+            holdThresholdMillis = this[Keys.clickHold] ?: defaults.holdThresholdMillis,
+            volumeRepeatMillis = this[Keys.clickVolumeRepeat] ?: defaults.volumeRepeatMillis,
+        )
 
     private fun MutablePreferences.write(settings: AppSettings) {
         this[Keys.ftp] = settings.ftp
@@ -101,6 +135,20 @@ class SettingsRepository(
         this[Keys.simulatedClick] = settings.simulatedClick.name
         this[Keys.deviceSource] = settings.deviceSource.name
         this[Keys.recordBleSessions] = settings.recordBleSessions
+        this[Keys.buttonMapping] = settings.buttonMapping.serialize()
+        val click = settings.click
+        this[Keys.clickPostHandshake] = click.sendPostHandshake
+        this[Keys.clickKeepAlive] = click.keepAlive.name
+        this[Keys.clickNoEventTimeout] = click.noEventTimeout.name
+        this[Keys.clickMtu] = click.mtu.name
+        this[Keys.clickWriteWithResponse] = click.writeWithResponse
+        this[Keys.clickRequireService] = click.requireAdvertisedService
+        this[Keys.clickPucks] = click.pucks.name
+        this[Keys.clickReplyCheck] = click.replyCheck.name
+        this[Keys.clickHold] = click.holdThresholdMillis
+        this[Keys.clickVolumeRepeat] = click.volumeRepeatMillis
+        if (settings.syncUrl.isEmpty()) remove(Keys.syncUrl) else this[Keys.syncUrl] = settings.syncUrl
+        if (settings.syncToken.isEmpty) remove(Keys.syncToken) else this[Keys.syncToken] = settings.syncToken.value
     }
 
     private inline fun <reified E : Enum<E>> enumOr(

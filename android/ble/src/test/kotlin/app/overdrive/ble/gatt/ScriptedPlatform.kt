@@ -14,6 +14,11 @@ internal val SERVICE = GattUuid.short(0x1826)
 internal val INDOOR_BIKE = GattUuid.short(0x2AD2)
 internal val CONTROL_POINT = GattUuid.short(0x2AD9)
 
+/** The Click's SYNC_RX, `0003` in the test names, which takes a write with and without response. */
+internal val CLICK_SYNC_RX = GattUuid.short(0x0003)
+internal val CLICK_SYNC_RX_INFO =
+    GattCharacteristicInfo(SERVICE, CLICK_SYNC_RX, setOf(GattProperty.WRITE, GattProperty.WRITE_WITHOUT_RESPONSE))
+
 internal val INDOOR_BIKE_INFO = GattCharacteristicInfo(SERVICE, INDOOR_BIKE, setOf(GattProperty.NOTIFY))
 internal val CONTROL_POINT_INFO =
     GattCharacteristicInfo(SERVICE, CONTROL_POINT, setOf(GattProperty.WRITE, GattProperty.INDICATE))
@@ -61,7 +66,10 @@ internal class ScriptedPlatform : PlatformGattOpener {
 
 /** The platform handle of [ScriptedPlatform]: records the calls, answers them as the test says. */
 internal class ScriptedGatt : PlatformGatt {
-    /** Every call, in order: `discover`, `mtu 64`, `read 2ACC`, `write 2AD9 0102`, `enable 2AD2 NOTIFICATION`, `disconnect`, `close`. */
+    /**
+     * Every call, in order: `discover`, `mtu 64`, `read 2ACC`, `write 2AD9 0102`, `writenr 2AD9 0102` (without response),
+     * `enable 2AD2 NOTIFICATION`, `disconnect`, `close`.
+     */
     val calls = mutableListOf<String>()
 
     /** What the next starts answer with; reset to [Start.STARTED] after each use unless [sticky]. */
@@ -91,6 +99,12 @@ internal class ScriptedGatt : PlatformGatt {
         characteristic: GattUuid,
         value: ByteArray,
     ) = start("write $characteristic ${value.joinToString("") { "%02X".format(it) }}")
+
+    override fun writeWithoutResponse(
+        service: GattUuid,
+        characteristic: GattUuid,
+        value: ByteArray,
+    ) = start("writenr $characteristic ${value.joinToString("") { "%02X".format(it) }}")
 
     override fun enable(
         service: GattUuid,

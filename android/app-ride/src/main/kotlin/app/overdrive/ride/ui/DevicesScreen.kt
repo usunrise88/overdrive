@@ -17,6 +17,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.overdrive.core.ble.ScanFailure
+import app.overdrive.core.click.ClickBits
+import app.overdrive.core.click.UnlockSignal
+import app.overdrive.core.control.ButtonMapping
+import app.overdrive.core.control.HandlebarButton
 import app.overdrive.ride.devices.FoundDevice
 import app.overdrive.ride.devices.PairingUi
 import app.overdrive.ride.host.DeviceRowUi
@@ -37,8 +41,9 @@ import app.overdrive.uikit.icons.OverdriveIcons
 import app.overdrive.uikit.tokens.OverdriveColors
 
 /**
- * What the rider can do on the Devices screen. The first five are the ones the simulated build had; the Click's two stay
- * placeholders until M4.
+ * What the rider can do on the Devices screen. The first five are the ones the simulated build had; the Click's **Pair**
+ * and **Check again** are the real Click's (a scan, a retry) with Bluetooth devices and the simulated one's with simulated
+ * ones (ADR 0012).
  */
 class DevicesActions(
     val onBack: () -> Unit,
@@ -54,6 +59,13 @@ class DevicesActions(
     val onPick: (FoundDevice) -> Unit = {},
     val onForgetTrainer: () -> Unit = {},
     val onForgetHeartRate: () -> Unit = {},
+    /** **Retry now** on a Click that is not found or dropped. */
+    val onRetryClick: () -> Unit = {},
+    val onForgetClick: () -> Unit = {},
+    /** **Learn buttons**: opens the guided flow that asks for the five roles in turn. */
+    val onLearnButtons: () -> Unit = {},
+    /** **Reset to default**: the default mapping again. */
+    val onResetButtons: () -> Unit = {},
 )
 
 /**
@@ -67,6 +79,7 @@ class DevicesActions(
  * @param devices the rows; [DevicesUi.simulated] says they are the developer setting's simulated devices.
  * @param pairing the scan panel's state.
  * @param bluetooth the action of the Bluetooth notice.
+ * @param mapping which of the Click's buttons is which role, shown beside what each does.
  */
 @Composable
 fun DevicesScreen(
@@ -75,6 +88,7 @@ fun DevicesScreen(
     modifier: Modifier = Modifier,
     pairing: PairingUi = PairingUi(),
     bluetooth: BluetoothFix = BluetoothFix.None,
+    mapping: ButtonMapping = ButtonMapping.DEFAULT,
 ) {
     Column(modifier.fillMaxSize().background(OverdriveColors.bg)) {
         BackTopBar("Devices", actions.onBack)
@@ -122,7 +136,13 @@ fun DevicesScreen(
                         divider = true,
                         onForget = actions.onForgetHeartRate.takeIf { devices.canForget(devices.heartRate) },
                     )
-                    ClickRow(devices.click, actions)
+                    ClickRow(
+                        devices.click,
+                        actions,
+                        // **Pair** is a scan like the others; with simulated devices it is the simulated Click's.
+                        onPair = if (devices.simulated) actions.onPairClick else pair,
+                        onForget = actions.onForgetClick.takeIf { devices.canForget(devices.click) },
+                    )
                 }
                 if (!devices.simulated) {
                     if (!devices.canChange) {
@@ -138,8 +158,8 @@ fun DevicesScreen(
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OdText("Click buttons", style = OdType.label, color = OverdriveColors.textTertiary)
-                ClickMap()
-                OdButton("Change button mapping", {}, enabled = false)
+                ClickMap(mapping)
+                LearnButtons(devices, mapping, actions)
             }
         }
     }
@@ -169,9 +189,17 @@ private fun ScanPanel(
         }
         if (!pairing.isEmpty) {
             OdCard(padding = PaddingValues(0.dp)) {
-                if (pairing.trainers.isNotEmpty()) FoundSection("Trainers", pairing.trainers, actions, divider = false)
+                var before = false
+                if (pairing.trainers.isNotEmpty()) {
+                    FoundSection("Trainers", pairing.trainers, actions, divider = before)
+                    before = true
+                }
                 if (pairing.straps.isNotEmpty()) {
-                    FoundSection("Heart-rate straps", pairing.straps, actions, divider = pairing.trainers.isNotEmpty())
+                    FoundSection("Heart-rate straps", pairing.straps, actions, divider = before)
+                    before = true
+                }
+                if (pairing.clicks.isNotEmpty()) {
+                    FoundSection("Handlebar controllers", pairing.clicks, actions, divider = before)
                 }
             }
         } else if (!pairing.scanning && pairing.scanned) {
@@ -188,7 +216,7 @@ private fun noResultText(pairing: PairingUi): String =
     if (pairing.failure == ScanFailure.REFUSED) {
         "Android allows only a few scans in a short time. Wait half a minute and scan again."
     } else {
-        "Switch the trainer or strap on and wake it. Close any other app that is connected to it, then scan again."
+        "Switch the trainer, strap or Click on and wake it. Close any other app that is connected to it, then scan again."
     }
 
 @Composable
@@ -231,39 +259,66 @@ fun signalText(rssi: Int): String {
 private const val STRONG_DBM = -60
 private const val GOOD_DBM = -75
 
+/**
+ * The Click's row: its real states in plain words, a **Retry now** while it waits, and below a locked one the notice of
+ * spec §4.7. The two signs of a lock have two texts (the service is hidden; it answers and says nothing) and one promise:
+ * unlock it through Zwift once, and the ride goes on without it.
+ */
 @Composable
 private fun ClickRow(
     row: DeviceRowUi,
     actions: DevicesActions,
+    onPair: () -> Unit,
+    onForget: (() -> Unit)?,
 ) {
     DeviceRow(
         OverdriveIcons.Gamepad2,
         "Click",
         row.subtitle,
         row.status,
-        onPair = actions.onPairClick,
+        onPair = onPair,
+        onRetry = actions.onRetryClick,
         divider = true,
+        onForget = onForget,
         notice =
-            if (row.status == DeviceStatus.Locked) {
+            row.locked?.let { signal ->
                 {
                     Notice(
                         icon = OverdriveIcons.Info,
-                        title = "Click is locked",
-                        text =
-                            "It is connected but sends no button presses. Unlock it once in the Zwift app, " +
-                                "then check again. You can ride without it; every action is on screen.",
+                        title = unlockTitle(signal),
+                        text = unlockText(signal),
                         actionLabel = "Check again",
                         onAction = actions.onCheckClick,
                     )
                 }
-            } else {
-                null
             },
     )
 }
 
+/** The unlock notice's title: what the rider sees first. */
+fun unlockTitle(signal: UnlockSignal): String =
+    when (signal) {
+        UnlockSignal.SERVICE_HIDDEN -> "Click is locked"
+        UnlockSignal.NO_EVENTS -> "Click sends no presses"
+    }
+
+/**
+ * The unlock notice's text (spec §4.7: "tells the user to unlock it through Zwift once and continues without the Click").
+ * One short sentence each, plain, ending in what the rider is promised.
+ */
+fun unlockText(signal: UnlockSignal): String =
+    when (signal) {
+        UnlockSignal.SERVICE_HIDDEN -> {
+            "Zwift has it locked. Unlock it through Zwift once; the ride continues without it."
+        }
+
+        UnlockSignal.NO_EVENTS -> {
+            "It is connected but silent. Unlock it through Zwift once; the ride continues without it."
+        }
+    }
+
 private class ClickMapping(
-    val button: String,
+    val role: HandlebarButton,
     val press: String,
     val hold: String,
     val holdRepeats: Boolean = false,
@@ -271,21 +326,41 @@ private class ClickMapping(
 
 private val clickMap =
     listOf(
-        ClickMapping("Plus", "Gear up", "Next interval"),
-        ClickMapping("Button 2", "Gear down", "Previous interval"),
-        ClickMapping("Button 3", "Play or pause media", "Pause or resume ride"),
-        ClickMapping("Button 4", "Volume up", "Repeats", holdRepeats = true),
-        ClickMapping("Button 5", "Volume down", "Repeats", holdRepeats = true),
+        ClickMapping(HandlebarButton.PLUS, "Gear up", "Next interval"),
+        ClickMapping(HandlebarButton.BUTTON_2, "Gear down", "Previous interval"),
+        ClickMapping(HandlebarButton.BUTTON_3, "Play or pause media", "Pause or resume ride"),
+        ClickMapping(HandlebarButton.BUTTON_4, "Volume up", "Repeats", holdRepeats = true),
+        ClickMapping(HandlebarButton.BUTTON_5, "Volume down", "Repeats", holdRepeats = true),
     )
 
-/** The press and hold map of the five buttons (spec §4.7), for reference. */
+/** What the Click's own names for the bits of [mask] read as: `Y`, `Plus`, `A + Z`. */
+fun buttonNames(mask: Int): String = buttonNames(ClickBits.namesOf(mask))
+
+/** The Click's names as the rider reads them: a single letter stays, `PLUS` is `Plus`, `NAV_LEFT` is `Nav left`. */
+fun buttonNames(names: List<String>): String = names.joinToString(" + ") { readable(it) }
+
+private fun readable(name: String): String =
+    if (name.length > 1 && name.all { it.isUpperCase() || it == '_' }) {
+        name.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
+    } else {
+        name
+    }
+
+/** The press and hold map of the five buttons (spec §4.7), each with the Click button it is on now. */
 @Composable
-private fun ClickMap() {
+private fun ClickMap(mapping: ButtonMapping) {
     OdCard(padding = PaddingValues(0.dp)) {
-        MapLine("Button", "Press", "Hold", header = true)
-        for (mapping in clickMap) {
+        MapLine("Button", "", "Press", "Hold", header = true)
+        for (line in clickMap) {
             HorizontalRule()
-            MapLine(mapping.button, mapping.press, mapping.hold, header = false, holdDim = mapping.holdRepeats)
+            MapLine(
+                line.role.label,
+                buttonNames(mapping.maskOf(line.role)),
+                line.press,
+                line.hold,
+                header = false,
+                holdDim = line.holdRepeats,
+            )
         }
         HorizontalRule()
         OdText(
@@ -300,13 +375,14 @@ private fun ClickMap() {
 @Composable
 private fun MapLine(
     button: String,
+    on: String,
     press: String,
     hold: String,
     header: Boolean,
     holdDim: Boolean = false,
 ) {
     Row(
-        Modifier.fillMaxWidth().height(if (header) 40.dp else 48.dp).padding(horizontal = 20.dp),
+        Modifier.fillMaxWidth().height(if (header) 40.dp else 56.dp).padding(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -315,7 +391,10 @@ private fun MapLine(
             OdText(press, Modifier.weight(1f), style = OdType.caption, color = OverdriveColors.textTertiary)
             OdText(hold, Modifier.weight(1f), style = OdType.caption, color = OverdriveColors.textTertiary)
         } else {
-            OdText(button, Modifier.width(112.dp), style = OdType.bodyStrong)
+            Column(Modifier.width(112.dp)) {
+                OdText(button, style = OdType.bodyStrong, maxLines = 1)
+                OdText(on, style = OdType.caption, color = OverdriveColors.textTertiary, maxLines = 1)
+            }
             OdText(press, Modifier.weight(1f), style = OdType.label)
             OdText(
                 hold,
@@ -324,5 +403,36 @@ private fun MapLine(
                 color = if (holdDim) OverdriveColors.textSecondary else OverdriveColors.textPrimary,
             )
         }
+    }
+}
+
+/**
+ * **Learn buttons** and **Reset to default** under the map. Learning is offered with a Click that is connected and no ride
+ * live, because the handlebar says nothing while it runs; when it is not, one line says why.
+ */
+@Composable
+private fun LearnButtons(
+    devices: DevicesUi,
+    mapping: ButtonMapping,
+    actions: DevicesActions,
+) {
+    val reason =
+        when {
+            devices.simulated -> "Learning needs the real Click: switch to Bluetooth under Settings, Developer."
+            !devices.canChange -> "Not during a ride."
+            devices.click.status != DeviceStatus.Connected -> "Connect the Click to learn its buttons."
+            else -> null
+        }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            OdButton("Learn buttons", actions.onLearnButtons, variant = ButtonVariant.Primary, enabled = reason == null)
+            OdButton(
+                "Reset to default",
+                actions.onResetButtons,
+                variant = ButtonVariant.Ghost,
+                enabled = mapping != ButtonMapping.DEFAULT,
+            )
+        }
+        if (reason != null) OdText(reason, style = OdType.label, color = OverdriveColors.textTertiary)
     }
 }
