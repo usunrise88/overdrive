@@ -31,7 +31,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overdrive.core.ride.RideState
-import app.overdrive.core.sync.SyncStatus
 import app.overdrive.ride.AppContainer
 import app.overdrive.ride.devices.DeviceRole
 import app.overdrive.ride.host.RideChoice
@@ -75,16 +74,6 @@ private enum class Page {
     Learn,
 }
 
-/** How many rides wait to be uploaded, from whatever the sync is doing: the Settings row "Waiting to upload". */
-private fun SyncStatus.waiting(): Int =
-    when (this) {
-        is SyncStatus.Idle -> pending
-        is SyncStatus.Syncing -> pending
-        is SyncStatus.WaitingToRetry -> pending
-        is SyncStatus.NotConfigured -> pending
-        SyncStatus.Stopped, is SyncStatus.OutboxUnavailable -> 0
-    }
-
 /**
  * The root of the ride app: the current screen with a 200 ms crossfade, the system Back button, and the in-app preview
  * of the overlay. Reads the ride from the [AppContainer]'s host and writes settings through it; everything below is
@@ -107,7 +96,8 @@ fun RideApp(
     val rideFiles = rememberRideFiles(container.rides)
     val pairing by container.pairing.state.collectAsStateWithLifecycle()
     val learn by container.learning.ui.collectAsStateWithLifecycle()
-    val sync by container.sync.status.collectAsStateWithLifecycle()
+    val syncStatus by container.sync.status.collectAsStateWithLifecycle()
+    val syncReport by container.sync.report.collectAsStateWithLifecycle()
     // One plain notice with one action for Bluetooth that cannot be used, re-read on every resume (ADR 0010).
     val bluetooth = rememberBluetoothFix(devices.radio.takeIf { !devices.simulated }, container.bluetooth)
 
@@ -340,10 +330,11 @@ fun RideApp(
                                 onResetOverlayPosition = container::resetOverlayPosition,
                                 onOpenOverlaySettings = overlay::openOverlaySettings,
                                 onOpenNotificationSettings = overlay::openNotificationSettings,
+                                onSendNow = container::sendNow,
                             ),
                         overlayAccess = access,
                         bleLogs = bleLogs,
-                        waitingToUpload = sync.waiting(),
+                        sync = SyncUi.of(syncStatus, syncReport, System.currentTimeMillis()),
                     )
                 }
             }

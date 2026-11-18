@@ -74,6 +74,8 @@ class SettingsActions(
     val onOpenOverlaySettings: () -> Unit = {},
     /** Opens the app's notification settings. */
     val onOpenNotificationSettings: () -> Unit = {},
+    /** Tries the upload queue now, refused rides and a rejected token included. */
+    val onSendNow: () -> Unit = {},
 )
 
 /**
@@ -88,7 +90,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     overlayAccess: OverlayAccess = OverlayAccess.Granted,
     bleLogs: BleLogFiles = BleLogFiles.None,
-    waitingToUpload: Int = 0,
+    sync: SyncUi = SyncUi(),
 ) {
     Column(modifier.fillMaxSize().background(OverdriveColors.bg)) {
         BackTopBar("Settings", actions.onBack)
@@ -103,7 +105,7 @@ fun SettingsScreen(
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(24.dp)) {
                 RiderGroup(settings, actions)
                 PhysicsGroup(settings, actions)
-                SyncGroup(settings, actions, waitingToUpload)
+                SyncGroup(settings, actions, sync)
                 ClickDeveloperGroup(settings, actions)
             }
         }
@@ -394,24 +396,30 @@ private fun DeveloperGroup(
 // ---- Sync --------------------------------------------------------------------------------------
 
 /**
- * Sync (spec §4.9, ADR 0012): the web service's address and token, **stored and not used yet**: the app sends nothing in
- * Phase 1, and the rides it finishes wait on this tablet for Phase 2. The address is checked as it is typed and stored only
- * when it is a good one; the token is hidden, never shown in a log and not part of a ride.
+ * Sync (spec §4.9, ADR 0014): the service's address and token, and what the uploads are doing. The address is checked as it
+ * is typed and stored only when it is a good one; a plain `http://` one is accepted and flagged "Not encrypted". The token is
+ * hidden, never shown in a log and not part of a ride; it is sent only to that address. Changes take effect without a restart.
+ * Under them: how many rides wait, one line of plain words about the last error, when an upload last succeeded and **Send now**.
  */
 @Composable
 private fun SyncGroup(
     settings: AppSettings,
     actions: SettingsActions,
-    waitingToUpload: Int,
+    sync: SyncUi,
 ) {
     Group("Sync") {
         var address by remember { mutableStateOf(settings.syncUrl) }
         val check = SyncRules.checkUrl(address)
         FieldRow(
             "Service address",
-            "Not used yet",
+            "Where finished rides are sent",
             first = true,
-            message = (check as? UrlCheck.Invalid)?.reason,
+            message =
+                when (check) {
+                    is UrlCheck.Invalid -> check.reason
+                    is UrlCheck.Valid -> if (check.isEncrypted) null else NOT_ENCRYPTED
+                    UrlCheck.Empty -> null
+                },
         ) {
             OdTextField(
                 address,
@@ -432,7 +440,7 @@ private fun SyncGroup(
         var showToken by remember { mutableStateOf(false) }
         // Typed text is kept here, like the address: the stored value comes back a moment later and would eat letters.
         var token by remember { mutableStateOf(settings.syncToken.value) }
-        FieldRow("Token", "Not used yet. It stays on this tablet") {
+        FieldRow("Token", "Sent only to this address") {
             OdTextField(
                 token,
                 { text ->
@@ -451,19 +459,23 @@ private fun SyncGroup(
                 height = 48.dp,
             )
         }
-        SettingRow(
-            "Waiting to upload",
-            description = "Nothing is sent yet. Finished rides wait here for the next version",
-        ) {
+        SettingRow("Waiting to upload", description = sync.line) {
             OdText(
-                if (waitingToUpload == 1) "1 ride" else "$waitingToUpload rides",
+                if (sync.waiting == 1) "1 ride" else "${sync.waiting} rides",
                 style = OdType.numXS,
                 textAlign = TextAlign.End,
                 maxLines = 1,
             )
         }
+        SettingRow("Last upload") {
+            OdText(sync.lastUpload, style = OdType.numXS, textAlign = TextAlign.End, maxLines = 1)
+            OdButton("Send now", actions.onSendNow, enabled = sync.canSendNow, height = 40.dp)
+        }
     }
 }
+
+/** What the address field says under a plain `http://` address. */
+internal const val NOT_ENCRYPTED = "Not encrypted: the token is sent as plain text"
 
 /** A setting whose control is a field wide enough to type in: title and note on top, the field under them, a message below. */
 @Composable

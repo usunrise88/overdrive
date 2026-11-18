@@ -14,11 +14,16 @@ import app.overdrive.ble.log.BleSessionLogger
 import app.overdrive.core.ble.GattTransportFactory
 import app.overdrive.core.control.ActionRouter
 import app.overdrive.core.control.GestureTiming
-import app.overdrive.core.sync.NoopSyncProvider
+import app.overdrive.core.sync.HttpSyncProvider
+import app.overdrive.core.sync.HttpTransport
 import app.overdrive.core.sync.OutboxEntry
+import app.overdrive.core.sync.SyncConfig
 import app.overdrive.core.sync.SyncCoordinator
 import app.overdrive.data.rides.RideStore
 import app.overdrive.data.sync.FileOutbox
+import app.overdrive.data.sync.LastUploadFile
+import app.overdrive.data.sync.StoredRidePayloads
+import app.overdrive.data.sync.UrlConnectionTransport
 import app.overdrive.ride.devices.BleDevicesModel
 import app.overdrive.ride.devices.DeviceRole
 import app.overdrive.ride.devices.DeviceStore
@@ -48,13 +53,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -68,6 +76,10 @@ import java.util.concurrent.atomic.AtomicLong
  * @param settingsName the settings' DataStore file; a second container in one process (a test) needs its own, because
  * DataStore allows one instance per file.
  * @param outboxFile the sync outbox's journal (ADR 0012); a test passes a temporary one.
+ * @param lastUploadFile the one-line file that remembers when an upload last succeeded; beside the outbox by default.
+ * @param syncTransport the network under the upload (`HttpURLConnection`); a test points it at a local server.
+ * @param syncSettleMillis how long the service address and token must stay as typed before the upload is tried again with
+ * them, so that typing a token does not send one request per letter.
  * @param mediaFactory the media keys of the ride bar and of the Click; a test records them.
  * @param elapsedMillis the monotonic clock of the gesture layer (a hold is 500 ms of it); Robolectric's is a fake one, so a
  * test of real holds passes a real clock.
@@ -80,6 +92,9 @@ class AppContainer(
     bleLogDirectory: File = File(context.applicationContext.filesDir, "ble-logs"),
     bleStack: (Context, CoroutineScope) -> BleStack = { appContext, scope -> AndroidBle(appContext, scope) },
     outboxFile: File = File(context.applicationContext.filesDir, "sync/outbox.log"),
+    lastUploadFile: File = File(outboxFile.absoluteFile.parentFile, "last-upload"),
+    syncTransport: HttpTransport = UrlConnectionTransport(),
+    syncSettleMillis: Long = SYNC_SETTLE_MILLIS,
     mediaFactory: (Context) -> MediaController = { AudioManagerMediaController(it) },
     elapsedMillis: () -> Long = SystemClock::elapsedRealtime,
 ) {
@@ -108,14 +123,30 @@ class AppContainer(
 
     val library: WorkoutLibrary = WorkoutLibrary.fromAssets(appContext.assets)
 
+    /** The rides on disk: read by the library below and by the upload, which sends the stored files as they are. */
+    private val rideStore = RideStore(ridesDirectory)
+
     /**
      * The sync outbox (spec §4.9, ADR 0012): finished rides waiting for an upload, on the tablet's disk, surviving the
-     * app being killed. Phase 1 has no destination, so the coordinator runs with the no-op provider, which acknowledges
-     * nothing, and every ride stays queued for Phase 2. **There is no network code, and nothing here is uploaded.**
+     * app being killed. The coordinator drains it through the [HttpSyncProvider] (ADR 0014): the service's address and
+     * token are read from the settings **at every upload**, so a change needs no restart, and with either empty nothing
+     * is sent and every ride stays queued.
      */
     val outbox: FileOutbox = FileOutbox(outboxFile)
 
-    val sync: SyncCoordinator = SyncCoordinator(scope, outbox, { NoopSyncProvider }).also { it.start() }
+    private val syncProvider =
+        HttpSyncProvider(
+            config = { settings.value.let { SyncConfig(it.syncUrl, it.syncToken.value) } },
+            rides = StoredRidePayloads(rideStore),
+            transport = syncTransport,
+        )
+
+    /** When an upload last succeeded, kept next to the outbox so Settings still says so after a restart. */
+    private val lastUpload = LastUploadFile(lastUploadFile)
+    private val lastUploadAtStart: Long? = lastUpload.read()
+
+    val sync: SyncCoordinator =
+        SyncCoordinator(scope, outbox, { syncProvider }, lastSuccessMillis = lastUploadAtStart).also { it.start() }
 
     /**
      * Wall-clock milliseconds for an entry's `enqueuedAtMillis`, **strictly increasing**: the coordinator queues each ride on
@@ -134,7 +165,7 @@ class AppContainer(
      */
     val rides: RideLibrary =
         RideLibrary(
-            store = RideStore(ridesDirectory),
+            store = rideStore,
             scope = diskScope,
             report = { note, cause -> Log.w(TAG, "$note: ${cause.javaClass.simpleName}: ${cause.message}") },
             onSaved = { stored ->
@@ -310,6 +341,39 @@ class AppContainer(
                 .distinctUntilChanged()
                 .collect { if (!it) learning.cancel() }
         }
+        // A changed service address or token takes effect without a restart: once it has settled (typing a token is one
+        // change per letter), the queue is tried again, refused rides and a rejected token included (ADR 0014 section 8).
+        scope.launch {
+            settings
+                .map { it.syncUrl to it.syncToken.value }
+                .distinctUntilChanged()
+                .collectLatest {
+                    delay(syncSettleMillis)
+                    syncProvider.retryRejected()
+                    sync.kick(retryRefused = true)
+                }
+        }
+        // The last success survives a restart; a disk that refuses the one-line file costs nothing but that.
+        scope.launch(Dispatchers.IO) {
+            var written = lastUploadAtStart
+            sync.report
+                .map { it.lastSuccessMillis }
+                .distinctUntilChanged()
+                .collect { millis ->
+                    if (millis != null && millis != written) {
+                        written = millis
+                        try {
+                            lastUpload.write(millis)
+                        } catch (e: IOException) {
+                            Log.w(TAG, "The time of the last upload could not be kept: ${e.javaClass.simpleName}")
+                        }
+                    }
+                }
+        }
+        // What the sync is doing, for adb logcat at the bench. Counts and plain reasons only: never an address, a token or a ride.
+        scope.launch {
+            sync.status.collect { Log.i(TAG, "Sync: $it") }
+        }
     }
 
     /** Whether one of the activities is on screen: the overlay window shows only while the app is not. */
@@ -350,7 +414,19 @@ class AppContainer(
         settingsScope.cancel()
     }
 
-    private companion object {
-        const val TAG = "OverdriveRides"
+    /**
+     * The Settings screen's **Send now**: tries the queue at once, and tries again what the service refused and a token it
+     * rejected (the rider may have fixed the cause on the server). Harmless when nothing waits.
+     */
+    fun sendNow() {
+        syncProvider.retryRejected()
+        sync.kick(retryRefused = true)
+    }
+
+    companion object {
+        /** An address or token that has not changed for this long is tried (ADR 0014 section 8). */
+        const val SYNC_SETTLE_MILLIS = 1_500L
+
+        private const val TAG = "OverdriveRides"
     }
 }
