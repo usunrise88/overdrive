@@ -199,7 +199,7 @@ public data class RepeatDefinition(
 
 /** A fixed-power step of the session: its 1-based [step] in the flattened workout, its length and target as a fraction of FTP. */
 @Serializable
-public data class RepeatStep(
+public data class RepeatSessionStep(
     val step: Int,
     val label: String,
     val durationSeconds: Int,
@@ -405,7 +405,7 @@ public data class RepeatDetailResponse(
     val routeKey: String?,
     val note: String,
     val definition: RepeatDefinition,
-    val steps: List<RepeatStep>,
+    val steps: List<RepeatSessionStep>,
     val comparedSteps: List<Int>,
     val attempts: List<RepeatAttempt>,
     val trends: RepeatTrends,

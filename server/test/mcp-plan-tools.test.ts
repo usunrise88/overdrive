@@ -112,12 +112,14 @@ describe("the tools and what they say about themselves", () => {
       "get_fitness",
       "get_profile",
       "get_recovery",
+      "get_repeat",
       "get_ride",
       "get_wellness",
       "list_activities",
       "list_discussion_topics",
       "list_insights",
       "list_planned_workouts",
+      "list_repeats",
       "list_rides",
       "mark_discussion_topic",
       "update_profile",
@@ -143,6 +145,8 @@ describe("the tools and what they say about themselves", () => {
       "get_facts",
       "list_insights",
       "list_discussion_topics",
+      "list_repeats",
+      "get_repeat",
     ]) {
       expect(by[name]?.annotations?.readOnlyHint, name).toBe(true);
     }

@@ -19,6 +19,7 @@ import { createOutdoor, type OutdoorService } from "./outdoor/service.ts";
 import { createPlanRefresher, type PlanRefresher } from "./plan/refresher.ts";
 import { createPlanStore, type PlanStore } from "./plan/store.ts";
 import { createProfileStore, type ProfileStore } from "./profile/store.ts";
+import { createRepeats, type RepeatsService } from "./repeats/service.ts";
 import { createRideStore, type RideStore } from "./ride-store.ts";
 import { createRideWorkoutResolver, type RideWorkoutResolver } from "./ride-workout.ts";
 import { createStrava, STRAVA_DESTINATION, type StravaUploads } from "./strava/index.ts";
@@ -84,6 +85,8 @@ export interface Services {
    * the forwarding of the watch's activities run only with one.
    */
   wellness: WellnessService;
+  /** Repeat-session comparison: the workouts ridden more than once, their attempts side by side and their trend (spec §11.7, ADR 0026). */
+  repeats: RepeatsService;
   /** Outdoor rides from FIT files, shared by the companion and sent to the Telegram bot (spec §11.8, ADR 0026). */
   outdoor: OutdoorService;
   /**
@@ -175,6 +178,15 @@ export function createServices(options: ServicesOptions): Services {
   bus.on("ride-stored", async ({ rideId }) => {
     const header = await rides.getHeader(rideId);
     if (header?.workoutId != null) await rideWorkouts.resolve(header);
+  });
+
+  const repeats = createRepeats({
+    db,
+    rides,
+    metrics,
+    timezone,
+    now: now ?? (() => new Date()),
+    log,
   });
 
   const wellness = createWellness({
@@ -300,6 +312,7 @@ export function createServices(options: ServicesOptions): Services {
     calendar,
     telegram,
     wellness,
+    repeats,
     outdoor,
     insights,
     start() {
@@ -310,6 +323,7 @@ export function createServices(options: ServicesOptions): Services {
       telegram?.start();
       wellness.start();
       metrics.start();
+      repeats.start();
       insights.start();
     },
     async stop() {
@@ -321,6 +335,7 @@ export function createServices(options: ServicesOptions): Services {
         telegram?.stop(),
         wellness.stop(),
         metrics.stop(),
+        repeats.whenIdle(),
         insights.stop(),
       ]);
     },

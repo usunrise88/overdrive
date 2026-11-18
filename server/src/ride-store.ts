@@ -1,4 +1,11 @@
-import type { RideHeader, RideRecord, RideSummary, Workout } from "@overdrive/contracts";
+import {
+  type RideHeader,
+  type RideRecord,
+  type RideSummary,
+  WORKOUT_HASH_VERSION,
+  type Workout,
+  workoutHash,
+} from "@overdrive/contracts";
 import type { Db } from "./db.ts";
 import { canonicalJson } from "./hash.ts";
 
@@ -113,10 +120,17 @@ export function createRideStore(db: Db): RideStore {
     },
 
     async saveWorkoutSnapshot(rideId, workout, at) {
+      // The hash of the workout's structure goes with it (spec §11.7, ADR 0026): two rides played from the same structure are repeats.
       await db.query(
-        `INSERT INTO ride_workouts (ride_id, workout, captured_at)
-         VALUES ($1, $2::jsonb, $3::timestamptz) ON CONFLICT (ride_id) DO NOTHING`,
-        [rideId, canonicalJson(workout), at.toISOString()],
+        `INSERT INTO ride_workouts (ride_id, workout, captured_at, workout_hash, workout_hash_version)
+         VALUES ($1, $2::jsonb, $3::timestamptz, $4, $5) ON CONFLICT (ride_id) DO NOTHING`,
+        [
+          rideId,
+          canonicalJson(workout),
+          at.toISOString(),
+          workoutHash(workout),
+          WORKOUT_HASH_VERSION,
+        ],
       );
     },
   };

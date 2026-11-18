@@ -129,7 +129,7 @@ export interface RepeatDefinition {
   minTrendAttempts: 3;
 }
 
-export interface RepeatStep {
+export interface RepeatSessionStep {
   /** 1-based position in the flattened workout. */
   step: number;
   label: string;
@@ -201,7 +201,7 @@ export interface RepeatDetailResponse {
   routeKey: string | null;
   note: string;
   definition: RepeatDefinition;
-  steps: RepeatStep[];
+  steps: RepeatSessionStep[];
   comparedSteps: number[];
   attempts: RepeatAttempt[];
   trends: {
