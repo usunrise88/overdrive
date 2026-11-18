@@ -66,7 +66,9 @@ Advertised model **H6M** (the owner expected an HR7). Standard Heart Rate servic
 
 **One observation for later:** the FIT's own session message carries average power 125 W, average cadence 64 and average heart rate 140, which count only the seconds that have a value, while intervals.icu recomputes from the records (89 W, 68, 137). intervals.icu ignores the session figures, so nothing is wrong there; a consumer that trusts the session message would show the higher average power. Whether the writer should average over all seconds is a question for `FitOptions` (docs/protocols/fit.md §8).
 
-Open: FIT 1 to FIT 8 except what the above answers (sport and sub-sport, start time and the invalid-value handling look right); laps and HRV not yet seen; acceptance criterion 6 stays unconfirmed until the laps are checked.
+**Laps:** with the Intervals panel expanded, intervals.icu showed one interval, "Recovery", covering the whole 3m44s (average 88 W); the file's two laps (168 s and 56 s, one per workout step) were not used. The panel's EDIT menu only offers Delete, and the owner did not find a "Use Laps" action (forum threads say intervals.icu detects intervals itself unless that action or setting is used, and ignores a file's laps otherwise). Why is open: it may be the service's default and menus, or something in our `lap` messages. A FIT viewer on the file, and the same file through another service, would tell.
+
+Open: FIT 1 to FIT 8 except what the above answers (sport and sub-sport, start time and the invalid-value handling look right); HRV not seen; acceptance criterion 6 stays unconfirmed until the laps question is settled.
 
 ## 5. What changed in the code because of this report
 

@@ -22,7 +22,7 @@ nothing has touched real hardware.
    the numbered questions of the protocol notes, and produces the Bluetooth session logs that fix the codecs. Defects go to
    `v0.1.x`; a switch in Settings, Developer · Click, or one default in `FtmsOptions`, `HeartRateOptions`, `ClickOptions` or
    `FitOptions` is most of the likely fixes.
-2. **Phase 2** (spec §5; not started, not asked for yet): the web service with planned workouts, the MCP server, the calendar,
+2. **Phase 2** (spec §5; handoff and a proposed split into stages in `docs/phase2-kickoff.md`): the web service with planned workouts, the MCP server, the calendar,
    the Telegram bot, ride upload (the outbox of Phase 1 is where it starts) and the ride app's changes. It begins, as every
    wire-format change does, in `contracts/`: the sync API's schemas and fixtures come first. Phase 3 (statistics, the companion
    app) follows.
