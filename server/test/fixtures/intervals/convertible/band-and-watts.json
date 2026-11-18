@@ -1,0 +1,28 @@
+{
+  "_comment": "Synthetic. A target band that is not a ramp becomes its middle; absolute watts become a fraction of the FTP the workout was resolved with.",
+  "event": {
+    "id": 1004,
+    "category": "WORKOUT",
+    "type": "Ride",
+    "start_date_local": "2026-11-24T00:00:00",
+    "name": "Tempo",
+    "workout_doc": {
+      "ftp": 280,
+      "steps": [
+        { "duration": 600, "power": { "start": 80, "end": 90, "units": "%ftp" } },
+        { "duration": 1200, "power": { "value": 210, "units": "w" }, "cadence": { "value": 90, "units": "rpm" } },
+        { "duration": 300, "ramp": true, "power": { "start": 140, "end": 280, "units": "w" } }
+      ]
+    }
+  },
+  "native": {
+    "schema": 1,
+    "id": "icu-1004",
+    "name": "Tempo",
+    "steps": [
+      { "type": "steady", "duration": 600, "target": 0.85 },
+      { "type": "steady", "duration": 1200, "target": 0.75, "cadence": 90 },
+      { "type": "ramp", "duration": 300, "from": 0.5, "to": 1 }
+    ]
+  }
+}

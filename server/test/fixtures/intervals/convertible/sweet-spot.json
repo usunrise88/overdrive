@@ -1,0 +1,37 @@
+{
+  "_comment": "Synthetic. A planned workout as the events API lists it, with a parsed workout_doc: ramp warm-up, a repeat, a descending ramp.",
+  "event": {
+    "id": 1001,
+    "category": "WORKOUT",
+    "type": "Ride",
+    "start_date_local": "2026-11-20T00:00:00",
+    "name": "Sweet spot 3x10",
+    "description": "Warm-up\n- 10m ramp 45-70%\n\n3x\n- Sweet spot 10m 88%\n- Recover 5m 50%\n\nCooldown\n- 5m ramp 55-40%",
+    "icu_ftp": 280,
+    "workout_doc": {
+      "ftp": 280,
+      "duration": 2700,
+      "steps": [
+        { "text": "Warm-up", "duration": 600, "ramp": true, "warmup": true, "power": { "start": 45, "end": 70, "units": "%ftp" } },
+        { "reps": 3, "duration": 2700, "steps": [
+          { "text": "Sweet spot", "duration": 600, "power": { "value": 88, "units": "%ftp" } },
+          { "text": "Recover", "duration": 300, "power": { "value": 50, "units": "%ftp" } }
+        ] },
+        { "text": "Cooldown", "duration": 300, "ramp": true, "cooldown": true, "power": { "start": 55, "end": 40, "units": "%ftp" } }
+      ]
+    }
+  },
+  "native": {
+    "schema": 1,
+    "id": "icu-1001",
+    "name": "Sweet spot 3x10",
+    "steps": [
+      { "type": "ramp", "duration": 600, "from": 0.45, "to": 0.7, "label": "Warm-up" },
+      { "type": "repeat", "count": 3, "steps": [
+        { "type": "steady", "duration": 600, "target": 0.88, "label": "Sweet spot" },
+        { "type": "steady", "duration": 300, "target": 0.5, "label": "Recover" }
+      ] },
+      { "type": "ramp", "duration": 300, "from": 0.55, "to": 0.4, "label": "Cooldown" }
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "event": {
+    "id": 2002,
+    "category": "WORKOUT",
+    "type": "Ride",
+    "start_date_local": "2026-11-20T00:00:00",
+    "name": "Ten kilometres",
+    "workout_doc": {
+      "steps": [
+        { "distance": 10000, "power": { "value": 80, "units": "%ftp" } }
+      ]
+    }
+  },
+  "reason": "measured in distance"
+}

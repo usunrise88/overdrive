@@ -52,3 +52,8 @@ export async function openMigratedTestDb(): Promise<Db> {
 export async function clearRides(db: Db): Promise<void> {
   await db.exec("TRUNCATE ride_destinations, rides");
 }
+
+/** Empties the plan cache and its refresh state. */
+export async function clearPlan(db: Db): Promise<void> {
+  await db.exec("TRUNCATE planned_workouts, plan_sync_state");
+}

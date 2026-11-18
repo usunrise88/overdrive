@@ -8,6 +8,7 @@ import {
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Db } from "./db.ts";
 import { HttpError } from "./errors.ts";
+import type { EventBus } from "./events.ts";
 import { checkFit } from "./fit.ts";
 import { canonicalJson, sha256Hex } from "./hash.ts";
 
@@ -26,6 +27,13 @@ export const DEFAULT_LIMITS: Limits = { recordBytes: 16 * 1024 * 1024, fitBytes:
 export interface RidesOptions {
   db: Db;
   limits: Limits;
+  /** Told when a ride is complete (record and FIT stored), after the transaction committed. */
+  events: EventBus;
+  /**
+   * The destinations (ADR 0014 section 5, `ride_destinations.destination`) a ride is queued for in
+   * the transaction that stores its FIT. The workers that drain the queue live elsewhere.
+   */
+  destinations: readonly string[];
 }
 
 interface RideParams {
@@ -70,7 +78,7 @@ function answer(reply: FastifyReply, rideId: string, status: UploadStatus): Fast
  * Authentication, body limits and the error body are the caller's (`app.ts`, `errors.ts`).
  */
 export function ridesRoutes(app: FastifyInstance, options: RidesOptions): void {
-  const { db, limits } = options;
+  const { db, limits, events, destinations } = options;
 
   // The record: JSON only.
   app.register(async (scope) => {
@@ -118,12 +126,17 @@ export function ridesRoutes(app: FastifyInstance, options: RidesOptions): void {
         }
         const check = checkFit(body);
         if (!check.ok) throw new HttpError("invalid_fit", check.reason);
-        const status = await storeFit(db, rideId, body);
+        const stored = await storeFit(db, rideId, body, destinations);
         request.log.info(
-          { device: request.device, rideId, status, bytes: body.length },
+          { device: request.device, rideId, status: stored.status, bytes: body.length },
           "ride fit file",
         );
-        return answer(reply, rideId, status);
+        // The ride is complete now. Listeners (the upload worker, later the bot) are not waited for
+        // and cannot fail this request.
+        if (stored.startEpochMillis !== undefined) {
+          events.emit("ride-stored", { rideId, startEpochMillis: stored.startEpochMillis });
+        }
+        return answer(reply, rideId, stored.status);
       },
     );
   });
@@ -182,14 +195,36 @@ async function storeRecord(db: Db, record: RideRecord, device: string): Promise<
   throw new Error(`Ride ${id} was refused by a constraint that no row explains`);
 }
 
-/** Stores the FIT file of a stored ride the first time, and recognises the same file arriving again. */
-async function storeFit(db: Db, rideId: string, fit: Uint8Array): Promise<UploadStatus> {
+/**
+ * Stores the FIT file of a stored ride the first time, and recognises the same file arriving again.
+ * The first time, the ride is queued for each destination in the same transaction: a ride with its
+ * FIT is never without its queue rows, and nothing is queued for a file that was not stored.
+ * `startEpochMillis` is set only when this request stored the file.
+ */
+async function storeFit(
+  db: Db,
+  rideId: string,
+  fit: Uint8Array,
+  destinations: readonly string[],
+): Promise<{ status: UploadStatus; startEpochMillis?: number }> {
   const sha = sha256Hex(fit);
-  const updated = await db.query(
-    "UPDATE rides SET fit = $2, fit_sha256 = $3 WHERE id = $1 AND fit IS NULL RETURNING id",
-    [rideId, fit, sha],
-  );
-  if (updated.rows.length > 0) return "stored";
+  const start = await db.transaction(async (tx) => {
+    const updated = await tx.query<{ start: string }>(
+      `UPDATE rides SET fit = $2, fit_sha256 = $3 WHERE id = $1 AND fit IS NULL
+       RETURNING start_epoch_millis::text AS start`,
+      [rideId, fit, sha],
+    );
+    const row = updated.rows[0];
+    if (row === undefined) return null;
+    for (const destination of destinations) {
+      await tx.query(
+        "INSERT INTO ride_destinations (ride_id, destination) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        [rideId, destination],
+      );
+    }
+    return row.start;
+  });
+  if (start !== null) return { status: "stored", startEpochMillis: Number(start) };
 
   const found = await db.query<{ fit_sha256: string | null }>(
     "SELECT fit_sha256 FROM rides WHERE id = $1",
@@ -202,7 +237,7 @@ async function storeFit(db: Db, rideId: string, fit: Uint8Array): Promise<Upload
       `Ride ${rideId} is not stored yet; upload its record first`,
     );
   }
-  if (ride.fit_sha256 === sha) return "already-stored";
+  if (ride.fit_sha256 === sha) return { status: "already-stored" };
   throw new HttpError(
     "fit_conflict",
     `Ride ${rideId} already has a different FIT file; a stored ride is never changed`,

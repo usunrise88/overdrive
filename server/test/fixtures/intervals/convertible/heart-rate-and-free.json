@@ -1,0 +1,29 @@
+{
+  "_comment": "Synthetic. A heart-rate step, a freeride step and a step with no target at all are free steps; a repeat that runs once is spliced in.",
+  "event": {
+    "id": 1006,
+    "category": "WORKOUT",
+    "type": "Ride",
+    "start_date_local": "2026-11-26T00:00:00",
+    "name": "By feel",
+    "workout_doc": {
+      "steps": [
+        { "text": "Z2 by heart rate", "duration": 1800, "hr": { "value": 2, "units": "hr_zone" } },
+        { "duration": 600, "freeride": true },
+        { "duration": 300 },
+        { "reps": 1, "steps": [ { "duration": 120, "power": { "value": 100, "units": "%ftp" } } ] }
+      ]
+    }
+  },
+  "native": {
+    "schema": 1,
+    "id": "icu-1006",
+    "name": "By feel",
+    "steps": [
+      { "type": "free", "duration": 1800, "label": "Z2 by heart rate" },
+      { "type": "free", "duration": 600 },
+      { "type": "free", "duration": 300 },
+      { "type": "steady", "duration": 120, "target": 1 }
+    ]
+  }
+}

@@ -29,6 +29,8 @@ try {
   const applied = await migrate(db);
   if (applied.length > 0) app.log.info({ migrations: applied }, "database migrated");
   await app.listen({ host: config.HOST, port: config.PORT });
+  // The upload worker and the plan refresher run only once the schema is there and the port is open.
+  app.services.start();
 } catch (err) {
   app.log.error(err);
   process.exit(1);

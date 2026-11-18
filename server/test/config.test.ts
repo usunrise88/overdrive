@@ -17,7 +17,87 @@ describe("loadConfig", () => {
       LOG_LEVEL: "info",
       DATABASE_URL,
       DEVICE_TOKENS: [],
+      INTERVALS_ATHLETE_ID: "0",
+      INTERVALS_BASE_URL: "https://intervals.icu",
+      PLAN_REFRESH_MINUTES: 15,
+      TIMEZONE: "UTC",
     });
+  });
+
+  it("leaves intervals.icu off without a key", () => {
+    expect(loadConfig({ DATABASE_URL }).INTERVALS_API_KEY).toBeUndefined();
+    // compose passes `${INTERVALS_API_KEY:-}`: empty is unset, and so is a blank one
+    expect(loadConfig({ DATABASE_URL, INTERVALS_API_KEY: "" }).INTERVALS_API_KEY).toBeUndefined();
+    expect(
+      loadConfig({ DATABASE_URL, INTERVALS_API_KEY: "   " }).INTERVALS_API_KEY,
+    ).toBeUndefined();
+  });
+
+  it("reads the intervals.icu settings, and blank ones mean the defaults", () => {
+    const config = loadConfig({
+      DATABASE_URL,
+      INTERVALS_API_KEY: " abc123XYZ ",
+      INTERVALS_ATHLETE_ID: "i12345",
+      INTERVALS_BASE_URL: "http://127.0.0.1:9999/",
+      PLAN_REFRESH_MINUTES: "5",
+      TIMEZONE: "Europe/Paris",
+    });
+    expect(config).toMatchObject({
+      INTERVALS_API_KEY: "abc123XYZ",
+      INTERVALS_ATHLETE_ID: "i12345",
+      INTERVALS_BASE_URL: "http://127.0.0.1:9999",
+      PLAN_REFRESH_MINUTES: 5,
+      TIMEZONE: "Europe/Paris",
+    });
+    expect(
+      loadConfig({
+        DATABASE_URL,
+        INTERVALS_ATHLETE_ID: "",
+        INTERVALS_BASE_URL: "",
+        PLAN_REFRESH_MINUTES: "",
+        TIMEZONE: "",
+      }),
+    ).toMatchObject({
+      INTERVALS_ATHLETE_ID: "0",
+      INTERVALS_BASE_URL: "https://intervals.icu",
+      PLAN_REFRESH_MINUTES: 15,
+      TIMEZONE: "UTC",
+    });
+  });
+
+  it("keeps a path in the base URL and drops trailing slashes", () => {
+    expect(
+      loadConfig({ DATABASE_URL, INTERVALS_BASE_URL: "https://proxy.example.com/intervals//" })
+        .INTERVALS_BASE_URL,
+    ).toBe("https://proxy.example.com/intervals");
+  });
+
+  it.each([
+    ["INTERVALS_API_KEY", { INTERVALS_API_KEY: "has a space" }],
+    ["INTERVALS_API_KEY", { INTERVALS_API_KEY: "tab\there" }],
+    ["INTERVALS_ATHLETE_ID", { INTERVALS_ATHLETE_ID: "i 123" }],
+    ["INTERVALS_BASE_URL", { INTERVALS_BASE_URL: "intervals.icu" }],
+    ["INTERVALS_BASE_URL", { INTERVALS_BASE_URL: "ftp://intervals.icu" }],
+    ["INTERVALS_BASE_URL", { INTERVALS_BASE_URL: "https://user:pass@intervals.icu" }],
+    ["INTERVALS_BASE_URL", { INTERVALS_BASE_URL: "https://intervals.icu/?a=b" }],
+    ["PLAN_REFRESH_MINUTES", { PLAN_REFRESH_MINUTES: "0" }],
+    ["PLAN_REFRESH_MINUTES", { PLAN_REFRESH_MINUTES: "1441" }],
+    ["PLAN_REFRESH_MINUTES", { PLAN_REFRESH_MINUTES: "2.5" }],
+    ["PLAN_REFRESH_MINUTES", { PLAN_REFRESH_MINUTES: "soon" }],
+    ["TIMEZONE", { TIMEZONE: "Mars/Olympus_Mons" }],
+  ])("rejects an invalid %s, naming it and not repeating the value", (name, env) => {
+    const value = Object.values(env)[0] as string;
+    let text = "";
+    try {
+      loadConfig({ DATABASE_URL, ...env });
+    } catch (err) {
+      text = describeConfigError(err);
+    }
+    expect(text).toContain(`${name}:`);
+    // The URL's credentials and the key's contents must never be echoed.
+    if (name === "INTERVALS_API_KEY" || value.includes("pass")) {
+      expect(text).not.toContain(value);
+    }
   });
 
   it("needs a database", () => {

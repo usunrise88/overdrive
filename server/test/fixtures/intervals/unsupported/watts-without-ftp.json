@@ -1,0 +1,15 @@
+{
+  "event": {
+    "id": 2005,
+    "category": "WORKOUT",
+    "type": "Ride",
+    "start_date_local": "2026-11-20T00:00:00",
+    "name": "Watts, FTP unknown",
+    "workout_doc": {
+      "steps": [
+        { "duration": 600, "power": { "value": 200, "units": "w" } }
+      ]
+    }
+  },
+  "reason": "does not say which FTP"
+}

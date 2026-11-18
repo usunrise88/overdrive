@@ -1,0 +1,11 @@
+{
+  "event": {
+    "id": 2010,
+    "category": "WORKOUT",
+    "type": "Ride",
+    "start_date_local": "2026-11-20T00:00:00",
+    "name": "Empty block",
+    "description": "Main set 4x\n\nCooldown\n- 5m 40%"
+  },
+  "reason": "a repeat with no steps"
+}

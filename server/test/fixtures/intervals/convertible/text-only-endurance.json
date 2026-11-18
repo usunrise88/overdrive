@@ -1,0 +1,21 @@
+{
+  "_comment": "Synthetic. An event with no parsed workout_doc: the text description is parsed, a cadence range becomes its middle.",
+  "event": {
+    "id": 1002,
+    "category": "WORKOUT",
+    "type": "VirtualRide",
+    "start_date_local": "2026-11-22T00:00:00",
+    "name": "Endurance",
+    "description": "Easy day\n\n- 5m ramp 40-60%\n- Steady 45m 65% 85-95rpm\n- 5m 40%"
+  },
+  "native": {
+    "schema": 1,
+    "id": "icu-1002",
+    "name": "Endurance",
+    "steps": [
+      { "type": "ramp", "duration": 300, "from": 0.4, "to": 0.6 },
+      { "type": "steady", "duration": 2700, "target": 0.65, "cadence": 90, "label": "Steady" },
+      { "type": "steady", "duration": 300, "target": 0.4 }
+    ]
+  }
+}

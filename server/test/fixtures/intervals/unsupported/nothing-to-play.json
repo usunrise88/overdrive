@@ -1,0 +1,11 @@
+{
+  "event": {
+    "id": 2006,
+    "category": "WORKOUT",
+    "type": "Ride",
+    "start_date_local": "2026-11-20T00:00:00",
+    "name": "Rest day idea",
+    "description": "Think about the week. Stretch."
+  },
+  "reason": "no steps and no planned duration"
+}
