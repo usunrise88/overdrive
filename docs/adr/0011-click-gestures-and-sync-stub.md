@@ -1,6 +1,7 @@
 # ADR 0011: The Click adapter, the gesture layer, the action router and the sync stub
 
-Status: accepted (stage M4-1, 2026-11-18)
+Status: accepted (stage M4-1, 2026-11-18). **Amended after the first bench (ADR 0013):** the default reply check accepts a bare
+`RideOn`, `silentMeansLocked` is off by default, and `FakeClick` behaves like the real puck by default (sections 3, 8 and 9 say so).
 
 ## Context
 
@@ -82,7 +83,8 @@ The shape is `HeartRateStrapDevice`'s: a `LinkControls` (`start`, `retryNow`, `c
 its three characteristics; ask for an MTU of 128 so that a reply with a 64-byte key arrives whole (a short MTU would still
 carry `RideOn 02 03`); **enable ASYNC (notify), then SYNC_TX (indicate), one CCCD write at a time**; **write `RideOn` to SYNC_RX
 without response**; wait for the reply, the first SYNC_TX value, which may arrive before the write returns (the wait is armed
-first); check it (`HandshakeReplyCheck`); write `FF 04 00`; read the firmware revision and the battery level (optional steps).
+first); check it (`HandshakeReplyCheck`; the default accepts the bare `RideOn` the first bench's right puck answered as well as `RideOn 02 03`,
+and nothing else, ADR 0013); write `FF 04 00`; read the firmware revision and the battery level (optional steps).
 "Read the reply" is waiting for the indication; the characteristic also offers a read (§2) but nothing says the reply is read.
 
 **Unlock handling (spec §4.7).** `ClickDevice.state` is what the Devices screen and the ride's notice explain:
@@ -93,13 +95,14 @@ first); check it (`HandshakeReplyCheck`); write `FF 04 00`; read the firmware re
 | `BluetoothUnavailable(availability)` | Bluetooth off or the permission missing; nothing is tried, and it connects at once when fixed |
 | `Connecting(attempt)` | an attempt is under way |
 | `NotFound(failures, retryInMillis, wasConnected)` | could not be reached (off, asleep, away, held by another app), or a link that was up has dropped |
-| `Waiting` | connected and set up, no frame yet, inside the no-event time |
-| `Active` | connected and **delivering events** |
+| `Waiting` | connected and set up, no frame yet, inside the no-event time. **Only with `silentMeansLocked` on** (opt-in); by default an answered handshake is `Active` at once |
+| `Active` | connected and set up: the handshake was answered (a real Click sends nothing until a button is pressed), or, with the silence rule on, a frame has arrived |
 | `NeedsUnlock(SERVICE_HIDDEN)` | discovery lists no Zwift service (§6.1); the set-up backs off and tries again, so an unlock through Zwift is picked up by itself |
-| `NeedsUnlock(NO_EVENTS)` | the handshake was answered and then **no frame at all** came within `noEventTimeout`; the link stays up and a late frame turns it into `Active`; `retryNow()` drops the link and starts over, for a rider who has just unlocked it |
+| `NeedsUnlock(NO_EVENTS)` | **opt-in (`silentMeansLocked`, off by default since the first bench):** the handshake was answered and then **no frame at all** came within `noEventTimeout`; the link stays up and a late frame turns it into `Active`; `retryNow()` drops the link and starts over, for a rider who has just unlocked it |
 | `SetupFailed(failure, retryInMillis)` | anything else in the set-up failed (the handshake reply, a subscription, a missing characteristic) |
 
-Both unlock signals are options. Any well-formed frame counts as delivering (a button state, a heartbeat, a battery report, a
+Both unlock signals are options, and since the first bench only the hidden service is on by default: a healthy Click is silent until a button is
+pressed, so silence is not a lock (ADR 0013). With the silence rule on, any well-formed frame counts as delivering (a button state, a heartbeat, a battery report, a
 type nobody knows); a malformed one does not. The ride is **never** affected: `ClickRideTest` rides the same workout without a
 Click and with a hidden-service and a silent one and asserts the three ride records are equal.
 
@@ -192,15 +195,20 @@ nothing changes by itself until a setting does. There is no network code.
 
 ### 8. The fake Click and the fixtures
 
-`FakeClick` advertises the service and the manufacturer data, answers `RideOn` with `RideOn 02 03` (a key tail of any length,
-a different version, a bare word, or silence, as options), delivers button frames, heartbeats and a battery report, and is
+`FakeClick` advertises the service and the manufacturer data and, **by default, behaves like the right puck of the first bench**:
+it answers `RideOn` with the bare word, sends **nothing until a press** (no heartbeat, no battery frame) and gives the battery by read
+only (`0x64`). Every other behaviour is an option: `RideOn 02 03` with a key tail of any length, another version, raw reply bytes or
+silence; `FakeClickOptions.byNotes()` is the whole puck as these notes described it (`02 03`, a battery frame, a heartbeat every five
+seconds) and `FakeClickOptions.realPuck()` adds the real GATT table (the three extra vendor characteristics, SYNC_RX write without
+response only), an MTU of 251 and the unknown `0x2A` message right after the notifications are enabled. It is
 **locked** in the two ways the spec's unlock handling reads (`FakeClickLock.HIDDEN`: discovery lists no Zwift service;
 `SILENT`: it answers and then says nothing; `unlock()` ends either). It is strict like the radio around it (frames only to a
 host that subscribed, a write without response only to a characteristic that offers it) and records every write with its mode.
 `ClickScript` is the small language: `press`, `release`, `tap`, `hold`, `drop`, `powerOff`, `silence`, `battery`, `notice`,
 `unlock`, `lock`, `frame`, all at absolute times on the world's clock.
 
-`contracts/fixtures/ble/click-*.click.session.txt` are five **generated** sessions (buttons, dropout, locked, unlock, silent):
+`contracts/fixtures/ble/click-*.click.session.txt` are six **generated** sessions (buttons, the notes' variant; real-puck, new; dropout,
+locked, unlock, and silent, which now sets `silentMeansLocked = true` explicitly):
 golden (`ClickSessionFixturesTest`, regenerate with `-PregenerateBleFixtures=true`), anonymous (the model `Click`, the
 firmware `*`, no key, no address), and each replays through the real adapter into the button changes, the states and the battery
 the live run showed.
@@ -217,18 +225,18 @@ and `5.n` an item of `docs/bench-checklist.md` session 5.
 | Which pucks the app wants | `ClickOptions.acceptedSides` | right only | spec §4.7 | CK 1 |
 | The Zwift service must be advertised | `requireAdvertisedService` | yes | §1 (checked before the manufacturer data) | **CK 12**, 5.2 |
 | The older service counts | `acceptLegacyService` | yes | §2 | CK 12 |
-| MTU asked for | `requestedMtu` | 128 | §3.1 (a key may follow the reply) | **CK 3**, 5.2 |
-| Writes with response | `writeWithResponse` | no, without response | §3.1 | **CK 2**, 5.2 |
-| How the reply is checked | `handshakeReply` (`EXPECTED_VERSION`, `ANY_RIDE_ON`, `NONE`) | `RideOn 02 03`, the tail ignored | §3.1, §3.2 | **CK 2, 3, 4**, 5.2 |
+| MTU asked for | `requestedMtu` | 128 | §3.1 (a key may follow the reply). First bench: 251 was granted, no key came | **CK 3**, 5.2 |
+| Writes with response | `writeWithResponse` | no, without response | §3.1. First bench: a write without response is accepted; SYNC_RX offers nothing else | **CK 2**, 5.2 |
+| How the reply is checked | `handshakeReply` (`EXPECTED_VERSION`, `ANY_RIDE_ON`, `NONE`) | **the bare `RideOn` or `RideOn 02 03`**, the tail ignored; other versions refused (changed after the first bench, ADR 0013) | §3.1, §3.2; first bench: the right puck answers the bare `RideOn` | **CK 2, 3, 4**, 5.2 |
 | Wait for the reply | `handshakeTimeout` | 5 s | unmeasured | CK 2 |
-| Write `FF 04 00` after the handshake | `sendPostHandshake` | yes; a refusal is only reported | §3.1: trainer-control and the newer BikeControl do, the licensed tag does not; meaning unknown | **CK 6**, 5.9 |
-| Read firmware and battery at set-up | `readStandardCharacteristics` | yes | §2 | CK 11 |
-| Keep-alive toward the controller | `keepAliveInterval`, `keepAliveFrame` | none; the neutral frame `23 08 FF FF FF FF 0F` | §5 (none in the licensed code), §4 | **CK 7**, 5.8 |
-| A hidden service means locked | `serviceHiddenMeansLocked` | yes | §6.1 | **CK 12**, 5.2, 5.3 |
-| Silence after the handshake means locked | `silentMeansLocked` | yes | §6, §7 | **CK 2, 14**, 5.2 |
-| How long to wait for a first frame | `noEventTimeout` | 30 s | §5: the heartbeat period is not known | CK 7 |
+| Write `FF 04 00` after the handshake | `sendPostHandshake` | yes; a refusal is only reported | §3.1: trainer-control and the newer BikeControl do, the licensed tag does not; meaning unknown. First bench: accepted, no visible effect | **CK 6**, 5.9 |
+| Read firmware and battery at set-up | `readStandardCharacteristics` | yes | §2. First bench: the battery read gives `0x64` (100 %); no `0x19` frame was seen | CK 11 |
+| Keep-alive toward the controller | `keepAliveInterval`, `keepAliveFrame` | none; the neutral frame `23 08 FF FF FF FF 0F` | §5 (none in the licensed code), §4. First bench: none sent, links stayed up for three minutes | **CK 7**, 5.8 |
+| A hidden service means locked | `serviceHiddenMeansLocked` | yes | §6.1. First bench: the service was listed on a right puck that needed no unlock | **CK 12**, 5.2, 5.3 |
+| Silence after the handshake means locked | `silentMeansLocked` | **no** (changed after the first bench, ADR 0013); a Developer · Click switch, **Silence means locked** | §6, §7; first bench: an answered, healthy Click sends nothing until a press | **CK 2, 14**, 5.2 |
+| How long to wait for a first frame (only with the silence rule on) | `noEventTimeout` | 30 s | §5: the heartbeat period is not known; first bench: no heartbeat at rest | CK 7 |
 | A stuck bit of the bitmap | `ignoredBits` | none | §4 | CK 5, 5.5 |
-| The bit table | `ClickBits` | the notes' table | §4 | **CK 5**, 5.5 |
+| The bit table | `ClickBits` | the notes' table | §4. First bench: it holds for the bits seen (A, B, Y, Minus `0x0100`, Plus `0x2000`); Z and `0x1000` not pressed | **CK 5**, 5.5 |
 | Which button is which role | `ButtonMapping.DEFAULT` | Plus gear up, B gear down, Y media, A volume up, Z volume down | §4 layout, section 5 above | 5.5, *Learn buttons* |
 | A button that sets two bits | `ButtonLearner(allowMultiBitButtons)` | no (a combo) | §4 lists `0x2000` for Plus too | CK 5 |
 | Hold threshold | `GestureTiming.HOLD_THRESHOLD_MILLIS` | 500 ms | spec §4.7 | 5.7 |
@@ -284,3 +292,13 @@ a heartbeat and whether it needs one from us (CK 7); how long an unlock lasts on
 (CK 12); that the second connection after a drop works at all (a controller may refuse a reconnect until it has slept);
 whether `connectGatt`'s write without response behaves like the fake's on the Xiaoxin Pad; that the media key and the volume
 step reach the video app (overlay-notes §7, OV 9.9); and the hold timing as a hand feels it (5.7).
+
+## First bench (2026-11-18)
+
+`docs/bench-reports/2026-11-18-first-ride.md` and `docs/protocols/click-v2.md` §11 are the first observation of a Click (one right puck;
+not run as the steps of the checklist; firmware and the time since Zwift last touched it were not recorded). What it answers here, in
+the numbering of click-v2 §9: **CK 2** (the plain handshake works, written without response, and buttons arrive without an unlock;
+the reply is a bare `RideOn`), **CK 3** (no key, MTU 251), **CK 4** (plain frames), **CK 5** (the table holds for the bits seen),
+**CK 6** (`FF 04 00` accepted, no visible effect), **CK 7** (no keep-alive needed for three minutes; three links ended with status 8
+at 135, 183 and 210 s), **CK 10** (an unknown `0x2A` message, none of `0x3C`), **CK 11** (battery by read), **CK 12** (the service is
+listed). It disproved two defaults, changed in ADR 0013: the reply check and the silence rule. **CK 1, 8, 9, 13 and 14 are open.**

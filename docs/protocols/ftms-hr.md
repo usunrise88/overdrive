@@ -1,8 +1,8 @@
 # FTMS and Heart Rate Service over BLE: codec notes
 
-Status: research notes for the pure-Kotlin FTMS and Heart Rate codecs (spec §2, §4.1, §4.3–§4.5, §7.5). Written from the Bluetooth SIG GATT definitions and two independent open-source decoders, not from memory. Nothing here was observed on the bench. The open questions at the end list what to check with the Van Rysel D500 and the Coospo HR7.
+Status: research notes for the pure-Kotlin FTMS and Heart Rate codecs (spec §2, §4.1, §4.3–§4.5, §7.5). Written from the Bluetooth SIG GATT definitions and two independent open-source decoders, not from memory. Until the first bench ride nothing here was observed; **§11 (2026-11-18) is the first observation: FT 1 is settled (bit 2 is cadence), the D500 answers every Request Control with a Reset status (ignored for 1.5 s since), and the strap advertised as an H6M, not an HR7.** The other open questions at the end are still open unless §11 says otherwise.
 
-**Implementation status (stages M3-1 and M3-2, ADR 0009 and ADR 0010; the Android transport, scanner, pairing and the raw session logs of M3-2 are written and tested on the JVM, none of it run on a radio):** the codecs of §2–§6 are written in `core` (`app.overdrive.core.ble.codec`), all 44 vectors of §8 pass as tests with their IDs, and the transport boundary, device adapters, reconnect supervisor, session recorder (§7.1) and fake Bluetooth are built on top. **Still nothing is observed on the bench:** a green test means the code agrees with these notes, not with the D500 or the HR7. Each disputed or unverified point below is one named constant or option; ADR 0009 §8 lists them all.
+**Implementation status (stages M3-1 and M3-2, ADR 0009 and ADR 0010; the Android transport, scanner, pairing and the raw session logs of M3-2 are written and tested on the JVM, none of it run on a radio):** the codecs of §2–§6 are written in `core` (`app.overdrive.core.ble.codec`), all 44 vectors of §8 pass as tests with their IDs, and the transport boundary, device adapters, reconnect supervisor, session recorder (§7.1) and fake Bluetooth are built on top. **Apart from what §11 lists, nothing is observed on the bench:** a green test means the code agrees with these notes, not with the D500 or the HR7. Each disputed or unverified point below is one named constant or option; ADR 0009 §8 lists them all.
 
 **Main gap:** the Bluetooth SIG Fitness Machine Service 1.0 and Heart Rate Service 1.0 specification texts were **not retrieved**. The bluetooth.com spec pages load, but their PDF download endpoints (`files.bluetooth.com/download/...`) return HTML landing pages, not files. Everything below marked *spec* therefore comes from the SIG's GATT characteristic XML (2017, see table), and everything about FTMS Control Point, Fitness Machine Status and Fitness Machine Feature bit meanings is either *cross-checked* (two decoders agree) or *single-source* (one decoder only) or *unverified*.
 
@@ -111,7 +111,7 @@ The XML's "Energy" unit labels say `kilogram_calorie`, so the expended-energy tr
 - [pycycling] and [Ewoc] both read **bit 1 = Average Speed** and **bit 2 = Instantaneous Cadence**. Two independent decoders agree with each other and with the XML's field order.
 - [pycycling] has a comment saying the SIG spec reverses the cadence bit ("0 means present"). The SIG XML does not say that (`Enumeration key="1"` = present), so that comment is not supported by the XML. The two decoders' reading is the one we use.
 
-**Decision for the codec:** bit 1 = Average Speed, bit 2 = Instantaneous Cadence, marked as *x-checked, disputed by one XML label set*. The bench test on the D500 must confirm it with a real cadence sample (§9).
+**Decision for the codec:** bit 1 = Average Speed, bit 2 = Instantaneous Cadence, marked as *x-checked, disputed by one XML label set*. The bench test on the D500 must confirm it with a real cadence sample (§9). **Confirmed on the D500 by the first bench (§11): the flags word is `0x0044` in all 4059 notifications (bit 0 clear, bit 2 and bit 6 set), and read with bit 2 as cadence the numbers are consistent.**
 
 ### 2.5 Ewoc's variant: do not adopt (vendor-specific)
 
@@ -233,7 +233,7 @@ Notifications: 1 byte opcode, then parameters. **Opcode table and layouts are si
 
 | Opcode | Event | Parameters | What our app does |
 |---|---|---|---|
-| `0x01` | Reset | none | Control is lost. Re-request control, then re-send the target. |
+| `0x01` | Reset | none | Control is lost. Re-request control, then re-send the target. **Except** a Reset within 1.5 s of a Request Control we just completed: the D500 sends one after every Request Control (§11), and the adapter ignores it (`FtmsOptions.selfResetGrace`). |
 | `0x02` | Stopped or paused by user | `0x01` stopped, `0x02` paused | Pause the ride engine and the ERG target. Ask the rider to resume. |
 | `0x03` | Stopped by safety key | none | Stop the session and tell the rider. |
 | `0x04` | Started or resumed by user | none | Resume. Re-send the current target if it was cleared. |
@@ -421,28 +421,28 @@ Every vector is a test case of `core/src/commonTest/kotlin/app/overdrive/core/bl
 
 ## 9. Open questions for the bench test (D500 and HR7)
 
-1. **Flag bits 1 and 2 (§2.4):** send a session with cadence on. Does the D500 set bit 1 or bit 2 for instantaneous cadence? Check against the cadence the trainer displays. This decides the codec's field order for every notification.
+1. **Flag bits 1 and 2 (§2.4):** send a session with cadence on. Does the D500 set bit 1 or bit 2 for instantaneous cadence? Check against the cadence the trainer displays. This decides the codec's field order for every notification. **Answered (§11): bit 2 is cadence.**
 2. **Total Distance units (§2.5):** is the uint24 in metres (SIG) or decimetres (Ewoc's Tunturi reading)? Compare with the trainer's display after a known distance.
-3. **More Data (§2.3):** does the D500 ever send bit 0 = 1 (speed absent) or a record split across two notifications?
-4. **Fitness Machine Status:** does the D500 send `0x08` after a target power write, `0x12` after a simulation write, and `0xFF` on control loss? Record which ones arrive.
+3. **More Data (§2.3):** does the D500 ever send bit 0 = 1 (speed absent) or a record split across two notifications? **First bench (§11): bit 0 was clear in all 4059 notifications and none was split; the notifications carry 14 unannounced trailing bytes. Not closed.**
+4. **Fitness Machine Status:** does the D500 send `0x08` after a target power write, `0x12` after a simulation write, and `0xFF` on control loss? Record which ones arrive. **First bench (§11): `0x08` after a target power, `0x12` after a simulation set, `0x01` after every Request Control and `0x04` after every Start, each repeated about every 240 ms. `0xFF` was not seen. Open for `0xFF`.**
 5. **Simulation resolution (§4.3):** which grade resolution does it honour? Send `0.01 %` steps and read the displayed grade. Also read the Supported Inclination Range (`0x2AD5`) to get the real limits. Is the 15 % maximum (spec §2) in that characteristic?
-6. **Response timing (§4.4):** how long after a write does the `0x80` indication arrive? Measure the median and the 95th percentile before setting the timeout.
-7. **Start or Resume (§4.2):** does the D500 apply a `0x05` target before a `0x07`? Does it need `0x07` at all?
+6. **Response timing (§4.4):** how long after a write does the `0x80` indication arrive? Measure the median and the 95th percentile before setting the timeout. **First bench (§11): about 60 ms, often before the write callback; no median or percentile was computed. Open.**
+7. **Start or Resume (§4.2):** does the D500 apply a `0x05` target before a `0x07`? Does it need `0x07` at all? **First bench (§11): Start was accepted every time; whether it is needed was not shown. Open.**
 8. **Simulation signedness (§5):** send a negative grade and read the Status echo. Is the field signed?
 9. **Control Point indications with notifications on the same connection (§4.1):** confirm that indications are delivered when Indoor Bike Data notifications are active at the same time.
-10. **HR7 RR intervals (§6.4):** is bit 4 set? How many RR values per notification, and are they in 1/1024 s? Compare the RR average with the strap's own report.
-11. **HR7 contact bits:** does it report status `2` when the strap is off the chest, and `3` when on?
-12. **MTU (§7):** what MTU does the D500 negotiate, and does a 30-byte maximal Indoor Bike Data notification arrive whole?
+10. **HR7 RR intervals (§6.4):** is bit 4 set? How many RR values per notification, and are they in 1/1024 s? Compare the RR average with the strap's own report. **First bench (§11), on a strap that advertised H6M: bit 4 set, several RR per notification. Units and the comparison with the strap's own report: open.**
+11. **HR7 contact bits:** does it report status `2` when the strap is off the chest, and `3` when on? **First bench (§11): contact supported and detected (`3`) while on; contact supported and not detected (`2`) in 11 notifications. Open for "off the chest" on purpose.**
+12. **MTU (§7):** what MTU does the D500 negotiate, and does a 30-byte maximal Indoor Bike Data notification arrive whole? **First bench (§11): 251 for the 64 asked; the 22-byte notifications arrived whole. A 30-byte one was not seen. Open.**
 13. **Battery Service (`0x180F`, §1):** the UUID is unverified. Check it on the bench.
 
 **Where each answer lands (stage M3-1).** A bench result changes one constant or option, never an adapter. Full table with defaults and evidence: ADR 0009 §8.
 
 | FT | What flips |
 |---|---|
-| 1 | `IndoorBikeFlagMap.DEFAULT` (`DECODERS` or `SIG_XML_LABELS`), per device `FtmsOptions.flagMap` |
+| 1 | `IndoorBikeFlagMap.DEFAULT` (`DECODERS` or `SIG_XML_LABELS`), per device `FtmsOptions.flagMap`. **Settled by the first bench: `DECODERS`, the default** |
 | 2 | `IndoorBikeData.totalDistanceMetres` (nothing in the ride reads it yet) |
 | 3 | `TrainerEvent.MoreDataSeen` is reported; splitting is not implemented, each notification is one record |
-| 4 | `FtmsOptions.controlRecoveryDelay`; which `TrainerEvent`s appear |
+| 4 | `FtmsOptions.controlRecoveryDelay`; `FtmsOptions.selfResetGrace` (the D500's Reset after our Request Control, §11); which `TrainerEvent`s appear |
 | 5 | the `0x2AD5` range is not read yet; the gear model keeps within ±15 % |
 | 6 | `FtmsOptions.controlPointTimeout` (3 s), `operationFailedRetries` (2), `operationFailedBackoff` (500 ms) |
 | 7 | `FtmsOptions.startAfterRequestControl` (on) |
@@ -462,3 +462,48 @@ Every vector is a test case of `core/src/commonTest/kotlin/app/overdrive/core/bl
 - The RR interval rounding rule (§6.3) should live in the domain layer, not the codec. **Done in M3-1:** `RrIntervals.rawToMillis` (`app.overdrive.core.device`); the heart-rate codec returns raw 1/1024 s.
 
 **Next step:** the Android transport (stage M3-2) implements `GattTransport`, `GattTransportFactory`, `GattScanner` and `BleEnvironment` on the platform; then the owner's bench sessions 3 and 4 (`docs/bench-checklist.md`) settle the questions of §9, each by changing the constant named in the table under it. Record what the bench shows in the results table of the checklist and update §2.4, §5 and §6.5 here.
+
+## 11. First bench observations (2026-11-18)
+
+Source: `docs/bench-reports/2026-11-18-first-ride.md` (facts only: no heart rate, power series or device address is copied; the raw
+files stay with the owner). A short ride with the Van Rysel D500 and a Coospo strap, **not run as the steps of the bench
+checklist**, so no row of its results table is filled in and no acceptance criterion is confirmed. The report's own labels for the
+questions differ in places from the numbers of §9; this section uses §9's numbers (ADR 0013 has the mapping).
+
+**The D500** (one session, 1020 seconds, 4059 Indoor Bike Data and 345 Status notifications, 103 Control Point writes).
+
+- **Services.** FTMS `1826` (Control Point `2AD9`: write, write without response, indicate; Indoor Bike Data `2AD2`: notify; Status
+  `2ADA`: notify; Feature `2ACC`; three range characteristics), Cycling Power `1818`, Cycling Speed and Cadence `1816`, and vendor
+  services the app does not use (a Nordic DFU `FE59`, a Nordic UART, two others). ATT MTU 251 (FT 12).
+- **Feature.** Machine features `0x00004003` (average speed, cadence, power measurement); target settings `0x0000A00C` (resistance
+  target, **power target**, **indoor bike simulation**, spin down): both ERG and simulation are offered.
+- **Indoor Bike Data (FT 1 settled).** The flags word is `0x0044` in every notification: bit 0 clear (speed present), **bit 2 set
+  (instantaneous cadence)**, bit 6 (instantaneous power). Decoded with bit 2 as cadence the numbers are consistent (cadence up to
+  84 rpm, power up to 343 W, no negative power, speed up to 23 km/h at 0.01 km/h). Every notification is **22 bytes**: the 8 the
+  flags announce, then **14 the flags do not announce**, two words of which repeat the cadence and the power (plus one). The codec
+  reads the announced fields and ignores the rest, which worked; the origin of the tail is unknown (FT 3 stays open). Rate: median
+  239 ms (about 4 Hz), longest gap 1.84 s.
+- **Control Point.** Every command was answered with success, with `80 <opcode> 01` within about 60 ms, often before the write
+  callback: Request Control `00` (5), Start or Resume `07` (5), Set Target Power `05` (55), Set Indoor Bike Simulation `11` (38).
+  No rejection. Simulation values accepted: wind 0, grade between about -4 % and +5 % in 1 % steps, rolling resistance `0.004`,
+  drag `0.21`.
+- **ERG held the target.** In a ramp from 98 W to 138 W in 4 W steps every 12 seconds the measured power four to nine seconds
+  after each step was within about 3 W of the target (a last step ran 12 W high); a target of zero read zero power. A good sign
+  for acceptance criterion 2, **not** a confirmed criterion.
+- **Status behaviour (FT 4).** A Request Control is followed by a **Reset (`01`)**, a Start by **Started (`04`)**, and the trainer
+  **re-sends the last status about every 240 ms** (`08 <watts>` after a target power, `12 <parameters>` after a simulation set).
+  `0xFF` was not seen.
+- **What changed in the code because of it.** The adapter took each Reset for lost control and asked again: a ping-pong of five
+  Request Control and Start pairs in the first 1.5 seconds. A Reset within `FtmsOptions.selfResetGrace` (1.5 s) of a Request
+  Control the same connection completed is now ignored; a Reset outside the window and a `0xFF` at any time are still recovered
+  (ADR 0009 §8, ADR 0013). `FakeFtmsTrainerOptions.resetsAfterRequestControl` and `statusRepeatInterval` model the D500.
+- **Still open for the D500.** Whether Start or Resume is needed (FT 7), response timing as a median and a percentile (FT 6),
+  distance units (FT 2), the unannounced tail, Bluetooth switched off or the trainer unplugged mid-ride (acceptance criterion 4),
+  `0x2AD5`, and long rides. Speed in the exported FIT is the app's physics speed, by design, not the trainer's.
+
+**The strap** (950 notifications over 950 seconds). It advertised the model **H6M**, not the HR7 the notes expect. Heart Rate
+service `180D` (`2A37` notify, `2A38`), a battery service and a vendor service `FD00`. Flags `0x16` in 939 notifications: 8-bit
+heart rate, sensor contact supported and detected, **RR intervals present** (several per notification, 1864 in all); flags `0x14`
+or `0x04` (contact supported, **not** detected) in 11 notifications, 10 of them without RR. Median interval 940 ms, longest gap
+1.5 s. The link ended with status 19 (remote user terminated: the strap was switched off or taken off). The RR unit (FT 10) was
+not compared with the strap's own report.

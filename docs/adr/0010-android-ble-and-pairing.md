@@ -265,3 +265,18 @@ added**. Checked in the release build's `mapping.txt`: `GattCallback` is renamed
   through the fake.
 - Pairing is one trainer and one strap. A second trainer or a power meter is out of scope for Phase 1.
 - Not done here: the Click (M4: the row stays a labelled placeholder), the companion app, any sync of the logs.
+
+## First bench (2026-11-18)
+
+The first ride on the tablet (`docs/bench-reports/2026-11-18-first-ride.md`; not run as the steps of the checklist, so no row of
+its results table is filled in) bears on these rows, **without settling them for good**:
+
+| Row | What the report shows |
+|---|---|
+| T2 | `requestMtu` was answered on this tablet: **251** for the 128 asked by the Click and, on the D500, 251 for the 64 asked. The app accepts what comes back |
+| T5 | The CCCD writes were enough: notifications on ASYNC and indications on SYNC_TX, then the D500's Control Point, Indoor Bike Data and Status, and the strap's heart rate, all delivered, with no `refresh()` |
+| C4 | A connect to a Click that was not reachable ended at the app's 30 second limit with status **147** |
+| H1 | FT 1 is settled (bit 2 is cadence); the D500's Reset after Request Control is handled (ADR 0013); the rest of FT 1 to FT 12 stays open (`docs/protocols/ftms-hr.md` §11) |
+
+Link losses seen: the Click's three linked sessions ended with status 8 (link supervision timeout) and the app reconnected each time;
+the strap's ended with 19 (remote user terminated). The Click's own rows K1 to K7 are answered in part in ADR 0012 and ADR 0013.

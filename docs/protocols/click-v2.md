@@ -1,6 +1,6 @@
 # Zwift Click v2 over BLE: protocol notes
 
-Status: research notes for the Click module (spec §4.7, §9, §10). Written from public sources only, in our own words, with a pointer for every fact. Nothing here was observed on the bench yet; the open questions at the end list what to verify with a real controller. **Stage M4-1 (2026-11-18) implements the plain path of §7 in `core` and tests it against a fake written from these notes: §10 says what is implemented, which vector covers what and which option settles which question.** The encryption of §3.3 and the unlock of §6 are not implemented.
+Status: research notes for the Click module (spec §4.7, §9, §10). Written from public sources only, in our own words, with a pointer for every fact. Until the first bench run nothing here was observed; **§11 (2026-11-18, one right puck) is the first observation and corrects what §3.1 and §3.4 say about the reply (a bare `RideOn`, not `RideOn 02 03`) and what §6 and §10 say about silence (a healthy Click is silent until a button is pressed)**. The open questions at the end list what is still to verify. **Stage M4-1 (2026-11-18) implements the plain path of §7 in `core` and tests it against a fake written from these notes: §10 says what is implemented, which vector covers what and which option settles which question.** The encryption of §3.3 and the unlock of §6 are not implemented.
 
 ## Sources and tags
 
@@ -65,7 +65,7 @@ Step by step, as BC-gpl3 does it (the version without the later unlock modes):
 
 The handshake write in BC-gpl3 is the six ASCII bytes **`52 69 64 65 4F 6E`** ("RideOn") written to SYNC_RX without response, with nothing after them. [code: BC-gpl3 `constants.dart` `RIDE_ON`; `zwift_device.dart` `setupHandshake`]
 
-Its reply is a notification or indication on SYNC_TX that starts with "RideOn" followed by two bytes. For Click v2 BC-gpl3 expects **`02 03`**, and it treats everything after that as a public key that it logs and does not use. BC-gpl3 does no key exchange and does not encrypt anything. [code: BC-gpl3 `constants.dart` `RESPONSE_START_CLICK_V2`; `zwift_device.dart` `processDevicePublicKeyResponse`]
+Its reply is a notification or indication on SYNC_TX that starts with "RideOn" followed by two bytes. For Click v2 BC-gpl3 expects **`02 03`**, and it treats everything after that as a public key that it logs and does not use. BC-gpl3 does no key exchange and does not encrypt anything. [code: BC-gpl3 `constants.dart` `RESPONSE_START_CLICK_V2`; `zwift_device.dart` `processDevicePublicKeyResponse`] **Corrected by the first bench (§11): the right puck answered with the bare six bytes `RideOn`, no `02 03` and no key.** The adapter accepts both.
 
 Post-handshake write: BC-HEAD writes **`FF 04 00`** to SYNC_RX after "RideOn" on Click v2, but only when the unlock is persisted (or a custom device script exists). BC-gpl3 does not send it. TC sends it on Click v2 after "RideOn" and says "BikeControl sends this to Click v2 after the handshake". [code: BC-HEAD `zwift_unlock.dart` `setupHandshake`; TC `click.js`, handshake block] The bytes' meaning is **unknown**.
 
@@ -74,7 +74,7 @@ Post-handshake write: BC-HEAD writes **`FF 04 00`** to SYNC_RX after "RideOn" on
 - **TC** sends a plain "RideOn" and says that this "asks for unencrypted messages", then reads plain button frames from both Click v1 and Click v2. [code: TC `click.js`] TC is an unlicensed third-party app; I could not run it, so this is a claim I have not checked.
 - **BC-gpl3** uses the same plain handshake and decodes plain button frames for Click v2 (section 4). It sends the handshake only once the controller counts as unlocked, so the plain path is what its releases rely on for the unlocked state. [code: BC-gpl3]
 - **Encryption is used by Zwift Play (RC1), per ZP.** ZP's handshake sends "RideOn" + `00 09` + the host's 64-byte public key when its encryption flag is on, and treats a bare "RideOn" reply as "unencrypted mode". [code: ZP `zaplibrary/.../device/common/AbstractZapDevice.kt` `buildHandshakeStart`, `processDevicePublicKeyResponse`] ZP's README also says the Play's handshake reply starts `RideOn 01 01` and that Zwift's request starts `RideOn 01 02`. [docs: ZP `README.md`]
-- Whether **Click v2 uses the Play encryption is unknown.** Nothing public confirms it. The evidence (plain works for TC and for BC-gpl3's unlocked state) suggests the Click v2 accepts plain frames at least after unlock. Bench test in section 9.
+- Whether **Click v2 uses the Play encryption is unknown.** Nothing public confirms it. The evidence (plain works for TC and for BC-gpl3's unlocked state) suggests the Click v2 accepts plain frames at least after unlock. Bench test in section 9. **First bench (§11):** the right puck answered the bare `RideOn` (ZP's "unencrypted mode" reply) and sent plain `23 08 <varint>` frames; for that puck the plain path is what it spoke.
 
 ### 3.3 Encryption as implemented for Zwift Play (ZP). Not confirmed for Click v2.
 
@@ -98,11 +98,11 @@ This is the only public description of the scheme. Treat it as the hypothesis to
 | 1 | Host subscribes notify on ASYNC | CCCD write | BC-gpl3 `zwift_device.dart` |
 | 2 | Host subscribes indicate on SYNC_TX | CCCD write | BC-gpl3 `zwift_device.dart` |
 | 3 | Host writes to SYNC_RX | `52 69 64 65 4F 6E` ("RideOn") | BC-gpl3 `zwift_device.dart`; TC |
-| 4 | Device replies on SYNC_TX | "RideOn" + `02 03` (Click v2) | BC-gpl3 `constants.dart`; ZP for the Play (`01 03`) |
+| 4 | Device replies on SYNC_TX | "RideOn" + `02 03` (Click v2); **the first bench's right puck: the bare "RideOn"** (§11) | BC-gpl3 `constants.dart`; ZP for the Play (`01 03`); first bench |
 | 5 | Host writes to SYNC_RX (BC-HEAD only, Click v2) | `FF 04 00` | BC-HEAD `zwift_unlock.dart`; TC |
 | 6 | Device sends button frames on ASYNC and/or SYNC_TX | section 4 | BC-gpl3 `zwift_ride.dart`; TC |
 
-Gaps: whether step 4 includes a public key on Click v2 (length unknown); what the device does if step 3 is not sent; whether the device needs anything after step 5.
+Gaps: whether step 4 includes a public key on Click v2 (**the first bench: no key**); what the device does if step 3 is not sent; whether the device needs anything after step 5 (**the first bench: `FF 04 00` was accepted and nothing visible changed**).
 
 ## 4. Message layout (device to host)
 
@@ -116,6 +116,7 @@ Every notification starts with a **one-byte message type**. The rest is a protob
 | `0x19` | 25 | Battery | Field 2, varint: percent. Example from TC: `19 10 1F` = 31 %. BC-gpl3 reads byte index 2, which is the same value. | TC; BC-gpl3 `zwift_device.dart` `BATTERY_LEVEL_TYPE` |
 | `0x3C` | 60 | Unknown Click v2 type | not known | BC-gpl3 `UNKNOWN_CLICKV2_TYPE`; TC `CLICK_V2_UNKNOWN` |
 | `0xFE` | 254 | Disconnect notice, seen when a Zwift Core connects | 1 byte | BC-gpl3 `DISCONNECT_MESSAGE_TYPE`; ZP `ZapConstants` |
+| `0x2A` | 42 | Unknown, **seen by the first bench** on ASYNC right after the notifications were enabled, in 3 of 28 sessions: 23 bytes, `2A 08 03 12 12 12 10 08 18 10 00 18 D8 04 22 05 FF FF FF FF 1F 28 00` | first bench (§11) |
 | `0x07` | 7 | Play controller frame (not Click v2) | | ZP `ControllerNotification.kt` |
 
 **Button bitmap for Click v2 (type 0x23, field 1).** Bits as used by BC-gpl3, which agree with TC on the shift bits:
@@ -151,7 +152,7 @@ Physical layout, from BC-HEAD's right-side controller definition: on the right p
 - BC-HEAD changelog 6.5.0 (22-08-2026, line 117) says the right puck "no longer falls asleep after a minute of inactivity, and the LEDs stay on" in right-side-only mode. [docs: BC-HEAD `CHANGELOG.md` line 117]. The mechanism is not public.
 - BC-gpl3 troubleshooting says that if the Click v2 has not been connected in Zwift first, BikeControl "will need to reconnect every minute". [docs: BC-gpl3 `TROUBLESHOOTING.md`, "My Click v2 disconnects after a minute"]
 
-The controller-side keep-alive requirement is **unknown** (section 9).
+The controller-side keep-alive requirement is **unknown** (section 9). **First bench (§11):** none was sent, and links stayed up for three minutes; three linked sessions ended with status 8 at 135, 183 and 210 seconds and the app reconnected, why is not known.
 
 ## 6. The unlock requirement
 
@@ -166,6 +167,7 @@ The controller-side keep-alive requirement is **unknown** (section 9).
 - 24 hours, counted from BikeControl's stored unlock time. [code: BC-gpl3 `zwift_clickv2.dart` `isUnlocked`]
 - The device's own timer is **unknown**. BC-HEAD says "re-unlock every 24 hours". [docs: BC-HEAD `CHANGELOG.md`, 6.4.0 entry]
 - Whether the device keeps its state across a reboot, or across a pairing change, is unknown.
+- **First bench (§11):** the right puck listed the Zwift service, connected and delivered buttons with **no unlock through Zwift**, and **sent nothing until a button was pressed**. So a connected puck that says nothing is not a sign of a lock; the only sign of §6.1 that is still believed is the hidden service.
 
 ### 6.3 How the unlock is done (BC-gpl3 and BC-HEAD)
 
@@ -250,15 +252,15 @@ The plain path on the right puck, in `core` (`app.overdrive.core.click`, `app.ov
 |---|---|---|
 | §1 recognising | `ClickAdvertisements.recognise` / `scanFilter`: service `FC82` (the older one as fallback), manufacturer `0x094A`, first byte `0x0A` right or `0x0B` left; never the name | |
 | §2 GATT layout | `ClickUuids`; discovery looks for the three characteristics in `FC82`, else in the older service | `00000006-…` (Play only); Device Information firmware (`0x2A26`) is read once and kept out of recordings |
-| §3.1 handshake | `ClickDevice` set-up: ASYNC notify, SYNC_TX indicate, `RideOn` without response, the reply, `FF 04 00` | |
+| §3.1 handshake | `ClickDevice` set-up: ASYNC notify, SYNC_TX indicate, `RideOn` without response, the reply (the default check accepts the bare `RideOn` and `RideOn 02 03`, nothing else), `FF 04 00` | |
 | §3.2, §3.3 encryption | not implemented; frames are read as plain bytes | the whole key agreement and cipher; an encrypted Click would show as a rejected reply or unrecognised frames |
 | §4 messages | `ClickCodec.parse`: `0x23`, `0x15`, `0x19`, `0xFE`, everything else (`0x3C` included) as `Unrecognised`; `ClickBits`; `ButtonEdges` | `0x37` (Click v1) and `0x07` (Play) are reported as unrecognised |
 | §5 keep-alive | none by default; `ClickOptions.keepAliveInterval` and `keepAliveFrame` (the neutral frame) | |
-| §6.1 locked means hidden | `ClickState.NeedsUnlock(SERVICE_HIDDEN)`; and `NeedsUnlock(NO_EVENTS)` for a controller that answers and then says nothing | the unlock itself (§6.3, §6.4), the RESET opcode and the left puck's restart workaround |
+| §6.1 locked means hidden | `ClickState.NeedsUnlock(SERVICE_HIDDEN)`; and, **opt-in and off by default since the first bench**, `NeedsUnlock(NO_EVENTS)` for a controller that answers and then says nothing (`ClickOptions.silentMeansLocked`) | the unlock itself (§6.3, §6.4), the RESET opcode and the left puck's restart workaround |
 
-**Vectors.** The ones the code is tested against are synthetic, derived by hand from the notes, never captured: **CK-V1** the neutral frame `23 08 FF FF FF FF 0F` (§4); **CK-V2 to CK-V7** one pressed button each, by the varint rule of the §4 table: A `EF FF FF FF 0F`, B `DF FF FF FF 0F`, Y `BF FF FF FF 0F`, Z `FF FE FF FF 0F`, Plus `FF DF FF FF 0F`, Plus's second bit `FF BF FF FF 0F` (each after `23 08`); **CK-V8** A and Plus together `EF DF FF FF 0F`; **CK-V9** battery `19 10 1F` = 31 % (§4); **CK-V10** heartbeat `15`; **CK-V11** `3C 01 02` unrecognised; **CK-V12** `FE`; **CK-V13** the handshake `52 69 64 65 4F 6E`; **CK-V14** the reply `RideOn 02 03`, with and without a 64-byte tail; **CK-V15** `FF 04 00` (all in `ClickCodecTest`). Beyond them: fields in another order and unknown fields skipped, a ten-byte varint, every wire type, every proper prefix, random bytes of every short length and an encode-and-decode round trip, none of which may throw.
+**Vectors.** The ones the code is tested against are synthetic, derived by hand from the notes, never captured: **CK-V1** the neutral frame `23 08 FF FF FF FF 0F` (§4); **CK-V2 to CK-V7** one pressed button each, by the varint rule of the §4 table: A `EF FF FF FF 0F`, B `DF FF FF FF 0F`, Y `BF FF FF FF 0F`, Z `FF FE FF FF 0F`, Plus `FF DF FF FF 0F`, Plus's second bit `FF BF FF FF 0F` (each after `23 08`); **CK-V8** A and Plus together `EF DF FF FF 0F`; **CK-V9** battery `19 10 1F` = 31 % (§4); **CK-V10** heartbeat `15`; **CK-V11** `3C 01 02` unrecognised; **CK-V12** `FE`; **CK-V13** the handshake `52 69 64 65 4F 6E`; **CK-V14** the reply `RideOn 02 03`, with and without a 64-byte tail (the bare `RideOn` the first bench saw is covered in `ClickDeviceTest`); **CK-V15** `FF 04 00` (all in `ClickCodecTest`). Beyond them: fields in another order and unknown fields skipped, a ten-byte varint, every wire type, every proper prefix, random bytes of every short length and an encode-and-decode round trip, none of which may throw.
 
-**Wired into the app (stage M4-2, ADR 0012).** The same code runs in the ride app over the Android transport: the Click is paired from the Devices scan, owned by the container, driven through the one routing rule, and its options are switches in Settings, Developer · Click. **Each question below has a step in `docs/bench-checklist.md`, session 5** (the coverage table there maps CK 1 to CK 14); the app's Bluetooth session files (`...-click.txt`) are the recordings. Nothing was observed on a Click yet.
+**Wired into the app (stage M4-2, ADR 0012).** The same code runs in the ride app over the Android transport: the Click is paired from the Devices scan, owned by the container, driven through the one routing rule, and its options are switches in Settings, Developer · Click. **Each question below has a step in `docs/bench-checklist.md`, session 5** (the coverage table there maps CK 1 to CK 14); the app's Bluetooth session files (`...-click.txt`) are the recordings. The first of them is §11.
 
 **Which option settles which question of section 9** (the names are `ClickOptions` unless noted):
 
@@ -275,7 +277,37 @@ The plain path on the right puck, in `core` (`app.overdrive.core.click`, `app.ov
 | 10 type `0x3C` | `ClickEvent.UnrecognisedFrame` (type and length) |
 | 11 battery | `ClickDevice.battery` |
 | 12 service visibility | `requireAdvertisedService`, `serviceHiddenMeansLocked`, `acceptLegacyService` |
-| 14 a right puck after a restart | `ClickState` after a power cycle; `silentMeansLocked` |
+| 14 a right puck after a restart | `ClickState` after a power cycle; `silentMeansLocked` (off: an idle Click is active) |
 | 9 RESET, 13 endianness and AAD | not implemented |
 
 **Recordings.** A Click session recorded through the existing decorator keeps no address and no unit identity: the firmware revision is `*`, and the tail after `RideOn` and the version bytes of a handshake reply becomes zeros of the same length (a key that never changes would name the unit; the length is what question 3 asks). Unknown vendor frames are written as they are, because question 10 needs them; keep recordings out of the repository.
+
+## 11. First bench observations (2026-11-18)
+
+Source: `docs/bench-reports/2026-11-18-first-ride.md` (facts only; the raw session files stay with the owner). One right puck,
+28 recorded Click sessions, not run as the steps of `docs/bench-checklist.md`. **Not recorded:** the puck's firmware version, how
+long since Zwift last touched it, and its advertisement. The report's own labels for the open questions differ in places from the
+numbers of §9 above; this table uses §9's numbers (ADR 0013 maps them).
+
+| §9 item | What the first bench showed | How firm |
+|---|---|---|
+| 1 advertising | not recorded | open |
+| 2 plain handshake | Notifications on ASYNC, indications on SYNC_TX, `RideOn` (`52 69 64 65 4F 6E`) written **without response** (status 0): accepted. **The reply is the bare six bytes `RideOn`** (not `RideOn 02 03`), within about 50 ms, as an indication on SYNC_TX. The puck connected and delivered buttons **without any unlock through Zwift** | every session; one puck |
+| 3 public key | **none**: the reply is the six bytes. The ATT MTU negotiated to **251** when the app asked for 128 | every session |
+| 4 encryption | frames were plain `23 08 <varint>`; no counter, no tag. The left puck and a Zwift-unlocked puck were not tried | one puck |
+| 5 bit meanings | Pressed (a clear bit): `0x0010` A, `0x0020` B, `0x0040` Y, `0x0100` Minus, `0x2000` Plus (shift down). `0x0080` (Z) and `0x1000` (Plus, shift up) were not pressed. No single press set two bits. All released is `FF FF FF FF 0F` after `23 08` | 527 frames in 4 sessions. **Unexplained:** a Minus (the notes give it to the left puck) on a puck called right, and Plus as `0x2000` while the default mapping has `0x1000` |
+| 6 `FF 04 00` | written after the handshake, accepted (status 0), no visible effect | whether it is needed: open |
+| 7 keep-alive | none was sent. **A connected, answered Click sends nothing until a button is pressed** (sessions of 15, 67 and 33 seconds had no frame before the first press); after a press it keeps sending frames, mostly all-released, about every 90 to 120 ms for a second or more, then goes quiet. Three linked sessions ended with status 8 (link supervision timeout) after 135, 183 and 210 seconds and the app reconnected each time; why is not known (range, or the Click sleeping). Not connecting at all ended after the app's 30 s limit with status 147 | one puck |
+| 8 unlock duration | not observed | open |
+| 9 left-puck reset | not tried | open |
+| 10 message `0x3C` | not seen. **A message of another type, `0x2A`, was**: `2A 08 03 12 12 12 10 08 18 10 00 18 D8 04 22 05 FF FF FF FF 1F 28 00` on ASYNC right after the notifications were enabled, in 3 of 28 sessions; the adapter reports it as unrecognised and goes on | 3 sessions |
+| 11 battery | the Battery Service level read at set-up was `0x64` (100 %); no `0x19` frame was seen | one reading |
+| 12 service visibility | **the Zwift service `FC82` is listed** on this puck: ASYNC `…0002` (notify), SYNC_RX `…0003` (**write without response only**), SYNC_TX `…0004` (read, indicate), and three more vendor characteristics `…0100`, `…0101` (write, write without response, notify) and `…0102` (write without response, notify) that the app does not use; Battery `180F`/`2A19` (read, notify), Device Information `2A26` | every session |
+| 13 endianness and AAD | not applicable: nothing was encrypted | |
+| 14 right puck after a restart | not tried. But an idle puck that answered and says nothing is **not** locked | |
+
+**What this corrects.** (1) §3.1 and §3.4: the reply to `RideOn` was the bare word, so the default check now accepts it as well
+as `RideOn 02 03`; `01 03`, seven bytes and other bytes still fail. (2) §6 and §10: "answered and then silent means locked" gave
+a false notice on a healthy idle Click, so `silentMeansLocked` is off by default and the hidden service stays the only default
+sign of a lock. (3) The notes' heartbeat (`15`) and battery frame (`0x19`) were not seen; the fake no longer sends either unless
+asked. Decisions and what is still open: `docs/adr/0013-first-bench-findings.md`.
