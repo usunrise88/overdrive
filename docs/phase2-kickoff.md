@@ -1,5 +1,8 @@
 # Phase 2 kickoff
 
+> **Superseded: Phase 2 was built; see docs/roadmap.md and ADRs 0014-0020.** The text below is the handoff as it was
+> written, kept as history.
+
 A handoff for whoever starts Phase 2 (spec §5: the web service, planned workouts, the MCP server, the calendar, the
 Telegram bot, ride upload) in a new session, for example on the server that will run the service. Written 2026-11-18, after
 the first ride on real devices. **Read `CLAUDE.md` first**, then `docs/spec.md` §1, §3, §5, §8, §9 and `docs/roadmap.md`.

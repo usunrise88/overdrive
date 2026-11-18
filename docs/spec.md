@@ -655,10 +655,12 @@ Keeping `core` free of Android code costs almost nothing now and leaves an iOS p
 
 Four contracts hold the system together: the workout file, the ride record, the sync API and the MCP tool set. Names and fields here are a first draft to be fixed during implementation.
 
-*Status at the end of Phase 1:* §8.1 (workout format) and §8.2 (ride record) are settled and live in `contracts/` with their
-fixtures, read and written by `core` and checked by the TypeScript side. §8.3 and §8.4 are Phase 2: §8.3 is settled for the ride
-intake (P2-1a), the planned workouts (P2-2a) and the profile (P2-3); §8.4 is settled for its Phase 2 tools (P2-3); the rest of §8.3 and
-the Phase 3 tools stay a first draft. The
+*Status:* §8.1 (workout format) and §8.2 (ride record) are settled and live in `contracts/` with their
+fixtures, read and written by `core` and checked by the TypeScript side. §8.3 is settled for the Phase 2 endpoints, under the
+versioned `/v1` path: the ride intake (P2-1a), the planned workouts (P2-2a) and the profile (P2-3). The Companion endpoints of §8.3
+(history, wellness, metrics, insights) are Phase 3 and not built. §8.4 is settled for its eight Phase 2 tools (P2-3): `list_planned_workouts`,
+`create_workout`, `update_workout`, `delete_workout`, `list_rides`, `get_ride`, `get_profile` and `update_profile`. The three Phase 3
+tools (`get_fitness`, `get_wellness`, `get_recovery`) are not built and stay a first draft. The
 outbox entry of §4.9 is **not** a wire format (ride id, enqueue time, start time, duration, title); what an upload sends is
 Phase 2's to settle, here, with its schema in `contracts/`, before any client or service code.
 
