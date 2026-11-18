@@ -171,7 +171,9 @@ public class HttpSyncProvider(
     override suspend fun upload(entry: OutboxEntry): SyncResult {
         val settings = config()
         if (!settings.isConfigured) return SyncResult.NotConfigured
-        if (rejected.value == settings) return SyncResult.TokenRejected
+        // A token the service could never have issued (spaces, accents, anything but visible ASCII) cannot be sent as a
+        // header value and cannot be right: say so without asking.
+        if (rejected.value == settings || !settings.token.all { it in '!'..'~' }) return SyncResult.TokenRejected
         val ride =
             try {
                 rides.payload(entry)

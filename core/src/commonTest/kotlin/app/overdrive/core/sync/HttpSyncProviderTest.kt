@@ -159,6 +159,17 @@ class HttpSyncProviderTest {
         }
 
     @Test
+    fun `a token that is not visible ASCII is rejected without being sent`() =
+        runTest {
+            for (bad in listOf("two words", "café-0123456789", "tab\there")) {
+                val transport = ScriptedTransport()
+                val config = SyncConfig("https://overdrive.example.org", bad)
+                assertEquals(SyncResult.TokenRejected, provider(transport, config).upload(entry), bad)
+                assertEquals(emptyList(), transport.sent)
+            }
+        }
+
+    @Test
     fun `a change of the settings is read at the next upload with no new provider`() =
         runTest {
             var config = SyncConfig("", "")

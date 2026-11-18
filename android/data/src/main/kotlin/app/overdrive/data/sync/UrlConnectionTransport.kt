@@ -1,0 +1,143 @@
+package app.overdrive.data.sync
+
+import app.overdrive.core.sync.ChunkSink
+import app.overdrive.core.sync.HttpAnswer
+import app.overdrive.core.sync.HttpRequest
+import app.overdrive.core.sync.HttpTransport
+import app.overdrive.core.sync.TransportException
+import app.overdrive.core.sync.TransportFailure
+import app.overdrive.core.sync.UploadBody
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.job
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileInputStream
+import java.io.IOException
+import java.io.InputStream
+import java.net.HttpURLConnection
+import java.net.SocketException
+import java.net.SocketTimeoutException
+import java.net.URL
+import java.net.UnknownHostException
+import javax.net.ssl.SSLException
+
+/**
+ * [HttpTransport] over `HttpURLConnection` (ADR 0014 section 6): no new dependency, no Play Services. One `PUT` per call
+ * with the body **streamed** from its source (a fixed length, so nothing is buffered in memory), `Authorization: Bearer`, and
+ * timeouts on connecting and on waiting for the answer. Redirects are not followed. The blocking socket work runs on
+ * [dispatcher], never on the main thread.
+ *
+ * **It logs nothing and keeps neither the token nor the body anywhere but the request being sent.** What went wrong without an
+ * answer is a [TransportException] whose message names only the kind of failure.
+ *
+ * @param connectTimeoutMillis how long to wait for the connection (and, for TLS, the handshake).
+ * @param readTimeoutMillis how long to wait for the server's answer once the body is sent, and between two of its bytes.
+ */
+class UrlConnectionTransport(
+    private val connectTimeoutMillis: Int = CONNECT_TIMEOUT_MILLIS,
+    private val readTimeoutMillis: Int = READ_TIMEOUT_MILLIS,
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : HttpTransport {
+    override suspend fun put(request: HttpRequest): HttpAnswer =
+        withContext(dispatcher) {
+            val job = currentCoroutineContext().job
+            val connection =
+                try {
+                    URL(request.url).openConnection() as HttpURLConnection
+                } catch (e: IOException) {
+                    throw TransportException(TransportFailure.Other, e)
+                } catch (e: ClassCastException) {
+                    throw TransportException(TransportFailure.Other, e)
+                }
+            try {
+                connection.requestMethod = "PUT"
+                connection.connectTimeout = connectTimeoutMillis
+                connection.readTimeout = readTimeoutMillis
+                connection.instanceFollowRedirects = false
+                connection.useCaches = false
+                connection.doInput = true
+                connection.doOutput = true
+                connection.setRequestProperty("Authorization", "Bearer ${request.bearerToken}")
+                connection.setRequestProperty("Content-Type", request.contentType)
+                connection.setRequestProperty("Accept", "application/json")
+                connection.setFixedLengthStreamingMode(request.body.length)
+                connection.outputStream.use { out ->
+                    request.body.writeTo(
+                        ChunkSink { bytes, offset, length ->
+                            job.ensureActive()
+                            out.write(bytes, offset, length)
+                        },
+                    )
+                }
+                val status = connection.responseCode
+                val stream = if (status >= HTTP_BAD_REQUEST) connection.errorStream else connection.inputStream
+                HttpAnswer(status, stream?.use(::readStart).orEmpty())
+            } catch (e: IOException) {
+                currentCoroutineContext().ensureActive()
+                throw TransportException(failureOf(e), e)
+            } finally {
+                connection.disconnect()
+            }
+        }
+
+    /** The first [MAX_ANSWER_BYTES] of an answer: an error message or the upload response is far shorter. */
+    private fun readStart(stream: InputStream): String {
+        val buffer = ByteArray(MAX_ANSWER_BYTES)
+        var filled = 0
+        while (filled < buffer.size) {
+            val read = stream.read(buffer, filled, buffer.size - filled)
+            if (read < 0) break
+            filled += read
+        }
+        return String(buffer, 0, filled, Charsets.UTF_8)
+    }
+
+    private fun failureOf(e: IOException): TransportFailure =
+        when (e) {
+            is SocketTimeoutException -> TransportFailure.TimedOut
+            is SSLException -> TransportFailure.SecureConnection
+            is SocketException, is UnknownHostException -> TransportFailure.Unreachable
+            else -> TransportFailure.Other
+        }
+
+    companion object {
+        const val CONNECT_TIMEOUT_MILLIS = 10_000
+        const val READ_TIMEOUT_MILLIS = 30_000
+        private const val MAX_ANSWER_BYTES = 4_096
+        private const val HTTP_BAD_REQUEST = 400
+    }
+}
+
+/**
+ * An [UploadBody] that streams a file in pieces. Its length is the file's at the moment it is asked; a file that changes size
+ * while it is sent fails the upload (the bytes written must match the length the request promised) instead of sending a
+ * damaged body, and the ride is tried again later.
+ */
+class FileBody(
+    private val file: File,
+) : UploadBody {
+    override val length: Long get() = file.length()
+
+    override fun writeTo(sink: ChunkSink) {
+        val expected = length
+        var sent = 0L
+        FileInputStream(file).use { input ->
+            val buffer = ByteArray(CHUNK_BYTES)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                sent += read
+                if (sent > expected) throw IOException("The file grew while it was sent")
+                sink.write(buffer, 0, read)
+            }
+        }
+        if (sent != expected) throw IOException("The file shrank while it was sent")
+    }
+
+    private companion object {
+        const val CHUNK_BYTES = 16 * 1024
+    }
+}
