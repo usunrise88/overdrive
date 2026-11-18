@@ -133,6 +133,27 @@ a token, instants, counts and the kind of the last trouble, never a record. The 
 they are accepted. The token is in no file the watch data keeps. Tests: the state and the status never hold a failure's words (a read that fails with a
 message holding a figure), the token is in no file, and no log line holds a figure or the token. The manifest declares read permissions only.
 
+## Tests
+
+- **`core` (JVM)**: the mapping of every record type against every valid fixture of `contracts/fixtures/wellness/upload` (read, turned into neutral records, mapped again:
+  identical), the batches' limits, and `HealthSync` driven by a fake Health Connect and a fake service: permissions granted, partial and declined, a type allowed later, the first
+  60-day read in pages and newest window first, the Changes API with an edit, an expired token, an upload that fails and is retried after its backoff and in order, an answer
+  that is lost and re-sent, a restart half way through the first read and with batches waiting, a 401, a 422 set aside, a 200 that is not the contract's, a revoked permission, a
+  background read without its permission, one run at a time, a run that begins while the state loads, and no figure in the state, the status or a failure.
+- **`android/data`**: the outbox on disk (order, restart, set aside, a damaged file, no temporary file left) and the client library's own record classes (built with synthetic
+  figures) mapped to the neutral records, with the exercise tokens checked against the library's constants.
+- **`app-companion`**: every model's words (recovery in each state, Wellness' cards, the notes, Settings), screenshots of every screen and state into `build/shots` (Wellness in each
+  range and state, Today's cards, Notes, Settings' groups, the first run's steps, the rationale), Compose flows (the first run through its steps, Wellness' one selection, a fact opening
+  Wellness at its metric, Notes with Copy, the stepper), the WorkManager scheduling and the worker, and **the real container against the loopback stand-in of the service with a fake
+  Health Connect** (`WatchContainerTest`): the first read, an app opened, a service that is down and comes back across a restart, a lost answer, a refused batch, a rejected token and
+  Sync now, access given and taken away, a state damaged on disk, a first read stopped half way, the figures kept on disk and shown with the service down, a year in two requests, the
+  heart-rate change reaching the service, and the secrecy of the token and of every figure in the files and the logs.
+- **Every wait is for a condition**, and where a test then closes the container or reads a file it waits for the disk as well (the outbox and the state are written before the
+  status that says so is published). **Stability**: the pipeline tests (`HealthSyncTest`, `WatchRepositoriesTest`) and the container tests (`WatchContainerTest`,
+  `CompanionContainerTest`) were run ten times in a row pinned to two cores (`taskset -c 0-1`) with three busy loops on the same cores, build cache off so each run really ran.
+  Two real races came out of earlier runs and were fixed in the code, not the tests: a run that began while the state was loading was turned away as "already running", and a
+  read that began before the rider changed a permission overwrote what the screen had just learned.
+
 ## Deviations from the design and the brief
 
 - **Nine permissions, not six**: weight, heart rate variability and steps are asked for, marked optional (the design lists six; the spec and brief name the rest).
