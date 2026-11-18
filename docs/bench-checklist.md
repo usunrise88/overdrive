@@ -359,7 +359,7 @@ the firmware revision at set-up (`ClickDevice.firmware`) and keeps it out of eve
 |---|---|
 | Not paired, **Pair** | nothing remembered |
 | Connecting to Zwift Click (right)… | the app is connecting or setting up |
-| Zwift Click (right) · checking it answers | connected, handshake done, no message yet (up to the silence limit) |
+| Zwift Click (right) · press any button | connected, handshake done, no message yet. First bench (2026-11-18): a real Click sends nothing until a button is pressed, so the row says to press any button (up to the silence limit) |
 | Zwift Click (right) · battery 87% | delivering messages; the battery once the Click has said |
 | Not found · retrying in 8 s / Connection lost · … / Could not connect · … | it is off, asleep, out of range or held by another app / the link dropped / a set-up step failed; **Retry now** tries at once |
 | Zwift Click (right) · locked, with a notice below | the Zwift service is hidden, or it answered and says nothing (5.3) |
@@ -411,7 +411,7 @@ Not a switch (change the default in `ClickOptions` and build again): the two dev
   without it (spec §4.7). Two signs, two texts, one promise. The service is hidden from discovery: the row says "locked"
   and the notice **Click is locked**, "Zwift has it locked. Unlock it through Zwift once; the ride continues without it."
   (the app backs off and tries again by itself, at most every 30 s). The Click answers the handshake and then sends
-  nothing for the silence limit: the notice **Click sends no presses**, "It is connected but silent. Unlock it through
+  nothing for the silence limit: the notice **Click sends no presses**, "Press any button on it. If that does nothing, unlock it through
   Zwift once; the ride continues without it." (the link stays up and a late message clears the notice by itself).
   **Check again** retries now; for a silent Click it drops the link and starts over. Expect: the notice shows with the
   right text for the sign, and the on-screen ride controls keep working. Write down the exact notice and which sign fired.
@@ -762,6 +762,16 @@ Everything a ride is, once, on all three devices, then the file it leaves.
 
 Fill this in on the bench. A criterion counts as confirmed only after its owner check is done on the device
 (`docs/phase1-acceptance.md`).
+
+**First report from the bench, 2026-11-18 (informal, from the owner's own words; none of the steps below was run as
+written, so no row of the table is filled in from it and no acceptance criterion is confirmed by it).** With the signed
+`v0.1.0` on the tablet: the trainer pairs and connects; the overlay works; the Click's gear buttons change gears and its
+media buttons work. The Click first showed **Could not connect** and retried; after changes in **Developer · Click**
+(which one was needed was not noted; the Click's session file, step 9.2, would show the reply to `RideOn`) the link came
+up and the row then sat on "checking it answers" **until any button was pressed**: a real Click sends nothing before
+the first press, which is not the silence of a locked one. The row now says "press any button" and the silent notice starts
+with that hint (this change is in the release after `v0.1.0`). Not reported, so still open: numbers and logs, hold timing,
+the app in the background and with the screen off, a 60-minute ride, FIT export and import, crash recovery.
 
 | Item | Pass / fail | Date | Notes |
 |---|---|---|---|

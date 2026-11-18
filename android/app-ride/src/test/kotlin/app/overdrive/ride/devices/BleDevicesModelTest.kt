@@ -143,7 +143,7 @@ class BleDeviceRowsTest {
             )
         }
         assertEquals(
-            DeviceRowUi(DeviceStatus.Searching, "Zwift Click (right) · checking it answers", canForget = true),
+            DeviceRowUi(DeviceStatus.Searching, "Zwift Click (right) · press any button", canForget = true),
             clickRow(ClickState.Waiting),
         )
     }

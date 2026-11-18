@@ -88,7 +88,7 @@ object BleDeviceRows {
      * |---|---|
      * | not paired | Not paired, **Pair** |
      * | Bluetooth off, permission missing | the same blocked row as the others |
-     * | connecting, or connected and waiting for a first message | searching: "Connecting to …" or "… · checking it answers" |
+     * | connecting, or connected and waiting for a first message | searching: "Connecting to …" or "… · press any button" |
      * | connected and delivering | connected: the name, with "battery 87%" once the Click said |
      * | not found, or a link that dropped, or a set-up that failed | "Not found · retrying in 8 s", "Connection lost · …", "Could not connect · …" and **Retry now** |
      * | locked (the Zwift service is hidden, or it answers and says nothing) | locked: "… · locked" and the unlock notice below the row |
@@ -113,7 +113,7 @@ object BleDeviceRows {
             }
 
             ClickState.Waiting -> {
-                DeviceRowUi(DeviceStatus.Searching, "$name · checking it answers", canForget = true)
+                DeviceRowUi(DeviceStatus.Searching, "$name · press any button", canForget = true)
             }
 
             is ClickState.NotFound -> {

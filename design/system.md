@@ -420,8 +420,8 @@ found. No colour, no border.
 | Connection lost | icon text 1 | `triangle-alert` 16 dp + "Connection lost · retrying in 8 s" ("Not found · …", "Could not connect · …", "Not a trainer · check the pairing") in text 1; the seconds count down once a second, only while it waits | **Retry now** (secondary) |
 | Blocked (stage M3-2) | icon text 1 | `triangle-alert` 16 dp + "D500 · Bluetooth is off" or "· needs Nearby devices" in text 1 | none: the Notice above the rows holds the one action |
 | Click connected (M4-2) | icon text 1 | "Zwift Click (right) · battery 87%" (the battery once the Click has said) | `check` 16 dp + "Connected" |
-| Click checking (M4-2) | icon text 1 | "Zwift Click (right) · checking it answers" | spinner ring |
-| Click locked | icon text 1 | "Zwift Click (right) · locked" | "No presses" (label, text 1) + the notice below the row, in **two wordings by the sign** (stage M4-2, spec §4.7): the Zwift service is hidden: title "Click is locked", text "Zwift has it locked. Unlock it through Zwift once; the ride continues without it."; it answers and says nothing: title "Click sends no presses", text "It is connected but silent. Unlock it through Zwift once; the ride continues without it."; button **Check again** |
+| Click checking (M4-2) | icon text 1 | "Zwift Click (right) · press any button" | spinner ring |
+| Click locked | icon text 1 | "Zwift Click (right) · locked" | "No presses" (label, text 1) + the notice below the row, in **two wordings by the sign** (stage M4-2, spec §4.7): the Zwift service is hidden: title "Click is locked", text "Zwift has it locked. Unlock it through Zwift once; the ride continues without it."; it answers and says nothing: title "Click sends no presses", text "Press any button on it. If that does nothing, unlock it through Zwift once; the ride continues without it."; button **Check again** |
 
 A row that has a paired device (stage M3-2) ends with a ghost **Forget** button, 40 dp, after the status. Searching reads
 "Connecting to <name>…". The Click's lost and blocked rows read like the others' ("Not found · retrying in 8 s", "Connection

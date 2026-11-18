@@ -82,7 +82,7 @@ with its own reconnecting supervisor.
 ### 4. The Click's row and the unlock notice
 
 `BleDeviceRows.clickRow` maps `ClickState`, the battery, the radio and the retry countdown to words (table in the KDoc and
-in bench session 5): Not paired; Connecting; "checking it answers" (connected, nothing yet); Connected with "battery 87%" once
+in bench session 5): Not paired; Connecting; "press any button" (connected, nothing yet); Connected with "battery 87%" once
 known (a value outside 0 to 100 is not shown); "Not found · retrying in N s", "Connection lost · …" and "Could not connect · …"
 with **Retry now**; **locked**; and the same blocked rows as the other devices when Bluetooth is off or the permission is
 missing. The countdown ticks once a second **only while a retry waits**; at rest nothing is emitted, and a battery report never
@@ -93,7 +93,7 @@ A locked Click gets **one notice with two wordings**, chosen by the sign that ga
 | Sign | Title | Text |
 |---|---|---|
 | The Zwift service is hidden from discovery | Click is locked | Zwift has it locked. Unlock it through Zwift once; the ride continues without it. |
-| The handshake was answered and then nothing came | Click sends no presses | It is connected but silent. Unlock it through Zwift once; the ride continues without it. |
+| The handshake was answered and then nothing came | Click sends no presses | Press any button on it. If that does nothing, unlock it through Zwift once; the ride continues without it. |
 
 Spec §4.7 says "tell the user to unlock it through Zwift once and continue without the Click"; the notice does, in one short
 sentence each, and **Check again** retries now. Neither state is ever an error of the ride.

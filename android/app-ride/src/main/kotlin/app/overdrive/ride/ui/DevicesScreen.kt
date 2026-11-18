@@ -313,7 +313,7 @@ fun unlockText(signal: UnlockSignal): String =
         }
 
         UnlockSignal.NO_EVENTS -> {
-            "It is connected but silent. Unlock it through Zwift once; the ride continues without it."
+            "Press any button on it. If that does nothing, unlock it through Zwift once; the ride continues without it."
         }
     }
 

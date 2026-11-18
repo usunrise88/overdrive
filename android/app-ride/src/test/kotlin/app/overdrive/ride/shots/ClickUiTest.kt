@@ -62,7 +62,7 @@ class ClickUiTest : ShotTest() {
     private val searching =
         DeviceRowUi(DeviceStatus.Searching, "Connecting to Zwift Click (right)…", canForget = true)
     private val checking =
-        DeviceRowUi(DeviceStatus.Searching, "Zwift Click (right) · checking it answers", canForget = true)
+        DeviceRowUi(DeviceStatus.Searching, "Zwift Click (right) · press any button", canForget = true)
     private val lost = DeviceRowUi(DeviceStatus.Lost, "Not found · retrying in 8 s", canForget = true)
     private val hidden =
         DeviceRowUi(
@@ -176,7 +176,7 @@ class ClickUiTest : ShotTest() {
             listOf(
                 connected to "Zwift Click (right) · battery 87%",
                 searching to "Connecting to Zwift Click (right)…",
-                checking to "Zwift Click (right) · checking it answers",
+                checking to "Zwift Click (right) · press any button",
                 lost to "Not found · retrying in 8 s",
                 hidden to "Zwift Click (right) · locked",
                 blocked to "Zwift Click (right) · Bluetooth is off",
@@ -205,12 +205,12 @@ class ClickUiTest : ShotTest() {
         assertNotEquals(hiddenText, silentText)
         assertNotEquals(unlockTitle(UnlockSignal.SERVICE_HIDDEN), unlockTitle(UnlockSignal.NO_EVENTS))
         for (text in listOf(hiddenText, silentText)) {
-            assertTrue(text, text.contains("Unlock it through Zwift once"))
+            assertTrue(text, text.contains("unlock it through Zwift once", ignoreCase = true))
             assertTrue(text, text.contains("the ride continues without it"))
             assertEquals("one sentence-ish, not a paragraph", 2, text.count { it == '.' })
         }
         assertTrue("hidden says Zwift has it locked", hiddenText.startsWith("Zwift has it locked."))
-        assertTrue("silent says it is connected but silent", silentText.startsWith("It is connected but silent."))
+        assertTrue("silent says to press a button first", silentText.startsWith("Press any button on it."))
 
         screen(devices(silent))
         rule.onNodeWithText(silentText).assertIsDisplayed()

@@ -269,10 +269,10 @@ stack has not been run on a radio either**):
   app on screen does. The foreground service of a live ride is what keeps the process alive; **that it does so with the
   screen off on this tablet, and that a media key from a background process reaches a video app, are bench items** (ADR 0012).
 - *The Click's row* says what it is doing in plain words: Connected (with the battery once the Click has said), Connecting,
-  "checking it answers", "Not found · retrying in N s", "Connection lost · …", "Could not connect · …", Bluetooth off or
+  "press any button", "Not found · retrying in N s", "Connection lost · …", "Could not connect · …", Bluetooth off or
   Nearby devices missing, and **locked**. A locked Click gets one notice, in two wordings by the sign that gave it away: the
   Zwift service is hidden ("Click is locked": "Zwift has it locked. Unlock it through Zwift once; the ride continues without
-  it.") or it answered and says nothing ("Click sends no presses": "It is connected but silent. Unlock it through Zwift once;
+  it.") or it answered and says nothing ("Click sends no presses": "Press any button on it. If that does nothing, unlock it through Zwift once;
   the ride continues without it."). Neither is ever an error of the ride.
 - *Learn buttons* (Devices, offered with a connected Click and no live ride) asks for the five roles in turn, rejects a
   combination and a duplicate with a plain message, can be cancelled, and saves the mapping (`ButtonMapping.serialize`) in the
