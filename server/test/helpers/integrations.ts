@@ -12,6 +12,7 @@ import {
 } from "./fake-google.ts";
 import { FAKE_API_KEY, FAKE_ATHLETE_ID, type FakeIntervals } from "./fake-intervals.ts";
 import { FAKE_BOT_TOKEN, type FakeTelegram, OWNER_CHAT } from "./fake-telegram.ts";
+import { plannedEvent, steady } from "./harness.ts";
 import {
   collectingLogger,
   type ManualTimers,
@@ -44,6 +45,13 @@ export interface IntegrationOptions {
   owner?: boolean;
   /** More settings, overriding the above (REMINDER_*, GCAL_WORKOUT_START, …). */
   config?: ServicesConfig;
+}
+
+/** Plans a 40-minute workout (10 min at 60%, 20 at 88%, 10 at 50% of FTP) on `date` in the fake intervals.icu; returns the event id. */
+export function planWorkout(fake: FakeIntervals, date: string, name = "Sweet spot"): number {
+  return fake.addEvent(
+    plannedEvent(date, name, [steady(600, 60), steady(1200, 88), steady(600, 50)]),
+  ).id;
 }
 
 /** Empties what the calendar mirror and the bot keep, leaving the schema. */

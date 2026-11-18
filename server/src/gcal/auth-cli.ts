@@ -124,7 +124,7 @@ export async function runGoogleAuth(options: AuthOptions): Promise<number> {
     env.GOOGLE_CLIENT_SECRET?.trim() ||
     (await io.ask("Google OAuth client secret (not shown): ", { secret: true })).trim();
   if (clientId === "" || clientSecret === "") {
-    io.print("A client ID and a client secret are needed (docs/deploy.md, section 12).\n");
+    io.print("A client ID and a client secret are needed (docs/deploy.md, section 13).\n");
     return 1;
   }
 
@@ -307,7 +307,14 @@ async function main(): Promise<void> {
   }
   const io = await terminalIo();
   try {
-    process.exitCode = await runGoogleAuth({ env: process.env, io, port });
+    // GOOGLE_TOKEN_URL is the server's own setting for the same endpoint; unset, it is Google's.
+    const tokenUrl = process.env.GOOGLE_TOKEN_URL?.trim();
+    process.exitCode = await runGoogleAuth({
+      env: process.env,
+      io,
+      port,
+      ...(tokenUrl === undefined || tokenUrl === "" ? {} : { tokenUrl }),
+    });
   } finally {
     io.close();
   }

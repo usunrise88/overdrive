@@ -36,6 +36,8 @@ export interface TelegramBot {
   stop(): Promise<void>;
   /** Handles one update as the loop would. For the tests. */
   handleUpdate(update: IncomingUpdate): Promise<void>;
+  /** Resolves when no pass over the scheduled messages is running. For the tests. */
+  idle(): Promise<void>;
 }
 
 const OFFSET_KEY = "telegram.offset";
@@ -207,6 +209,7 @@ export function createTelegramBot(options: BotLoopOptions): TelegramBot {
 
   return {
     handleUpdate,
+    idle: () => notifier?.idle() ?? Promise.resolve(),
     start() {
       if (!stopped) return;
       stopped = false;
