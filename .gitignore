@@ -31,8 +31,9 @@ captures/
 *.aab
 *.hprof
 
-# Local tool state
+# Local tool state (agent worktrees live under .claude/worktrees)
 .claude/settings.local.json
+.claude/worktrees/
 
 # Generated ride artifacts used during manual testing
 *.fit
