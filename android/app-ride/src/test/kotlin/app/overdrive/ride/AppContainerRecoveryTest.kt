@@ -137,7 +137,11 @@ class AppContainerRecoveryTest {
         assertEquals("Free ride", found.title)
 
         container.rides.saveRecovered(found.id)
-        await("the ride is saved") { container.rides.lastSaved.value?.id == found.id }
+        // The library sets the last ride first and clears the notice a moment later (two state flows, one after the other),
+        // so waiting for the first and reading the second at once would race; wait for both.
+        await("the ride is saved and the notice is gone") {
+            container.rides.lastSaved.value?.id == found.id && container.rides.recovery.value == RecoveryState.None
+        }
         assertEquals(RecoveryState.None, container.rides.recovery.value)
         val stored = RideRecordJson.decode(File(directory, "${found.id}.json").readText())
         assertEquals(found.durationSeconds, stored.samples.size)
