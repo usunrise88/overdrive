@@ -86,7 +86,7 @@ Tasks live in Lific, project OVD.
 | Interfaces | The phone companion's design: navigation, screens, charts, copy, mock-ups (`design/companion.md`) | | done |
 | P3-1 Metrics engine | Load, fitness/fatigue/form, power curve, eFTP suggestion, aerobic drift, W′ balance; `GET /v1/metrics`, ride detail, MCP `get_fitness` (§6.3) | OVD-12 | in progress |
 | P3-2 Wellness | `POST /v1/wellness`, `WellnessSource`, intervals.icu wellness, baselines, ready/caution/rest, other activities from the watch (§6.2, §6.4, §6.7) | OVD-13 | server side done (ADR 0023); the upload comes with the companion, P3-4 |
-| P3-3 Insights and alerts | Written notes from computed facts (configurable LLM endpoint), morning/deviation/drift alerts in Telegram, MCP tools (§6.5, §6.6) | OVD-14 | not started |
+| P3-3 Insights and alerts | Written notes from computed facts (configurable LLM endpoint), morning/deviation/drift alerts in Telegram, MCP tools, coach topics (§6.5, §6.6, §12.3) | OVD-14 | server side done (ADR 0025); the companion shows the notes in P3-4 |
 | P3-4 Companion app | Phone app: five screens, Health Connect reader, background sync (§6.1) | OVD-15 | not started |
 | P3-5 FTP confirmation | The eFTP suggestion is confirmed or dismissed by the owner (companion, Telegram, MCP); only then do zones move (§6.3) | OVD-16 | not started |
 | P3-6 Release candidate | `v0.3.0-rc.1`, then the long checks while the owner tests, then `v0.3.0` | OVD-17 | not started |

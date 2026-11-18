@@ -629,12 +629,45 @@ guesses to be tuned on real data):
 - The same facts are exposed through MCP, so the planning agent can reason over them directly.
 - The endpoint is configurable. Health data leaves the server only to the endpoint the user chooses.
 
+**Settled in stage P3-3** (ADR 0025, `server/src/insights/`, contracts `insights-response.schema.json`, `discussion-topic.schema.json`; **written
+without a real language-model endpoint**, against a fake one: what a real one does is the first thing the owner's setup will settle):
+
+- *Facts:* one structured JSON per kind, built by pure, golden-tested functions from numbers the services computed: **morning** (recovery state,
+  rule, reason and signals, whether it is this morning's, the adjustment for caution or rest, today's planned workout with its length, planned load,
+  intensity and hardest step at the FTP in force, fitness, fatigue, form and their change, the last ride), **ride** (the ride, the plan step by step
+  with the share of the planned length ridden, steps on target, load against plan, the best power at 5 s, 1, 5, 20 and 60 minutes against earlier
+  bests, drift, W′), **week** (sessions planned, done, missed, load against the week before, fitness and form, recovery mornings, wellness against the
+  week before, new bests, the next 7 days). Every number is rounded once and listed in `quotable` with a label and a unit.
+- *Writer and check:* an OpenAI-compatible chat-completions client (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`; https only, retries, no redirect,
+  nothing sensitive logged); prompts in `insights/prompts/`, one file per kind, versioned (stored as `promptVersion`). **The rule is enforced:** a
+  validator extracts every number, date and time from the text and rejects it if the facts did not supply it (comparing at the precision the text gives;
+  list numbers, "7 days", power zones allowed) or if a word of a deny list appears (no diagnosis, no medical condition; `INSIGHT_DENY_WORDS` adds to it);
+  the model is asked once more with the violation named, and a second rejection or any failure of the endpoint stores the **template's** text
+  (`source: "template"`). With no endpoint set every note is the template's and **no health data leaves the server**.
+- *Notes:* `morning` at `INSIGHT_MORNING_TIME` (07:00) for 6 hours, from this morning's verdict or, after 2 hours without it, a plan alone; `ride` when
+  a ride is stored, against its plan; `week` at the weekly summary's time. Table `insights`, idempotent per (kind, day, ride or week) by `UNIQUE (kind, key)`;
+  `GET /v1/insights` and MCP `list_insights`, `get_facts` (§8.3, §8.4). A note recommends in words and **never changes the plan**.
+
 ### 6.6 Notifications
 
 - **Morning:** recovery state and the day's workout, adjusted if the state is caution or rest.
 - **Deviation alerts:** a metric outside its baseline for several days in a row, with a plain-language reading of what that usually means for training.
 - **Plan drift:** missed sessions or load running well above or below plan.
 - All through the Telegram bot and the companion's today screen.
+
+**Settled in stage P3-3** (ADR 0025):
+
+- *Morning:* the morning note is the message (its wording is adjusted by the state: caution says to keep the hard parts short, rest says to swap the
+  workout for an easy spin or take the day off). Sent through the bot's exactly-once `bot_notifications`, to the owner's chat only; also the note after
+  each ride and the weekly review. The phone sends no notification of its own.
+- *Deviation alerts:* a scored metric outside its personal baseline **on its adverse side** (resting heart rate above, sleep below, later bedtime, respiratory
+  rate above, oxygen saturation below, heart rate in sleep above, HRV below) for `ALERT_STREAK_DAYS` = **3** mornings in a row (2 to 14), **once per metric per
+  streak** (the day the run began). The text says what that *usually* means for training, from fixed sentences, with no cause and no condition.
+- *Plan drift:* over the 7 days before today, `ALERT_MISSED_SESSIONS` = **2** planned sessions with no ride (a skipped session is neither), or the ride load
+  more than `ALERT_LOAD_ABOVE_PERCENT` = **30%** above or `ALERT_LOAD_BELOW_PERCENT` = **40%** below the load planned for those sessions (only when the planned
+  load is at least 50 and known for all of them); **at most once a week**.
+- Alerts are also notes of kind `deviation` and `drift` in `GET /v1/insights`, so the companion's Today can show them. They are written like any note
+  (model under the same check, else template).
 
 ### 6.7 Other activities from the watch
 
@@ -823,7 +856,7 @@ path: everything is under `/v1`.
 | `GET /v1/activities/{id}` | Companion | One workout from the watch. **Settled** (stage P3-2, below) |
 | `GET /v1/metrics?from&to` | Companion | Load, form, power curve, FTP, drift. **Settled** (stage P3-1, below); the recovery state and baselines are `GET /v1/recovery` and `GET /v1/wellness` |
 | `POST /v1/ftp-suggestion/dismiss` | Companion | Hide an FTP suggestion. **Settled** (stage P3-1) |
-| `GET /v1/insights?from&to` | Companion | Written notes |
+| `GET /v1/insights?from&to` | Companion | Written notes and alerts, each with its ride's discussion topic. **Settled** (stage P3-3, below) |
 | `GET /v1/profile`, `PATCH /v1/profile` | Both | FTP, zones, physics settings. **Settled** (stage P2-3, below) |
 
 **Settled in stage P2-1a (ride intake; ADR 0014, `server/README.md`, schemas in `contracts/`):**
@@ -932,6 +965,14 @@ yet", and sent first by the next refresh; a `4xx` other than 401, 408 and 429 dr
   `estimatedMaxHeartRate`, `estimatedThresholdHeartRate`. They are **optional on read** (a profile cached before they existed stays valid) and the
   service always writes all four.
 
+**Settled in stage P3-3 (written insights; ADR 0025, `contracts/schema/insights-response.schema.json`, `discussion-topic.schema.json`, Kotlin `InsightsApiJson`):**
+
+- `GET /v1/insights?from=YYYY-MM-DD&to=YYYY-MM-DD` answers `{ "from", "to", "generatedAt", "stale", "insights": [{ "id", "kind", "createdAt", "text", "rideId", "topic" }] }`:
+  the notes created on the local days `from` to `to` (both included, at most **366 days**, `400 invalid_range` otherwise), **newest first**, not cached. `kind` is
+  `morning`, `ride`, `week` (§6.5) or `deviation`, `drift` (§6.6); `text` is plain text; `rideId` is set exactly for a ride note; `topic` is null or the ride
+  note's `{ id, text, openingQuestion, rideId, createdAt, status }` (§12.3). `stale` is always false: the notes are the service's own rows. The notes come from the model
+  or the template (`source` is stored, not sent). The ride detail has no `insightId`: find a ride's note by its `rideId`.
+
 ### 8.4 MCP tools
 
 | Tool | Kind | Purpose |
@@ -945,6 +986,10 @@ yet", and sent first by the next refresh; a `4xx` other than 401, 408 and 429 dr
 | `get_fitness` | Read | Load, fitness, fatigue, form series |
 | `get_wellness` | Read | Daily wellness metrics and baselines |
 | `get_recovery` | Read | Today's state and the facts behind it |
+| `list_insights` | Read | The written notes, newest first, with how each was written |
+| `get_facts` | Read | The computed facts a note is written from (the very ones stored with an existing note) |
+| `list_discussion_topics` | Read | Topics worth discussing, with the opening question |
+| `mark_discussion_topic` | Write | Mark a topic discussed (changes nothing else) |
 | `get_profile` | Read | FTP, zones, weekly availability |
 | `update_profile` | Write | FTP, availability, goals |
 
@@ -982,6 +1027,13 @@ today's state, the rule that decided it (and what the rule means), the reason, t
 watch names, `source: "watch"`), and `get_activity` with a ride id answers as `get_ride` did; `list_rides` and `get_ride` stay registered, marked
 deprecated, for one release. `get_profile` and `update_profile` carry `maxHeartRate`, `thresholdHeartRate` and the read-only estimates. Facts only,
 compact by default, no diagnosis and no cause.
+
+**Settled in stage P3-3 (ADR 0025):** `list_insights` gives the notes of a range (default the last 7 days, at most 366; `kind` filters; `detail: "full"` adds the
+prompt version and the hash of the facts): id, kind, createdAt, text, `source` (`llm` or `template`), rideId and the ride note's topic (id, text, status): what the
+rider has already been told. `get_facts` takes a `kind` and a day, a ride id or a week and gives the structured facts with their `quotable` numbers: those stored with
+the note when one exists (`stored: true`, with the note's id, how it was written and the hash), else worked out now. `list_discussion_topics` (open by default,
+newest first) gives each topic's text, opening question, ride (id, name, day) and the rule that found it; `mark_discussion_topic` sets `discussed` and nothing else (an
+expired topic stays expired). Every number is computed by the server; nothing here can change the plan or the profile.
 
 ## 9. Risks and open checks
 
@@ -1266,6 +1318,15 @@ The automatic post-ride note from 6.5 gains one job: saying when a ride is worth
 - The Telegram note shows the topic with the opening question ready to copy.
 - Topics are stored. When the rider opens a chat with the coach agent, the agent finds them through `list_discussion_topics` and can start from the latest one without the rider explaining anything.
 - A topic closes when the agent marks it discussed, or after 14 days.
+
+**Settled in stage P3-3** (ADR 0025, `server/src/insights/topics.ts`, contract `discussion-topic.schema.json`): a topic is `{ id, text, openingQuestion, rideId,
+createdAt, status }` (`open`, `discussed`, `expired`), attached to the ride note (`GET /v1/insights` carries it), and its text and question are filled in by
+code from the ride's facts, so every number was computed. The reasons are an explicit **rule table**, first match wins: `cut-short` (under 75% of the planned
+length), `power-record` (a new best at 5, 20 or 60 minutes, at least 3 earlier rides, at least 1% above), `load-off-plan` (+30% or −40% against the planned load),
+`repeated-drift` (the second plan-drift alert in 28 days). The signals of later stages (the stall guard, the effort rating, tag streaks, a heart-rate-at-power
+trend over repeats) are **named, unavailable rows** to switch on when their stage lands. At most **two topics in any rolling 7 days** and one per ride; a topic
+closes when marked discussed or **14 days** after it was written. Telegram shows the topic after the ride note with the opening question as a monospace block to
+copy. MCP: `list_discussion_topics` (open by default), `mark_discussion_topic` (only to `discussed`).
 
 ### 12.4 Methodology fixed in the notebook
 

@@ -191,6 +191,17 @@ Values in `.env` are never in the repository.
 | `WELLNESS_PULL_HOURS` | `6` | 1 to 168: how often intervals.icu's wellness is read (with an intervals.icu key) |
 | `WELLNESS_BASELINE_DAYS` | `42` | 28 to 60: the window of a personal baseline |
 | `WELLNESS_NIGHTS_NEEDED` | `14` | 7 to 28: nights before any recovery verdict (the companion says "Learning your usual range" until then) |
+| `INSIGHTS_ENABLED` | `true` | `false`: no written note or alert is written or sent (the ones already written are still served). ADR 0025 |
+| `LLM_BASE_URL` | unset | The address of an OpenAI-compatible chat-completions server, for example `https://api.example.com/v1` (https; http only for localhost). **With `LLM_MODEL`, turns the language model on**: the facts of your training and recovery are sent there and to no other address. Unset: notes are written from templates, nothing leaves the server. Section 17 |
+| `LLM_API_KEY` | unset | The key of that endpoint, if it needs one. **Secret: only in `.env`**, never in a chat, an issue or a commit |
+| `LLM_MODEL` | unset | The model's name at that endpoint |
+| `LLM_TIMEOUT_SECONDS` | `60` | 5 to 600: how long one request to the endpoint may take (a failed or slow one is retried twice, then the note is written from the template) |
+| `INSIGHTS_LANGUAGE` | `en` | A language name or code put in the prompt (`en`, `French`, `pt-BR`). The fallback template is always English |
+| `INSIGHT_MORNING_TIME` | `07:00` | When the morning note is written, in `TIMEZONE` (`HH:MM` or `off`); the morning alerts are checked then too |
+| `INSIGHT_DENY_WORDS` | empty | Words a written note may never contain, added to the built-in list (comma-separated) |
+| `ALERT_STREAK_DAYS` | `3` | 2 to 14: mornings in a row a metric is outside its usual range before an alert |
+| `ALERT_MISSED_SESSIONS` | `2` | 1 to 7: planned sessions missed in the last 7 days before a plan-drift alert |
+| `ALERT_LOAD_ABOVE_PERCENT`, `ALERT_LOAD_BELOW_PERCENT` | `30`, `40` | Plan drift: the load of the last 7 days this many percent above (5 to 300) or below (5 to 95) the load planned for them |
 | `PUBLIC_BASE_URL` | unset | `https://overdrive.llmto.day`: the service's public address (https, no path). **With `OWNER_PASSPHRASE_HASH`, turns the MCP server on.** ADR 0018 |
 | `OWNER_PASSPHRASE_HASH` | unset | The hash of the owner's passphrase, `scrypt:…` (section 12). **With `PUBLIC_BASE_URL`, turns the MCP server on.** The plain passphrase is never configured |
 | `MCP_STATIC_TOKENS` | empty | `name:token,name:token`: fixed bearer tokens for an MCP client that cannot do OAuth; at least 32 characters each; open `/mcp` only |
@@ -211,6 +222,7 @@ Values in `.env` are never in the repository.
 | `DEVICE_TOKENS` | from `.env` | As above |
 | `INTERVALS_*`, `PLAN_REFRESH_MINUTES`, `TIMEZONE` | from `.env` | As above; empty means the default |
 | `WELLNESS_*` | from `.env` | As above; empty means the default (wellness and recovery need no key: only the intervals.icu pull and the forwarding of the watch's workouts do) |
+| `INSIGHTS_ENABLED`, `LLM_*`, `INSIGHTS_LANGUAGE`, `INSIGHT_*`, `ALERT_*` | from `.env` | As above; empty means the default or unset (written notes need no key: without `LLM_BASE_URL` and `LLM_MODEL` they are written from templates) |
 | `PUBLIC_BASE_URL`, `OWNER_PASSPHRASE_HASH`, `MCP_STATIC_TOKENS` | from `.env` | As above; empty means unset |
 | `STRAVA_*` | from `.env` | As above; empty means unset (the upload is off unless the first three are all set) |
 | `LOG_LEVEL` | from `.env` | As above |
@@ -248,9 +260,7 @@ a chat, an issue or a commit. The invalid ones stop the start with the variable'
 
 ### Planned: not read yet (marked planned, names as the stages settle them)
 
-| Variable | Added by stage | Meaning |
-|---|---|---|
-| LLM endpoint (name not fixed) | planned: insights, not yet in the roadmap | Endpoint and key of the model that writes insight text (spec §7.2) |
+None at the moment: the language-model endpoint of spec §7.2 is `LLM_BASE_URL`, `LLM_API_KEY` and `LLM_MODEL` (section 17).
 
 ## 12. The MCP server
 
@@ -301,7 +311,9 @@ the profile and ride tools still work.
 ## 13. The Telegram bot
 
 The bot (spec §5.4, ADR 0019) sends reminders, a summary after each ride and a weekly summary, and answers `/today`, `/week`,
-`/skip`, `/move` and `/help`. It answers **only your chat** and ignores everyone else without a word. The token and the chat id
+`/skip`, `/move` and `/help`. From stage P3-3 it also sends the **written notes and alerts** (section 17): the morning note, a note
+after each ride (with the opening question of a discussion topic in a block you can tap to copy), the weekly review, and the alerts for a
+metric outside your usual range and for a plan that is drifting. It answers **only your chat** and ignores everyone else without a word. The token and the chat id
 stay in `.env`: you type them into the file on the host and never into a chat.
 
 1. **Make the bot.** In Telegram open `@BotFather`, send `/newbot`, give it a name and a user name ending in `bot`. BotFather
@@ -458,6 +470,39 @@ To look at what has arrived (counts, not values): `docker compose exec db psql -
 max(received_at) FROM wellness_records GROUP BY kind"`; the queue of workouts for intervals.icu: `SELECT activity_id, state, attempts,
 last_error FROM activity_destinations`. A workout in `skipped` has the reason in `last_error`. The recovery state says `learning` until
 14 nights have arrived (`WELLNESS_NIGHTS_NEEDED`).
+
+## 17. Written insights, alerts and the language model
+
+The service writes short notes from facts it has computed (spec §6.5, §6.6, §12.3, ADR 0025): a **morning note** at `INSIGHT_MORNING_TIME`
+(state, why, what to do with today's workout), a **note after each ride** (against its plan), a **weekly review** at the weekly summary's
+time, **alerts** when a metric stays outside your usual range or the plan drifts, and **discussion topics** for the coach agent. They go to
+your Telegram chat (when the bot is on) and to the companion's Today screen (`GET /v1/insights`), and the planning agent can read them
+and the facts behind them through MCP (`list_insights`, `get_facts`, `list_discussion_topics`). The notes never change the plan.
+
+**It works with no setting.** Without a language model the notes are written from fixed templates (`source: template` in the `insights`
+table), and **no health data leaves the server**. That is the default.
+
+**To have a language model write the notes** (more natural wording; the same facts, the same checks), point the server at an
+OpenAI-compatible chat-completions endpoint (MiniMax M3.1 or any other: the one you chose, hosted or on your own machine):
+
+1. On the host, in an editor (never in a chat, an issue or a commit; the key is a secret), add to `.env`:
+   `LLM_BASE_URL=https://<the endpoint>/v1` (the address the path `/chat/completions` is added to), `LLM_MODEL=<the model's name>` and,
+   if it needs one, `LLM_API_KEY=<the key>`. https is required (http only for `localhost`).
+2. `docker compose up -d server`. The start-up log says "written insights use the configured language model"; if only one of
+   `LLM_BASE_URL` and `LLM_MODEL` is set it says which is missing and the notes stay on templates.
+3. **Health data leaves the server only to that address**, as the facts of the day: recovery state and signals, planned workout, load,
+   fitness and form, a ride's figures against its plan. Nothing else, nothing to anyone else; the log holds no fact, text, key or address.
+   Read your provider's terms on what it does with what it receives before turning this on.
+4. The server checks every text the model writes: a number that was not in the facts, a date or time that was not, or a word of the
+   deny list (no diagnosis, no medical condition) rejects it; the model is asked once more with the problem named, and a second
+   rejection (or any failure of the endpoint) stores the template's text instead, so Telegram is never empty. `INSIGHT_DENY_WORDS`
+   adds your own words. `INSIGHTS_LANGUAGE` is put in the prompt as you write it; the template stays English.
+
+To see how notes were written: `docker compose exec db psql -U overdrive -d overdrive -c "SELECT kind, source, prompt_version, count(*)
+FROM insights GROUP BY 1, 2, 3"`. Many `template` rows with a model configured means its text is being rejected or the endpoint is failing:
+the log says which ("a note was rejected", "model-server", "model-timeout"; counts and kinds, never the text).
+
+What the alerts mean, and their thresholds: ADR 0025. Change them with `ALERT_*`. `INSIGHTS_ENABLED=false` switches the whole feature off.
 
 ## Troubleshooting
 

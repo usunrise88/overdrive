@@ -6,7 +6,8 @@ the tablet's rides arrive here and are stored), the PostgreSQL schema behind it,
 integration (ADR 0016: rides are forwarded, the planned workouts are read, converted, cached and
 served to the tablet), the rider's profile (`GET`/`PATCH /v1/profile`), the MCP server with its
 OAuth server for AI clients (ADR 0018), the Google Calendar mirror and the Telegram bot (ADR 0019), the Strava upload (ADR 0020), the
-training metrics (ADR 0022), wellness, recovery and the watch's other activities (ADR 0023) and `GET /healthz`.
+training metrics (ADR 0022), wellness, recovery and the watch's other activities (ADR 0023), the written insights, alerts and discussion
+topics (ADR 0025) and `GET /healthz`.
 
 ```bash
 pnpm --filter @overdrive/server dev      # node --watch src/main.ts, http://127.0.0.1:8080 (needs DATABASE_URL)
@@ -40,6 +41,16 @@ and names the variable, never its value):
 | `WELLNESS_PULL_HOURS` | `6` | 1 to 168: how often intervals.icu's wellness is read (only with an intervals.icu key) |
 | `WELLNESS_BASELINE_DAYS` | `42` | 28 to 60: the window a personal baseline is the mean and standard deviation of |
 | `WELLNESS_NIGHTS_NEEDED` | `14` | 7 to 28: readings a metric needs before it has a baseline, and nights before any recovery verdict |
+| `INSIGHTS_ENABLED` | `true` | `false`: no written note or alert is written or sent (the stored ones are still served). ADR 0025 |
+| `LLM_BASE_URL`, `LLM_MODEL` | unset | An OpenAI-compatible chat-completions endpoint and the model name. **The language model is on only when both are set**; otherwise the notes are written from templates and no health data leaves the server. `LLM_BASE_URL` is https (http only for `localhost`), no credentials, query or fragment: the facts of the rider's training and recovery are sent there and nowhere else |
+| `LLM_API_KEY` | unset | The endpoint's key, if it needs one. A secret: only in the server's environment; no log line or error holds it |
+| `LLM_TIMEOUT_SECONDS` | `60` | 5 to 600: per request; a failing or slow one is retried (three requests, 1 s and 2 s apart), then the template is used |
+| `INSIGHTS_LANGUAGE` | `en` | A language name or code put in the prompt (letters, spaces and hyphens only). The template is English |
+| `INSIGHT_MORNING_TIME` | `07:00` | `HH:MM` in `TIMEZONE`, or `off`: when the morning note is written (and the morning alerts checked) |
+| `INSIGHT_DENY_WORDS` | empty | Comma-separated words a note may never contain, added to the built-in list |
+| `ALERT_STREAK_DAYS` | `3` | 2 to 14: mornings in a row a metric is outside its usual range (adverse side) before an alert |
+| `ALERT_MISSED_SESSIONS` | `2` | 1 to 7: planned sessions missed in the last 7 days before a plan-drift alert |
+| `ALERT_LOAD_ABOVE_PERCENT`, `ALERT_LOAD_BELOW_PERCENT` | `30`, `40` | The ride load of the last 7 days this far above (5 to 300) or below (5 to 95) the planned load: plan drift |
 | `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_REFRESH_TOKEN` | unset | The Strava upload (ADR 0020). **The feature is off unless all three are set**; with only some set it is off and the log names the missing ones. The client id is the number of the application on strava.com/settings/api; the refresh token (which only seeds the first run, Strava rotates it) comes from `strava-auth` (below). Letters, digits and `. _ ~ + / = : -` only |
 | `STRAVA_BACKFILL` | `false` | `true` also sends the rides stored before Strava was turned on, at start. Off, turning Strava on does not post the history |
 | `STRAVA_BASE_URL` | `https://www.strava.com` | Another http(s) address; the tests point it at a fake |
@@ -98,6 +109,8 @@ general 1 to 128 characters from `A-Z a-z 0-9 . _ -`, starting with a letter or 
 | `GET /v1/wellness?from=YYYY-MM-DD&to=YYYY-MM-DD[&refresh=true]` | none | `200` the daily figures from `from` to `to` (at most 186 days) with each metric's value, source, usual range, deviation and streak, the usual bedtime and wake-up, `nightsLogged`, `stale` (`wellness-response.schema.json`) · `400 invalid_range` |
 | `GET /v1/recovery[?refresh=true]` | none | `200` today's state `ready`, `caution`, `rest`, `learning` or `noData`, the rule that decided, a one-sentence reason, guidance, 3 or 4 facts, `nightsLogged` of `nightsNeeded` (`recovery-response.schema.json`) |
 | `GET /v1/activities/{id}` | none | `200` a workout from the watch, `watch-<record id>`: summary, heart-rate load (`loadApproximate`, `loadNote`), how dense the samples are, the heart rate in at most 300 points (`activity.schema.json`) · `404 not_found` |
+
+| `GET /v1/insights?from=YYYY-MM-DD&to=YYYY-MM-DD` | none | `200` the written notes created on those local days, at most 366, newest first, not cached (`insights-response.schema.json`, ADR 0025): `{ id, kind, createdAt, text, rideId, topic }` with `kind` `morning`, `ride`, `week`, `deviation` or `drift`, and, on a ride note, its discussion topic (`discussion-topic.schema.json`) · `400 invalid_range` |
 
 Also `401 unauthorized` everywhere, `404 not_found` for any other path or method, and `500
 internal_error` (the tablet retries those). "The same" means the same content: a record is compared
@@ -190,6 +203,32 @@ The watch's load is registered with the metrics service as its `other` load sour
 Failures and logs never name a measured value (`test/wellness-privacy.test.ts`). Without an intervals.icu key the upload and everything
 computed from it work; the pull and the forwarding are off. What it assumes about intervals.icu's wellness and `POST activities/manual`
 could not be checked without an account (ADR 0023, last section).
+
+## Written insights, alerts and discussion topics (ADR 0025)
+
+The service writes a morning note, a note after each ride, a weekly review, alerts and discussion topics from **facts it computes**; a
+language model, when one is configured, only chooses the words. **It never calculates**: every number a note may quote is in the facts
+(`quotable`, with a unit), and the text is checked after it is written. A number, date or time that was not supplied, or a word of the deny
+list (no diagnosis, no medical condition), rejects the text; the model is asked once more with the problem named; a second rejection or any
+failure of the endpoint stores the deterministic template's text (`source: "template"`), so a note is never missing. With no model set, every
+note is the template's and **no health data leaves the server**.
+
+| Piece | Where |
+|---|---|
+| Facts builders (pure, golden-tested in `test/fixtures/insights-facts-*.json`) | `src/insights/facts.ts`, `quotes.ts`, `planned.ts`; what they read: `gather.ts` |
+| The check on a text | `src/insights/validator.ts`, `deny.ts` |
+| The model client and the writer | `src/insights/llm.ts` (OpenAI-compatible chat completions, retries, no redirects, nothing sensitive logged), `writer.ts` |
+| Prompts, versioned (stored as `prompt_version`) | `src/insights/prompts/` (`system.ts` and one file per kind) |
+| Template text; the readings of the deviation alerts | `src/insights/template.ts`, `readings.ts` |
+| Alert thresholds; the topic rule table | `src/insights/alerts.ts`, `topics.ts` (the table has named, unavailable rows for later stages) |
+| Triggers, idempotence, the Telegram source | `src/insights/service.ts` (one pass a minute and on events; `UNIQUE (kind, key)` in `insights`), `store.ts` |
+| MCP tools | `src/mcp/tools/insights.ts`: `list_insights`, `get_facts`, `list_discussion_topics`, `mark_discussion_topic` |
+
+The Telegram bot sends what the service stores, through its exactly-once `bot_notifications` and to the owner's chat only (a ride note with
+a topic ends with the opening question in a monospace block to copy). The tests use a **fake OpenAI-compatible server**
+(`test/helpers/fake-llm.ts`: well-behaved, a wrong number, medical wording, a hang, a 500, garbage) and the fake Telegram; they prove the
+check, the retry and the fallback, the triggers across a restart, the thresholds as tables, the topic limits and that no log line holds a
+value, a sentence, the key or the address. What only a real endpoint settles is in ADR 0025.
 
 ## Strava (ADR 0020)
 
@@ -340,6 +379,7 @@ Other modules (the MCP tools, Telegram, Google Calendar, Strava) plug in without
 | Rides | `services.rides` (`src/ride-store.ts`), `services.rideWorkouts` | `list`, `getRecord` of the stored rides; the workout a ride was played from, copied when it was stored. `src/ride-stats.ts` has the pure statistics, series and compliance (`rideStatistics`, `rideSeries`, `rideCompliance`) a ride summary for Telegram can reuse |
 | Training metrics | `services.metrics` (`src/metrics/`, ADR 0022) | `metrics(from, to)`, `rideMetrics`, `rideList`, `rideDetail`, `ftpAdvice`, `dismissSuggestion`; `registerLoadSource({ name, entries(untilDate) })` feeds the daily load with other activities (`kind: "other"`: counts for fatigue and form, never for the power curve, eFTP or drift) and `registerActivitySource({ name, list({ beforeMillis, limit }) })` adds them to `GET /v1/rides`. The pure math (`power-curve.ts`, `load.ts`, `ftp.ts`, `drift.ts`, `wbal.ts`) knows nothing of the database. A listener on `ride-stored` computes a ride, one on `profile-changed` keeps the FTP history and marks a suggestion accepted |
 | Wellness | `services.wellness` (`src/wellness/`, ADR 0023) | `upload.ingest(batch, device)`, `wellness(from, to)`, `recovery()`, `activity(id)`, `listActivities(query)`, `otherLoadByDay(from, to)` (the watch's load per local day), `refresh()` (pulls intervals.icu, `null` without a key); the `activity-stored` event queues a forwarding |
+| Insights | `services.insights` (`src/insights/`, ADR 0025) | `list(from, to)` (the wire shape), `facts(request)`, `topics(statuses, limit)`, `markTopicDiscussed(id)`, `tick()`; `notifications` is a `NotificationSource` (`src/notifications.ts`) the bot sends; a stored note emits `insight-stored`, new wellness figures `wellness-updated`. The plan history (`createPlanHistory`, shared with the bot) keeps each planned workout with its length and planned load after the cache drops its day |
 | Plan entries | `src/plan/entries.ts` (`readPlanEvent`), `src/plan/summary.ts` | one reading of a calendar event as a plan entry; duration, estimated load and a one-line outline of a native workout |
 
 ## Deployment
