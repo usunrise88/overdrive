@@ -219,4 +219,4 @@ contains everything they did. Their notes stay in `docs/releases/` as the record
 
 | Tag | Commit | CI run | Status |
 |---|---|---|---|
-| `v0.1.0` | see `docs/releases/` and the agent's message | CI green on that commit | to be made by the owner in the web UI |
+| `v0.1.0` | `f20de1f30333d1d6265de14d2670ac3adc0f6318` | CI 44278322515, Release run 44282264193 (success) | **published** 2026-11-18 by the owner in the web UI; both APKs verified against the keystore digest `93c1e980…4b86` |
