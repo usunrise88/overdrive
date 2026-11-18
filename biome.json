@@ -14,7 +14,7 @@
       "!**/*.md",
       "!design/icons",
       "!design/mockups/tokens.css",
-      "!design/mockups/*.html"
+      "!design/mockups/**/*.html"
     ]
   },
   "formatter": {

@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Companion: Power</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../components.css">
+<link rel="stylesheet" href="companion.css">
+</head>
+<body data-ready="false">
+
+<figure class="shot"><figcaption><b>Power · 6 months, FTP suggestion open.</b> Full scroll. The curve's readout rests on 20 minutes; the other charts on their latest point.</figcaption><div class="frame phone tall" id="power"></div></figure>
+<figure class="shot"><figcaption><b>Power · a duration selected, no suggestion.</b> Holding on the curve at 5 minutes; the FTP card shows only the current value and when it was set.</figcaption><div class="frame phone tall" id="power-selected"></div></figure>
+
+<script type="module">
+import {
+  DURATIONS, FTP, curve, dayOf, durLabel, fmtDay, fmtShort, head, ic, lineChart, logX, monthName,
+  niceTicks, range, readout, rng, shell,
+} from "./companion.js";
+
+const T1 = "var(--color-text-primary)";
+const T2 = "var(--color-text-secondary)";
+const T3 = "var(--color-text-tertiary)";
+const W = 346;
+const N = 182;
+
+// Power curve: 6 months (longest ride 1:32:10) and best ever.
+const recent = curve(248, 11000, 12, 5530);
+const best = curve(258, 12500, 12, 7200);
+const xs = DURATIONS.map(logX);
+const cTicks = [5, 60, 300, 1200, 3600].map((t) => ({ i: DURATIONS.indexOf(t), text: durLabel(t) }));
+cTicks[0].anchor = "middle";
+const cy = { min: 0, max: 1250, ticks: [0, 250, 500, 750, 1000, 1250] };
+
+// FTP history (step) and estimates (dots) over 6 months.
+const r = rng(21);
+const ftpSet = (ago) => (ago <= 47 ? 250 : ago <= 120 ? 244 : 238);
+const ftp = Array.from({ length: N }, (_, i) => ftpSet(N - 1 - i));
+const est = Array.from({ length: N }, (_, i) => {
+  const ago = N - 1 - i;
+  if (ago % 7 !== 3) return null;
+  if (ago < 30) return Math.round(252 + (30 - ago) / 7 + r() * 2);
+  return Math.round(ftpSet(ago) + 1 + (r() - 0.5) * 8);
+});
+const fTicks = [];
+for (let i = 4; i < N - 6; i++) if (dayOf(N - 1 - i).getUTCDate() === 1) fTicks.push({ i, text: monthName(dayOf(N - 1 - i)) });
+
+// Aerobic drift: steady rides only.
+const rd = rng(5);
+const drift = Array.from({ length: N }, (_, i) => {
+  const ago = N - 1 - i;
+  if (ago % 9 !== 4) return null;
+  return Math.round((7.6 - 3.6 * (i / N) + (rd() - 0.5) * 1.8) * 10) / 10;
+});
+const roll = drift.map((_, i) => {
+  if (drift[i] == null) return null;
+  const prev = drift.slice(0, i + 1).filter((v) => v != null).slice(-5);
+  return Math.round((prev.reduce((a, b) => a + b, 0) / prev.length) * 10) / 10;
+});
+const lastDrift = drift.findLastIndex((v) => v != null);
+
+const ftpCard = (suggest) => `
+  <div class="card pad stack gap12">
+    <div class="between" style="align-items:flex-start">
+      <div class="stack"><span class="t-label c3">FTP</span><span class="num t-num-m">250<span class="unit">W</span></span><span class="t-label c2 num">Set 2 Oct${suggest ? "" : " · estimated 251 W"}</span></div>
+      ${suggest ? `<div class="stack" style="align-items:flex-end;text-align:right"><span class="t-label c3">Estimated</span><span class="num t-num-m">256<span class="unit">W</span></span><span class="t-label c2">from 3 rides in 6 weeks</span></div>` : ""}
+    </div>
+    ${suggest ? `<span class="t-label c2">Your best efforts point to a higher FTP. Zones change only when you confirm.</span>
+    <div style="display:flex;gap:8px"><span class="btn btn-secondary">Use 256 W</span><span class="btn btn-ghost">Keep 250 W</span></div>` : ""}
+  </div>`;
+
+const efforts = [
+  ["5 s", 895, "Sat 14 Nov"],
+  ["1 min", 400, "Thu 12 Nov"],
+  ["5 min", 283, "Thu 12 Nov"],
+  ["20 min", 257, "Mon 16 Nov"],
+  ["1 h", 238, "Sat 24 Oct"],
+];
+
+const screen = (id, suggest, selDur) => {
+  const si = DURATIONS.indexOf(selDur);
+  shell(id, {
+    tab: "Power",
+    body: `${head("Power", "Updated 07:40")}
+    ${range(["6 weeks", "6 months", "1 year"], "6 months")}
+    ${ftpCard(suggest)}
+    <div class="card chart">
+      <div class="between"><span class="t-label c3">Power curve</span><span class="t-label c2">Values</span></div>
+      ${readout(durLabel(selDur), [
+        ["line", T1, "6 months", `${recent[si]} W`],
+        ["line", T3, "Best ever", `${best[si]} W`],
+      ])}
+      ${lineChart({
+        w: W, h: 220, n: DURATIONS.length, xs, y: cy, xTicks: cTicks, sel: si, crosshair: selDur !== 1200,
+        refs: [{ v: FTP, label: "FTP 250" }],
+        series: [
+          { v: best, color: T3, sw: 1.5 },
+          { v: recent, color: T1, sw: 2 },
+        ],
+      })}
+    </div>
+    <div class="card stack">
+      <div class="between" style="padding:16px 16px 4px"><span class="t-label c3">Best efforts · 6 months</span></div>
+      <div class="tbl" style="grid-template-columns:1fr auto auto 20px;padding:0 16px 8px">
+        ${efforts
+          .map(
+            ([d, w, when]) =>
+              `<span class="t-body">${d}</span><span class="r t-num-xs num">${w}<span class="unit">W</span></span><span class="r t-label c2 num">${when}</span><span class="r c3">${ic("chevron-right", "i-16")}</span>`,
+          )
+          .join("")}
+      </div>
+    </div>
+    <div class="card chart">
+      <span class="t-label c3">FTP history</span>
+      ${readout(fmtDay(dayOf(0)), [
+        ["line", T1, "FTP", "250 W"],
+        ["dot", T2, "Estimated", "256 W"],
+      ])}
+      ${lineChart({
+        w: W, h: 150, n: N, y: niceTicks(225, 265, 4), xTicks: fTicks, sel: N - 1,
+        series: [
+          { v: est, color: T2, sw: 0, dots: "all", r: 3, noSelDot: true },
+          { v: ftp, color: T1, sw: 2, step: true },
+        ],
+      })}
+    </div>
+    <div class="card chart">
+      <span class="t-label c3">Aerobic drift</span>
+      ${readout(`${fmtShort(dayOf(N - 1 - lastDrift))} · Endurance 90`, [
+        ["dot", T2, "Drift", `${drift[lastDrift]}%`],
+        ["line", T1, "Last 5 rides", `${roll[lastDrift]}%`],
+      ])}
+      ${lineChart({
+        w: W, h: 150, n: N, y: { min: 0, max: 10, ticks: [0, 5, 10], fmt: (v) => `${v}%`, base: 0 },
+        xTicks: fTicks, sel: lastDrift,
+        bands: [{ lo: 0, hi: 5, fill: "var(--color-surface2)", label: "Steady" }],
+        series: [
+          { v: roll, color: T1, sw: 2, connect: true },
+          { v: drift, color: T2, sw: 0, dots: "all", r: 3, noSelDot: true },
+        ],
+      })}
+      <span class="chart-note">How much heart rate rose against power on steady rides of 45 minutes or more. Lower is better.</span>
+    </div>`,
+  });
+};
+
+screen("power", true, 1200);
+screen("power-selected", false, 300);
+
+document.body.dataset.ready = "true";
+</script>
+</body>
+</html>

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Companion: Fitness</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../components.css">
+<link rel="stylesheet" href="companion.css">
+</head>
+<body data-ready="false">
+
+<figure class="shot"><figcaption><b>Fitness · 6 months.</b> Full scroll. Nothing selected: every readout shows today (the last day, marked by its dots and the dark current-week column).</figcaption><div class="frame phone tall" id="fitness"></div></figure>
+<figure class="shot"><figcaption><b>Fitness · 6 weeks, a past day selected.</b> Touch and hold on any chart, then slide: one crosshair moves through both line charts and the week column under it; the readouts follow. "Today" returns.</figcaption><div class="frame phone tall" id="fitness-selected"></div></figure>
+<figure class="shot"><figcaption><b>Fitness · 1 year.</b> 52 weeks: the columns thin to 4 dp; quarter ticks.</figcaption><div class="frame phone tall" id="fitness-year"></div></figure>
+
+<script type="module">
+import {
+  columns, fitnessData, fmtDay, fmtShort, formWord, head, lineChart, minus, monthTicks, niceTicks,
+  range, readout, shell, signed, tile, weeksOf,
+} from "./companion.js";
+
+const all = fitnessData();
+const T1 = "var(--color-text-primary)";
+const T3 = "var(--color-text-tertiary)";
+const W = 346;
+
+const screen = (id, label, n, selOffset = null, every = 1) => {
+  const days = all.slice(-n);
+  const sel = selOffset === null ? days.length - 1 : days.length - 1 - selOffset;
+  const d = days[sel];
+  const today = all.at(-1);
+  const notToday = selOffset !== null;
+  const ctl = days.map((x) => x.ctl);
+  const atl = days.map((x) => x.atl);
+  const tsb = days.map((x) => x.tsb);
+  const ly = niceTicks(Math.min(...ctl, ...atl) - 2, Math.max(...ctl, ...atl) + 2, 4);
+  const fy = niceTicks(Math.min(-32, ...tsb), Math.max(12, ...tsb), 4);
+  const ticks =
+    n <= 60
+      ? days
+          .map((x, i) => ({ i, text: fmtShort(x.date), mon: x.date.getUTCDay() === 1 }))
+          .filter((t) => t.mon && t.i > 2 && t.i < days.length - 3)
+          .filter((_, k) => k % 2 === 0)
+      : monthTicks(days, every);
+  const weeks = weeksOf(days);
+  const selWeek = weeks.findIndex((w, k) => d.date >= w.start && (k === weeks.length - 1 || d.date < weeks[k + 1].start));
+  const maxWeek = weeks.reduce((m, w, k) => (w.load > weeks[m].load ? k : m), 0);
+  const wy = niceTicks(0, Math.max(...weeks.map((w) => w.load)), 3);
+  const weekTicks = [];
+  weeks.forEach((w, k) => {
+    if (k === 0) return;
+    const prev = weeks[k - 1].start;
+    if (w.start.getUTCMonth() !== prev.getUTCMonth() && (n <= 60 || w.start.getUTCMonth() % every === 0)) {
+      if (k < weeks.length - 1) weekTicks.push({ i: k, text: n <= 60 ? fmtShort(w.start) : fmtShort(w.start).split(" ")[1] });
+    }
+  });
+  if (n <= 60) weeks.forEach((w, k) => k > 0 && k < weeks.length && weekTicks.length < 6 && !weekTicks.find((t) => t.i === k) && weekTicks.push({ i: k, text: fmtShort(w.start) }));
+  const sw = weeks[selWeek];
+  const current = selWeek === weeks.length - 1;
+  const ago = all.at(-29);
+  const week = all.at(-8);
+
+  shell(id, {
+    tab: "Fitness",
+    body: `${head("Fitness", "Updated 07:40")}
+    ${range(["6 weeks", "6 months", "1 year"], label)}
+    <div class="tiles" style="grid-template-columns:repeat(3,1fr)">
+      ${tile("Fitness", Math.round(today.ctl), "", `${signed(Math.round(today.ctl - ago.ctl))} in 4 weeks`)}
+      ${tile("Fatigue", Math.round(today.atl), "", `${signed(Math.round(today.atl - week.atl))} in 7 days`)}
+      ${tile("Form", minus(Math.round(today.tsb)), "", formWord(today.tsb))}
+    </div>
+    <div class="card chart">
+      <div class="between"><span class="t-label c3">Fitness and fatigue</span><span class="t-label c2">Values</span></div>
+      ${readout(fmtDay(d.date), [
+        ["line", T1, "Fitness", Math.round(d.ctl)],
+        ["line", T3, "Fatigue", Math.round(d.atl)],
+      ], { notToday })}
+      ${lineChart({
+        w: W, h: 196, n: days.length, y: ly, xTicks: ticks, sel, crosshair: notToday,
+        series: [
+          { v: atl, color: T3, sw: 1.5 },
+          { v: ctl, color: T1, sw: 2 },
+        ],
+      })}
+    </div>
+    <div class="card chart">
+      <span class="t-label c3">Form</span>
+      ${readout(fmtDay(d.date), [["line", T1, "Form", `${minus(Math.round(d.tsb))} · ${formWord(d.tsb)}`]], { notToday })}
+      ${lineChart({
+        w: W, h: 148, n: days.length, y: { ...fy, base: 0 }, xTicks: ticks, sel, crosshair: notToday,
+        bands: [{ lo: -30, hi: -10, fill: "var(--color-surface2)", label: "Training hard" }],
+        series: [{ v: tsb, color: T1, sw: 2 }],
+      })}
+      <span class="chart-note">Fitness minus fatigue. Below −10 you are training hard; above 5 you are fresh.</span>
+    </div>
+    <div class="card chart">
+      <span class="t-label c3">Weekly load</span>
+      ${readout(`Week of ${fmtShort(sw.start)}${current ? " · so far" : ""}`, [
+        ["band", T1, "Load", Math.round(sw.load)],
+        [null, null, "Rides", sw.rides],
+        ...(sw.other ? [[null, null, "Watch", Math.round(sw.other)]] : []),
+      ], { notToday })}
+      ${columns({ w: W, h: 150, values: weeks.map((w) => Math.round(w.load)), sel: selWeek, y: wy, label: [...new Set([selWeek, maxWeek])], xTicks: weekTicks })}
+    </div>`,
+  });
+};
+
+screen("fitness", "6 months", 182);
+screen("fitness-selected", "6 weeks", 42, 9);
+screen("fitness-year", "1 year", 365, null, 3);
+
+document.body.dataset.ready = "true";
+</script>
+</body>
+</html>
