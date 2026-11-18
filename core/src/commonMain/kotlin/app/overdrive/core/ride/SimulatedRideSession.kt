@@ -335,6 +335,7 @@ public class SimulatedRideSession(
             intensityPercent = intensity,
             zone = powerReading?.let { PowerZone.of(it, ftp) },
             workout = progress(),
+            pauseReason = if (state == RideState.PAUSED) PauseReason.MANUAL else null,
         )
     }
 

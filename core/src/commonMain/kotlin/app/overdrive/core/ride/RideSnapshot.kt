@@ -50,6 +50,11 @@ public data class RideSnapshot(
     val zone: PowerZone? = null,
     /** Progress through the workout, null for a free ride without a workout. */
     val workout: WorkoutProgress? = null,
+    /**
+     * Why the ride is paused, so a pause is never a mystery (spec §4.2). Null whenever [state] is not
+     * [RideState.PAUSED]; a session that is paused for no reason it can name leaves it null too.
+     */
+    val pauseReason: PauseReason? = null,
 ) {
     init {
         require(ftp > 0) { "FTP must be positive, got $ftp" }
