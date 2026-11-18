@@ -2,6 +2,7 @@ package app.overdrive.companion.shots
 
 import app.overdrive.companion.ConnectResult
 import app.overdrive.companion.Samples
+import app.overdrive.companion.WatchSamples
 import app.overdrive.companion.model.ActivityWords
 import app.overdrive.companion.model.FitnessUi
 import app.overdrive.companion.model.PowerUi
@@ -25,21 +26,26 @@ import app.overdrive.companion.ui.SettingsUiState
 import app.overdrive.companion.ui.SettingsView
 import app.overdrive.companion.ui.TodayActions
 import app.overdrive.companion.ui.TodayView
-import app.overdrive.companion.wellness.RecoveryFactData
-import app.overdrive.companion.wellness.RecoveryLevel
-import app.overdrive.companion.wellness.RecoveryState
+import app.overdrive.core.health.HealthAccess
+import app.overdrive.core.health.HealthDataType
+import app.overdrive.core.health.HealthStatus
+import app.overdrive.core.insights.InsightsResponse
 import app.overdrive.core.metrics.MetricsResponse
 import app.overdrive.core.plan.WorkoutsResponse
 import app.overdrive.core.profile.ProfileState
 import app.overdrive.core.remote.FtpAnswers
+import app.overdrive.core.remote.InsightsList
+import app.overdrive.core.remote.InsightsView
 import app.overdrive.core.remote.MetricsRange
 import app.overdrive.core.remote.ProblemKind
 import app.overdrive.core.remote.ResourceState
 import app.overdrive.core.remote.RidesList
 import app.overdrive.core.remote.RidesView
 import app.overdrive.core.remote.ServiceProblem
+import app.overdrive.core.wellness.RecoveryResponse
 import app.overdrive.uikit.chart.ChartSelection
 import org.junit.Test
+import app.overdrive.core.wellness.RecoveryState as ServiceState
 
 /** Every screen and state of design/companion.md at 412 dp wide, from the synthetic answers, into build/shots. */
 class ScreenShotsTest : ShotTest() {
@@ -71,36 +77,50 @@ class ScreenShotsTest : ShotTest() {
 
     // region today
 
-    private val facts =
-        listOf(
-            RecoveryFactData("resting-hr", "Resting heart rate", "52", "bpm", "usual 50–56", false),
-            RecoveryFactData("sleep", "Sleep", "7:40", null, "usual 6:50–7:50", false),
-            RecoveryFactData("resp", "Respiratory rate", "14.2", "/min", "usual 13.6–14.6", false),
-            RecoveryFactData("spo2", "Oxygen saturation", "96", "%", "usual 95–98", false),
+    private val todayActions = TodayActions(none, none, none, {}, {}, {}, {}, none, {})
+
+    private val connected =
+        HealthStatus(
+            checked = true,
+            access = HealthAccess(HealthDataType.entries.toSet(), history = true, background = true),
         )
 
-    private val todayActions = TodayActions(none, none, none, {}, {}, {}, none)
+    private fun recovery(
+        state: ServiceState,
+        nights: Int = 31,
+    ) = fresh(WatchSamples.recovery(state, nights = nights))
 
     private fun today(
-        recovery: RecoveryState,
+        recovery: ResourceState<RecoveryResponse> = ResourceState(loaded = true, asked = true),
         metrics: ResourceState<MetricsResponse> = fresh(metrics()),
         workouts: ResourceState<WorkoutsResponse> = fresh(Samples.workouts()),
         answers: FtpAnswers = FtpAnswers(),
         justUsed: Int? = null,
-    ) = TodayUi.of(recovery, metrics, workouts, RidesView(), profile, answers, justUsed, Samples.TODAY, words, host)
+        insights: InsightsView = InsightsView(),
+        watch: HealthStatus = connected,
+    ) = TodayUi.of(
+        recovery,
+        metrics,
+        workouts,
+        RidesView(),
+        profile,
+        answers,
+        justUsed,
+        Samples.TODAY,
+        words,
+        host,
+        insights,
+        watch,
+    )
+
+    private fun notes(response: InsightsResponse = WatchSamples.insights()) =
+        InsightsView(fresh(response), InsightsList(response.insights))
 
     @Test
     fun todayReady() =
         shot("today--ready") {
             TodayView(
-                today(
-                    RecoveryState.Rated(
-                        RecoveryLevel.Ready,
-                        "All four signals are in your usual range. Train as planned.",
-                        facts,
-                    ),
-                    metrics = fresh(metrics(suggestion = false)),
-                ),
+                today(recovery(ServiceState.READY), metrics = fresh(metrics(suggestion = false)), insights = notes()),
                 todayActions,
             )
         }
@@ -108,17 +128,9 @@ class ScreenShotsTest : ShotTest() {
     @Test
     fun todayCautionOfflineWithSuggestion() =
         shot("today--caution") {
-            val caution =
-                listOf(RecoveryFactData("resting-hr", "Resting heart rate", "59", "bpm", "above usual 50–56", true)) +
-                    facts.drop(1)
             TodayView(
                 today(
-                    RecoveryState.Rated(
-                        RecoveryLevel.Caution,
-                        "Resting heart rate is above your usual range for the second morning. " +
-                            "Train, but keep the hard parts short.",
-                        caution,
-                    ),
+                    recovery(ServiceState.CAUTION),
                     metrics = fresh(metrics()).copy(problem = offline),
                     workouts = fresh(Samples.workouts()).copy(problem = offline),
                 ),
@@ -127,29 +139,14 @@ class ScreenShotsTest : ShotTest() {
         }
 
     @Test
-    fun todayRest() =
-        shot("today--rest") {
-            TodayView(
-                today(
-                    RecoveryState.Rated(
-                        RecoveryLevel.Rest,
-                        "Two signals are outside your usual range. Keep today easy or take it off.",
-                        facts,
-                    ),
-                ),
-                todayActions,
-            )
-        }
+    fun todayRest() = shot("today--rest") { TodayView(today(recovery(ServiceState.REST)), todayActions) }
 
     @Test
     fun todayLearning() =
         shot("today--learning") {
-            val learning =
-                facts.take(3).map { it.copy(caption = "last night") } +
-                    RecoveryFactData("spo2", "Oxygen saturation", null, null, "no reading", false)
             TodayView(
                 today(
-                    RecoveryState.Learning(9, 14, learning),
+                    recovery(ServiceState.LEARNING, nights = 9),
                     workouts = fresh(Samples.workouts(withToday = false)),
                     metrics = fresh(metrics(suggestion = false)),
                 ),
@@ -159,19 +156,53 @@ class ScreenShotsTest : ShotTest() {
 
     @Test
     fun todayWithoutTheWatch() =
-        shot("today--no-watch") { TodayView(today(RecoveryState.NotAvailableYet), todayActions) }
+        shot("today--no-watch") { TodayView(today(watch = HealthStatus(checked = true)), todayActions) }
 
     @Test
-    fun todayNoReading() = shot("today--no-reading") { TodayView(today(RecoveryState.NoReading), todayActions) }
+    fun todayNoReading() = shot("today--no-reading") { TodayView(today(recovery(ServiceState.NO_DATA)), todayActions) }
 
     @Test
-    fun todayAfterUse() =
-        shot("today--after-use") { TodayView(today(RecoveryState.NotAvailableYet, justUsed = 256), todayActions) }
+    fun todayNoteBeforeItIsWritten() =
+        shot("today--note-waiting") {
+            TodayView(
+                today(recovery(ServiceState.READY), insights = notes(WatchSamples.insights(withToday = false))),
+                todayActions,
+            )
+        }
+
+    @Test
+    fun todayAlertAndTopic() =
+        shot("today--alert-note") {
+            val response = WatchSamples.insights(withToday = false)
+            TodayView(
+                today(
+                    recovery(ServiceState.CAUTION),
+                    insights = notes(response.copy(insights = response.insights.drop(1))),
+                    watch = HealthStatus(checked = true),
+                ),
+                todayActions,
+            )
+        }
+
+    @Test
+    fun todayWatchReadStopped() =
+        shot("today--watch-stopped") {
+            TodayView(
+                today(
+                    recovery(ServiceState.READY),
+                    watch = connected.copy(firstReadDone = true, lastReadMillis = TestClock.now - 40 * 3_600_000),
+                ),
+                todayActions,
+            )
+        }
+
+    @Test
+    fun todayAfterUse() = shot("today--after-use") { TodayView(today(justUsed = 256), todayActions) }
 
     @Test
     fun todayKeepQueued() =
         shot("today--keep-queued") {
-            TodayView(today(RecoveryState.NotAvailableYet, answers = FtpAnswers(setOf(7), waiting = 1)), todayActions)
+            TodayView(today(answers = FtpAnswers(setOf(7), waiting = 1)), todayActions)
         }
 
     @Test
@@ -179,9 +210,8 @@ class ScreenShotsTest : ShotTest() {
         shot("today--loading") {
             TodayView(
                 today(
-                    RecoveryState.NotAvailableYet,
-                    ResourceState(loaded = true, refreshing = true),
-                    ResourceState(loaded = true, refreshing = true),
+                    metrics = ResourceState(loaded = true, refreshing = true),
+                    workouts = ResourceState(loaded = true, refreshing = true),
                 ),
                 todayActions,
             )
@@ -192,16 +222,14 @@ class ScreenShotsTest : ShotTest() {
         shot("today--error") {
             val failed = ResourceState<MetricsResponse>(loaded = true, problem = dns, asked = true)
             TodayView(
-                today(RecoveryState.NotAvailableYet, failed, ResourceState(loaded = true, problem = dns, asked = true)),
+                today(metrics = failed, workouts = ResourceState(loaded = true, problem = dns, asked = true)),
                 todayActions,
             )
         }
 
     @Test
     fun todayRefreshing() =
-        shot("today--refreshing") {
-            TodayView(today(RecoveryState.NotAvailableYet, fresh(metrics()).copy(refreshing = true)), todayActions)
-        }
+        shot("today--refreshing") { TodayView(today(metrics = fresh(metrics()).copy(refreshing = true)), todayActions) }
 
     // region fitness
 

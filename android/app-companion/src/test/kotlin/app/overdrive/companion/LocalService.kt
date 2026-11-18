@@ -8,6 +8,15 @@ import app.overdrive.core.metrics.RideItem
 import app.overdrive.core.plan.PlanApiJson
 import app.overdrive.core.profile.Profile
 import app.overdrive.core.profile.ProfileApiJson
+import app.overdrive.core.insights.InsightsApiJson
+import app.overdrive.core.insights.InsightsResponse
+import app.overdrive.core.health.kindName
+import app.overdrive.core.wellness.RecordCounts
+import app.overdrive.core.wellness.RecoveryResponse
+import app.overdrive.core.wellness.RecoveryState
+import app.overdrive.core.wellness.WellnessApiJson
+import app.overdrive.core.wellness.WellnessRecord
+import app.overdrive.core.wellness.WellnessUploadResponse
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import java.net.InetAddress
@@ -55,6 +64,26 @@ class LocalService(
 
     @Volatile
     var dismissed = emptyList<Int>()
+
+    /** What `GET /v1/recovery` answers, and what `GET /v1/insights` does. */
+    @Volatile
+    var recovery: RecoveryResponse = WatchSamples.recovery(RecoveryState.READY)
+
+    @Volatile
+    var insights: InsightsResponse = WatchSamples.insights()
+
+    /** Every record the service holds from `POST /v1/wellness`, by id: idempotent, as the real one is. */
+    val wellnessRecords = java.util.concurrent.ConcurrentHashMap<String, WellnessRecord>()
+
+    /** Every body `POST /v1/wellness` received, in order (an upload that was refused is in it too). */
+    val wellnessBodies = CopyOnWriteArrayList<String>()
+
+    /** Answers for the next uploads instead of storing: a status and a body, used once each. */
+    val wellnessScript = java.util.concurrent.ConcurrentLinkedQueue<Pair<Int, String>>()
+
+    /** Stores the next uploads but cuts the connection before the answer: the answer is lost, the data is not. */
+    @Volatile
+    var wellnessLoseAnswers = 0
 
     private val executor = Executors.newCachedThreadPool()
     private val server = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0)
@@ -135,6 +164,27 @@ class LocalService(
                 dismiss(body)
             }
 
+            method == "POST" && path == "/v1/wellness" -> {
+                upload(body)
+            }
+
+            method == "GET" && path == "/v1/wellness" -> {
+                val from = q.getValue("from")
+                val to = q.getValue("to")
+                200 to WellnessApiJson.encodeWellnessResponse(WatchSamples.wellnessResponse(from, to))
+            }
+
+            method == "GET" && path == "/v1/recovery" -> {
+                200 to WellnessApiJson.encodeRecoveryResponse(recovery)
+            }
+
+            method == "GET" && path == "/v1/insights" -> {
+                val from = q.getValue("from")
+                val to = q.getValue("to")
+                val shown = insights.insights.filter { it.createdAt.take(10) in from..to }
+                200 to InsightsApiJson.encodeResponse(insights.copy(from = from, to = to, insights = shown))
+            }
+
             else -> {
                 404 to error("not_found", "No such route")
             }
@@ -181,6 +231,46 @@ class LocalService(
                 405 to error("not_found", "No such route")
             }
         }
+    }
+
+    private fun upload(body: String): Pair<Int, String> {
+        wellnessBodies += body
+        wellnessScript.poll()?.let { return it }
+        val upload =
+            try {
+                WellnessApiJson.decodeUpload(body)
+            } catch (e: IllegalArgumentException) {
+                return 422 to error("invalid_record", "Not an upload")
+            }
+        var accepted = 0
+        var duplicates = 0
+        val byType = LinkedHashMap<String, IntArray>()
+        for (record in upload.records) {
+            val kind = record.kindName()
+            val counts = byType.getOrPut(kind) { IntArray(2) }
+            val known = wellnessRecords[record.id]
+            if (known == null || (record.lastModified != null && record.lastModified!! > (known.lastModified ?: ""))) {
+                wellnessRecords[record.id] = record
+                accepted++
+                counts[0]++
+            } else {
+                duplicates++
+                counts[1]++
+            }
+        }
+        if (wellnessLoseAnswers > 0) {
+            wellnessLoseAnswers--
+            throw java.io.IOException("The answer is lost")
+        }
+        val response =
+            WellnessUploadResponse(
+                accepted,
+                duplicates,
+                0,
+                byType.mapValues { RecordCounts(it.value[0], it.value[1], 0) },
+                "2026-11-18T07:40:00Z",
+            )
+        return 200 to WellnessApiJson.encodeUploadResponse(response)
     }
 
     private fun dismiss(body: String): Pair<Int, String> {

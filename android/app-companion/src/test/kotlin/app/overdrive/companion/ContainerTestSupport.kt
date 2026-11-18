@@ -2,6 +2,9 @@ package app.overdrive.companion
 
 import android.content.Context
 import app.overdrive.companion.model.TestClock
+import app.overdrive.companion.settings.OnboardingStep
+import app.overdrive.core.health.HealthSource
+import app.overdrive.core.health.RetryPolicy
 import app.overdrive.data.settings.SecretText
 import app.overdrive.data.sync.UrlConnectionTransport
 import kotlinx.coroutines.runBlocking
@@ -24,26 +27,42 @@ class ContainerWorld(
     private val containers = mutableListOf<CompanionContainer>()
     private var count = 0
 
-    /** A container over [cache]; [name] is its settings file, shared by a "restarted" one. */
+    /**
+     * A container over [cache]; [name] is its settings file, shared by a "restarted" one. [health] is the phone's Health Connect (by
+     * default one that allows nothing); a test that waits for a retry passes [moving], because the backoff reads the clock.
+     */
     fun container(
         name: String = "settings-${count++}",
         settleMillis: Long = 50,
+        health: HealthSource = FakeHealth(),
+        moving: Boolean = false,
+        retry: RetryPolicy = RetryPolicy(40, 200),
     ): CompanionContainer =
         CompanionContainer(
             context,
             settingsName = name,
             cacheDirectory = cache,
             patchTransport = UrlConnectionTransport(setPatchMethod = JdkPatch::allow),
-            clock = TestClock.clock,
+            clock = if (moving) TestClock.moving else TestClock.clock,
             settleMillis = settleMillis,
+            healthSource = health,
+            permissionRequest = { emptySet() },
+            retryPolicy = retry,
+            openGapMillis = 0,
         ).also { containers += it }
 
     fun CompanionContainer.configure(
         url: String = service.baseUrl,
         token: String = service.token,
+        onboarded: Boolean = true,
     ) {
         updateService(url, token)
         await("the settings are stored") { settings.value?.isConfigured == true }
+        // The first run's steps are a screen's concern: the container tests start from a phone that has been through them.
+        if (onboarded) {
+            setOnboarding(OnboardingStep.Done)
+            await("the first run is over") { settings.value?.onboarding == OnboardingStep.Done }
+        }
     }
 
     /** Stops a container the way the process ending does; the files stay. */

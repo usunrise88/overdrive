@@ -1,19 +1,26 @@
 package app.overdrive.companion.model
 
 import app.overdrive.companion.Samples
+import app.overdrive.companion.WatchSamples
 import app.overdrive.companion.model.TestClock.fresh
 import app.overdrive.companion.wellness.RecoveryFactData
 import app.overdrive.companion.wellness.RecoveryLevel
 import app.overdrive.companion.wellness.RecoveryState
+import app.overdrive.core.health.HealthAccess
+import app.overdrive.core.health.HealthDataType
+import app.overdrive.core.health.HealthStatus
 import app.overdrive.core.metrics.MetricsResponse
 import app.overdrive.core.profile.ProfileState
 import app.overdrive.core.remote.FtpAnswers
+import app.overdrive.core.remote.InsightsList
+import app.overdrive.core.remote.InsightsView
 import app.overdrive.core.remote.MetricsRange
 import app.overdrive.core.remote.ProblemKind
 import app.overdrive.core.remote.ResourceState
 import app.overdrive.core.remote.RidesList
 import app.overdrive.core.remote.RidesView
 import app.overdrive.core.remote.ServiceProblem
+import app.overdrive.core.wellness.RecoveryResponse
 import app.overdrive.uikit.RecoveryLook
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -460,13 +467,26 @@ class ScreenModelsTest {
 
     // region today
 
+    private val noRecovery = ResourceState<RecoveryResponse>(loaded = true, asked = true)
+
+    private fun recovery(state: app.overdrive.core.wellness.RecoveryState) = fresh(WatchSamples.recovery(state))
+
+    private val connected =
+        HealthStatus(
+            checked = true,
+            access = HealthAccess(HealthDataType.entries.toSet(), history = true, background = true),
+        )
+    private val declined = HealthStatus(checked = true)
+
     private fun today(
-        recovery: RecoveryState = RecoveryState.NotAvailableYet,
+        recovery: ResourceState<RecoveryResponse> = noRecovery,
         metrics: ResourceState<MetricsResponse> = fresh(Samples.metrics("2026-05-25")),
         workouts: ResourceState<app.overdrive.core.plan.WorkoutsResponse> = fresh(Samples.workouts()),
         rides: RidesView = RidesView(),
         answers: FtpAnswers = FtpAnswers(),
         justUsed: Int? = null,
+        insights: InsightsView = InsightsView(),
+        watch: HealthStatus = HealthStatus(),
     ) = TodayUi.of(
         recovery,
         metrics,
@@ -478,6 +498,8 @@ class ScreenModelsTest {
         Samples.TODAY,
         words,
         host,
+        insights,
+        watch,
     )
 
     @Test
@@ -538,38 +560,226 @@ class ScreenModelsTest {
         assertNull(today(metrics = fresh(Samples.metrics("2026-05-25", suggestion = null))).content().ftp)
     }
 
+    // region recovery
+
     @Test
-    fun `without the watch the recovery card is the learning form, never a state`() {
-        val recovery = today().content().recovery
+    fun `with Health Connect declined the recovery card says where to allow it, and never a state`() {
+        val recovery = today(watch = declined).content().recovery!!
         assertEquals(RecoveryLook.Learning, recovery.look)
         assertEquals("Learning your usual range", recovery.heading)
-        assertEquals(
-            "Overdrive rates recovery after 14 nights with the watch. The watch is not connected yet.",
-            recovery.reason,
-        )
+        val allow = "Allow Health Connect in Settings to rate recovery."
+        assertEquals("Overdrive rates recovery after 14 nights with the watch. $allow", recovery.reason)
         assertEquals(0f, recovery.progress)
     }
 
     @Test
-    fun `the recovery card's other states are ready for the watch data stage`() {
-        val facts = listOf(RecoveryFactData("resting-hr", "Resting heart rate", "59", "bpm", "above usual 50–56", true))
-        val caution =
-            TodayUi.recoveryUi(
-                RecoveryState.Rated(
-                    RecoveryLevel.Caution,
-                    "Resting heart rate is above your usual range for the second morning.",
-                    facts,
-                ),
-            )
-        assertEquals("Recovery · this morning", caution.label)
-        assertEquals(RecoveryLook.Caution, caution.look)
+    fun `while the rating has not come and Health Connect is allowed there is no card yet`() {
+        assertNull(today(watch = connected).content().recovery)
+        assertNull(today().content().recovery)
+    }
+
+    @Test
+    fun `ready, caution and rest are the service's words with its guidance, and the facts in its order`() {
+        val ready =
+            today(
+                recovery(app.overdrive.core.wellness.RecoveryState.READY),
+                watch = connected,
+            ).content().recovery!!
+        assertEquals("Recovery · this morning", ready.label)
+        assertEquals(RecoveryLook.Ready, ready.look)
+        assertEquals("All four signals are in your usual range. Train as planned.", ready.reason)
         assertEquals(
-            "Recovery · yesterday",
-            TodayUi.recoveryUi(RecoveryState.Rated(RecoveryLevel.Ready, "x", facts, thisMorning = false)).label,
+            listOf("Resting heart rate", "Sleep", "Respiratory rate", "Oxygen saturation"),
+            ready.facts.map { it.name },
         )
-        val learning = TodayUi.recoveryUi(RecoveryState.Learning(9, 14, facts))
+        assertEquals(listOf("52", "7:40", "14.2", "96"), ready.facts.map { it.value })
+        assertEquals(listOf("bpm", null, "/min", "%"), ready.facts.map { it.unit })
+        assertEquals(
+            listOf("usual 50–56", "usual 6:50–7:50", "usual 13.6–14.6", "usual 95–98"),
+            ready.facts.map { it.caption },
+        )
+        assertTrue(ready.facts.none { it.outside })
+
+        val caution =
+            today(
+                recovery(app.overdrive.core.wellness.RecoveryState.CAUTION),
+                watch = connected,
+            ).content().recovery!!
+        assertEquals(RecoveryLook.Caution, caution.look)
+        val reason = "Resting heart rate is above your usual range for the second morning."
+        assertEquals("$reason Train, but keep the hard parts short.", caution.reason)
+        assertEquals("above usual 50–56", caution.facts.first().caption)
+        assertTrue(caution.facts.first().outside)
+        assertEquals("restingHr", caution.facts.first().key)
+
+        val rest =
+            today(
+                recovery(app.overdrive.core.wellness.RecoveryState.REST),
+                watch = connected,
+            ).content().recovery!!
+        assertEquals(RecoveryLook.Rest, rest.look)
+        assertEquals("5:30", rest.facts[1].value)
+        assertEquals("below usual 6:50–7:50", rest.facts[1].caption)
+        assertEquals("above usual 13.6–14.6", rest.facts[2].caption)
+    }
+
+    @Test
+    fun `an older rating says its day so an old verdict never passes as this morning's`() {
+        val yesterday = WatchSamples.recovery(app.overdrive.core.wellness.RecoveryState.READY, date = "2026-11-17")
+        assertEquals("Recovery · yesterday", today(fresh(yesterday), watch = connected).content().recovery!!.label)
+    }
+
+    @Test
+    fun `learning shows the nights so far, a bar and the facts as last night's figures`() {
+        val learning =
+            today(
+                recovery(app.overdrive.core.wellness.RecoveryState.LEARNING),
+                watch = connected,
+            ).content().recovery!!
+        assertEquals(RecoveryLook.Learning, learning.look)
+        assertEquals("Learning your usual range", learning.heading)
         assertEquals("Overdrive rates recovery after 14 nights with the watch. 9 nights so far.", learning.reason)
         assertEquals(9f / 14f, learning.progress!!, 1e-6f)
-        assertEquals("No reading from last night", TodayUi.recoveryUi(RecoveryState.NoReading).heading)
+        assertEquals(listOf("last night", "last night", "last night", "no reading"), learning.facts.map { it.caption })
+        assertNull(learning.facts.last().value)
+    }
+
+    @Test
+    fun `no data last night is its own card`() {
+        val none =
+            today(
+                recovery(app.overdrive.core.wellness.RecoveryState.NO_DATA),
+                watch = connected,
+            ).content().recovery!!
+        assertEquals(RecoveryLook.NoData, none.look)
+        assertEquals("No reading from last night", none.heading)
+        assertEquals("Wear the watch to sleep, then open Overdrive in the morning.", none.reason)
+    }
+
+    @Test
+    fun `a bedtime fact is a clock time and says later or earlier than usual`() {
+        val fact =
+            app.overdrive.core.wellness.RecoveryFact(
+                app.overdrive.core.wellness.RecoveryMetric.BEDTIME_MINUTES,
+                "Bedtime",
+                -10.0,
+                app.overdrive.core.wellness.RecoveryUnit.MINUTES,
+                -70.0,
+                -20.0,
+                app.overdrive.core.wellness.Deviation.ABOVE,
+                1,
+            )
+        val data = RecoveryWords.fact(fact)
+        assertEquals("23:50", data.value)
+        assertNull(data.unit)
+        assertEquals("later than usual 22:50–23:40", data.caption)
+        assertTrue(data.outside)
+    }
+
+    @Test
+    fun `a watch that stopped reading says so on today, and a fresh read says nothing`() {
+        val read = TestClock.now - 3_600_000
+        assertNull(today(watch = connected.copy(firstReadDone = true, lastReadMillis = read)).status)
+        val late =
+            today(
+                watch = connected.copy(firstReadDone = true, lastReadMillis = TestClock.now - 40 * 3_600_000),
+            ).status
+        assertEquals("The phone stopped this morning's read. The figures are from yesterday.", late?.cause)
+        val revoked =
+            today(
+                watch = connected.copy(readIssue = app.overdrive.core.health.ReadIssue.PERMISSION_REVOKED),
+            ).status
+        assertEquals("Overdrive can no longer read your watch data. Allow it in Settings.", revoked?.cause)
+        assertEquals(ProblemAction.Settings, revoked?.action)
+    }
+
+    // region notes
+
+    private fun emptyNotes() = view(WatchSamples.insights().copy(insights = emptyList()))
+
+    private fun view(response: app.overdrive.core.insights.InsightsResponse) =
+        InsightsView(fresh(response), InsightsList(response.insights))
+
+    @Test
+    fun `today's note is the latest one with its time, and All notes is offered`() {
+        val card = today(insights = view(WatchSamples.insights()), watch = connected).content().note!!
+        assertEquals("Morning note · 07:30", card.note!!.label)
+        assertTrue(card.note!!.text.startsWith("You slept 7 hours 40"))
+        assertTrue(card.hasAll)
+        assertNull(card.waiting)
+    }
+
+    @Test
+    fun `an earlier note shows with its day, and before ten with none yet today it says when it is written`() {
+        val earlier = view(WatchSamples.insights(withToday = false))
+        val before = today(insights = earlier, watch = connected).content().note!!
+        assertNull(before.note)
+        assertEquals(NotesUi.NOT_YET, before.waiting)
+        assertTrue(NotesUi.NOT_YET.startsWith("No note yet today."))
+        assertTrue(before.hasAll)
+        // Without the watch no morning note is coming: the latest note is shown with its day.
+        val without = today(insights = earlier, watch = declined).content().note!!
+        assertEquals("Heads-up · yesterday 07:10", without.note!!.label)
+        assertTrue(without.note!!.alert)
+    }
+
+    @Test
+    fun `never a note is no card`() {
+        assertNull(today(insights = emptyNotes(), watch = declined).content().note)
+    }
+
+    @Test
+    fun `the notes screen groups by day, labels each kind, links the ride and carries the open topic`() {
+        val ui = NotesUi.screen(view(WatchSamples.insights()), RidesView(), Samples.TODAY, words, host)
+        val content = ui.content()
+        val headings = listOf("Today", "Yesterday", "Monday 16 November", "Tuesday 10 November")
+        assertEquals(headings, content.groups.map { it.heading })
+        val labels =
+            listOf(
+                "Morning note · 07:30",
+                "Heads-up · 07:10",
+                "After your ride · 19:42",
+                "Weekly review · 08:00",
+                "Plan check · 07:00",
+            )
+        assertEquals(labels, content.groups.flatMap { it.notes }.map { it.label })
+        val ride = content.groups[2].notes.first()
+        assertEquals("ride-1", ride.ride?.rideId)
+        assertEquals("the ride's name is not known when the list was not fetched", "Open the ride", ride.ride?.name)
+        assertEquals(WatchSamples.topic().openingQuestion, ride.topic?.question)
+        assertNull(content.groups[0].notes.single().topic)
+    }
+
+    @Test
+    fun `a ride note names its ride from the rides list, and a closed topic is not shown`() {
+        val threshold = Samples.ride("ride-1", "2026-11-16", "Threshold 2×20", 3900, 74.0, 196.0)
+        val rides = RidesView(fresh(Samples.ridesPage(listOf(threshold))), RidesList(listOf(threshold)))
+        val note =
+            NotesUi.note(
+                WatchSamples.insights().insights.first { it.rideId != null },
+                rides,
+                words,
+                withDay = false,
+            )
+        assertEquals("Threshold 2×20", note.ride?.name)
+        val closed =
+            WatchSamples
+                .insights()
+                .insights
+                .first {
+                    it.rideId != null
+                }.copy(topic = WatchSamples.topic(status = app.overdrive.core.insights.TopicStatus.DISCUSSED))
+        assertNull(NotesUi.note(closed, rides, words, withDay = false).topic)
+    }
+
+    @Test
+    fun `the notes screen has its own empty, loading and error states`() {
+        fun screen(view: InsightsView) = NotesUi.screen(view, RidesView(), Samples.TODAY, words, host).body
+        val text = "Notes are written after your morning's watch data and after each ride."
+        assertEquals(Body.Empty("No notes yet", text), screen(emptyNotes()))
+        assertEquals(Body.Loading("Loading your notes…"), screen(InsightsView(ResourceState(loaded = true))))
+        val offline = ServiceProblem(ProblemKind.NO_NETWORK, "x")
+        val failed = screen(InsightsView(ResourceState(loaded = true, problem = offline, asked = true)))
+        assertEquals("Could not reach your service", (failed as Body.Failed).problem.title)
     }
 }
