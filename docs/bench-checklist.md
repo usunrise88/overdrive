@@ -68,8 +68,15 @@ nothing, write down what Settings → About shows.)
   recording is an open question (OV 9.2), so note what the recording shows.
 - Screenshots: `adb exec-out screencap -p > ~/bench/shot-name.png`.
 - After any failure, run `adb bugreport ~/bench/` straight away, while the state is still on the tablet.
-- Raw BLE session recorder: its files will be written by the M3 build. The location is not defined in the
-  research notes; **see the M3 release notes** for where to find them and how to pull them.
+- Raw BLE session recorder: the format and the code exist since stage M3-1 (`BleSessionRecorder`, wrapped round the
+  transport with `factory.recording(...)`; one text line per GATT event, format in `docs/protocols/ftms-hr.md` §7.1,
+  ADR 0009 §6). The build that writes the files on the tablet is M3-2; **see the M3 release notes** for where to find
+  them and how to pull them. A file holds no address and no identity values, but it **does hold the owner's heart rate
+  and RR**: keep it out of the repository and send it privately (8.4). Where a step below says "the recording", it means
+  these files; the HCI snoop log shows the same traffic.
+- Where a step says **flip**, the change is one default in `FtmsOptions` (`core/src/commonMain/.../ble/adapter/FtmsOptions.kt`),
+  in `HeartRateOptions` or in the named constant, followed by a new build. ADR 0009 §8 lists every one with its default
+  and the evidence behind it. Write the observed value in the results table even when the default turned out right.
 
 **Conventions for results.** Each step ends with **If different**: write the screen you saw, the time,
 the session number and the log file name. Do not change the expected result to match what happened.
@@ -236,22 +243,37 @@ Turn the HCI snoop log on for this whole session.
   (ftms-hr §7.1).
 - [ ] **3.2 Feature and status.** The app reads the Fitness Machine Feature and Status characteristics
   (spec §4.1). Check the logs for the feature bits. Expect: the bits needed for ERG and simulation are
-  set (ftms-hr §10 asks for these bit checks before ERG and gears). Write down what the app does if a needed
-  bit is missing. Settles: the precondition in ftms-hr §10.
+  set (ftms-hr §10 asks for these bit checks before ERG and gears). Write down the eight bytes of the Feature
+  read (the `R 2ACC` line of the recording, or the snoop log; the codec's reading is two little-endian words,
+  ftms-hr §3), and whether the app reported anything missing (`TrainerEvent.FeaturesMissing`;
+  `FitnessMachineFeatures.missingForRide`). By default a missing bit is only reported and the trainer's own answer
+  decides (`FtmsOptions.enforceFeatureBits = false`): if the D500 rejects ERG or simulation although its Feature word
+  claims them, or accepts them although it does not, write that down and decide whether to turn
+  `enforceFeatureBits` on. Settles: the precondition in ftms-hr §10.
 - [ ] **3.3 ERG holds target (AC 2, part).** Start a steady workout step at a set target, for example
   100% of FTP. Read the D500 display and the app's power. Expect: the trainer holds the target for the whole
   step. The tolerance is not defined in the sources. Judge it on the display and write down the range you
-  saw. Settles: AC 2 (on the D500), FT 4 (write status `0x08` after a target write).
+  saw. In the recording, look for the Status notification (`N 2ADA`) after a target write: opcode `08` and the
+  watts (`FtmsOptions.controlRecoveryDelay` and `TrainerEvent.TargetPowerAltered` exist because of this question; if the
+  D500 never sends `08`, nothing breaks). Settles: AC 2 (on the D500), FT 4 (write status `0x08` after a target write).
 - [ ] **3.3b Ramp and interval steps (AC 2).** Load a workout file with a steady step, a ramp and an interval
   set (the native JSON or a Zwift ZWO file, spec §4.5). Run it from the start. Expect: each step's target shows on
   the overlay, and the trainer's power follows each target through the ramp and every interval. Write down any
   step where power does not follow. Settles: AC 2 (every step type).
 - [ ] **3.4 Control point replies.** In the snoop log, find the replies to the target and simulation
   writes. Expect: the `0x80` indication arrives. Note the time from write to indication (median and the
-  worst of several), since the research notes say the timeout depends on this. Settles: FT 6.
+  worst of several), since the research notes say the timeout depends on this: the recording shows it as the gap
+  between the `W 2AD9` line and the `I 2AD9` line that follows. The guesses to set from it are
+  `FtmsOptions.controlPointTimeout` (3 s; make it comfortably longer than the worst you saw),
+  `operationFailedRetries` (2) and `operationFailedBackoff` (500 ms). Also note any result code other than `01` and
+  which command got it (`80 <opcode> <result>`; the adapter retries `04`, takes control again on `05`, and remembers `02`).
+  Settles: FT 6.
 - [ ] **3.5 Start or Resume.** Check in the snoop log whether the app sends `0x07` (Start or Resume) and
-  whether the trainer needs it before a target (`0x05`). Expect: unknown. Write down the sequence that
-  worked. Settles: FT 7.
+  whether the trainer needs it before a target (`0x05`). Expect: unknown. The M3 adapter sends it by default, right
+  after Request Control (the recording shows `W 2AD9 00`, then `W 2AD9 07`, then the first `05`;
+  `FtmsOptions.startAfterRequestControl = true`). Write down the result code the D500 gives `07` (`80 07 <result>`; a
+  refusal is only logged) and whether a target works without it. Flip `startAfterRequestControl` to false only if
+  sending it does harm. Write down the sequence that worked. Settles: FT 7.
 - [ ] **3.6 Gear feel.** Free ride, flat. Step through the gears one at a time, up and down. Write down, for
   each gear you try, whether the change feels right. The defaults are 24 gears at 1% each, neutral at 12
   (ADR4, spec §4.4). Expect: each gear is clearly different and no step feels like a jump. Also read the
@@ -260,28 +282,54 @@ Turn the HCI snoop log on for this whole session.
 - [ ] **3.7 Simulation limits.** The app should log the Supported Inclination Range characteristic (`0x2AD5`).
   Find it in the log and write down the min and max. Check whether the 15% maximum in spec §2 is there.
   Then set a negative grade in a free ride and check the value on the D500 display. Expect: a negative grade
-  reads as a downhill. Settles: FT 5, FT 8.
+  reads as a downhill. The M3 adapter does not read `0x2AD5` itself yet (ftms-hr §10), so take it from the snoop log
+  or nRF Connect. Also find the Status echo of the simulation (`N 2ADA 12 ...`): the two grade bytes are two's
+  complement for a downhill (`38 FF` is -2.00 %, ftms-hr §8 ST3). The codec reads them signed
+  (`FitnessMachineStatusCodec.DEFAULT_SIMULATION_SIGNED = true`, per device `FtmsOptions.simulationStatusSigned`); write
+  down what you saw and whether the display agrees. Settles: FT 5, FT 8.
 - [ ] **3.8 Cadence, speed and distance.** Ride at a steady cadence. Compare the cadence on the D500 with the
   app's cadence. Ride a known distance (for example, a lap of the trainer's own display) and compare with the
   app's distance. Expect: cadence matches. Distance matches within the trainer's own tolerance (unverified).
-  Note which flag bit the cadence is in (FT 1, the codec's assumption is bit 2). Settles: FT 1, FT 2, FT 3
-  (More Data: check for speed-absent or split notifications in the log).
+  Note which flag bit the cadence is in (FT 1, the codec's assumption is bit 2): in the recording, take an
+  `N 2AD2` line with speed, cadence and power and read the low byte of the flags. `44` (bits 2 and 6) is what
+  `IndoorBikeFlagMap.DEFAULT` (`DECODERS`) expects, with the cadence in bit 2; `42` means the D500 puts the cadence in
+  bit 1 as the SIG XML labels say, and then `IndoorBikeFlagMap.DEFAULT` must become `SIG_XML_LABELS` (one line; per
+  device `FtmsOptions.flagMap`). That reading of the two byte patterns is derived from ftms-hr §2.2 and §2.4, not
+  observed. For distance, `IndoorBikeData.totalDistanceMetres` assumes metres (FT 2); if the app's distance is ten
+  times off, the unit is decimetres. Settles: FT 1, FT 2, FT 3 (More Data: check for speed-absent or split
+  notifications in the log; the app counts them as `TrainerEvent.MoreDataSeen`).
 - [ ] **3.9 Auto-pause (cadence 0).** Ride, then stop pedalling. Expect: the ride pauses after about 3 seconds
   (spec §4.2). The overlay says why (auto). Pedal again: the ride resumes. Watch the log for the cadence the
   trainer reports when you stop: does it send 0, or hold the last value? Expect: 0. If it holds the last value,
   auto-pause never fires. Settles: ADR4 ("reports cadence 0 when the rider stops").
 - [ ] **3.10 Zero watts in a paused ERG step.** Start a workout ERG step, then pause it (on screen). Expect:
   the trainer's target drops to 0 W and the trainer accepts it. If it rejects 0 W, the response code appears in
-  the `0x80` indication. Record the code. On resume, the target ramps in over about 3 seconds (spec §4.5).
-  Settles: ADR4 ("is 0 W accepted"), spec §4.5.
+  the `0x80` indication (`80 05 <result>`). Record the code. On resume, the target ramps in over about 3 seconds
+  (spec §4.5). A rejection is retried every second by the engine, so the ride does not stop, but the trainer then
+  holds its last target. Settles: ADR4 ("is 0 W accepted"), spec §4.5.
 - [ ] **3.11 Trainer dropout (AC 4).** Ride for a few minutes. Switch the trainer off at the wall. Expect:
   the ride pauses at once, and the overlay says the trainer disconnected. Wait 30 seconds, then switch it on.
   Expect: the trainer reconnects by itself and the ride resumes. When the ride is over, the record should show
-  the seconds in between as paused samples with no power. Write down the reconnect time. Settles: AC 4, spec
+  the seconds in between as paused samples with no power. Write down the reconnect time. After the reconnect,
+  the recording should show a new `S connecting` and the whole set-up again (discovery, the three CCCD writes, `W 2AD9 00`),
+  and the trainer's power should follow the workout target again without you touching anything: the adapter takes
+  control back and the engine re-sends the target. Write down any step that did not repeat. Settles: AC 4, spec
   §4.2 (trainer link), FT 9 (indications still arrive while notifications are on).
 - [ ] **3.12 Reconnect without the app restarting.** Repeat 3.11 with a longer gap (two minutes). Expect: the
-  reconnect backoff works and the app reconnects without a restart. Note the time of each attempt in the log.
-  Settles: spec §4.1 (reconnect with backoff).
+  reconnect backoff works and the app reconnects without a restart. Note the time of each attempt (each
+  `S connecting` line of the recording, or the log). The default `BackoffPolicy` waits 1 s, 2 s, 4 s, 8 s, 16 s and then
+  30 s between attempts (each +/-20 %), starts again from 1 s after a link that held 30 s, and gives an attempt 45 s to
+  finish (`LinkSupervisor.DEFAULT_ESTABLISH_TIMEOUT`). Also write down how long one attempt against the switched-off
+  trainer takes to fail (`S connecting` to `S disconnected` and its status; 133 is expected) and whether any attempt
+  ended only because of the 45 s backstop. If the Devices screen has a **Retry** button (M3-2), press it during a wait:
+  the next attempt should start at once. Settles: spec §4.1 (reconnect with backoff); the guesses to tune are
+  `BackoffPolicy` (initial, factor, cap, jitter, stable time) and the establish timeout.
+- [ ] **3.13 Bluetooth switched off, and the permission.** During a ride, switch the tablet's Bluetooth off from the
+  quick settings. Expect: the ride pauses (the trainer link is gone), the Devices screen says Bluetooth is off
+  (`LinkStatus.BluetoothUnavailable`) and nothing is retried. Switch it on: the trainer and the strap reconnect at
+  once, without waiting for a backoff step. Repeat by revoking "Nearby devices" in the app's permissions (spec §4.1,
+  Android 12 and later): expect the same state with a different reason. Write down how long the reconnect took after
+  Bluetooth came back. Settles: spec §4.1 (reconnect), ADR 0009 §5.
 
 ---
 
@@ -292,17 +340,28 @@ Turn the HCI snoop log on for this whole session.
 - [ ] **4.2 RR intervals.** Check the snoop log or the M3 raw recorder (see the M3 release notes) for the
   Heart Rate Measurement flags. Expect: unknown: spec §9 lists RR intervals from the Coospo strap as an
   open check. Write down whether RR bit is set, how many RR values come per notification, and whether they
-  look like 1/1024 s units (FT 10). If the app has no RR, record that. Optional: compare the RR average with the
-  strap's own report, if you have nRF Connect (spec §9 names it). Settles: SP9 "RR intervals", FT 10.
+  look like 1/1024 s units (FT 10). In the recording these are the `N 2A37` lines: the first byte is the flags
+  (`16` is 8-bit rate, contact detected, RR present; bit 4, `0x10`, is the RR flag), and each RR is two little-endian
+  bytes after the rate. The app converts them with `RrIntervals.rawToMillis` (x1000/1024, halves rounded up); if the
+  strap's RR looks like milliseconds already, that is the one function to change. If the app has no RR, record that.
+  Optional: compare the RR average with the strap's own report, if you have nRF Connect (spec §9 names it). The file holds
+  heart rate and RR: do not commit it. Settles: SP9 "RR intervals", FT 10.
 - [ ] **4.3 Contact.** Take the strap off the chest. Expect: no heart rate is shown, not a stuck value (ADR4:
   0 bpm without contact). Put it back on. In the log, write down the contact status values you see (2 or 3).
-  Expect: 3 when on the chest (the SIG XML's reading, ftms-hr §6.5). Settles: FT 11.
+  Expect: 3 when on the chest (the SIG XML's reading, ftms-hr §6.5). In the recording the contact status is bits 1 and 2
+  of the first byte of each `N 2A37` line (`06` is 3, `04` is 2, `02` is 1, `00` is 0). The app reads only 3 as contact
+  (`HeartRateContactRule.DEFAULT = SIG_XML`; the other rule is `ANY_NONZERO`, pycycling's reading) and shows no heart
+  rate, with no RR, while contact is reported as supported but not detected (`HeartRateOptions.noSignalWithoutContact`).
+  If the HR7 reports 1 or 0 all the time it does not report contact, and a strap off the chest is then visible only
+  as notifications that stop: write that down. Settles: FT 11.
 - [ ] **4.4 Dropout is only a gap.** During a ride, move the strap away for 20 seconds. Expect: the ride keeps
   going and the heart-rate samples have a gap (spec §4.2). Settles: spec §4.2 (heart-rate dropout never
   pauses).
 - [ ] **4.5 MTU and long notifications.** In the log, find the negotiated MTU and whether the largest trainer
-  notification (30 bytes) arrives whole. Expect: MTU at least 64, requested at connect (ftms-hr §7). Write down
-  the negotiated value. Settles: FT 12.
+  notification (30 bytes) arrives whole. Expect: MTU at least 64, requested at connect (ftms-hr §7;
+  `FtmsOptions.requestedMtu = 64`). The negotiated value is the `S - 0 mtu=N` line of the recording. Write down the
+  negotiated value, and whether the app carried on when the request was refused (the MTU step is optional in the
+  adapter). Settles: FT 12.
 - [ ] **4.6 Battery service (optional).** The UUID `0x180F` is unverified (ftms-hr §1, FT 13). With nRF Connect,
   check whether the strap exposes it. Write down what you see. Not needed for acceptance.
 
@@ -447,7 +506,7 @@ the firmware version from the Companion app and the Zwift app version before eac
 | 1. 60-minute free ride, video full screen, overlay visible | 60 min over a real video app | 2.1, 2.8, 2.9, 2.10, 2.13, 1.6 |
 | 2. ERG holds target through steady, ramp and interval steps | Same workout on the D500 | 3.3, 3.3b, 3.5, 3.10 |
 | 3. All ten Click actions work from the right controller in the background | Each action with the video app in front | 5.5, 5.6, 5.7 |
-| 4. Trainer power pulled mid-ride pauses; resumes with no data lost | Unplug the trainer | 3.11, 3.12 |
+| 4. Trainer power pulled mid-ride pauses; resumes with no data lost | Unplug the trainer | 3.11, 3.12, 3.13 |
 | 5. Force-stop mid-ride, relaunch recovers the ride | Force-stop, relaunch | 6.1, 6.2, 6.3 |
 | 6. FIT opens in intervals.icu with power, HR, cadence and laps | Import into intervals.icu | 7.1 to 7.4 |
 | 7. Overlay drag drops no frames at the tablet's refresh rate | `dumpsys gfxinfo` while dragging | 2.5, 2.6, 2.14 |
@@ -511,6 +570,7 @@ Fill this in on the bench. A criterion counts as confirmed only after its owner 
 | 3.10 Zero watts when paused | | | |
 | 3.11 Trainer dropout (AC 4) | | | |
 | 3.12 Reconnect | | | |
+| 3.13 Bluetooth off and permission | | | |
 | 4.1 HR pairing | | | |
 | 4.2 RR intervals | | | |
 | 4.3 Contact | | | |
@@ -559,6 +619,10 @@ Read these before the bench, so a surprising result is not taken as a bug in the
   screen and the Last ride row) before session 7. Each open FIT question is a field of `FitOptions`, so a finding in
   session 7 is a one-line change of its default.
 - **Heart-rate contact.** The SIG XML says only status 3 means contact is detected. pycycling reads any non-zero
-  value as contact (ftms-hr §6.5). The codec follows the XML. Session 4.3 settles it.
+  value as contact (ftms-hr §6.5). The codec follows the XML (`HeartRateContactRule.DEFAULT`, one line to flip).
+  Session 4.3 settles it.
+- **Cadence flag bit.** The SIG XML labels bit 1 as cadence and bit 2 as average speed; pycycling and Ewoc read them the
+  other way round (ftms-hr §2.4). The codec follows the two decoders (`IndoorBikeFlagMap.DEFAULT = DECODERS`, one line to
+  flip). Session 3.8 settles it.
 - **Overlay frame-stats output.** The `dumpsys gfxinfo` commands in acceptance criterion 7 come from overlay-notes
   §5.4, and that section marks their output format unverified. Record the output as printed.

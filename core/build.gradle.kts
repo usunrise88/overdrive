@@ -43,12 +43,21 @@ val contractsDir = layout.projectDirectory.dir("../contracts")
 // fit.md section 7); the test loads it from this path at run time. Without the property that test is skipped, as in CI.
 val fitOracleJar = providers.gradleProperty("fitOracleJar")
 
+// Regenerates the synthetic BLE session fixtures of contracts/fixtures/ble/ (docs/adr/0009-ble-transport-and-adapters.md):
+// `./gradlew jvmTest -PregenerateBleFixtures=true` rewrites them from the generator, then review the diff. Without it the
+// test only compares.
+val regenerateBleFixtures = providers.gradleProperty("regenerateBleFixtures")
+
 tasks.named<Test>("jvmTest") {
     systemProperty("overdrive.contracts.dir", contractsDir.asFile.absolutePath)
     inputs.dir(contractsDir.dir("fixtures")).withPropertyName("contractFixtures")
     fitOracleJar.orNull?.let { jar ->
         systemProperty("overdrive.fit.oracle.jar", jar)
         inputs.file(jar).withPropertyName("fitOracleJar")
+    }
+    regenerateBleFixtures.orNull?.let { value ->
+        systemProperty("overdrive.ble.regenerate", value)
+        inputs.property("regenerateBleFixtures", value)
     }
 }
 

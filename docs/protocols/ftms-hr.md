@@ -2,6 +2,8 @@
 
 Status: research notes for the pure-Kotlin FTMS and Heart Rate codecs (spec §2, §4.1, §4.3–§4.5, §7.5). Written from the Bluetooth SIG GATT definitions and two independent open-source decoders, not from memory. Nothing here was observed on the bench. The open questions at the end list what to check with the Van Rysel D500 and the Coospo HR7.
 
+**Implementation status (stage M3-1, ADR 0009):** the codecs of §2–§6 are written in `core` (`app.overdrive.core.ble.codec`), all 44 vectors of §8 pass as tests with their IDs, and the transport boundary, device adapters, reconnect supervisor, session recorder (§7.1) and fake Bluetooth are built on top. **Still nothing is observed on the bench:** a green test means the code agrees with these notes, not with the D500 or the HR7. Each disputed or unverified point below is one named constant or option; ADR 0009 §8 lists them all.
+
 **Main gap:** the Bluetooth SIG Fitness Machine Service 1.0 and Heart Rate Service 1.0 specification texts were **not retrieved**. The bluetooth.com spec pages load, but their PDF download endpoints (`files.bluetooth.com/download/...`) return HTML landing pages, not files. Everything below marked *spec* therefore comes from the SIG's GATT characteristic XML (2017, see table), and everything about FTMS Control Point, Fitness Machine Status and Fitness Machine Feature bit meanings is either *cross-checked* (two decoders agree) or *single-source* (one decoder only) or *unverified*.
 
 ## Sources and tags
@@ -296,17 +298,27 @@ The HR7 is expected to send RR intervals, which the spec §2 calls "expected but
 
 ### 7.1 Raw session recorder (for replay, spec §7.5)
 
-Record one line per event, in order:
+**As implemented in stage M3-1** (`app.overdrive.core.ble.recording`, format version 1, ADR 0009 §6). One event per line,
+in order, after the header `# overdrive-ble-session 1` and an optional `# model <advertised name>`:
 
 | Field | Example | Notes |
 |---|---|---|
-| `t_ns` | monotonic nanoseconds (`elapsedRealtimeNanos`) | ordering and timing |
-| `dir` | `N` (notification), `I` (indication), `W` (write), `R` (read), `C` (CCCD write), `S` (connection state) | |
-| `char` | `2AD2` or the full UUID | |
-| `status` | GATT status (0 for success), or `-` | |
-| `hex` | `4400C409B400FA00` | the exact bytes, unchanged |
+| `t_ns` | `1200000000` | **nanoseconds since the recording began** (not since boot: the file carries no clock) |
+| `dir` | `N` | `N` notification, `I` indication, `W` write, `R` read, `C` CCCD write, `S` connection state, **`D` discovered characteristic** (added: a replay needs to know what the peripheral offered) |
+| `char` | `2AD2` | 16-bit form of the characteristic UUID, or `-` for `S` |
+| `status` | `0`, `133`, `-` | GATT status of a completed operation; `-` where there is none (`N`, `I`, `D`, some `S`) |
+| `data` | `44008C0AB4006400` | the exact bytes, unchanged, in hex; `*` where the value was redacted; for `D` the service and properties (`1826/WI`: R read, W write, w write without response, N notify, I indicate); for `S` one of `connecting`, `connected`, `disconnected`, `closed`, `mtu=N` |
 
-Do **not** write device MAC addresses, serial numbers or the HR strap's identity into a file that goes in the repo. The fixtures in the repo are synthetic (§8). Real recordings stay out of git: the repository is public and the rules in `CLAUDE.md` forbid committing raw recordings of the owner's body.
+`W`, `R` and `C` lines are written when the operation completes, with its status. The recorder is a decorator over the
+transport (`factory.recording(recorder, scope)`), so the adapters need no cooperation, and it writes through a queue so a
+slow disk never delays a BLE callback.
+
+**Never written** (`BleRecordingPolicy`): a device address (the recorder is never given one), a serial number, the strap's
+identity, or any name beyond the advertised model (cleaned to ASCII, serial-like words dropped, 24 characters at most). The
+**values** of the Device Information identity characteristics (`2A00`, `2A23`–`2A29`) are replaced with `*`. Do **not** put a
+real recording in the repo: it is public, and the rules in `CLAUDE.md` forbid committing raw recordings of the owner's body.
+The fixtures in `contracts/fixtures/ble/` are **generated** by running a synthetic ride over the fake Bluetooth with the
+recorder on (§8), so they hold synthetic bytes only.
 
 ## 8. Test vectors
 
@@ -390,6 +402,23 @@ CP3 and CP4 are also written by Ewoc (`05`, lo, hi), so they are cross-checked t
 
 Summary: 44 vectors, 41 agree with pycycling, 3 disagree. HR4 and HR5 are a pycycling defect against the SIG XML. ST3 depends on the signedness of the simulation grade in the Status characteristic, which is **unverified** because the FTMS text was not retrieved; pycycling's own Control Point encoder treats the same field as signed.
 
+### 8.7 Vector coverage (stage M3-1)
+
+Every vector is a test case of `core/src/commonTest/kotlin/app/overdrive/core/ble/codec/VectorsTest.kt`, named with its ID (`IBD1` … `FMF2`), and passes. A vector that disagrees with pycycling asserts the **notes'** value (HR4, HR5, ST3), and the same bytes are asserted again under the other reading in `DisputedPointsTest`, so each disagreement is a visible, one-line-flippable test.
+
+| Vectors | Test (VectorsTest unless noted) | Checks |
+|---|---|---|
+| IBD1–IBD10 | one test each | every field of §2.2, bit 0 inverted, power sint16, distance uint24, MET /10, the 30-byte maximal record |
+| IBD3 | also `DisputedPointsTest` (4 tests) | §2.4: default `DECODERS`, flipped to `SIG_XML_LABELS`; a flag map must use bits 1 and 2 once each |
+| HR1–HR2, HR6–HR11 | one test each | §6.2–§6.3: formats, RR as raw 1/1024 s, energy before RR, empty RR list, stray byte |
+| HR3–HR5 | `HR3 to HR5 contact bits`; `DisputedPointsTest` (2 tests) | §6.5: default `SIG_XML` (only 3 is contact), flipped to `ANY_NONZERO` reads HR4 and HR5 as contact |
+| HR6, HR7 | also `RR conversion rounds halves up…` | the rounding rule is `RrIntervals.rawToMillis` in the domain layer (§6.3, §10), not in the codec |
+| CP1–CP9 | `CP1 to CP7…`, `CP8 and CP9…` | exact bytes; the engine's flat and gear commands also encode as the gear model intends |
+| RC1–RC5 | `RC1 to RC5 response codes` | the result table of §4.4; an unlisted code keeps its raw value |
+| ST1–ST7 | `ST1 to ST7…`; `DisputedPointsTest` (2 tests) | §5; ST3 default signed (-2.00 %), flipped to unsigned (653 %) |
+| FMF1–FMF2 | `FMF1 and FMF2 feature words` | the Feature and Target Setting words; a missing power-target feature is reported; bit 31 is read unsigned |
+| (none) | `CodecFuzzTest` (8 tests) | random bytes of every short length never throw; every proper prefix of an IBD vector is `TRUNCATED`; empty payloads are typed errors; random IBD and heart-rate records survive an encode-decode round trip |
+
 ## 9. Open questions for the bench test (D500 and HR7)
 
 1. **Flag bits 1 and 2 (§2.4):** send a session with cadence on. Does the D500 set bit 1 or bit 2 for instantaneous cadence? Check against the cadence the trainer displays. This decides the codec's field order for every notification.
@@ -406,11 +435,30 @@ Summary: 44 vectors, 41 agree with pycycling, 3 disagree. HR4 and HR5 are a pycy
 12. **MTU (§7):** what MTU does the D500 negotiate, and does a 30-byte maximal Indoor Bike Data notification arrive whole?
 13. **Battery Service (`0x180F`, §1):** the UUID is unverified. Check it on the bench.
 
+**Where each answer lands (stage M3-1).** A bench result changes one constant or option, never an adapter. Full table with defaults and evidence: ADR 0009 §8.
+
+| FT | What flips |
+|---|---|
+| 1 | `IndoorBikeFlagMap.DEFAULT` (`DECODERS` or `SIG_XML_LABELS`), per device `FtmsOptions.flagMap` |
+| 2 | `IndoorBikeData.totalDistanceMetres` (nothing in the ride reads it yet) |
+| 3 | `TrainerEvent.MoreDataSeen` is reported; splitting is not implemented, each notification is one record |
+| 4 | `FtmsOptions.controlRecoveryDelay`; which `TrainerEvent`s appear |
+| 5 | the `0x2AD5` range is not read yet; the gear model keeps within ±15 % |
+| 6 | `FtmsOptions.controlPointTimeout` (3 s), `operationFailedRetries` (2), `operationFailedBackoff` (500 ms) |
+| 7 | `FtmsOptions.startAfterRequestControl` (on) |
+| 8 | `FitnessMachineStatusCodec.DEFAULT_SIMULATION_SIGNED`, per device `FtmsOptions.simulationStatusSigned` |
+| 9 | CCCD order in `FtmsSession` (Control Point, then Indoor Bike Data, then Status, one at a time) |
+| 10 | `RrIntervals.rawToMillis`; the adapter passes whatever RR the strap sends |
+| 11 | `HeartRateContactRule.DEFAULT` (`SIG_XML` or `ANY_NONZERO`), `HeartRateOptions.contactRule` and `noSignalWithoutContact` |
+| 12 | `FtmsOptions.requestedMtu` (64) |
+| 13 | nothing uses the Battery Service |
+| 3.2 of the bench checklist | `FtmsOptions.enforceFeatureBits` (off) |
+
 ## 10. Items to fix in the spec (`docs/spec.md`) and the codecs
 
-- §4.1 says "Read Fitness Machine Feature and Status". Add the bit checks in §3 as a precondition for ERG and gears.
-- §2 gives the D500's 15 % maximum grade. Keep it, and add the device-read limit (`0x2AD5`) as the source of truth once measured.
-- §4.4's gear offset must stay within ±15 % (±1500 raw) by construction.
-- The RR interval rounding rule (§6.3) should live in the domain layer, not the codec.
+- §4.1 says "Read Fitness Machine Feature and Status". Add the bit checks in §3 as a precondition for ERG and gears. **Done in M3-1:** `FitnessMachineFeatures.missingForRide` names what the ride needs; the adapter reports it (`TrainerEvent.FeaturesMissing`) and refuses the command only with `FtmsOptions.enforceFeatureBits` (off by default, bench 3.2); spec §4.1 says so.
+- §2 gives the D500's 15 % maximum grade. Keep it, and add the device-read limit (`0x2AD5`) as the source of truth once measured. **Open:** the adapter does not read `0x2AD5` yet (bench 3.7 reads it with the snoop log first).
+- §4.4's gear offset must stay within ±15 % (±1500 raw) by construction. **Unchanged:** the gear model already does this; `VectorsTest` encodes the engine's real flat and gear commands and checks the raw values.
+- The RR interval rounding rule (§6.3) should live in the domain layer, not the codec. **Done in M3-1:** `RrIntervals.rawToMillis` (`app.overdrive.core.device`); the heart-rate codec returns raw 1/1024 s.
 
-**Next step for the implementer:** write the codecs from §2–§6 and the vectors in §8 as the test oracle. Start with the two disputed points (§2.4 and §6.5) as explicit test cases, so a later bench result can flip them with one change.
+**Next step:** the Android transport (stage M3-2) implements `GattTransport`, `GattTransportFactory`, `GattScanner` and `BleEnvironment` on the platform; then the owner's bench sessions 3 and 4 (`docs/bench-checklist.md`) settle the questions of §9, each by changing the constant named in the table under it. Record what the bench shows in the results table of the checklist and update §2.4, §5 and §6.5 here.

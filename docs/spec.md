@@ -107,6 +107,30 @@ Phase 1 delivers a complete offline ride: connect the devices, ride free or play
 - **Click v2.** Zwift's proprietary encrypted protocol, ported from BikeControl. Button down and up events are delivered to the gesture layer.
 - **Reconnect.** Each device reconnects on its own with backoff. A dropout never stops the ride; missing values are recorded as gaps.
 - **Pairing.** One setup screen scans and remembers the three devices. Later launches connect without user action.
+- *Settled in stage M3-1* (`app.overdrive.core.ble`, ADR 0009; written from `docs/protocols/ftms-hr.md`, **nothing observed
+  on the bench yet**). The platform boundary is four interfaces in `core`: `GattTransport` (one single-use GATT session; a
+  failed or dropped one, status 133 included, is closed and replaced, never reused), `GattTransportFactory`, `GattScanner`
+  and `BleEnvironment` (Bluetooth off, permission missing). Device ids are opaque (`DeviceId`), so no address can reach a log
+  or a recording.
+  **Trainer.** `FtmsTrainerDevice` is the engine's `TrainerDevice`. On each connection it discovers the services, asks for an
+  MTU of 64, reads the Feature word, enables the Control Point (indications), Indoor Bike Data and Status (notifications) one
+  after another, requests control and sends Start or Resume; only then is the trainer connected, so the engine's `READY`
+  means it can be commanded. The Control Point has one command in flight and a 3 s answer timeout; *operation failed* is
+  retried twice, *control not permitted* takes control again once, *op code not supported* is remembered. A control loss
+  reported by Status is repaired by itself after a second and the last target is sent again. **The Feature bits are a
+  report, not a gate:** a trainer that lacks power target setting or simulation is reported (`TrainerEvent.FeaturesMissing`)
+  and the Response Code decides; `FtmsOptions.enforceFeatureBits` refuses the command instead (bench 3.2).
+  **Heart rate.** `HeartRateStrapDevice` is the engine's `HeartRateDevice`: a strap that reports no skin contact reads as
+  0 bpm without RR (no signal), RR arrives in whole milliseconds (`RrIntervals.rawToMillis`, rounded half up, in the domain
+  layer) and a dropout is only a gap.
+  **Reconnect.** One `LinkSupervisor` per device: 1 s, doubling, 30 s cap, ±20 % jitter, back to 1 s after a link that held
+  30 s; Retry (`retryNow()`) cuts the wait; Bluetooth off or a revoked permission is a state (`LinkStatus.BluetoothUnavailable`),
+  not a failure, and connects at once when it returns.
+  **Recording.** A decorator writes every GATT event to a text file (`BleSessionFormat`, version 1, relative times, no
+  addresses, identity values redacted) that replays through a fake peripheral on virtual time; the committed fixtures
+  (`contracts/fixtures/ble/`) are generated, never real recordings.
+  **Open until the bench:** which flag bit carries cadence, the units of distance, the contact bits and RR of the HR7, response
+  timing, whether Start is needed; each is a named constant or option (ADR 0009 §8).
 
 ### 4.2 Ride engine
 
@@ -604,6 +628,10 @@ live spec document.
   Bluetooth); M3 adds `connectedDevice` and `BLUETOOTH_CONNECT` with the BLE adapters. Opening the app from the overlay's long
   press depends on Android's background-activity-start exemptions for a visible window and `SYSTEM_ALERT_WINDOW`;
   that it works on the tablet is unverified, and the notification's tap is the fallback. See ADR 0006.
+- **§4.1, Feature bits.** Settled in M3-1 as a report, not a precondition: the missing-feature check of `docs/protocols/ftms-hr.md`
+  §10 is implemented (`FitnessMachineFeatures.missingForRide`) but refuses ERG or gears only when
+  `FtmsOptions.enforceFeatureBits` is on, because the Feature word is single-source until the bench and a wrong one must not
+  stop a ride. The Supported Inclination Range (`0x2AD5`) is not read yet; the gear model stays within ±15 % by construction.
 - **§4.8, FIT export.** Garmin's FIT SDK is under a proprietary agreement that does not allow
   redistributing it inside an APK under a source-disclosure licence. The FIT writer is therefore our own
   implementation of the published format; the SDK is used only as a test-time decoder.
