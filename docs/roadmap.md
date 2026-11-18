@@ -74,3 +74,24 @@ sessions (§7.5). The honest consequences:
 
 Pre-releases are `v0.1.0-alpha.N`; the MVP is `v0.1.0`. Later phases continue from there
 (`v0.2.0` for Phase 2, with no alphas). Mechanics and checklist: `CLAUDE.md`, Process.
+
+## Phase 3 stages (spec §6)
+
+Order of work, 2026-11-18. Stages merge into the development branch without a release; the phase ends with a release candidate
+`v0.3.0-rc.1`, which the owner tests while the orchestrator runs the long checks, then the final `v0.3.0` (`CLAUDE.md`, Process).
+Tasks live in Lific, project OVD.
+
+| Stage | Goal | Task | State |
+|---|---|---|---|
+| Interfaces | The phone companion's design: navigation, screens, charts, copy, mock-ups (`design/companion.md`) | | done |
+| P3-1 Metrics engine | Load, fitness/fatigue/form, power curve, eFTP suggestion, aerobic drift, W′ balance; `GET /v1/metrics`, ride detail, MCP `get_fitness` (§6.3) | OVD-12 | in progress |
+| P3-2 Wellness | `POST /v1/wellness`, `WellnessSource`, intervals.icu wellness, baselines, ready/caution/rest, other activities from the watch (§6.2, §6.4, §6.7) | OVD-13 | not started |
+| P3-3 Insights and alerts | Written notes from computed facts (configurable LLM endpoint), morning/deviation/drift alerts in Telegram, MCP tools (§6.5, §6.6) | OVD-14 | not started |
+| P3-4 Companion app | Phone app: five screens, Health Connect reader, background sync (§6.1) | OVD-15 | not started |
+| P3-5 FTP confirmation | The eFTP suggestion is confirmed or dismissed by the owner (companion, Telegram, MCP); only then do zones move (§6.3) | OVD-16 | not started |
+| P3-6 Release candidate | `v0.3.0-rc.1`, then the long checks while the owner tests, then `v0.3.0` | OVD-17 | not started |
+
+Owner's open design questions, answered with the designer's defaults until the owner says otherwise: 14 nights before a recovery
+verdict; charts open on 6 months (fitness, power) and 4 weeks (wellness); form words Fresh/Neutral/Training hard/Very fatigued at
++5/−10/−30; a dismissed FTP suggestion stays hidden until the estimate moves by 3 W; the phone sends no notifications of its own
+(Telegram only).

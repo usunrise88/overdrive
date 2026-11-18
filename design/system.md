@@ -6,7 +6,7 @@ The implementer's spec for `android/ui-kit`, the ride app and the companion. Val
 
 Contents: 1 Principles as rules · 2 Colour · 3 Type and numbers · 4 Space, shape, icons ·
 5 Overlay · 6 Ride app screens · 7 Components · 8 Charts · 9 Motion · 10 Companion ·
-11 Copy · 12 Compose notes.
+11 Copy · 12 Compose notes · 13 Companion components.
 
 ## 1. Principles as rules
 
@@ -508,18 +508,11 @@ time shows a 1 dp stub. Times sum to the moving time.
 
 ### 8.4 Companion charts
 
-- **Load (fitness and fatigue):** two lines over 90 days, y gridlines every 10. Fitness 2 dp
-  text 1, fatigue 1.5 dp text 3, end dots 8 dp with 2 dp bg ring, direct labels to the right.
-  Three date ticks (start, middle, "Today").
-- **Form:** one 2 dp line, gridlines at −10, 0, 10, end label = today's value with true minus.
-- **Weekly load:** 12 columns, 20 dp wide, top corners 4 dp; past weeks surface3, current week
-  text 1; labels: the current week's value and the highest week's value only; baseline 1 dp
-  borderStrong; "12 weeks ago" / "This week" under the ends.
-- **Power curve:** x is log duration (5 s, 1 min, 5 min, 20 min, 1 h ticks), y watts; 90 days
-  2 dp text 1, best ever 1.5 dp text 3; legend keys in the card header because the lines
-  converge at long durations.
-- **Wellness sparkline:** 120 × 32, 28 days, the usual range as a surface3 band, 1.5 dp text 2
-  line, today as a 6 dp text-1 dot. Value and "usual 50–56" are text beside it.
+Specified chart by chart in `design/companion.md` §6 (stage P3 design pass), which supersedes the first sketch that stood here.
+In short: every chart has a **readout row** above the plot that doubles as its legend and shows the selected point (tap, or hold
+and slide; at rest the latest point); no end labels and no hover; one selection per screen where charts share an x axis; a
+**Values** sheet as the table twin; neutral series (text 1 main, text 3 or text 2 second), zone colours only for power data;
+baselines and reference ranges as flat surface-2/3 bands named in words.
 
 ## 9. Motion
 
@@ -539,23 +532,11 @@ Nothing pulses, blinks or loops on the overlay or the riding screen. Respect the
 
 ## 10. Companion (phone, 412 × 915 dp)
 
-Same tokens and components. Status bar inset, then screen padding 12 dp top, 16 dp sides, 16 dp
-gaps; header = title (title) + optional subtitle (label, text 2) with 4 dp extra side inset.
-
-- **Today:** Recovery card (label "Recovery", a 3-segment meter 96 × 6 dp: segments filled text 1
-  for Ready 3, Caution 2, Rest 1, the rest surface3; the state word in title; one-line reason;
-  three key/value rows: metric, value, "usual …" in text 3). Planned card (time, name, duration
-  · load · hardest step, mini profile 44 dp). Morning note card (body text).
-- **Fitness:** tile group Fitness / Fatigue / Form with sub-lines; Load, Form and Weekly load
-  cards (§8.4).
-- **Power:** FTP card (current vs estimated; "Zones change only when you confirm"; secondary
-  button "Use 256 W"); power curve card; tile group of best 5 s, 1 min, 5 min, 20 min.
-- **Wellness:** one card of rows: label, value + unit, "usual …", sparkline at the right.
-- **Rides:** month label (label, text 3) with a column hint at the right ("Load · avg power"),
-  then a card of two-line rows: name; "Wed 18 · 1:05:00"; trailing load (numXS) over average
-  power (caption, text 3).
-
-The recovery state uses no colour: "Ready", "Caution" and "Rest" differ by word and meter fill.
+The companion's screens, states, charts, copy and data needs are in **`design/companion.md`**; mock-ups in
+`design/mockups/companion/`. Same tokens and components as here. Status bar inset, then screen padding 12 dp top, 16 dp sides,
+16 dp gaps; header = title (title) + one subtitle line (label, text 2) with 4 dp extra side inset. Five tabs: Today, Fitness,
+Power, Wellness, Rides; Settings is pushed from Today. The recovery state uses no colour: "Ready", "Caution" and "Rest" differ by
+word, icon (`check`, `triangle-alert`, `pause`) and meter fill.
 
 ## 11. Copy
 
@@ -586,3 +567,34 @@ The recovery state uses no colour: "Ready", "Caution" and "Rest" differ by word 
 - Window drag: update `LayoutParams.x/y` on the main thread from raw touch events; do not route
   drag positions through Compose state.
 - Ride screen buttons fire the same actions as the Click gesture layer; one action dispatcher.
+
+## 13. Companion components (stage P3 design pass)
+
+New `ui-kit` components for the phone; their screens are in `design/companion.md`. All are built from the tokens above.
+
+- **BottomNav**: §7.9, five items (`house` Today, `activity` Fitness, `zap` Power, `moon` Wellness, `list` Rides). Tapping the
+  active item scrolls its screen to the top.
+- **ScreenHeader**: title (title) over one subtitle line (label, text 2): the date and/or "Updated 07:40"; "Updating…" with a 16 dp
+  spinner ring while a refresh runs; optional 48 dp ghost icon button at the right.
+- **StatusLine**: the problem line under a header: surface 2, radius 8, padding 12 × 16, 20 dp `triangle-alert`, first line
+  bodyStrong text 1 ("Offline · updated 06:10"), cause in label text 2, optional 40 dp secondary button. A Notice without a title
+  icon choice: always the alert, always about data being old.
+- **RangeSelector**: a full-width `SegmentedControl` with three equal segments, 44 dp tall (48 dp with its frame).
+- **RecoveryCard**: card with "Recovery · this morning" (label, text 3) and the **RecoveryMeter** (96 × 6 dp, three segments
+  4 dp apart, radius 3, filled text 1 from the left: Ready 3, Caution 2, Rest 1, the rest surface 3; hidden from accessibility);
+  the state line (24 dp icon + the word in numM); the reason (body, text 2); and **FactRows**: 56 dp, name (body) left, value
+  (numXS + unit) over caption right; outside the usual range the caption is text 1 and a 16 dp `triangle-alert` leads the name.
+- **ChartCard**: card, padding 16 × 16 × 12, gap 8: heading (label, text 3) with an optional ghost **Values** (label, text 2,
+  48 dp hit), the **ChartReadout**, the plot, an optional note (label, text 2).
+- **ChartReadout**: one wrapping row, label style, 24 dp min: the selected x (text 1, tabular), then per series a key (12 × 2
+  line, 8 dp dot or 12 × 8 band in the mark's colour, 6 dp gap), its name (text 2) and value (text 1, 600, tabular); 14 dp
+  between entries; a 24 dp **Today** pill (surface 2, full radius, label text 2, 48 dp hit) at the right while a past point is
+  selected. It is the chart's legend.
+- **LineChart**, **ColumnChart**, **SleepTimingChart**, **RideChart**: Canvas charts with a shared scale and selection model
+  (geometry in `design/companion.md` §6): 32 dp y gutter (40 dp on Wellness), 20 dp x band, hairline gridlines, `borderStrong`
+  baseline, crosshair 1 dp text 2 only while a past point is selected, 8 dp selection dots with a 2 dp surface-1 ring, 6 dp small
+  dots, flat surface-2/3 bands.
+- **ValuesSheet**: bottom sheet (system motion) with a lazy table: first column label text 1, numbers right-aligned tabular,
+  40 dp rows, header in caption text 3.
+- **ProgressBar**: 4 dp track surface 3, fill text 1, radius 2; determinate only (first read, learning nights).
+

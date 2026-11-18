@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Companion: Settings and first run</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../components.css">
+<link rel="stylesheet" href="companion.css">
+<style>
+  .srow { display: flex; align-items: center; gap: 16px; min-height: 64px; padding: 12px 16px; border-top: 1px solid var(--color-border); }
+  .list > .srow:first-child { border-top: 0; }
+  .srow .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .frow { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px 16px; border-top: 1px solid var(--color-border); }
+  .list > .frow:first-child { border-top: 0; }
+  .btn.sm { height: 40px; padding: 0 14px; }
+  .glabel { padding: 4px 4px 0; }
+</style>
+</head>
+<body data-ready="false">
+
+<figure class="shot"><figcaption><b>Settings</b> (from the gear on Today). Full scroll. Everything is in working order.</figcaption><div class="frame phone tall" id="settings"></div></figure>
+<figure class="shot"><figcaption><b>Settings · problems.</b> The token was refused; background reading is blocked by the phone; one data type is off.</figcaption><div class="frame phone" id="settings-problems"></div></figure>
+<figure class="shot"><figcaption><b>First run 1 · Connect.</b></figcaption><div class="frame phone" id="onb-connect"></div></figure>
+<figure class="shot"><figcaption><b>First run 2 · Health Connect.</b> What is read and why, before the system dialog.</figcaption><div class="frame phone" id="onb-health"></div></figure>
+<figure class="shot"><figcaption><b>First run 2 · partly allowed.</b> After the system dialog, when sleep was left off.</figcaption><div class="frame phone" id="onb-partial"></div></figure>
+<figure class="shot"><figcaption><b>First run 3 · Background.</b> The battery and Autostart steps a Xiaomi phone needs.</figcaption><div class="frame phone" id="onb-background"></div></figure>
+<figure class="shot"><figcaption><b>First run · first read.</b> 60 days of watch data go to the service once.</figcaption><div class="frame phone" id="onb-sync"></div></figure>
+
+<script type="module">
+import { backbar, ic, shell } from "./companion.js";
+
+const stepper = (v) => `<span class="stepper"><span class="b">${ic("minus")}</span><span class="v num">${v}<span class="unit">bpm</span></span><span class="b">${ic("plus")}</span></span>`;
+const srow = (title, note, trail = "", noteClass = "c2") =>
+  `<div class="srow"><div class="txt"><span class="t-strong">${title}</span><span class="t-label ${noteClass}">${note}</span></div>${trail}</div>`;
+const value = (v) => `<span class="num t-num-xs">${v}</span>`;
+
+const settingsBody = (problems) => `
+  <span class="section-label glabel">Service</span>
+  <div class="card list">
+    <div class="frow"><div class="stack"><span class="t-strong">Service address</span><span class="t-label c2">Where your rides and watch data are kept</span></div>
+      <div class="field">overdrive.example.net</div></div>
+    <div class="frow"><div class="stack"><span class="t-strong">Token</span><span class="t-label c2">Sent only to this address</span></div>
+      <div class="field"><span style="flex:1;letter-spacing:2px">••••••••••••••••</span><span class="t-label c2">Show</span></div>
+      ${problems ? `<span class="t-label c1 fresh">${ic("triangle-alert", "i-16")}The service did not accept this token (401).</span>` : ""}</div>
+    ${srow(
+      "Last sync",
+      problems ? "Nothing sent since then. 312 watch records are waiting." : "Sent 214 watch records · received today's figures",
+      `${value(problems ? "Yesterday 21:10" : "Today 07:40")}`,
+    )}
+    <div style="padding:0 16px 16px"><span class="btn btn-secondary sm">${ic("refresh-cw")}Sync now</span></div>
+  </div>
+  <span class="section-label glabel">Health Connect</span>
+  <div class="card list">
+    ${srow("Data access", problems ? "5 of 6 allowed · sleep is off, so recovery says less" : "All 6 allowed", `<span class="btn btn-secondary sm">Manage</span>`)}
+    ${srow("Last read", "Once a day at about 06:00, and when you open the app", value(problems ? "Yesterday 06:02" : "Today 07:40"))}
+    ${srow(
+      "Background reading",
+      problems ? "Blocked by the phone's battery saving. The morning note will be late." : "Allowed",
+      problems ? `<span class="btn btn-secondary sm">Open settings</span>` : `<span class="c2">${ic("check")}</span>`,
+      problems ? "c1" : "c2",
+    )}
+  </div>
+  ${problems ? "" : `
+  <span class="section-label glabel">Heart rate</span>
+  <div class="card list">
+    ${srow("Maximum", "Highest you have reached. Your rides show 184.", stepper(186))}
+    ${srow("Threshold", "Used to count the load of watch activities. Your rides suggest 167.", stepper(168))}
+  </div>
+  <span class="section-label glabel">About</span>
+  <div class="card list">
+    ${srow("Version", "Overdrive companion", value("0.4.0"))}
+    ${srow("Licences", "Geist (SIL OFL 1.1), Lucide (ISC)", `<span class="c2">${ic("chevron-right")}</span>`)}
+  </div>`}`;
+
+shell("settings", { top: backbar("Settings"), body: settingsBody(false) });
+shell("settings-problems", { top: backbar("Settings"), body: settingsBody(true) });
+
+const onb = (id, step, title, text, middle, actions) => {
+  document.getElementById(id).innerHTML = `<div class="status"><span class="num">07:42</span><span class="num">82%</span></div>
+  <div class="onb">
+    ${step ? `<span class="t-label c3">Step ${step} of 3</span>` : ""}
+    <div class="stack gap8"><span class="t-title">${title}</span><p class="t-body c2">${text}</p></div>
+    ${middle}
+    <div class="grow"></div>
+    <div class="stack gap8">${actions}</div>
+  </div>`;
+};
+
+onb(
+  "onb-connect", 1, "Connect to your service",
+  "Overdrive keeps your rides and watch data on your own service. Enter its address and the token made for this phone.",
+  `<div class="stack gap8"><span class="t-strong">Service address</span><div class="field focus">overdrive.example.net</div></div>
+   <div class="stack gap8"><span class="t-strong">Token</span><div class="field"><span style="flex:1;letter-spacing:2px">••••••••••••••••</span><span class="t-label c2">Show</span></div></div>`,
+  `<span class="btn btn-primary full">Connect</span>`,
+);
+
+const perms = [
+  ["Resting heart rate", "The main recovery signal"],
+  ["Sleep", "How long and when you sleep, for recovery"],
+  ["Respiratory rate", "A recovery signal"],
+  ["Oxygen saturation", "A recovery signal"],
+  ["Heart rate", "Heart rate in sleep, and the load of watch activities"],
+  ["Exercise", "Watch activities count toward fatigue"],
+];
+onb(
+  "onb-health", 2, "Read your watch data",
+  "Overdrive reads these from Health Connect and sends them only to overdrive.example.net. It never writes to Health Connect.",
+  `<div class="stack">${perms.map(([n, w]) => `<div class="perm" style="grid-template-columns:1fr"><div class="stack"><span class="t-strong">${n}</span><span class="t-label c2">${w}</span></div></div>`).join("")}</div>`,
+  `<span class="btn btn-primary full">Continue</span><span class="btn btn-ghost full">Not now</span>`,
+);
+onb(
+  "onb-partial", 2, "Read your watch data",
+  "Health Connect allowed 5 of 6.",
+  `<div class="stack">${perms
+    .map(([n], k) => `<div class="perm" style="grid-template-columns:1fr auto"><span class="t-strong">${n}</span><span class="t-label ${k === 1 ? "c1 fresh" : "c2 fresh"}">${k === 1 ? `${ic("triangle-alert", "i-16")}Off` : `${ic("check", "i-16")}Allowed`}</span></div>`)
+    .join("")}</div>
+   <div class="notice">${ic("info")}<div class="stack"><span class="t-strong">Sleep is off</span><span class="t-label c2">Recovery works from the other signals and says less. You can allow it later in Settings.</span></div></div>`,
+  `<span class="btn btn-primary full">Continue</span><span class="btn btn-ghost full">Allow sleep</span>`,
+);
+onb(
+  "onb-background", 3, "Read in the background",
+  "Once a day, around 06:00, Overdrive reads new watch data so this morning's figures and note are ready when you wake. Xiaomi phones stop this unless both settings below are on.",
+  `<div class="stack">
+     <div class="perm" style="grid-template-columns:1fr auto"><div class="stack"><span class="t-strong">No battery restrictions</span><span class="t-label c2">Battery saver · Overdrive · No restrictions</span></div><span class="t-label c2 fresh">${ic("check", "i-16")}On</span></div>
+     <div class="perm" style="grid-template-columns:1fr auto"><div class="stack"><span class="t-strong">Autostart</span><span class="t-label c2">Apps · Autostart · Overdrive</span></div><span class="t-label c1 fresh">${ic("triangle-alert", "i-16")}Off</span></div>
+   </div>`,
+  `<span class="btn btn-primary full">Open settings</span><span class="btn btn-ghost full">Skip</span>`,
+);
+onb(
+  "onb-sync", null, "Reading the last 60 days",
+  "Your watch data goes to the service once. After that only new records are sent.",
+  `<div class="stack gap8"><div class="bar-track"><i style="width:40%"></i></div><span class="t-label c2 num">1,240 of about 3,100 records</span></div>`,
+  `<span class="t-label c3">You can leave the app; reading continues.</span>`,
+);
+
+document.body.dataset.ready = "true";
+</script>
+</body>
+</html>
