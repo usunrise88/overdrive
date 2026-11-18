@@ -41,7 +41,7 @@ public sealed interface PlayerTarget {
  *
  * - **Targets.** In an ERG step the target is the step's FTP fraction, linear over the step in a ramp
  *   ([FlatStep.targetFractionAt]), times [ftp] and the [intensityPercent] (50 to 150 in steps of 5), rounded to whole
- *   watts. A free-ride step has no target and runs in simulation mode with gears.
+ *   watts, halves up. A free-ride step has no target and runs in simulation mode with gears.
  * - **Skipping.** [nextInterval] jumps to the start of the next step and does nothing in the last one.
  *   [previousInterval] restarts the current step when more than
  *   [RideSession.PREVIOUS_INTERVAL_RESTART_AFTER_SECONDS] seconds into it, otherwise goes to the start of
@@ -100,8 +100,8 @@ public class WorkoutPlayer(
             val fraction = step.targetFractionAt(stepElapsedSeconds) ?: return PlayerTarget.Free
             val nominal = fraction * ftp * intensityPercent / PERCENT
             return PlayerTarget.Erg(
-                watts = (nominal * rampInFactor()).roundToInt(),
-                nominalWatts = nominal.roundToInt(),
+                watts = roundWatts(nominal * rampInFactor()),
+                nominalWatts = roundWatts(nominal),
             )
         }
 
@@ -166,6 +166,13 @@ public class WorkoutPlayer(
         return true
     }
 
+    /**
+     * Whole watts, halves rounded up. The workout's fractions are binary floating-point numbers, so a target of
+     * exactly 162.5 W can come out as 162.49999999999997; a tiny allowance makes such ties round the same way
+     * whichever way they were computed.
+     */
+    private fun roundWatts(watts: Double): Int = (watts + ROUNDING_ALLOWANCE_WATTS).roundToInt()
+
     private fun rampInFactor(): Double = if (rampInSeconds == 0) 1.0 else rampElapsedSeconds.toDouble() / rampInSeconds
 
     public companion object {
@@ -173,5 +180,6 @@ public class WorkoutPlayer(
         public const val DEFAULT_RAMP_IN_SECONDS: Int = 3
 
         private const val PERCENT = 100.0
+        private const val ROUNDING_ALLOWANCE_WATTS = 1e-9
     }
 }
