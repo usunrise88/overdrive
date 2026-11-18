@@ -1,7 +1,7 @@
 # Build context is the repository root:
 #   docker build -f server/Dockerfile -t overdrive-server .
 
-FROM node:24-slim AS build
+FROM node:26-slim AS build
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable
 WORKDIR /repo
@@ -17,7 +17,7 @@ COPY server server
 RUN pnpm --filter @overdrive/server build \
  && pnpm --filter @overdrive/server deploy --prod /out
 
-FROM node:24-slim
+FROM node:26-slim
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=8080
 WORKDIR /app
 COPY --from=build /out/package.json ./
