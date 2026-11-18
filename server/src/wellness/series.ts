@@ -1,14 +1,13 @@
-import {
-  addDaysToIsoDate,
-  type Deviation,
-  isoDateToEpochDay,
-  type Reading,
-  type UsualRange,
-  type WellnessDay,
-  type WellnessMetric,
-  type WellnessSourceId,
+import type {
+  Deviation,
+  Reading,
+  UsualRange,
+  WellnessDay,
+  WellnessMetric,
+  WellnessSourceId,
 } from "@overdrive/contracts";
 import { baselineBefore, type DaySeries, deviationOf, shownRange, zScore } from "./baseline.ts";
+import { dateOfEpochDay, epochDay, shiftDate } from "./dates.ts";
 import {
   METRIC_KEYS,
   METRIC_SPECS,
@@ -77,10 +76,10 @@ export function trackMetric(
   const tracked = new Map<string, Tracked>();
   if (table === undefined) return tracked;
   const values = plainSeries(table);
-  const firstDay = isoDateToEpochDay(first) as number;
-  const lastDay = isoDateToEpochDay(last) as number;
+  const firstDay = epochDay(first);
+  const lastDay = epochDay(last);
   for (let day = firstDay; day <= lastDay; day++) {
-    const date = addDaysToIsoDate("1970-01-01", day);
+    const date = dateOfEpochDay(day);
     const entry = table.get(date);
     if (entry === undefined || (spec.ln && entry.value <= 0)) continue;
     const baseline = baselineBefore(values, date, spec, settings);
@@ -97,7 +96,7 @@ export function trackMetric(
     }
     const z = zScore(entry.value, baseline, spec);
     const deviation = deviationOf(z);
-    const before = tracked.get(addDaysToIsoDate(date, -1));
+    const before = tracked.get(shiftDate(date, -1));
     const streak =
       deviation === "inside" ? 0 : before?.deviation === deviation ? before.streak + 1 : 1;
     tracked.set(date, {
@@ -130,7 +129,7 @@ export function nightsLogged(table: DailyTable, date: string, settings: Wellness
   const scored = METRIC_KEYS.filter((key) => METRIC_SPECS[key].adverse !== null);
   let nights = 0;
   for (let back = 1; back <= settings.baselineDays; back++) {
-    const day = addDaysToIsoDate(date, -back);
+    const day = shiftDate(date, -back);
     if (scored.some((key) => table[key]?.has(day) === true)) nights++;
   }
   return nights;
@@ -147,7 +146,7 @@ export function weightAverage(
   if (table === undefined) return null;
   const values: number[] = [];
   for (let back = 0; back < WEIGHT_AVERAGE_DAYS; back++) {
-    const value = table.get(addDaysToIsoDate(date, -back))?.value;
+    const value = table.get(shiftDate(date, -back))?.value;
     if (value !== undefined) values.push(value);
   }
   return values.length === 0 ? null : values.reduce((a, b) => a + b, 0) / values.length;
@@ -167,16 +166,16 @@ export function buildDays(
   to: string,
   settings: WellnessSettings,
 ): { days: WellnessDay[]; usual: { bedtime: UsualRange | null; wake: UsualRange | null } } {
-  const lookback = addDaysToIsoDate(from, -STREAK_LOOKBACK_DAYS);
+  const lookback = shiftDate(from, -STREAK_LOOKBACK_DAYS);
   const tracks = new Map<WellnessMetric, Map<string, Tracked>>();
   for (const key of METRIC_KEYS) {
     tracks.set(key, trackMetric(table[key], METRIC_SPECS[key], settings, lookback, to));
   }
   const days: WellnessDay[] = [];
-  const first = isoDateToEpochDay(from) as number;
-  const last = isoDateToEpochDay(to) as number;
+  const first = epochDay(from);
+  const last = epochDay(to);
   for (let day = first; day <= last; day++) {
-    const date = addDaysToIsoDate("1970-01-01", day);
+    const date = dateOfEpochDay(day);
     const reading = (key: WellnessMetric): Reading =>
       readingOf(tracks.get(key)?.get(date), METRIC_SPECS[key]);
     const steps = table.steps?.get(date)?.value;

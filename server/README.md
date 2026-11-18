@@ -5,7 +5,8 @@ bot, insights. One deployable with internal modules. Today it has the ride intak
 the tablet's rides arrive here and are stored), the PostgreSQL schema behind it, the intervals.icu
 integration (ADR 0016: rides are forwarded, the planned workouts are read, converted, cached and
 served to the tablet), the rider's profile (`GET`/`PATCH /v1/profile`), the MCP server with its
-OAuth server for AI clients (ADR 0018), the Google Calendar mirror and the Telegram bot (ADR 0019), the Strava upload (ADR 0020) and `GET /healthz`.
+OAuth server for AI clients (ADR 0018), the Google Calendar mirror and the Telegram bot (ADR 0019), the Strava upload (ADR 0020), the
+training metrics (ADR 0022), wellness, recovery and the watch's other activities (ADR 0023) and `GET /healthz`.
 
 ```bash
 pnpm --filter @overdrive/server dev      # node --watch src/main.ts, http://127.0.0.1:8080 (needs DATABASE_URL)
@@ -34,7 +35,11 @@ and names the variable, never its value):
 | `INTERVALS_ATHLETE_ID` | `0` | `i12345`; `0` is the athlete the key belongs to |
 | `INTERVALS_BASE_URL` | `https://intervals.icu` | Another http(s) address (a proxy, a bench); no credentials or query. The tests point it at a fake |
 | `PLAN_REFRESH_MINUTES` | `15` | 1 to 1440: how often the plan is read |
-| `TIMEZONE` | `UTC` | The rider's IANA time zone (`Europe/Paris`): which day is "today" for the plan and which day a ride belongs to |
+| `TIMEZONE` | `UTC` | The rider's IANA time zone (`Europe/Paris`): which day is "today" for the plan and which day a ride, a night, a reading or a watch workout belongs to |
+| `WELLNESS_SOURCE_ORDER` | `healthconnect,intervals` | Which source a daily wellness figure is taken from: the first in the list that has one. After semicolons a metric gets an order of its own, `healthconnect,intervals;restingHr=intervals,healthconnect`; a source left out of a metric's list is not used for it. Metrics: `restingHr`, `sleepSeconds`, `bedtimeMinutes`, `wakeMinutes`, `respiratoryRate`, `spo2`, `sleepingHr`, `hrvRmssd`, `hrvSdnn`, `steps`, `weightKg`. ADR 0023 |
+| `WELLNESS_PULL_HOURS` | `6` | 1 to 168: how often intervals.icu's wellness is read (only with an intervals.icu key) |
+| `WELLNESS_BASELINE_DAYS` | `42` | 28 to 60: the window a personal baseline is the mean and standard deviation of |
+| `WELLNESS_NIGHTS_NEEDED` | `14` | 7 to 28: readings a metric needs before it has a baseline, and nights before any recovery verdict |
 | `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_REFRESH_TOKEN` | unset | The Strava upload (ADR 0020). **The feature is off unless all three are set**; with only some set it is off and the log names the missing ones. The client id is the number of the application on strava.com/settings/api; the refresh token (which only seeds the first run, Strava rotates it) comes from `strava-auth` (below). Letters, digits and `. _ ~ + / = : -` only |
 | `STRAVA_BACKFILL` | `false` | `true` also sends the rides stored before Strava was turned on, at start. Off, turning Strava on does not post the history |
 | `STRAVA_BASE_URL` | `https://www.strava.com` | Another http(s) address; the tests point it at a fake |
@@ -89,6 +94,11 @@ general 1 to 128 characters from `A-Z a-z 0-9 . _ -`, starting with a letter or 
 | `GET /v1/rides/{rideId}/metrics[?wbal=true[&series=true][&cp=watts][&wPrimeKj=kJ]]` | none | `200` the ride's load, power curve and aerobic drift (and why there is none), and with `wbal=true` the W′ balance (`ride-metrics-response.schema.json`) · `404 ride_not_found` · `400 invalid_query` |
 | `POST /v1/ftp-suggestion/dismiss` | `{ "suggestionId": n }` | `200` `{ suggestionId, status }` (`dismissed`, or `accepted`/`superseded` when it had left that way) · `404 not_found` no such suggestion · `400 invalid_json`. Accepting a suggestion is `PATCH /v1/profile` with its value |
 
+| `POST /v1/wellness` | A batch of Health Connect records, `application/json` (`wellness-upload.schema.json`, ADR 0023): `{ source: "healthconnect", device?, records }`, each record typed by `kind` (`restingHeartRate`, `heartRateSamples`, `sleepSession`, `respiratoryRate`, `oxygenSaturation`, `steps`, `exerciseSession`, `heartRateVariabilityRmssd`, `weight`); at most 2000 records and 4 MiB | `200` `{ accepted, duplicates, rejected, byType, generatedAt }`: counts only (`wellness-upload-response.schema.json`); idempotent by record id, a newer `lastModified` replaces · `422 invalid_record` one bad record refuses the whole batch, the message names its index and field and never the value · `413 payload_too_large` · `400 invalid_json` (without quoting the body) · `415` |
+| `GET /v1/wellness?from=YYYY-MM-DD&to=YYYY-MM-DD[&refresh=true]` | none | `200` the daily figures from `from` to `to` (at most 186 days) with each metric's value, source, usual range, deviation and streak, the usual bedtime and wake-up, `nightsLogged`, `stale` (`wellness-response.schema.json`) · `400 invalid_range` |
+| `GET /v1/recovery[?refresh=true]` | none | `200` today's state `ready`, `caution`, `rest`, `learning` or `noData`, the rule that decided, a one-sentence reason, guidance, 3 or 4 facts, `nightsLogged` of `nightsNeeded` (`recovery-response.schema.json`) |
+| `GET /v1/activities/{id}` | none | `200` a workout from the watch, `watch-<record id>`: summary, heart-rate load (`loadApproximate`, `loadNote`), how dense the samples are, the heart rate in at most 300 points (`activity.schema.json`) · `404 not_found` |
+
 Also `401 unauthorized` everywhere, `404 not_found` for any other path or method, and `500
 internal_error` (the tablet retries those). "The same" means the same content: a record is compared
 by the SHA-256 of its canonical JSON (keys sorted, no whitespace), a file by the SHA-256 of its bytes. A stored
@@ -116,6 +126,12 @@ Migration 0005 (ADR 0020) adds `strava_auth` (the one rotated Strava refresh tok
 Migration 0006 (ADR 0022) adds `ride_metrics` (what is worked out once per ride: load, power curve, aerobic drift; computed when
 the ride's FIT arrives and, for rides stored earlier or when the formulas change, on the next read), `ftp_suggestions` (each FTP
 suggestion with its status: pending, accepted, dismissed, superseded) and `ftp_history` (every change of the profile's FTP).
+
+Migration 0007 (ADR 0023) adds `wellness_records` (the raw Health Connect records, compact jsonb, unique by source and record id),
+`wellness_daily` (the daily figures per day, metric and source, the value and where it came from), `wellness_sync_state` (how the pulls
+of intervals.icu's wellness went), `activities` (the watch's workouts with their heart-rate samples and how dense they are),
+`activity_destinations` (the queue that forwards them to intervals.icu) and `ride_heart_rate` (what each ride says about the rider's
+heart rates, for the profile's estimates). **Health data: nothing in them is ever logged.**
 
 Tests run on PGlite and need nothing installed. To run them on a real PostgreSQL as well (CI does),
 set `TEST_DATABASE_URL`: **the `public` schema of that database is dropped**, so point it at a scratch one.
@@ -151,6 +167,29 @@ UPDATE ride_destinations SET state = 'pending', attempts = 0, next_attempt_at = 
 The tests never touch the real intervals.icu: `test/helpers/fake-intervals.ts` is a fake of it (a Node HTTP server on a free
 port; every payload in it and in `test/fixtures/intervals/` is invented). What it assumes about the real API, and what only an
 account can confirm, is listed in ADR 0016.
+
+## Wellness, recovery and the watch's activities (ADR 0023)
+
+The companion app on the phone uploads the owner's Health Connect records (`POST /v1/wellness`); the service keeps them raw, works the
+daily figures out (a night belongs to the morning it ends, in `TIMEZONE`), keeps a personal baseline per metric (mean and standard
+deviation over 42 days, a spread never below a floor) and rates each morning `ready`, `caution`, `rest`, `learning` (fewer than 14
+nights) or `noData` from an **explicit rule table** that names the rule that fired. Everything is deterministic code: no model is called.
+
+| Piece | Where |
+|---|---|
+| Rule table, thresholds, reasons | `src/wellness/recovery.ts` (the table in its header comment; every row has a test), `src/wellness/metrics.ts` (directions, floors, plausible ranges) |
+| Baselines and streaks | `src/wellness/baseline.ts`, `src/wellness/series.ts` |
+| Daily figures from records | `src/wellness/derive.ts` (night, bedtime, density rule for heart rate in sleep, weight) |
+| Sources | `src/wellness/sources.ts`: `HealthConnectUpload` (push), `IntervalsWellnessSource` (pull, every `WELLNESS_PULL_HOURS` and on demand), `WELLNESS_SOURCE_ORDER` |
+| Heart-rate load (TRIMP, 100 = one hour at threshold) | `src/wellness/trimp.ts`, `src/wellness/activities.ts` |
+| Forwarding the watch's workouts to intervals.icu | `src/wellness/forward.ts` (queue `activity_destinations`, off without a key, nothing to Strava) |
+| Estimates of maximum and threshold heart rate from rides | `src/wellness/heart-rate-index.ts` (the profile's read-only `estimated*HeartRate`) |
+
+The watch's load is registered with the metrics service as its `other` load source and its activities as a source of `GET /v1/rides`
+(`createWellness` does it, given `services.metrics`); a watch session that overlaps a ride from the tablet is the same ride and counts once.
+Failures and logs never name a measured value (`test/wellness-privacy.test.ts`). Without an intervals.icu key the upload and everything
+computed from it work; the pull and the forwarding are off. What it assumes about intervals.icu's wellness and `POST activities/manual`
+could not be checked without an account (ADR 0023, last section).
 
 ## Strava (ADR 0020)
 
@@ -231,7 +270,10 @@ instead: `openssl rand -base64 36`, `MCP_STATIC_TOKENS=claude:<that>`, restart.
 intervals.icu, through the same client the plan refresher uses, then the plan cache and the `plan-changed` event), `list_rides`,
 `get_ride` (statistics, laps and compliance with the plan, power curve, aerobic drift and W′ balance, computed here from the stored record),
 `get_fitness` (load, fitness, fatigue, form, best efforts, drift and the FTP with its suggestion, which is only a suggestion; ADR 0022),
-`get_profile`, `update_profile`.
+`get_profile`, `update_profile` (also the maximum and threshold heart rate and the read-only estimates from the rides), and, from
+stage P3-2 (ADR 0023): `get_wellness` (the daily figures, with the owner's own usual ranges and body weight and its trend),
+`get_recovery` (today's state, the rule that decided, the facts), `list_activities` and `get_activity` (the tablet's rides and the
+watch's workouts, each with a `type` and a `source`). `list_rides` and `get_ride` remain as deprecated aliases for one release.
 Results are compact JSON, failures are tool errors in plain words (`plan source not configured: …`, `workout does not validate: /steps/0/duration must
 be integer`); without `INTERVALS_API_KEY` the plan tools say so and the rest work.
 
@@ -297,6 +339,7 @@ Other modules (the MCP tools, Telegram, Google Calendar, Strava) plug in without
 | Profile | `services.profile` (`src/profile/store.ts`) | `get()` the FTP, zones, availability, goals and physics; `update(patch)` (validated, atomic); a change emits `profile-changed` (`{ fields }`) |
 | Rides | `services.rides` (`src/ride-store.ts`), `services.rideWorkouts` | `list`, `getRecord` of the stored rides; the workout a ride was played from, copied when it was stored. `src/ride-stats.ts` has the pure statistics, series and compliance (`rideStatistics`, `rideSeries`, `rideCompliance`) a ride summary for Telegram can reuse |
 | Training metrics | `services.metrics` (`src/metrics/`, ADR 0022) | `metrics(from, to)`, `rideMetrics`, `rideList`, `rideDetail`, `ftpAdvice`, `dismissSuggestion`; `registerLoadSource({ name, entries(untilDate) })` feeds the daily load with other activities (`kind: "other"`: counts for fatigue and form, never for the power curve, eFTP or drift) and `registerActivitySource({ name, list({ beforeMillis, limit }) })` adds them to `GET /v1/rides`. The pure math (`power-curve.ts`, `load.ts`, `ftp.ts`, `drift.ts`, `wbal.ts`) knows nothing of the database. A listener on `ride-stored` computes a ride, one on `profile-changed` keeps the FTP history and marks a suggestion accepted |
+| Wellness | `services.wellness` (`src/wellness/`, ADR 0023) | `upload.ingest(batch, device)`, `wellness(from, to)`, `recovery()`, `activity(id)`, `listActivities(query)`, `otherLoadByDay(from, to)` (the watch's load per local day), `refresh()` (pulls intervals.icu, `null` without a key); the `activity-stored` event queues a forwarding |
 | Plan entries | `src/plan/entries.ts` (`readPlanEvent`), `src/plan/summary.ts` | one reading of a calendar event as a plan entry; duration, estimated load and a one-line outline of a native workout |
 
 ## Deployment

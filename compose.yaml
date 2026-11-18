@@ -22,6 +22,11 @@ services:
       PLAN_REFRESH_MINUTES: ${PLAN_REFRESH_MINUTES:-}
       # The rider's time zone (IANA name): which day is "today" for the plan and for a ride.
       TIMEZONE: ${TIMEZONE:-}
+      # Wellness and recovery (ADR 0023): empty values mean the defaults. docs/deploy.md, section 16.
+      WELLNESS_SOURCE_ORDER: ${WELLNESS_SOURCE_ORDER:-}
+      WELLNESS_PULL_HOURS: ${WELLNESS_PULL_HOURS:-}
+      WELLNESS_BASELINE_DAYS: ${WELLNESS_BASELINE_DAYS:-}
+      WELLNESS_NIGHTS_NEEDED: ${WELLNESS_NIGHTS_NEEDED:-}
       # The MCP server and its OAuth server (ADR 0018): on only when both of the first two are set.
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
       OWNER_PASSPHRASE_HASH: ${OWNER_PASSPHRASE_HASH:-}

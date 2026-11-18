@@ -186,7 +186,11 @@ Values in `.env` are never in the repository.
 | `INTERVALS_ATHLETE_ID` | `0` | `i12345`; `0` is the athlete the key belongs to |
 | `INTERVALS_BASE_URL` | `https://intervals.icu` | Only to go through a proxy |
 | `PLAN_REFRESH_MINUTES` | `15` | 1 to 1440: how often the plan (today and 14 days) is read |
-| `TIMEZONE` | `UTC` | The rider's IANA time zone, for example `Europe/Paris`: which day is "today" for the plan, which day a ride belongs to, the default ranges of the MCP tools |
+| `TIMEZONE` | `UTC` | The rider's IANA time zone, for example `Europe/Paris`: which day is "today" for the plan, which day a ride, a night of sleep, a reading or a watch workout belongs to, the default ranges of the MCP tools |
+| `WELLNESS_SOURCE_ORDER` | `healthconnect,intervals` | Which source a daily wellness figure comes from: the first in the list that has one. `…;restingHr=intervals,healthconnect` gives one metric an order of its own; a source left out is not used for that metric. ADR 0023 |
+| `WELLNESS_PULL_HOURS` | `6` | 1 to 168: how often intervals.icu's wellness is read (with an intervals.icu key) |
+| `WELLNESS_BASELINE_DAYS` | `42` | 28 to 60: the window of a personal baseline |
+| `WELLNESS_NIGHTS_NEEDED` | `14` | 7 to 28: nights before any recovery verdict (the companion says "Learning your usual range" until then) |
 | `PUBLIC_BASE_URL` | unset | `https://overdrive.llmto.day`: the service's public address (https, no path). **With `OWNER_PASSPHRASE_HASH`, turns the MCP server on.** ADR 0018 |
 | `OWNER_PASSPHRASE_HASH` | unset | The hash of the owner's passphrase, `scrypt:…` (section 12). **With `PUBLIC_BASE_URL`, turns the MCP server on.** The plain passphrase is never configured |
 | `MCP_STATIC_TOKENS` | empty | `name:token,name:token`: fixed bearer tokens for an MCP client that cannot do OAuth; at least 32 characters each; open `/mcp` only |
@@ -206,6 +210,7 @@ Values in `.env` are never in the repository.
 | `DATABASE_URL` | built from `POSTGRES_PASSWORD` | `postgres://overdrive:…@db:5432/overdrive` |
 | `DEVICE_TOKENS` | from `.env` | As above |
 | `INTERVALS_*`, `PLAN_REFRESH_MINUTES`, `TIMEZONE` | from `.env` | As above; empty means the default |
+| `WELLNESS_*` | from `.env` | As above; empty means the default (wellness and recovery need no key: only the intervals.icu pull and the forwarding of the watch's workouts do) |
 | `PUBLIC_BASE_URL`, `OWNER_PASSPHRASE_HASH`, `MCP_STATIC_TOKENS` | from `.env` | As above; empty means unset |
 | `STRAVA_*` | from `.env` | As above; empty means unset (the upload is off unless the first three are all set) |
 | `LOG_LEVEL` | from `.env` | As above |
@@ -429,6 +434,30 @@ FROM ride_destinations WHERE destination = 'strava'"`. A ride in `pending` with 
 token, the scope or the account (HTTP 401 or 403) needs you: check the subscription and the application, run `strava-auth` again
 if needed; the server asks again after a restart or six hours, and says it only once in the log. To turn the upload off, empty any of
 the three values.
+
+## 16. Wellness and recovery
+
+The companion app on your phone reads your watch's records from Health Connect and uploads them to `POST /v1/wellness` (spec §6.1,
+§6.2, ADR 0023); the service works out your daily figures, your personal usual ranges and a morning state, and keeps the workouts
+the watch recorded. It needs **no key and no setting**: the phone's device token (`DEVICE_TOKENS`, make one named `companion`) is
+enough. Optional:
+
+- **intervals.icu wellness** is read too when `INTERVALS_API_KEY` is set (every `WELLNESS_PULL_HOURS`, six by default), as a second source
+  of the same figures. `WELLNESS_SOURCE_ORDER` says which source wins for each figure (the watch first by default).
+- **The watch's workouts** are forwarded to intervals.icu as activities when the key is set (a session older than a week when it arrives, and a
+  watch session that overlaps a ride from the tablet, are not). Nothing goes to Strava.
+- For the heart-rate load of those workouts the service needs your maximum and threshold heart rate: set them in the companion's
+  Settings, or `PATCH /v1/profile` (`maxHeartRate`, `thresholdHeartRate`), or `update_profile` through MCP. Until you do, it uses estimates
+  from your rides (the highest heart rate, and 95% of your best 20 minutes) and marks the load approximate.
+
+**This is health data.** The database holds your raw records, daily figures and workouts: the backups of section 8 contain it, so keep
+them as private as the database. The logs hold counts and ids only, never a measured value. It leaves the server only to the MCP clients
+you approved and, as average and maximum heart rate of a workout, to intervals.icu with your own key.
+
+To look at what has arrived (counts, not values): `docker compose exec db psql -U overdrive -d overdrive -c "SELECT kind, count(*),
+max(received_at) FROM wellness_records GROUP BY kind"`; the queue of workouts for intervals.icu: `SELECT activity_id, state, attempts,
+last_error FROM activity_destinations`. A workout in `skipped` has the reason in `last_error`. The recovery state says `learning` until
+14 nights have arrived (`WELLNESS_NIGHTS_NEEDED`).
 
 ## Troubleshooting
 

@@ -553,6 +553,21 @@ Wellness input sits behind one `WellnessSource` interface so the wearable can ch
 | Health Connect, fed by another app | Later, no code change | Depends on the device. Gadgetbridge has initial Amazfit Helio Strap support and can write HRV. |
 | Wear OS passive-data app on the watch | Only if a one-evening probe shows the watch exposes HRV through passive monitoring | HRV. Continuous sensor reading is ruled out for battery reasons. |
 
+**Settled in stage P3-2** (ADR 0023, `server/src/wellness/`, contracts `wellness-upload.schema.json` and the answers; **written without a real
+Health Connect batch or an intervals.icu account**: what OHealth really writes is the first thing the owner's phone will settle):
+
+- *Interface:* `WellnessSource` is either **pushed** (`HealthConnectUpload`: the companion's batches, `POST /v1/wellness`) or **pulled**
+  (`IntervalsWellnessSource`: `GET /api/v1/athlete/{id}/wellness`, every `WELLNESS_PULL_HOURS` (6) and on demand, off without a key). Daily
+  figures are kept **per source** and the one used is the first in `WELLNESS_SOURCE_ORDER` (default `healthconnect,intervals`, per-metric orders
+  allowed) that has a value, so a figure and its source are both known.
+- *Records:* the upload is typed by `kind` and mirrors Health Connect (`restingHeartRate`, `heartRateSamples`, `sleepSession`,
+  `respiratoryRate`, `oxygenSaturation`, `steps`, `exerciseSession`, `heartRateVariabilityRmssd`, and `weight` from §12.5), idempotent by record id
+  with `lastModified`, at most 2000 records and 4 MiB; a bad record refuses the whole batch naming its index and field, never the value; the
+  answer is counts only. Raw records are kept (compact) and the daily figures derived from them.
+- *Daily figures:* a night belongs to the morning it ends, in `TIMEZONE`; bedtime and waking are minutes from local midnight (before midnight
+  negative); the sleeping heart rate is the mean of the night's samples only when there are at least 20 and one per 20 minutes; body weight is
+  the day's mean with a 7-day average (`weightKg`, `weightKg7d`) and **changes nothing** in the settings or the physics.
+
 ### 6.3 Training load
 
 - **Per-ride load:** normalised power, intensity factor and a training stress score from power and FTP. This is the Coggan model: a practitioner standard described in Allen and Coggan, *Training and Racing with a Power Meter*, not a peer-reviewed physiological law.
@@ -588,6 +603,24 @@ Wellness input sits behind one `WellnessSource` interface so the wearable can ch
 - The rules are explicit and inspectable. No opaque score.
 - **HRV, when a source exists:** 7-day rolling average of ln rMSSD against the personal baseline, following Plews et al. (2013), peer-reviewed. It refines the state and is never required.
 
+**Settled in stage P3-2** (ADR 0023, `server/src/wellness/recovery.ts`, `baseline.ts`; every row of the table has a test; the thresholds are first
+guesses to be tuned on real data):
+
+- *Baseline:* the mean and the sample standard deviation of a metric's daily values over the **42 days before** the day (`WELLNESS_BASELINE_DAYS`,
+  28 to 60), the day itself excluded; the usual range is mean ± one spread, and the spread has a per-metric floor (resting heart rate 1.5 bpm, sleep
+  20 minutes, sleep timing 60 minutes, …). A metric has a baseline from 14 readings (`WELLNESS_NIGHTS_NEEDED`); `streak` counts the days in a row
+  outside the range on one side. rMSSD is compared on the ln scale.
+- *Scoring:* each metric's distance from its mean in spreads, counted positive in the adverse direction: resting heart rate, respiratory rate, heart
+  rate in sleep and a later bedtime above; sleep, oxygen saturation and HRV below.
+- *Rule table, first match wins:* **R1** three metrics beyond 1.5 spreads: rest · **R2** a metric (not HRV) beyond 3 spreads this morning and the morning
+  before: rest · **C1** two metrics beyond 1: caution · **C2** one metric beyond 2: caution · **C3** one metric beyond 1 two mornings in a row: caution ·
+  otherwise ready. `learning` before 14 nights (or while no metric has a baseline), `noData` with no reading in the last two days. The answer names the
+  `rule`, a one-sentence `reason` written from it by a template, a `guidance` sentence and 3 or 4 `facts` in the order that decided. No model, no
+  medical wording, no cause.
+- *HRV:* the 7-day geometric mean (at least four readings in seven days) against the baseline of that same mean; one more metric in the table, never
+  required, never alone enough for rest.
+- `GET /v1/wellness?from&to` (at most 186 days) and `GET /v1/recovery`: see §8.3.
+
 ### 6.5 Written insights
 
 - The service computes facts deterministically and passes them to the LLM as structured data. The model writes; it does not calculate.
@@ -615,6 +648,26 @@ Workouts recorded on the watch, such as VR sessions in Beat Saber or Superhot, c
 - **Forwarding:** each session is also posted to intervals.icu as an activity of the matching type. Nothing is sent to Strava unless enabled.
 - **Interfaces:** MCP `list_rides` and `get_ride` become `list_activities` and `get_activity` with a type field; the companion history shows both.
 - **To check:** how dense the heart-rate samples are for an OHealth exercise session in Health Connect. Per-second or per-few-seconds is fine; per-minute would make the load estimate coarse.
+
+**Settled in stage P3-2** (ADR 0023, `server/src/wellness/trimp.ts`, `activities.ts`, `forward.ts`; hand-worked golden numbers in
+`server/test/wellness-trimp.test.ts`):
+
+- *Activity:* each `exerciseSession` is an activity `watch-<record id>` with its heart-rate samples (the record's own, else the heart-rate records
+  that overlap it) and **per-session density figures** (sample count, median and longest gap, coverage): the "to check" above is visible per session in
+  `GET /v1/activities/{id}`.
+- *Load:* Banister's exponential TRIMP per sample interval, `x = (HR − rest)/(max − rest)` clamped to 0..1, `y(x) = x·e^(1.92·x)`, load
+  `= 100 · Σ(dt_h · y(x)) / y(x_threshold)`: **one hour at threshold heart rate is 100**, the scale of the power-based score. A sample holds until the next, at
+  most 5 minutes. Coefficient 1.92 (Banister's for men) for everyone: the profile has no sex, and the normalisation absorbs most of the difference.
+- *Settings:* `maxHeartRate` and `thresholdHeartRate` in the profile (§8.3), else the read-only estimates from the rides: the highest heart rate and 95% of
+  the best 20-minute average. No thresholds known: load `null`. `loadApproximate` is true where an estimate, a fallback resting heart rate (the mean of the
+  last 42 days' readings, else 60) or a coverage under 80% was used; `loadNote` carries the known bias in words.
+- *Same ride twice:* a session overlapping a tablet ride by half or more is the same ride: not counted, not listed, not forwarded.
+- *Separation:* the load is the metrics service's `other` load source (fatigue and form, recovery) and the activities are rows of `GET /v1/rides`
+  (`kind: "activity"`); power curve, FTP and drift read rides only.
+- *Forwarding:* `POST activities/manual` to intervals.icu with the matching sport, once, queued like rides (`activity_destinations`), off without a key, a
+  session older than 7 days when received is not sent; nothing goes to Strava. Unverified without an account.
+- *MCP:* `list_activities` and `get_activity` carry a `type` (`cycling` for a tablet ride, the watch's name for a workout) and a `source`; `list_rides` and
+  `get_ride` remain as deprecated aliases for one release.
 
 ## 7. Tech stack and non-functional requirements
 
@@ -765,8 +818,10 @@ path: everything is under `/v1`.
 | `PUT /v1/rides/{rideId}/fit` | Ride app | Upload the FIT file generated from that record (`application/vnd.ant.fit`). **Settled** |
 | `GET /v1/workouts?from&to` | Ride app | Planned workouts in native format. **Settled** (stage P2-2a, below) |
 | `GET /v1/rides`, `GET /v1/rides/{id}`, `GET /v1/rides/{id}/metrics` | Companion | History, detail, and what was computed from one ride. **Settled** (stage P3-1, below) |
-| `POST /v1/wellness` | Companion | Batch of Health Connect records |
-| `GET /v1/metrics?from&to` | Companion | Load, form, power curve, FTP, drift. **Settled** (stage P3-1, below); recovery state and baselines come with the wellness stage |
+| `POST /v1/wellness` | Companion | Batch of Health Connect records. **Settled** (stage P3-2, below) |
+| `GET /v1/wellness?from&to`, `GET /v1/recovery` | Companion | Daily wellness figures with baselines; today's recovery state and its facts. **Settled** (stage P3-2, below) |
+| `GET /v1/activities/{id}` | Companion | One workout from the watch. **Settled** (stage P3-2, below) |
+| `GET /v1/metrics?from&to` | Companion | Load, form, power curve, FTP, drift. **Settled** (stage P3-1, below); the recovery state and baselines are `GET /v1/recovery` and `GET /v1/wellness` |
 | `POST /v1/ftp-suggestion/dismiss` | Companion | Hide an FTP suggestion. **Settled** (stage P3-1) |
 | `GET /v1/insights?from&to` | Companion | Written notes |
 | `GET /v1/profile`, `PATCH /v1/profile` | Both | FTP, zones, physics settings. **Settled** (stage P2-3, below) |
@@ -851,6 +906,32 @@ yet", and sent first by the next refresh; a `4xx` other than 401, 408 and 429 dr
   parameter is `400 invalid_query` (a new code of the closed list).
 - The profile has a new key, `wPrimeKj` (§8.3 profile): W′ in kilojoules, 1 to 100, null for the default of 20.
 
+**Settled in stage P3-2 (wellness, recovery and the watch's activities; ADR 0023, `contracts/schema/wellness-upload.schema.json`,
+`wellness-upload-response.schema.json`, `wellness-response.schema.json`, `recovery-response.schema.json`, `activity.schema.json`, Kotlin
+`WellnessApiJson`):**
+
+- `POST /v1/wellness` takes `{ "source": "healthconnect", "device"?, "records": [...] }`, at most **2000 records and 4 MiB** (`413 payload_too_large`).
+  Each record has a `kind` (`restingHeartRate`, `heartRateSamples`, `sleepSession`, `respiratoryRate`, `oxygenSaturation`, `steps`, `exerciseSession`,
+  `heartRateVariabilityRmssd`, `weight`), its Health Connect `id`, UTC instants, and optionally `zoneOffsetSeconds` and `lastModified`. Idempotent
+  by `(source, id)`: the same record again is a duplicate, one with a newer `lastModified` replaces. The whole batch is checked first: one bad record is
+  `422 invalid_record` and nothing is stored; the message names the record's index and field (`/records/3/bpm must be <= 300`), **never the value**.
+  The answer is `{ accepted, duplicates, rejected, byType, generatedAt }`, counts only (`rejected`: an id already used by another kind, or a record
+  ending more than a day in the future). No new error code.
+- `GET /v1/wellness?from&to[&refresh=true]` (at most **186 days**, `400 invalid_range` otherwise) answers `{ from, to, generatedAt, stale, nightsLogged,
+  nightsNeeded, baselineDays, usual: { bedtime, wake }, days }`; a day has `date` and, for `restingHr`, `sleepSeconds`, `bedtimeMinutes`, `wakeMinutes`,
+  `respiratoryRate`, `spo2`, `sleepingHr`, `hrvRmssd`, a **reading** `{ value, source, baselineLow, baselineHigh, deviation, streak }` (null where there is
+  none), and `sleepStart`, `sleepEnd`, `steps`, `hrvSdnn`, `weightKg`, `weightKg7d`. `stale` is true when intervals.icu failed at its last read.
+- `GET /v1/recovery[?refresh=true]` answers `{ date, state, reason, guidance, rule, nightsLogged, nightsNeeded, generatedAt, stale, facts }` with `state`
+  `ready | caution | rest | learning | noData`, `rule` `R1 | R2 | C1 | C2 | C3 | OK | null`, and `facts` `[{ metric, label, value, unit, baselineLow,
+  baselineHigh, deviation, streak }]` (3 or 4, in the order that decided).
+- `GET /v1/activities/{id}` answers a workout from the watch (`watch-<record id>`): `{ id, kind: "activity", source: "watch", type, name, start, end, startDate,
+  durationSeconds, averageHeartRate, maxHeartRate, load, loadApproximate, countsTowardLoad, overlapsRideId, loadNote, thresholdHr, maxHr, heartRate
+  { samples, medianGapSeconds, maxGapSeconds, coverage }, series: [{ t, heartRate }], generatedAt }` (`404 not_found` otherwise). `GET /v1/rides` lists
+  them next to the rides.
+- The profile (§8.3) has four new keys, `maxHeartRate`, `thresholdHeartRate` (bpm or null; patchable, the threshold below the maximum) and the read-only
+  `estimatedMaxHeartRate`, `estimatedThresholdHeartRate`. They are **optional on read** (a profile cached before they existed stays valid) and the
+  service always writes all four.
+
 ### 8.4 MCP tools
 
 | Tool | Kind | Purpose |
@@ -891,6 +972,16 @@ loads, optionally every day), the best efforts at 5 s, 1, 5, 20 and 60 minutes i
 FTP with its **suggestion and basis**; the eFTP is described, and returned, as only a suggestion that is not to be written to the profile
 unasked. Without dates it covers the last 42 days; `series: true` adds the daily series, the whole 25-duration curve and the weekly estimates.
 `get_ride` gains `powerCurve`, `aerobicDrift` and `wPrimeBalance`; `update_profile` and `get_profile` carry `wPrimeKj`.
+
+**Settled in stage P3-2 (ADR 0023):** `get_wellness` gives the daily figures of the days asked (default the last 14, at most 186): `restingHr`,
+`sleepHours`, `bedtime` and `wake` as clock times, `respiratoryRate`, `spo2`, `sleepingHr`, `hrvRmssd`, `steps`, `weightKg` and its 7-day trend
+`weightKg7d`, and which metrics are outside their usual range that day, on which side and for how many days; the usual ranges as of the last day;
+`detail: "full"` gives every reading with its source, range, deviation and streak; `refresh: true` reads intervals.icu first. `get_recovery` gives
+today's state, the rule that decided it (and what the rule means), the reason, the guidance and the facts. `list_activities` and `get_activity`
+**replace** `list_rides` and `get_ride`: they cover the tablet's rides (`type: "cycling"`, `source: "tablet"`) and the watch's workouts (the type the
+watch names, `source: "watch"`), and `get_activity` with a ride id answers as `get_ride` did; `list_rides` and `get_ride` stay registered, marked
+deprecated, for one release. `get_profile` and `update_profile` carry `maxHeartRate`, `thresholdHeartRate` and the read-only estimates. Facts only,
+compact by default, no diagnosis and no cause.
 
 ## 9. Risks and open checks
 

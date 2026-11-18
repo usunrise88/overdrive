@@ -1,11 +1,11 @@
-import {
-  addDaysToIsoDate,
-  type RecoveryFact,
-  type RecoveryRule,
-  type RecoveryState,
-  type WellnessMetric,
+import type {
+  RecoveryFact,
+  RecoveryRule,
+  RecoveryState,
+  WellnessMetric,
 } from "@overdrive/contracts";
 import { baselineBefore, shownRange } from "./baseline.ts";
+import { shiftDate } from "./dates.ts";
 import { METRIC_KEYS, METRIC_SPECS, roundTo, type WellnessSettings } from "./metrics.ts";
 import {
   type DailyTable,
@@ -125,7 +125,7 @@ export const GUIDANCE = {
 const NUMBER_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight"];
 const ORDINALS = ["", "first", "second", "third", "fourth", "fifth", "sixth", "seventh"];
 
-const yesterdayOf = (date: string): string => addDaysToIsoDate(date, -1);
+const yesterdayOf = (date: string): string => shiftDate(date, -1);
 
 const capitalize = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
 
@@ -143,7 +143,7 @@ export function rollingHrv(
   for (const [date, entry] of raw) {
     const logs: number[] = [];
     for (let back = 0; back < HRV_WINDOW_DAYS; back++) {
-      const value = raw.get(addDaysToIsoDate(date, -back))?.value;
+      const value = raw.get(shiftDate(date, -back))?.value;
       if (value !== undefined && value > 0) logs.push(Math.log(value));
     }
     if (logs.length >= HRV_MIN_READINGS) {
@@ -320,7 +320,7 @@ export function evaluateRecovery(
   if (rolling !== undefined) table.hrvRmssd = rolling;
 
   const hasReading = (date: string) => SCORED.some((key) => table[key]?.has(date) === true);
-  const yesterday = addDaysToIsoDate(today, -1);
+  const yesterday = shiftDate(today, -1);
   const date = hasReading(today) ? today : hasReading(yesterday) ? yesterday : null;
   if (date === null) {
     return {
@@ -335,7 +335,7 @@ export function evaluateRecovery(
     };
   }
 
-  const first = addDaysToIsoDate(date, -STREAK_LOOKBACK_DAYS);
+  const first = shiftDate(date, -STREAK_LOOKBACK_DAYS);
   const tracks = new Map<WellnessMetric, Map<string, Tracked>>();
   for (const key of SCORED) {
     tracks.set(key, trackMetric(table[key], METRIC_SPECS[key], settings, first, date));
@@ -350,7 +350,7 @@ export function evaluateRecovery(
     if (now === null) continue;
     let run = 0;
     for (let back = 0; back <= STREAK_LOOKBACK_DAYS; back++) {
-      const score = adverseScore(track?.get(addDaysToIsoDate(date, -back)), key);
+      const score = adverseScore(track?.get(shiftDate(date, -back)), key);
       if (score === null || score <= 1) break;
       run++;
     }

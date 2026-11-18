@@ -13,5 +13,9 @@ export default defineConfig({
   test: {
     // Against a real PostgreSQL (TEST_DATABASE_URL) the test files share one schema: take turns.
     fileParallelism: !process.env.TEST_DATABASE_URL,
+    // Every file starts its own in-process PostgreSQL (PGlite) and many wait on timers of a few seconds (the bot's polling, the
+    // loops): on a machine with many cores one worker per core made the burst at the start starve those waits and a test now and
+    // then failed on time alone. The suite takes as long with fewer workers.
+    maxWorkers: 12,
   },
 });

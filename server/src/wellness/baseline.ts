@@ -1,4 +1,5 @@
-import { addDaysToIsoDate, type Deviation } from "@overdrive/contracts";
+import type { Deviation } from "@overdrive/contracts";
+import { shiftDate } from "./dates.ts";
 import { type MetricSpec, roundTo, type WellnessSettings } from "./metrics.ts";
 
 /**
@@ -70,7 +71,7 @@ export function baselineBefore(
 ): Baseline | null {
   const scaled: number[] = [];
   for (let back = 1; back <= settings.baselineDays; back++) {
-    const value = series.get(addDaysToIsoDate(date, -back));
+    const value = series.get(shiftDate(date, -back));
     if (value !== undefined && (!spec.ln || value > 0)) scaled.push(onScale(spec, value));
   }
   return baselineFromScaled(scaled, spec, settings);

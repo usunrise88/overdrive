@@ -25,6 +25,11 @@ src/         @overdrive/contracts: the schema plus a validator for the TypeScrip
 | Ride list (`GET /v1/rides`) | `schema/rides-response.schema.json` | §6.7, §8.3, ADR 0022 |
 | Dismissing an FTP suggestion (`POST /v1/ftp-suggestion/dismiss`) | `schema/ftp-suggestion-dismiss-request.schema.json`, `…-response.schema.json` | §6.3, §8.3, ADR 0022 |
 | Ride detail (`GET /v1/rides/{id}`) | `schema/ride-detail-response.schema.json` | §8.3, ADR 0022 |
+| Wellness upload (`POST /v1/wellness`) | `schema/wellness-upload.schema.json` | §6.2, §6.7, §12.5, §8.3, ADR 0023 |
+| Wellness upload answer (counts only) | `schema/wellness-upload-response.schema.json` | §8.3, ADR 0023 |
+| Daily wellness (`GET /v1/wellness`) | `schema/wellness-response.schema.json` | §6.4, §12.5, §8.3, ADR 0023 |
+| Recovery (`GET /v1/recovery`) | `schema/recovery-response.schema.json` | §6.4, §8.3, ADR 0023 |
+| Watch activity (`GET /v1/activities/{id}`) | `schema/activity.schema.json` | §6.7, §8.3, ADR 0023 |
 
 The remaining sync API payloads and the MCP tool inputs (spec §8.3–§8.4) get schemas here as they are fixed during
 implementation. The sync outbox of the ride app (ADR 0012) is a local journal, not a wire format, and has no schema.
@@ -70,6 +75,18 @@ duration, `nextBefore` that follows from the page, laps that tile the ride, …)
 `validateMetricsResponse` & co. here and by `MetricsApiJson` in Kotlin (`MetricsContractTest`), against the same fixtures. The profile has
 a new key, `wPrimeKj` (W′ in kJ, 1 to 100, or null for the default of 20 kJ), in the schema, the patch and every profile fixture; the API
 error codes have a new one, `invalid_query` (400), for a malformed `limit`, `before`, `step` or `cp`. All the fixtures are synthetic.
+
+`fixtures/wellness/` holds the golden files of the wellness part of the sync API (ADR 0023): `upload`, `upload-response`, `wellness`,
+`recovery` and `activity`, each with `valid/` and `invalid/`. The upload is a batch of Health Connect records typed by `kind` (nine kinds,
+`weight` included); `validateWellnessUpload` checks the envelope, then each record against the schema of its kind, then what a schema cannot
+say (real instants, end not before start, unique ids), and its messages name `/records/<index>/<field>` and the rule, **never a value**
+(`contracts/test/wellness.test.ts` searches them for the value it sent). The whole `wellness-upload.schema.json` with its `oneOf` rejects every
+invalid fixture except a documented few that only the second step can see. The answers carry consistency rules a schema cannot state
+(a recovery verdict has a rule, guidance and facts; a reading without a value has no source or streak; an activity that overlaps a ride has no
+load): `validateWellnessUploadResponse`, `validateWellnessResponse`, `validateRecoveryResponse`, `validateActivity`, and in Kotlin
+`WellnessApiJson` (`WellnessContractTest`), against the same files. The profile gained four heart-rate keys (`maxHeartRate`,
+`thresholdHeartRate`, `estimatedMaxHeartRate`, `estimatedThresholdHeartRate`), **optional on read** so that a profile cached before they existed
+stays valid, with `profile/valid/heart-rates.json` and the patch fixtures `heart-rate-*`.
 
 `fixtures/fit/` holds two FIT files for the upload's tests: `fit-golden-3s.fit`, the 376 bytes `FitWriter` writes for
 `rides/valid/fit-golden-3s.json` (the worked example of `docs/protocols/fit.md`; Kotlin's `FitFixturesTest` regenerates it

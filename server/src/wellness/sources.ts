@@ -45,6 +45,12 @@ export interface PushWellnessSource extends WellnessSource {
   ingest(upload: WellnessUpload, device: string): Promise<WellnessUploadResponse>;
 }
 
+/** The source the companion's Health Connect batches come through (`POST /v1/wellness`): `services.wellness.upload`. */
+export type HealthConnectUpload = PushWellnessSource;
+
+/** The source read from intervals.icu (`createIntervalsWellnessSource`). */
+export type IntervalsWellnessSource = PullWellnessSource;
+
 // ---- Which source wins ---------------------------------------------------------------------------------
 
 /** For a metric, the sources to take its value from, the preferred first; one not listed is not used for it. */
@@ -136,7 +142,7 @@ export function observationFromIntervals(day: IntervalsWellness): DailyObservati
  */
 export function createIntervalsWellnessSource(
   client: Pick<IntervalsClient, "listWellness">,
-): PullWellnessSource {
+): IntervalsWellnessSource {
   return {
     id: "intervals",
     mode: "pull",

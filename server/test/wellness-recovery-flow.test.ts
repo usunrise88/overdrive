@@ -52,9 +52,45 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  await clearWellness(db);
+  await resetBetweenTests();
   h.clock.set("2026-11-18T08:00:00Z");
 });
+
+// Uploading 60 nights for every test is most of this file's time, so the steady history of the days before the last five is
+// uploaded once and kept; between tests only what was uploaded after it goes. A test that needs another history wipes it all.
+let baseReceivedAt: string | null = null;
+const TAIL_FROM = "2026-11-14"; // four days before today: the first of the last five days, which tests may change
+
+async function steadyBase(): Promise<void> {
+  if (baseReceivedAt !== null) return;
+  await clearWellness(db);
+  await uploadAll(h.app, history(STEADY_NIGHTS, 60, 5));
+  const stamp = await db.query<{ at: string }>(
+    "SELECT max(received_at)::text AS at FROM wellness_records",
+  );
+  baseReceivedAt = stamp.rows[0]?.at ?? null;
+}
+
+async function wipe(): Promise<void> {
+  await clearWellness(db);
+  baseReceivedAt = null;
+}
+
+async function resetBetweenTests(): Promise<void> {
+  if (baseReceivedAt === null) {
+    await clearWellness(db);
+    return;
+  }
+  await db.query("DELETE FROM wellness_records WHERE received_at > $1::timestamptz", [
+    baseReceivedAt,
+  ]);
+  await db.query("DELETE FROM wellness_daily WHERE day >= $1::date OR metric = 'weightKg'", [
+    TAIL_FROM,
+  ]);
+}
+
+/** The last five days (and the days of the steady history after them, as asked) from patterns. */
+const lastDays = (patterns: NightPatterns, firstBack = 0) => history(patterns, 4, firstBack);
 
 /** The steady history: resting heart rate 50 and 54 (mean 52), respiratory rate 13.8 and 14.6, oxygen 95 and 97, heart rate in sleep 46 and 50. */
 const STEADY_NIGHTS: NightPatterns = {
@@ -76,7 +112,8 @@ const mcp = (name: string, args: Record<string, unknown> = {}) => callTool(clien
 
 describe("upload, daily figures, recovery: the whole path over 60 synthetic days", () => {
   it("rates a steady history ready, naming the rule and the signals", async () => {
-    await uploadAll(h.app, history(STEADY_NIGHTS, 60));
+    await steadyBase();
+    await uploadAll(h.app, lastDays(STEADY_NIGHTS));
     const answer = await recovery();
     expect(answer).toMatchObject({
       date: TODAY,
@@ -104,9 +141,10 @@ describe("upload, daily figures, recovery: the whole path over 60 synthetic days
   });
 
   it("rates caution when the resting heart rate stays above its usual range for a second morning", async () => {
+    await steadyBase();
     await uploadAll(
       h.app,
-      history({ ...STEADY_NIGHTS, restingHr: planted(alternating(50, 54), { 1: 55, 0: 55 }) }, 60),
+      lastDays({ ...STEADY_NIGHTS, restingHr: planted(alternating(50, 54), { 1: 55, 0: 55 }) }),
     );
     const answer = await recovery();
     expect(answer).toMatchObject({
@@ -126,7 +164,7 @@ describe("upload, daily figures, recovery: the whole path over 60 synthetic days
   it("rates rest when three signals are far outside their usual range", async () => {
     // Today: resting heart rate 62, a night cut to 4 h 30 min, respiratory rate 17.5.
     const records = [
-      ...history(STEADY_NIGHTS, 60, 1),
+      ...lastDays(STEADY_NIGHTS, 1),
       ...nightRecords(TODAY, {
         restingHr: 62,
         respiratoryRate: 17.5,
@@ -135,6 +173,7 @@ describe("upload, daily figures, recovery: the whole path over 60 synthetic days
         wake: "03:15",
       }),
     ];
+    await steadyBase();
     await uploadAll(h.app, records);
     const answer = await recovery();
     expect(answer).toMatchObject({
@@ -155,6 +194,7 @@ describe("upload, daily figures, recovery: the whole path over 60 synthetic days
   });
 
   it("learns for the first 14 nights and says how many it has", async () => {
+    await wipe();
     await uploadAll(h.app, history(STEADY_NIGHTS, 9));
     const answer = await recovery();
     expect(answer).toMatchObject({
@@ -169,16 +209,16 @@ describe("upload, daily figures, recovery: the whole path over 60 synthetic days
   });
 
   it("is noData when nothing has come for two days, and rates yesterday while today's data is on its way", async () => {
-    await uploadAll(h.app, history(STEADY_NIGHTS, 60, 3));
+    await steadyBase();
     expect(await recovery()).toMatchObject({ state: "noData", date: TODAY, rule: null, facts: [] });
 
-    await clearWellness(db);
-    await uploadAll(h.app, history(STEADY_NIGHTS, 60, 1));
+    await uploadAll(h.app, lastDays(STEADY_NIGHTS, 1));
     expect(await recovery()).toMatchObject({ state: "ready", date: "2026-11-17" });
   });
 
   it("is rated afresh when the morning's data arrives", async () => {
-    await uploadAll(h.app, history(STEADY_NIGHTS, 60, 1));
+    await steadyBase();
+    await uploadAll(h.app, lastDays(STEADY_NIGHTS, 1));
     expect((await recovery()).date).toBe("2026-11-17");
     await uploadAll(
       h.app,
@@ -188,12 +228,13 @@ describe("upload, daily figures, recovery: the whole path over 60 synthetic days
   });
 
   it("answers GET /v1/wellness with the baselines in force, the streaks and the usual sleep times", async () => {
+    await steadyBase();
     await uploadAll(
       h.app,
-      history(
-        { ...STEADY_NIGHTS, restingHr: planted(alternating(50, 54), { 2: 58, 1: 58, 0: 58 }) },
-        60,
-      ),
+      lastDays({
+        ...STEADY_NIGHTS,
+        restingHr: planted(alternating(50, 54), { 2: 58, 1: 58, 0: 58 }),
+      }),
     );
     const res = await get(h.app, `/v1/wellness?from=2026-11-16&to=${TODAY}`);
     const body = res.json() as WellnessResponse;
@@ -227,6 +268,7 @@ describe("upload, daily figures, recovery: the whole path over 60 synthetic days
   it("uses the heart-rate variability where there is one, 7-day mean and all", async () => {
     // 60 ms every morning, then five mornings at 40 ms: the 7-day mean falls far below its usual range.
     const hrvPattern = planted(constant(60), { 4: 40, 3: 40, 2: 40, 1: 40, 0: 40 });
+    await wipe();
     await uploadAll(
       h.app,
       history(
@@ -338,9 +380,10 @@ describe("body weight (spec §12.5)", () => {
 
 describe("the MCP tools", () => {
   it("get_recovery answers as the endpoint does, and says what the rule means", async () => {
+    await steadyBase();
     await uploadAll(
       h.app,
-      history({ ...STEADY_NIGHTS, restingHr: planted(alternating(50, 54), { 1: 55, 0: 55 }) }, 60),
+      lastDays({ ...STEADY_NIGHTS, restingHr: planted(alternating(50, 54), { 1: 55, 0: 55 }) }),
     );
     const { json, isError } = await mcp("get_recovery");
     expect(isError).toBe(false);
@@ -350,15 +393,17 @@ describe("the MCP tools", () => {
   });
 
   it("get_recovery for a learning rider has no rule", async () => {
+    await wipe();
     await uploadAll(h.app, history(STEADY_NIGHTS, 5));
     const { json } = await mcp("get_recovery");
     expect(json).toMatchObject({ state: "learning", rule: null, ruleMeaning: null });
   });
 
   it("get_wellness is compact by default: values in plain units, the usual ranges, who is outside", async () => {
+    await steadyBase();
     await uploadAll(
       h.app,
-      history({ ...STEADY_NIGHTS, restingHr: planted(alternating(50, 54), { 1: 58, 0: 58 }) }, 60),
+      lastDays({ ...STEADY_NIGHTS, restingHr: planted(alternating(50, 54), { 1: 58, 0: 58 }) }),
     );
     const { json, isError } = await mcp("get_wellness");
     expect(isError).toBe(false);
@@ -394,6 +439,7 @@ describe("the MCP tools", () => {
   });
 
   it("get_wellness with detail full is the contract's answer", async () => {
+    await wipe();
     await uploadAll(h.app, history(STEADY_NIGHTS, 20));
     const { json } = await mcp("get_wellness", { from: "2026-11-16", to: TODAY, detail: "full" });
     expect(validateWellnessResponse(json)).toMatchObject({ ok: true });
@@ -423,9 +469,10 @@ describe("the MCP tools", () => {
       );
       expect(text, tool.name).not.toMatch(medical);
     }
+    await steadyBase();
     await uploadAll(
       h.app,
-      history({ ...STEADY_NIGHTS, restingHr: planted(alternating(50, 54), { 1: 62, 0: 62 }) }, 60),
+      lastDays({ ...STEADY_NIGHTS, restingHr: planted(alternating(50, 54), { 1: 62, 0: 62 }) }),
     );
     const state = await recovery();
     expect(`${state.reason} ${state.guidance}`).not.toMatch(medical);
