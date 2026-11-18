@@ -1,0 +1,61 @@
+{
+  "id": "ride-1795160000000",
+  "startTime": "2026-11-12T18:40:00Z",
+  "endTime": "2026-11-12T19:40:00Z",
+  "date": "2026-11-12",
+  "workoutId": "icu-5001",
+  "workoutName": "Sweet spot 2x20",
+  "ftp": 250,
+  "devices": [
+    "Wahoo KICKR",
+    "Polar H10"
+  ],
+  "summary": {
+    "durationSeconds": 3600,
+    "movingSeconds": 3580,
+    "distanceMeters": 31200,
+    "averagePower": 187.4,
+    "normalizedPower": 201.2,
+    "maxPower": 420,
+    "averageHeartRate": 138.5,
+    "maxHeartRate": 161,
+    "workKilojoules": 671.2,
+    "intensityFactor": 0.8,
+    "trainingStressScore": 64.1
+  },
+  "series": {
+    "stepSeconds": 600,
+    "power": [
+      140,
+      225,
+      223,
+      111,
+      226,
+      225
+    ],
+    "heartRate": [
+      118,
+      148,
+      153,
+      130,
+      155,
+      157
+    ],
+    "cadence": [
+      88,
+      90,
+      90,
+      84,
+      91,
+      90
+    ],
+    "targetPower": [
+      138,
+      225,
+      225,
+      125,
+      225,
+      225
+    ]
+  }
+}

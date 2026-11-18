@@ -1,0 +1,36 @@
+{
+  "from": "2026-11-18",
+  "to": "2026-11-18",
+  "generatedAt": "2026-11-18T08:00:00Z",
+  "firstLoadDate": null,
+  "daily": [
+    {
+      "date": "2026-11-18",
+      "load": 0,
+      "loadCycling": 0,
+      "loadOther": 0,
+      "ctl": 0,
+      "atl": 0,
+      "tsb": 0
+    }
+  ],
+  "weekly": [
+    {
+      "weekStart": "2026-11-16",
+      "load": 0,
+      "rides": 0,
+      "durationSec": 0
+    }
+  ],
+  "powerCurve": {
+    "windowDays": 1,
+    "best": []
+  },
+  "ftp": {
+    "current": null,
+    "suggestion": null,
+    "suggestionNote": "No ride has been recorded yet",
+    "history": []
+  },
+  "drift": []
+}

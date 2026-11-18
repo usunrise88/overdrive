@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive rides response",
+  "description": "The service's answer to GET /v1/rides[?from=YYYY-MM-DD][&to=YYYY-MM-DD][&limit=n][&offset=n] (spec §8.3, ADR 0022): the stored rides, newest first, as the summaries the tablet recorded when each ended. from and to are the rider's local days, both included, each optional (null here when not given); limit is 1 to 100 (default 20); total is how many rides match, offset how many were skipped, hasMore whether there are rides after this page. A summary is the one of the ride record (ride-record.schema.json), with the same optional keys. workoutName is the name of the workout the ride was played from, as it was when the ride was stored, null for a free ride or when the service no longer has it. Rules a schema cannot state, checked by every implementation: from and to are real dates and from is not after to; rides has at most limit entries and no more than total - offset; hasMore is true exactly when offset plus the number of rides is below total; ids are unique and start times do not increase down the list.",
+  "type": "object",
+  "required": ["from", "to", "total", "offset", "limit", "hasMore", "rides"],
+  "additionalProperties": false,
+  "properties": {
+    "from": { "oneOf": [{ "$ref": "#/$defs/date" }, { "type": "null" }] },
+    "to": { "oneOf": [{ "$ref": "#/$defs/date" }, { "type": "null" }] },
+    "total": { "type": "integer", "minimum": 0 },
+    "offset": { "type": "integer", "minimum": 0 },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 100 },
+    "hasMore": { "type": "boolean" },
+    "rides": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "instant": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "entry": {
+      "type": "object",
+      "required": [
+        "id",
+        "startTime",
+        "endTime",
+        "date",
+        "workoutId",
+        "workoutName",
+        "ftp",
+        "devices",
+        "summary"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+        "startTime": { "$ref": "#/$defs/instant" },
+        "endTime": {
+          "description": "null while the record has no end.",
+          "oneOf": [{ "$ref": "#/$defs/instant" }, { "type": "null" }]
+        },
+        "date": { "description": "The rider's local day of the start.", "$ref": "#/$defs/date" },
+        "workoutId": { "type": ["string", "null"] },
+        "workoutName": { "type": ["string", "null"] },
+        "ftp": {
+          "description": "FTP in watts at the time of the ride.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "devices": { "type": "array", "items": { "type": "string" } },
+        "summary": { "$ref": "ride-record.schema.json#/$defs/summary" }
+      }
+    }
+  }
+}

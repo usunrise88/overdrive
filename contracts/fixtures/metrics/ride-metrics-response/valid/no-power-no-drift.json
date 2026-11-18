@@ -1,0 +1,19 @@
+{
+  "rideId": "ride-1795160000000",
+  "startTime": "2026-11-12T18:40:00Z",
+  "date": "2026-11-12",
+  "ftp": 250,
+  "durationSec": 20,
+  "movingSec": 20,
+  "load": null,
+  "powerCurve": [],
+  "drift": {
+    "available": false,
+    "reason": "At least 40 minutes of steady riding with power and heart rate are needed; the ride is 20 seconds long",
+    "driftPercent": null,
+    "efFirst": null,
+    "efSecond": null,
+    "startSec": null,
+    "endSec": null
+  }
+}
