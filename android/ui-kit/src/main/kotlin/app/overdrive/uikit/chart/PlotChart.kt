@@ -127,6 +127,33 @@ private class PlotLayout(
             linePath(line.xs, line.ys, indices, xScale::toPx, yScale::toPx, line.stepped)
         }
 
+    /** The personal ranges as polygons following the days, one per run of days that has a range. */
+    private val rangePaths: List<Path> =
+        spec.rangeBands.map { band ->
+            Path().apply {
+                var run = 0
+                while (run < band.xs.size) {
+                    if (band.lows[run].isNaN() || band.highs[run].isNaN()) {
+                        run++
+                        continue
+                    }
+                    var end = run
+                    while (end + 1 < band.xs.size && !band.lows[end + 1].isNaN() && !band.highs[end + 1].isNaN()) end++
+                    if (end > run) {
+                        moveTo(xScale.toPx(band.xs[run]), yScale.toPx(band.highs[run].coerceIn(spec.yMin, spec.yMax)))
+                        for (i in run + 1..end) {
+                            lineTo(xScale.toPx(band.xs[i]), yScale.toPx(band.highs[i].coerceIn(spec.yMin, spec.yMax)))
+                        }
+                        for (i in end downTo run) {
+                            lineTo(xScale.toPx(band.xs[i]), yScale.toPx(band.lows[i].coerceIn(spec.yMin, spec.yMax)))
+                        }
+                        close()
+                    }
+                    run = end + 1
+                }
+            }
+        }
+
     private val strokePx = spec.lines.map { with(density) { it.widthDp.dp.toPx() } }
     private val smallDot = with(density) { 6.dp.toPx() / 2f }
     private val ring = with(density) { 1.5.dp.toPx() }
@@ -146,6 +173,7 @@ private class PlotLayout(
                 )
             }
         }
+        for ((index, path) in rangePaths.withIndex()) drawPath(path, spec.rangeBands[index].color)
         for ((y, label) in yLabels) {
             val isBase = abs(y - frame.bottom) < 0.5f
             hairline(
@@ -183,6 +211,7 @@ private class PlotLayout(
         // The second series first, so the main one is on top.
         for (index in spec.lines.indices.reversed()) strokeLine(paths[index], spec.lines[index].color, strokePx[index])
         for (layer in spec.dots) {
+            if (!layer.drawn) continue
             for (i in layer.xs.indices) {
                 val y = layer.ys[i]
                 if (y.isNaN()) continue
