@@ -242,6 +242,29 @@ describe("events", () => {
     await expect(c.deleteEvent(created.id)).resolves.toBeUndefined();
   });
 
+  it("reads one event of any category, and answers null for one that is not there", async () => {
+    const note = fake.addEvent({
+      category: "NOTE",
+      start_date_local: "2026-11-20T00:00:00",
+      name: "Note",
+    });
+    const { client: c } = client();
+    expect(await c.getEvent(note.id)).toMatchObject({
+      id: note.id,
+      category: "NOTE",
+      name: "Note",
+    });
+    expect(fake.requests[0]).toMatchObject({
+      method: "GET",
+      path: `/api/v1/athlete/${FAKE_ATHLETE_ID}/events/${note.id}`,
+    });
+    // A 404 on one event says it is gone, not that the athlete id is wrong.
+    expect(await c.getEvent(999)).toBeNull();
+    // Anything else still fails.
+    fake.failNext(1, 401, { path: `/events/${note.id}` });
+    expect((await failure(c.getEvent(note.id))).kind).toBe("unauthorized");
+  });
+
   it("an update of an event that does not exist is `not-found`", async () => {
     const error = await failure(client().client.updateEvent(999, { name: "x" }));
     expect(error.kind).toBe("not-found");

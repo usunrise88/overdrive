@@ -36,13 +36,18 @@ const migration = (version: number, sql: string): Migration => ({
 });
 
 describe("the real migrations", () => {
-  it("create the ride tables and the plan tables", async () => {
+  it("create the ride, plan, profile, ride workout and OAuth tables", async () => {
     const applied = await migrate(db);
-    expect(applied).toEqual([1, 2]);
+    expect(applied).toEqual([1, 2, 3]);
     expect(await tables()).toEqual([
+      "oauth_clients",
+      "oauth_codes",
+      "oauth_tokens",
       "plan_sync_state",
       "planned_workouts",
+      "profile",
       "ride_destinations",
+      "ride_workouts",
       "rides",
       "schema_migrations",
     ]);
@@ -63,7 +68,7 @@ describe("the real migrations", () => {
       "INSERT INTO ride_destinations (ride_id, destination, state) VALUES ('with-fit', 'strava', 'done')",
     );
 
-    expect(await migrate(db, all)).toEqual([2]);
+    expect(await migrate(db, all.slice(0, 2))).toEqual([2]);
     const rows = await db.query<{ ride_id: string; destination: string; state: string }>(
       "SELECT ride_id, destination, state FROM ride_destinations ORDER BY destination",
     );
@@ -102,14 +107,60 @@ describe("the real migrations", () => {
     expect(await migrate(db)).toEqual([]);
     expect(await migrate(db)).toEqual([]);
     const rows = await db.query<{ version: number }>("SELECT version FROM schema_migrations");
-    expect(rows.rows).toEqual([{ version: 1 }, { version: 2 }]);
+    expect(rows.rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
     const rides = await db.query("SELECT id FROM rides");
     expect(rides.rows).toHaveLength(1);
   });
 
   it("run together once each when two starts race", async () => {
     const results = await Promise.all([migrate(db), migrate(db)]);
-    expect(results.flat()).toEqual([1, 2]);
+    expect(results.flat()).toEqual([1, 2, 3]);
+  });
+
+  it("give the profile one row and the OAuth tables their constraints (0003)", async () => {
+    await migrate(db);
+    const profile = (id: boolean, data: string) =>
+      db.query("INSERT INTO profile (id, data, updated_at) VALUES ($1, $2::jsonb, now())", [
+        id,
+        data,
+      ]);
+    await expect(profile(false, "{}")).rejects.toThrow(); // the row is the only row
+    await expect(profile(true, "[]")).rejects.toThrow(); // an object
+    await profile(true, "{}");
+    await expect(profile(true, "{}")).rejects.toThrow(); // and there is one
+
+    const client = (id: string, method: string, secret: string | null) =>
+      db.query(
+        `INSERT INTO oauth_clients (client_id, client_secret_sha256, client_name, redirect_uris,
+                                    token_endpoint_auth_method, created_at)
+         VALUES ($1, $3, 'c', '[]'::jsonb, $2, now())`,
+        [id, method, secret],
+      );
+    await client("public", "none", null);
+    await client("confidential", "client_secret_post", "digest");
+    await expect(client("bad1", "none", "digest")).rejects.toThrow(); // a public client has no secret
+    await expect(client("bad2", "client_secret_basic", null)).rejects.toThrow(); // a confidential one has
+    await expect(client("bad3", "private_key_jwt", "digest")).rejects.toThrow(); // only the methods we do
+
+    // Tokens and codes belong to a client, and go with it.
+    await db.query(
+      `INSERT INTO oauth_tokens (token_sha256, kind, family_id, client_id, scope, resource, expires_at, created_at)
+       VALUES ('t', 'access', 'f', 'public', 'mcp', 'r', now(), now())`,
+    );
+    await expect(
+      db.query(
+        `INSERT INTO oauth_tokens (token_sha256, kind, family_id, client_id, scope, resource, expires_at, created_at)
+         VALUES ('u', 'id', 'f', 'public', 'mcp', 'r', now(), now())`,
+      ),
+    ).rejects.toThrow(); // access or refresh
+    await expect(
+      db.query(
+        `INSERT INTO oauth_tokens (token_sha256, kind, family_id, client_id, scope, resource, expires_at, created_at)
+         VALUES ('v', 'access', 'f', 'nobody', 'mcp', 'r', now(), now())`,
+      ),
+    ).rejects.toThrow();
+    await db.query("DELETE FROM oauth_clients WHERE client_id = 'public'");
+    expect((await db.query("SELECT 1 FROM oauth_tokens")).rows).toHaveLength(0);
   });
 
   it("make a table the data constraints hold", async () => {

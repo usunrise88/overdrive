@@ -22,6 +22,7 @@ export const API_ERROR_STATUS = {
   invalid_ride_id: 400,
   invalid_range: 400,
   invalid_record: 422,
+  invalid_profile: 422,
   ride_id_mismatch: 422,
   invalid_fit: 422,
   ride_not_found: 404,

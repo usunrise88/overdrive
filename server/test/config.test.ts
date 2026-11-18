@@ -17,6 +17,7 @@ describe("loadConfig", () => {
       LOG_LEVEL: "info",
       DATABASE_URL,
       DEVICE_TOKENS: [],
+      MCP_STATIC_TOKENS: [],
       INTERVALS_ATHLETE_ID: "0",
       INTERVALS_BASE_URL: "https://intervals.icu",
       PLAN_REFRESH_MINUTES: 15,

@@ -4,6 +4,7 @@ packages:
 
 # Versions shared by every workspace package. Reference them as "catalog:".
 catalog:
+  "@modelcontextprotocol/sdk": 1.32.2
   "@types/node": ^24.0.0
   typescript: ^7.0.2
   vitest: ^5.1.0

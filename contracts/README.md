@@ -18,6 +18,8 @@ src/         @overdrive/contracts: the schema plus a validator for the TypeScrip
 | Upload response (`{rideId, status}`) | `schema/sync-upload-response.schema.json` | §8.3, ADR 0014 |
 | API error (`{error: {code, message}}`) | `schema/api-error.schema.json` | §8.3, ADR 0014 |
 | Planned workouts (`GET /v1/workouts`) | `schema/workouts-response.schema.json` | §5.1, §8.3, ADR 0016 |
+| Rider's profile (`GET /v1/profile`) | `schema/profile.schema.json` | §8.3, ADR 0018 |
+| Profile patch (`PATCH /v1/profile`) | `schema/profile-patch.schema.json` | §8.3, ADR 0018 |
 
 The remaining sync API payloads and the MCP tool inputs (spec §8.3–§8.4) get schemas here as they are fixed during
 implementation. The sync outbox of the ride app (ADR 0012) is a local journal, not a wire format, and has no schema.
@@ -39,6 +41,15 @@ empty) and `workouts`, each `{ id, date, name, source, workout }` with the nativ
 equal to the entry's `id`, an unconfigured service being empty and not stale) is checked by `validateWorkoutsResponse` here and
 by `PlanApiJson` in Kotlin (`PlanApiContractTest`), against the same fixtures. The request also takes `refresh=true` (read the
 source first, wait at most ten seconds); that is a query parameter and has no schema. A malformed range is `400 invalid_range`.
+
+`fixtures/profile/` holds the golden files of the rider's profile (ADR 0018): `profile/{valid,invalid}` for the profile itself (FTP 30 to
+2000 or null, six strictly increasing zone bounds, minutes per weekday, at most ten goals, the physics constants under the names of
+the ride engine's `PhysicsSettings`, every key always present); `patch/{valid,invalid}` each hold `{ before, patch, after }` (valid: applying
+the merge-patch-like `patch` to `before` must give exactly `after`; invalid: it must be refused, either as a patch or as the profile it
+would make, and `before` is untouched); and `zone-ranges.json`, the seven zones in watts for an FTP and its six bounds, with the zone of
+every whole-watt power derived from them (Kotlin also checks Coggan's against `PowerZone.of`). `contracts/test/profile.test.ts`,
+Kotlin's `ProfileContractTest` (`ProfileApiJson`, strict like the schemas) and the service's `profile.test.ts` (through HTTP) run the
+same files. The new API error code `invalid_profile` (422) has its fixture under `sync/api-error/valid/`.
 
 `fixtures/fit/` holds two FIT files for the upload's tests: `fit-golden-3s.fit`, the 376 bytes `FitWriter` writes for
 `rides/valid/fit-golden-3s.json` (the worked example of `docs/protocols/fit.md`; Kotlin's `FitFixturesTest` regenerates it

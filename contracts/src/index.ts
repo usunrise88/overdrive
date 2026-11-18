@@ -3,6 +3,7 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 
 // The sync API's request and response shapes (spec §8.3) live in their own files.
 export * from "./plan.ts";
+export * from "./profile.ts";
 export * from "./sync.ts";
 
 // ---- Workout (spec §8.1) -------------------------------------------------------------------
@@ -59,6 +60,12 @@ export type Validation<T> = { ok: true; value: T } | { ok: false; errors: string
 const workoutSchema: object = JSON.parse(
   readFileSync(new URL("../schema/workout.schema.json", import.meta.url), "utf8"),
 );
+
+/** The native workout's JSON Schema, for tools that advertise the format (the MCP tools describe it to a model). */
+export const workoutJsonSchema: Readonly<Record<string, unknown>> = workoutSchema as Record<
+  string,
+  unknown
+>;
 
 const ajv = new Ajv2020({ allErrors: true });
 const checkWorkout = ajv.compile<Workout>(workoutSchema);

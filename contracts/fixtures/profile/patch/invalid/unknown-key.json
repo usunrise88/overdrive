@@ -1,0 +1,40 @@
+{
+  "description": "",
+  "before": {
+    "ftp": 250,
+    "zones": {
+      "upperPercentOfFtp": [
+        50,
+        70,
+        88,
+        100,
+        115,
+        140
+      ]
+    },
+    "weeklyAvailability": {
+      "mon": 0,
+      "tue": 60,
+      "wed": 45,
+      "thu": 60,
+      "fri": 0,
+      "sat": 120,
+      "sun": 180
+    },
+    "goals": [
+      "Raise FTP to 270 W by spring",
+      "Ride a hilly gran fondo in June"
+    ],
+    "physics": {
+      "systemMassKg": 78.5,
+      "cdA": 0.32,
+      "crr": 0.0035,
+      "airDensity": 1.2,
+      "drivetrainEfficiency": 0.975
+    },
+    "updatedAt": "2026-11-18T09:30:00Z"
+  },
+  "patch": {
+    "weight": 70
+  }
+}

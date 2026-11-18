@@ -11,6 +11,9 @@ import {
 import type { Logger } from "./log.ts";
 import { createPlanRefresher, type PlanRefresher } from "./plan/refresher.ts";
 import { createPlanStore, type PlanStore } from "./plan/store.ts";
+import { createProfileStore, type ProfileStore } from "./profile/store.ts";
+import { createRideStore, type RideStore } from "./ride-store.ts";
+import { createRideWorkoutResolver, type RideWorkoutResolver } from "./ride-workout.ts";
 import type { Timers } from "./timers.ts";
 
 /** The part of the configuration the integrations read; all optional, with the defaults of `config.ts`. */
@@ -33,6 +36,12 @@ export type ServicesConfig = Partial<
 export interface Services {
   bus: EventBus;
   plan: PlanStore;
+  /** The rider's profile: FTP, zones, availability, goals, physics (ADR 0018). */
+  profile: ProfileStore;
+  /** Reads of the stored rides. */
+  rides: RideStore;
+  /** The workout a stored ride was played from, kept when the ride is stored (ADR 0018). */
+  rideWorkouts: RideWorkoutResolver;
   /** The intervals.icu client; null when `INTERVALS_API_KEY` is not set (the integration is off). */
   intervals: IntervalsClient | null;
   /** null when the integration is off: no plan is read and the API says so. */
@@ -72,6 +81,8 @@ export function createServices(options: ServicesOptions): Services {
   const timezone = config.TIMEZONE ?? "UTC";
   const plan = createPlanStore(db, bus);
   const now = options.now;
+  const profile = createProfileStore(db, bus, now ?? (() => new Date()));
+  const rides = createRideStore(db);
 
   let intervals: IntervalsClient | null = null;
   let refresher: PlanRefresher | null = null;
@@ -100,9 +111,25 @@ export function createServices(options: ServicesOptions): Services {
     );
   }
 
+  const rideWorkouts = createRideWorkoutResolver({
+    rides,
+    plan,
+    intervals,
+    now: now ?? (() => new Date()),
+    log,
+  });
+  // A ride keeps the workout it was played from, whatever the plan does later.
+  bus.on("ride-stored", async ({ rideId }) => {
+    const header = await rides.getHeader(rideId);
+    if (header?.workoutId != null) await rideWorkouts.resolve(header);
+  });
+
   return {
     bus,
     plan,
+    profile,
+    rides,
+    rideWorkouts,
     intervals,
     refresher,
     uploads,

@@ -287,8 +287,14 @@ export async function startFakeIntervals(): Promise<FakeIntervals> {
       const found = state.events[index];
       if (found === undefined)
         return send(response, 404, { status: 404, error: "Event not found" });
+      if (method === "GET") return send(response, 200, found);
       if (method === "PUT") {
         const updated = { ...found, ...(json as object) } as FakeEvent;
+        // A new description is parsed afresh by the real service (assumed, ADR 0018): the steps it had
+        // parsed from the old text no longer stand.
+        if (typeof (json as { description?: unknown } | undefined)?.description === "string") {
+          delete updated.workout_doc;
+        }
         state.events[index] = updated;
         return send(response, 200, updated);
       }

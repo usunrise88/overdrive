@@ -1,0 +1,341 @@
+{
+  "description": "The seven zones in watts for an FTP and its six upper bounds (percent of FTP, inclusive). Power is whole watts, so a bound of 137.5 W is 137 W and the next zone starts at 138 W. Every implementation must give these ranges, and the zone of every whole-watt power from 0 to 2500 W must be the one whose range holds it (Kotlin's PowerZone.of agrees for Coggan's bounds).",
+  "cases": [
+    {
+      "ftp": 250,
+      "upperPercentOfFtp": [
+        55,
+        75,
+        90,
+        105,
+        120,
+        150
+      ],
+      "ranges": [
+        {
+          "zone": 1,
+          "minWatts": 0,
+          "maxWatts": 137
+        },
+        {
+          "zone": 2,
+          "minWatts": 138,
+          "maxWatts": 187
+        },
+        {
+          "zone": 3,
+          "minWatts": 188,
+          "maxWatts": 225
+        },
+        {
+          "zone": 4,
+          "minWatts": 226,
+          "maxWatts": 262
+        },
+        {
+          "zone": 5,
+          "minWatts": 263,
+          "maxWatts": 300
+        },
+        {
+          "zone": 6,
+          "minWatts": 301,
+          "maxWatts": 375
+        },
+        {
+          "zone": 7,
+          "minWatts": 376,
+          "maxWatts": null
+        }
+      ]
+    },
+    {
+      "ftp": 200,
+      "upperPercentOfFtp": [
+        55,
+        75,
+        90,
+        105,
+        120,
+        150
+      ],
+      "ranges": [
+        {
+          "zone": 1,
+          "minWatts": 0,
+          "maxWatts": 110
+        },
+        {
+          "zone": 2,
+          "minWatts": 111,
+          "maxWatts": 150
+        },
+        {
+          "zone": 3,
+          "minWatts": 151,
+          "maxWatts": 180
+        },
+        {
+          "zone": 4,
+          "minWatts": 181,
+          "maxWatts": 210
+        },
+        {
+          "zone": 5,
+          "minWatts": 211,
+          "maxWatts": 240
+        },
+        {
+          "zone": 6,
+          "minWatts": 241,
+          "maxWatts": 300
+        },
+        {
+          "zone": 7,
+          "minWatts": 301,
+          "maxWatts": null
+        }
+      ]
+    },
+    {
+      "ftp": 187,
+      "upperPercentOfFtp": [
+        55,
+        75,
+        90,
+        105,
+        120,
+        150
+      ],
+      "ranges": [
+        {
+          "zone": 1,
+          "minWatts": 0,
+          "maxWatts": 102
+        },
+        {
+          "zone": 2,
+          "minWatts": 103,
+          "maxWatts": 140
+        },
+        {
+          "zone": 3,
+          "minWatts": 141,
+          "maxWatts": 168
+        },
+        {
+          "zone": 4,
+          "minWatts": 169,
+          "maxWatts": 196
+        },
+        {
+          "zone": 5,
+          "minWatts": 197,
+          "maxWatts": 224
+        },
+        {
+          "zone": 6,
+          "minWatts": 225,
+          "maxWatts": 280
+        },
+        {
+          "zone": 7,
+          "minWatts": 281,
+          "maxWatts": null
+        }
+      ]
+    },
+    {
+      "ftp": 30,
+      "upperPercentOfFtp": [
+        55,
+        75,
+        90,
+        105,
+        120,
+        150
+      ],
+      "ranges": [
+        {
+          "zone": 1,
+          "minWatts": 0,
+          "maxWatts": 16
+        },
+        {
+          "zone": 2,
+          "minWatts": 17,
+          "maxWatts": 22
+        },
+        {
+          "zone": 3,
+          "minWatts": 23,
+          "maxWatts": 27
+        },
+        {
+          "zone": 4,
+          "minWatts": 28,
+          "maxWatts": 31
+        },
+        {
+          "zone": 5,
+          "minWatts": 32,
+          "maxWatts": 36
+        },
+        {
+          "zone": 6,
+          "minWatts": 37,
+          "maxWatts": 45
+        },
+        {
+          "zone": 7,
+          "minWatts": 46,
+          "maxWatts": null
+        }
+      ]
+    },
+    {
+      "ftp": 2000,
+      "upperPercentOfFtp": [
+        55,
+        75,
+        90,
+        105,
+        120,
+        150
+      ],
+      "ranges": [
+        {
+          "zone": 1,
+          "minWatts": 0,
+          "maxWatts": 1100
+        },
+        {
+          "zone": 2,
+          "minWatts": 1101,
+          "maxWatts": 1500
+        },
+        {
+          "zone": 3,
+          "minWatts": 1501,
+          "maxWatts": 1800
+        },
+        {
+          "zone": 4,
+          "minWatts": 1801,
+          "maxWatts": 2100
+        },
+        {
+          "zone": 5,
+          "minWatts": 2101,
+          "maxWatts": 2400
+        },
+        {
+          "zone": 6,
+          "minWatts": 2401,
+          "maxWatts": 3000
+        },
+        {
+          "zone": 7,
+          "minWatts": 3001,
+          "maxWatts": null
+        }
+      ]
+    },
+    {
+      "ftp": 250,
+      "upperPercentOfFtp": [
+        50,
+        70,
+        88,
+        100,
+        115,
+        140
+      ],
+      "ranges": [
+        {
+          "zone": 1,
+          "minWatts": 0,
+          "maxWatts": 125
+        },
+        {
+          "zone": 2,
+          "minWatts": 126,
+          "maxWatts": 175
+        },
+        {
+          "zone": 3,
+          "minWatts": 176,
+          "maxWatts": 220
+        },
+        {
+          "zone": 4,
+          "minWatts": 221,
+          "maxWatts": 250
+        },
+        {
+          "zone": 5,
+          "minWatts": 251,
+          "maxWatts": 287
+        },
+        {
+          "zone": 6,
+          "minWatts": 288,
+          "maxWatts": 350
+        },
+        {
+          "zone": 7,
+          "minWatts": 351,
+          "maxWatts": null
+        }
+      ]
+    },
+    {
+      "ftp": 333,
+      "upperPercentOfFtp": [
+        60,
+        80,
+        95,
+        110,
+        125,
+        160
+      ],
+      "ranges": [
+        {
+          "zone": 1,
+          "minWatts": 0,
+          "maxWatts": 199
+        },
+        {
+          "zone": 2,
+          "minWatts": 200,
+          "maxWatts": 266
+        },
+        {
+          "zone": 3,
+          "minWatts": 267,
+          "maxWatts": 316
+        },
+        {
+          "zone": 4,
+          "minWatts": 317,
+          "maxWatts": 366
+        },
+        {
+          "zone": 5,
+          "minWatts": 367,
+          "maxWatts": 416
+        },
+        {
+          "zone": 6,
+          "minWatts": 417,
+          "maxWatts": 532
+        },
+        {
+          "zone": 7,
+          "minWatts": 533,
+          "maxWatts": null
+        }
+      ]
+    }
+  ]
+}

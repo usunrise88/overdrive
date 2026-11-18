@@ -1,0 +1,90 @@
+{
+  "description": "Every part of a patch applies together.",
+  "before": {
+    "ftp": null,
+    "zones": {
+      "upperPercentOfFtp": [
+        55,
+        75,
+        90,
+        105,
+        120,
+        150
+      ]
+    },
+    "weeklyAvailability": {
+      "mon": null,
+      "tue": null,
+      "wed": null,
+      "thu": null,
+      "fri": null,
+      "sat": null,
+      "sun": null
+    },
+    "goals": [],
+    "physics": {
+      "systemMassKg": 80,
+      "cdA": 0.35,
+      "crr": 0.004,
+      "airDensity": 1.225,
+      "drivetrainEfficiency": 1
+    },
+    "updatedAt": null
+  },
+  "patch": {
+    "ftp": 240,
+    "zones": {
+      "upperPercentOfFtp": [
+        55,
+        75,
+        90,
+        105,
+        120,
+        150
+      ]
+    },
+    "weeklyAvailability": {
+      "tue": 60,
+      "thu": 60
+    },
+    "goals": [
+      "Base miles"
+    ],
+    "physics": {
+      "drivetrainEfficiency": 0.97
+    }
+  },
+  "after": {
+    "ftp": 240,
+    "zones": {
+      "upperPercentOfFtp": [
+        55,
+        75,
+        90,
+        105,
+        120,
+        150
+      ]
+    },
+    "weeklyAvailability": {
+      "mon": null,
+      "tue": 60,
+      "wed": null,
+      "thu": 60,
+      "fri": null,
+      "sat": null,
+      "sun": null
+    },
+    "goals": [
+      "Base miles"
+    ],
+    "physics": {
+      "systemMassKg": 80,
+      "cdA": 0.35,
+      "crr": 0.004,
+      "airDensity": 1.225,
+      "drivetrainEfficiency": 0.97
+    },
+    "updatedAt": null
+  }
+}

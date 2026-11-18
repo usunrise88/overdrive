@@ -1,16 +1,15 @@
-import { addDaysToIsoDate, isIsoDate } from "@overdrive/contracts";
+import { addDaysToIsoDate } from "@overdrive/contracts";
 import type { IntervalsClient } from "../intervals/client.ts";
-import { isCyclingType, plannedIdFor } from "../intervals/ids.ts";
-import { convertIntervalsEvent } from "../intervals/workout-convert.ts";
 import type { Logger } from "../log.ts";
 import { localDate } from "../time.ts";
 import { realTimers, type Timers } from "../timers.ts";
+import { PLAN_SOURCE, readPlanEvent } from "./entries.ts";
 import type { PlanChange, PlanEntry, PlanStore } from "./store.ts";
+
+export { PLAN_SOURCE };
 
 /** Today and this many days after it are kept in the cache (spec §5.1). */
 export const PLAN_HORIZON_DAYS = 14;
-
-export const PLAN_SOURCE = "intervals.icu";
 
 export type RefreshResult =
   | {
@@ -71,49 +70,33 @@ export function createPlanRefresher(options: PlanRefresherOptions): PlanRefreshe
     const entries: PlanEntry[] = [];
     const unsupported: { id: string; name: string; date: string; reason: string }[] = [];
     for (const event of events) {
-      if (event.category !== undefined && event.category !== null && event.category !== "WORKOUT")
-        continue;
-      if (!isCyclingType(event.type)) continue;
-      const date = event.start_date_local.slice(0, 10);
-      if (!isIsoDate(date) || date < window.from || date > window.to) {
+      const reading = readPlanEvent(event);
+      if (reading.kind === "ignored") continue;
+      if (
+        reading.kind === "no-date" ||
+        reading.entry.date < window.from ||
+        reading.entry.date > window.to
+      ) {
         log.warn(
           { eventId: event.id },
           "plan event with a date outside the window or unreadable was ignored",
         );
         continue;
       }
-      const id = plannedIdFor(event.id);
-      const name = (event.name ?? "").trim() || "Workout";
-      const converted = convertIntervalsEvent(event, id);
-      if (converted.ok) {
-        entries.push({
-          id,
-          source: PLAN_SOURCE,
-          externalId: String(event.id),
-          date,
-          name,
-          workout: converted.workout,
-          unsupportedReason: null,
-        });
-        reported.delete(id);
-      } else {
-        entries.push({
-          id,
-          source: PLAN_SOURCE,
-          externalId: String(event.id),
-          date,
-          name,
-          workout: null,
-          unsupportedReason: converted.reason,
-        });
-        unsupported.push({ id, name, date, reason: converted.reason });
-        if (reported.get(id) !== converted.reason) {
-          reported.set(id, converted.reason);
-          log.warn(
-            { eventId: event.id, date, reason: converted.reason },
-            "planned workout skipped: not supported on the tablet",
-          );
-        }
+      const { entry } = reading;
+      entries.push(entry);
+      if (entry.workout !== null) {
+        reported.delete(entry.id);
+        continue;
+      }
+      const reason = entry.unsupportedReason ?? "it cannot be converted";
+      unsupported.push({ id: entry.id, name: entry.name, date: entry.date, reason });
+      if (reported.get(entry.id) !== reason) {
+        reported.set(entry.id, reason);
+        log.warn(
+          { eventId: event.id, date: entry.date, reason },
+          "planned workout skipped: not supported on the tablet",
+        );
       }
     }
     for (const id of [...reported.keys()]) {

@@ -15,6 +15,14 @@ const db = createPgDb(config.DATABASE_URL, (err) =>
 );
 const app = buildApp({ config, db });
 
+// The owner's passphrase is never configured, only its hash (ADR 0018). A plain one in the
+// environment is a mistake worth saying so about, though its value is never read or printed.
+if ((process.env.OWNER_PASSPHRASE ?? "") !== "") {
+  app.log.warn(
+    "OWNER_PASSPHRASE is set but is not read: the server takes only OWNER_PASSPHRASE_HASH. Remove the plain passphrase from the environment",
+  );
+}
+
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     app.log.info({ signal }, "shutting down");

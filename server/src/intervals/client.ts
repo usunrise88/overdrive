@@ -122,6 +122,8 @@ export interface IntervalsClient {
   findActivityId(input: FindActivityInput): Promise<string | null>;
   /** The WORKOUT events from `from` to `to` (local dates, both included). */
   listEvents(from: string, to: string): Promise<IntervalsEvent[]>;
+  /** One calendar event of any category, or null when there is none with this id. */
+  getEvent(id: number): Promise<IntervalsEvent | null>;
   createEvent(payload: IntervalsEventPayload): Promise<IntervalsEvent>;
   updateEvent(id: number, payload: Partial<IntervalsEventPayload>): Promise<IntervalsEvent>;
   /** Deleting an event that is already gone succeeds. */
@@ -437,6 +439,18 @@ export function createIntervalsClient(options: IntervalsClientOptions): Interval
       if (dropped > 0)
         log.warn({ dropped }, "intervals.icu events without an id or a date were ignored");
       return events;
+    },
+
+    async getEvent(id) {
+      try {
+        return parseEvent(
+          await send({ method: "GET", path: `events/${id}`, repeatable: true, timeoutMs }),
+        );
+      } catch (error) {
+        // A 404 here says the event is not there; it is not a sign of a wrong athlete id.
+        if (error instanceof IntervalsError && error.kind === "not-found") return null;
+        throw error;
+      }
     },
 
     async createEvent(payload) {
