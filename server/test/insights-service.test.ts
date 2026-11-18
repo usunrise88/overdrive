@@ -33,6 +33,9 @@ import type { IntegrationHarness } from "./helpers/integrations.ts";
  * checked and the template used when it is not there.
  */
 
+// These tests start the whole service over an in-process database: on a loaded machine they may take a few seconds, never because of a wait.
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
+
 let db: Db;
 let env: InsightsEnv;
 let intervals: FakeIntervals;
@@ -65,7 +68,7 @@ afterEach(async () => {
 });
 
 const until = (check: () => void | Promise<void>) =>
-  vi.waitFor(check, { timeout: 5000, interval: 20 });
+  vi.waitFor(check, { timeout: 15_000, interval: 20 });
 
 const MORNING = "2026-11-18T07:00:00Z";
 

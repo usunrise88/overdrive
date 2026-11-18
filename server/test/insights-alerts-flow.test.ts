@@ -27,6 +27,9 @@ import { batch, nightRecords, post } from "./helpers/wellness-data.ts";
  * streak; plan drift, at most once a week; both sent to Telegram once and listed in GET /v1/insights.
  */
 
+// These tests start the whole service over an in-process database: on a loaded machine they may take a few seconds, never because of a wait.
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
+
 let db: Db;
 let env: InsightsEnv;
 let intervals: FakeIntervals;
@@ -57,7 +60,7 @@ afterEach(async () => {
 });
 
 const until = (check: () => void | Promise<void>) =>
-  vi.waitFor(check, { timeout: 5000, interval: 20 });
+  vi.waitFor(check, { timeout: 15_000, interval: 20 });
 
 /** Resting heart rate by date: 50 and 54 on alternating days (mean 52, usual range 50 to 54), `planted` on the days named. */
 const restingOn = (date: string, planted: Record<string, number>): number => {

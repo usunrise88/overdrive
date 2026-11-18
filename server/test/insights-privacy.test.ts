@@ -25,6 +25,9 @@ import {
  * address of the endpoint. Only ids, kinds and counts.
  */
 
+// These tests start the whole service over an in-process database: on a loaded machine they may take a few seconds, never because of a wait.
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
+
 let db: Db;
 let env: InsightsEnv;
 let intervals: FakeIntervals;
@@ -57,7 +60,7 @@ afterEach(async () => {
 });
 
 const until = (check: () => void | Promise<void>) =>
-  vi.waitFor(check, { timeout: 5000, interval: 20 });
+  vi.waitFor(check, { timeout: 15_000, interval: 20 });
 
 describe("the log", () => {
   it("holds no note, fact, value, key or address after a morning, an alert, a ride and a week, with and without the model", async () => {

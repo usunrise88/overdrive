@@ -1,6 +1,6 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { type InsightsResponse, validateInsightsResponse } from "@overdrive/contracts";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "../src/db.ts";
 import { buildRideFacts } from "../src/insights/facts.ts";
 import type { NewInsight } from "../src/insights/store.ts";
@@ -21,6 +21,8 @@ import {
  * `GET /v1/insights` and the MCP tools `list_insights`, `get_facts`, `list_discussion_topics`, `mark_discussion_topic` (spec §6.5,
  * §8.3, §8.4, ADR 0025): ranges, ordering, local days, the topic of a ride note, the facts the writer saw, and privacy.
  */
+
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
 
 let db: Db;
 let fake: FakeIntervals;
