@@ -11,23 +11,32 @@ import app.overdrive.core.sync.HttpPostBytesTransport
 import app.overdrive.core.sync.HttpPostRequest
 import app.overdrive.core.sync.HttpPostTransport
 import app.overdrive.core.sync.HttpRequest
+import app.overdrive.core.sync.HttpStreamRequest
+import app.overdrive.core.sync.HttpStreamTransport
 import app.overdrive.core.sync.HttpTransport
 import app.overdrive.core.sync.TransportException
 import app.overdrive.core.sync.TransportFailure
 import app.overdrive.core.sync.UploadBody
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
 import java.io.InputStream
+import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * [HttpTransport] over `HttpURLConnection` (ADR 0014 section 6): no new dependency, no Play Services. One `PUT` per call
@@ -43,7 +52,9 @@ import java.net.URL
  * companion's FTP answer (ADR 0024): one `POST` with a small JSON body, the same stack and rules again. And it is the
  * [HttpPostBytesTransport] of the outdoor ride's FIT file (ADR 0028): one `POST` of up to 16 MiB of bytes with a fixed length, sent in
  * pieces so a cancelled request stops, with `Content-Type` as the request says (`application/vnd.ant.fit`); the body is the rider's ride,
- * so it is kept out of every failure and every printed request, like the token.
+ * so it is kept out of every failure and every printed request, like the token. And it is the [HttpStreamTransport] of the live coach's cue stream
+ * (docs/adr/0039): a `GET` read **as it arrives** (`text/event-stream`), with a read timeout of its own, longer than the service's 15 s heartbeat,
+ * so a connection that goes quiet is broken and not waited on for ever; cancelling the request closes the connection.
  *
  * **It logs nothing and keeps neither the token nor the body anywhere but the request being sent.** What went wrong without an
  * answer is a [TransportException] whose message names only the kind of failure; its hint for the owner is a fixed vocabulary
@@ -59,11 +70,16 @@ class UrlConnectionTransport(
     private val readTimeoutMillis: Int = READ_TIMEOUT_MILLIS,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val setPatchMethod: (HttpURLConnection) -> Unit = { it.requestMethod = "PATCH" },
+    private val streamReadTimeoutMillis: Int = STREAM_READ_TIMEOUT_MILLIS,
 ) : HttpTransport,
     HttpGetTransport,
     HttpPatchTransport,
     HttpPostTransport,
-    HttpPostBytesTransport {
+    HttpPostBytesTransport,
+    HttpStreamTransport {
+    /** Where the blocking reads of event streams run, **detached from the caller**: see [stream]. */
+    private val streamScope = CoroutineScope(SupervisorJob() + dispatcher)
+
     override suspend fun get(request: HttpGetRequest): HttpAnswer =
         withContext(dispatcher) {
             val connection =
@@ -93,6 +109,96 @@ class UrlConnectionTransport(
                 connection.disconnect()
             }
         }
+
+    /**
+     * `GET` as an event stream: the text of a `200` is given to [onChunk] as it is read, until the server ends the response (the answer is then `200`
+     * with no body), the connection breaks or goes quiet for [streamReadTimeoutMillis] (a [TransportException]: the service writes a heartbeat every
+     * 15 s, so a healthy stream never does), or the coroutine is cancelled. Any other status is returned with the start of its body and `onChunk` is
+     * not called. Text is decoded as UTF-8 by a reader that holds half a character until its other half arrives.
+     *
+     * **A read that is waiting cannot be cancelled**, and whether closing the connection wakes it depends on the stack (Android's `HttpURLConnection` does:
+     * the call is cancelled; the JDK's waits for the next byte). So the blocking read runs in a coroutine of its own ([streamScope]) that hands the
+     * text to this one through a channel: **cancelling returns at once**, closes the connection from yet another coroutine so that nothing here waits for
+     * it, and a reader that is still blocked ends with its read timeout and gives up its thread then. Nothing the reader reads after the cancel is used.
+     */
+    override suspend fun stream(
+        request: HttpStreamRequest,
+        onChunk: suspend (String) -> Unit,
+    ): HttpAnswer {
+        val items = Channel<Any>(Channel.UNLIMITED)
+        val open = AtomicReference<HttpURLConnection?>(null)
+        val reader =
+            streamScope.launch {
+                try {
+                    items.trySend(readStream(request, open) { items.trySend(it) })
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    items.trySend(e)
+                }
+            }
+        try {
+            while (true) {
+                when (val item = items.receive()) {
+                    is String -> onChunk(item)
+                    is HttpAnswer -> return item
+                    is Exception -> throw item
+                }
+            }
+        } finally {
+            reader.cancel()
+            open.get()?.let { connection -> streamScope.launch { connection.disconnect() } }
+        }
+    }
+
+    /** The blocking half of [stream]: opens the connection (leaving it in [open] for the caller to close) and gives the text to [give] as it is read. */
+    private suspend fun readStream(
+        request: HttpStreamRequest,
+        open: AtomicReference<HttpURLConnection?>,
+        give: (String) -> Unit,
+    ): HttpAnswer {
+        val connection =
+            try {
+                URL(request.url).openConnection() as HttpURLConnection
+            } catch (e: IOException) {
+                throw TransportException(TransportFailure.Other, e)
+            } catch (e: ClassCastException) {
+                throw TransportException(TransportFailure.Other, e)
+            }
+        open.set(connection)
+        try {
+            connection.requestMethod = "GET"
+            connection.connectTimeout = connectTimeoutMillis
+            connection.readTimeout = streamReadTimeoutMillis
+            connection.instanceFollowRedirects = false
+            connection.useCaches = false
+            connection.doInput = true
+            connection.setRequestProperty("Authorization", "Bearer ${request.bearerToken}")
+            connection.setRequestProperty("Accept", "text/event-stream")
+            connection.setRequestProperty("Cache-Control", "no-cache")
+            request.lastEventId?.let { connection.setRequestProperty("Last-Event-ID", it) }
+            val status = connection.responseCode
+            if (status != HTTP_OK) {
+                val stream = if (status >= HTTP_BAD_REQUEST) connection.errorStream else connection.inputStream
+                return HttpAnswer(status, stream?.use(::readStart).orEmpty())
+            }
+            InputStreamReader(connection.inputStream, Charsets.UTF_8).use { reader ->
+                val buffer = CharArray(STREAM_CHUNK_CHARS)
+                while (true) {
+                    val read = reader.read(buffer)
+                    currentCoroutineContext().ensureActive()
+                    if (read < 0) break
+                    if (read > 0) give(String(buffer, 0, read))
+                }
+            }
+            return HttpAnswer(HTTP_OK)
+        } catch (e: IOException) {
+            currentCoroutineContext().ensureActive()
+            throw NetworkFailures.exceptionOf(e)
+        } finally {
+            connection.disconnect()
+        }
+    }
 
     override suspend fun put(request: HttpRequest): HttpAnswer =
         withContext(dispatcher) {
@@ -244,6 +350,11 @@ class UrlConnectionTransport(
     companion object {
         const val CONNECT_TIMEOUT_MILLIS = 10_000
         const val READ_TIMEOUT_MILLIS = 30_000
+
+        /** The cue stream's read timeout: longer than the service's 15 s heartbeat, shorter than the 30 s every other request waits (docs/adr/0038). */
+        const val STREAM_READ_TIMEOUT_MILLIS = 25_000
+        private const val STREAM_CHUNK_CHARS = 8_192
+        private const val HTTP_OK = 200
         private const val MAX_ANSWER_BYTES = 4_096
         private const val READ_CHUNK_BYTES = 8_192
         private const val WRITE_CHUNK_BYTES = 64 * 1024

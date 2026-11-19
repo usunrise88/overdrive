@@ -57,6 +57,8 @@ public class CueStream(
     private val source: CueStreamSource,
     private val onCue: (LiveCue) -> Unit,
     private val defaultRetryMillis: Long = DEFAULT_RETRY_MILLIS,
+    /** The shortest wait between two connections. The default is a second; only a test that does not want to wait for real asks for less. */
+    private val minRetryMillis: Long = MIN_RETRY_MILLIS,
 ) {
     /** How many events were skipped for not being the contract's. For tests and the bench; never the events themselves. */
     public var skipped: Int = 0
@@ -73,7 +75,7 @@ public class CueStream(
     /** Opens the stream and keeps it open until the service ends it. Throws only for cancellation. */
     public suspend fun run(): CueStreamEnd {
         var lastEventId: String? = null
-        var retry = defaultRetryMillis.coerceIn(MIN_RETRY_MILLIS, MAX_RETRY_MILLIS)
+        var retry = defaultRetryMillis.coerceIn(minRetryMillis, MAX_RETRY_MILLIS)
         var silentConnections = 0
         while (true) {
             attempts++
@@ -91,7 +93,7 @@ public class CueStream(
                                 throw BrokenStream()
                             }
                         for (event in events) handle(event)
-                        parser.retryMillis?.let { retry = it.coerceIn(MIN_RETRY_MILLIS, MAX_RETRY_MILLIS) }
+                        parser.retryMillis?.let { retry = it.coerceIn(minRetryMillis, MAX_RETRY_MILLIS) }
                         lastEventId = parser.lastEventId
                     }
                 } catch (e: EndEvent) {
