@@ -986,6 +986,7 @@ path: everything is under `/v1`.
 - *Stage A1b of v0.4.0:* a heart-rate step (§8.1) whose target is a fraction of the threshold heart rate is served with `target_bpm` worked out
   from the profile's threshold (the rider's own, else the estimate from the rides) and no `target_lthr`; the stored plan keeps the fraction.
   How the step travels to and from intervals.icu: ADR 0033 section 6.
+- *Stage A1c of v0.4.0:* every planned workout carries an optional `structureHash` (§11.7, the repeats' own hash of the workout as served), so the tablet can ask for the previous attempt without computing one (ADR 0034).
 
 **Settled in stage P2-3 (the profile; ADR 0018, `contracts/schema/profile.schema.json`, `profile-patch.schema.json`, Kotlin `ProfileApiJson`):**
 
@@ -1003,6 +1004,7 @@ path: everything is under `/v1`.
   constants it names. It answers the whole profile. A change that would not make a valid profile changes nothing and is
   `422 invalid_profile` (a new code of the closed list); a body that is not JSON is `400 invalid_json`. A change emits the
   `profile-changed` event inside the service.
+- *Stage A1c of v0.4.0:* the profile may also carry `bikeWeightKg` (writable by `PATCH`, `null` clears it) and the read-only derived `riderWeight` `{ kg, date, days }` (§12.5, ADR 0034); both keys are written only when they have a value.
 
 **Settled in P2 fix: profile on the tablet (ADR 0021, `core` `ProfileRepository`, `android/data` `FileProfileCache`):** the ride app
 uses the profile. It reads `GET /v1/profile` with the same address, token and transport class as the plan (at start, when the Ready
@@ -1287,6 +1289,15 @@ In ERG a falling cadence makes the trainer raise torque, which drops cadence fur
   `stall-guard` (§12.3) is switched on: **at least 3 activations in one ride** (`TopicSettings.stallGuardActivations`), after the rows that were there before it;
   the limit of two topics in any 7 days is unchanged.
 
+**Settled in stage A1c of v0.4.0** (ADR 0034; **not seen on the tablet**):
+
+- *The overlay says it:* while the guard has hold the fifth cell's label is **"Cadence guard"** in primary text (a word, not a colour) and its value is what the trainer is
+  held at (`stallGuardWatts`); the ride screen says the same in place of "Target". The guard taking hold and letting go is shown at once (a change of the fifth cell is a rider action
+  for the once-a-second limit of §4.6).
+- *Settings:* **Settings, Ride**: **Cadence guard** (switch, on) and **Cadence floor** (30 to 90 rpm, default 55). **Developer · Cadence guard**: the seconds below the floor (3), the target while it
+  holds (70%), the margin above the floor to let go (10 rpm), the seconds above (5), the climb back (5 s), the seconds not judged after a resume (5) and the longest wait to get up to speed (30 s). Each row
+  has a plain label, its unit and its default; **Reset** puts the group back. They are persisted as `tune_<id>` and reach the next ride.
+
 ### 11.2 Heart-rate hold
 
 A workout step that holds heart rate in a band by adjusting power. It needs no FTP and matches the load to the day's condition, which suits base training.
@@ -1326,11 +1337,30 @@ on a rider**: the owner tunes the numbers, and ADR 0033 lists what to look for):
   `powerMax`; `targetPower` is the controller's power. **Compliance** is the time inside the band over the judged seconds (§8.2).
 - **Settings** are `RideSettings.heartRateHold` (`HeartRateHoldSettings`) with the defaults above: engine defaults, not in Settings (stage A1c).
 
+**Settled in stage A1c of v0.4.0** (ADR 0034; `core` `HeartRateHoldState`, `app-ride` `RideMapping.hold`, `ui-kit` `OverlayHold`; **not seen on the tablet**):
+
+- *The overlay says it* in one line under the main row, **in both modes**: the target heart rate and band, where the heart rate is **by position and words** (a small gauge and "In band", "Above band",
+  "Below band"), "Easing in" during the start ramp, "No heart rate" before the strap counts as lost, **"Strap lost · holding 142 W"** after 15 s and **"Strap lost · power at the minimum, 80 W"** after 60 s. The fifth
+  cell is "Target" with no intensity and the controller's power. The ±2 bpm of the gear buttons is the target changing at once, with the difference from the step's own in brackets ("137 bpm (+2)").
+  The ride screen shows "Heart rate target" in place of "Intensity" (and the two buttons say so) and a banner for the strap. The profile chart draws the step as a floating band, not a free-ride block.
+- *Settings:* **Developer · Heart-rate hold**: the start ramp (180 s) and where it ends (30% of the range), the gain (0.5 W/bpm), the look-ahead (30 s), the largest rise (5 W) and fall (10 W) per decision, the dead band (1 bpm),
+  the smoothing (15 s), the trend window (30 s), the two strap times (hold after 15 s, drop to the minimum after 60 s; the drop is never before the hold: the two steppers refuse each other and say why), the gear
+  button's step (2 bpm) and how far the target may move (20 bpm). Same rows, defaults and **Reset** as above; the decision interval stays the spec's 10 s and is not a setting.
+
 ### 11.3 Overlay expands around step changes
 
 - 10 s before a step change the overlay switches to detailed mode and shows the countdown and the next step.
 - 10 s after the change it returns to the mode the rider had chosen.
 - A setting turns this off. Step changes get no sound of their own: the overlay is always in view. Spoken cues exist only as the opt-in feature in 12.1.
+
+**Settled in stage A1c of v0.4.0** (ADR 0034, `core` `StepChangeWindow`, `app-ride` `OverlayModeState`; **not seen on the tablet**):
+
+- *The window is a pure function of the step progress:* open when the ride is live in a workout and the step is within **10 s of its end with a step after it** or within **10 s of its start and not the first**. The start of the
+  workout and its end are not step changes; a skip with Next or Previous is one (a skip back to the first step is not); a step of 20 s or less is expanded from its first to its last second; a pause freezes it; a free-ride step
+  changes like any other. In the window the overlay is detailed, which has the countdown ("2:43 left") and the next step; no sound, no animation.
+- *The rider's choice wins:* a tap flips what is **shown**. Tapping an overlay that expanded by itself collapses it, leaves the chosen mode alone and keeps that window from expanding it again (so the return afterwards does nothing);
+  tapping a compact overlay chooses detailed for good. A dismissal lasts until the window closes.
+- *Setting:* **Settings, Overlay, Expand at step changes** (switch, on).
 
 ### 11.4 Routes with elevation
 
@@ -1398,6 +1428,16 @@ Riding the same session again is the cleanest measure of progress. The system de
 
 - *The companion's page is built:* the Rides tab has a second view, **History | Repeats**: the sessions ridden at least twice (name, attempts, last date, and the latest attempt against the previous in one plain line: "Heart rate at the same power 144 bpm, 2 lower than last time"), and a page per session with every attempt side by side. Both are cached resources (`GET /v1/repeats`, `GET /v1/repeats/{hash}`), shown at once and offline with the cause when old.
 - *Every figure is the service's.* The page draws, per attempt, the heart rate at the same power (overall and per compared step), the aerobic drift, the compliance, the average power and the duration, each as a dot per attempt (x is the attempt, equally spaced); the phone computes no trend and no verdict. **The trend is said in words only as the service says it:** "Heart rate at the same power is trending down: fitter" only when the direction is `improving` with at least three attempts that have a figure (the contract guarantees the count), "trending up" for `worsening`, "steady" inside the band, "Not enough attempts yet" (and how many attempts have a figure) otherwise; drift and compliance have their own words and never say "fitter". The service's `note` (heat, sleep and caffeine) is shown plainly under the heart-rate chart. An attempt with no figure says why in the service's words; a card where no attempt has the figure is one sentence; a tap on an attempt opens the ride.
+
+**Settled in stage A1c of v0.4.0** (ADR 0034, `core` `PreviousAttemptComparison`, `previousAttemptOf`; `contracts` `structureHash`; **not seen on the tablet**):
+
+- *The hash comes from the service:* `GET /v1/workouts` gives each planned workout an additive `structureHash` (the repeats' own hash of the workout as served); the tablet never computes one, and a workout opened from a file has none and no line.
+  **Once, when the ride starts,** the host asks `GET /v1/repeats/{hash}/previous` (no `before`: the ride is not on the service yet) on the ride's own coroutine; the answer is kept in memory for the ride. **Offline-safe:** no address, no network,
+  401, 404, 5xx, a bad body, another session's hash and "no earlier attempt" are all *no line*, with no error and no retry, and the ride never waits.
+- *The comparison* counts the seconds of the current **steady ERG step** by the rules of ADR 0026 (not paused, power within 3% of the step's target, a heart rate, **after the first 60 s of each stretch**; a pause ends a stretch) and speaks only
+  when the previous attempt has a figure for that step at the same power (its target within 3% of this one's) and **at least 120 counted seconds or half of the counted length the previous attempt had, whichever is more** (the second keeps cardiac
+  drift from saying "3 below" in the rider's favour). Words: "Heart rate 3 below last time" / "same as last time" (within 1 bpm) / "Heart rate 4 above last time"; never "fitter" while riding.
+- *Where:* one line in the **detailed** overlay's interval section, only in an ERG steady step. The compact overlay does not carry it. For a route the time gap is the next stage's: `LiveComparison` is the hook, `PreviousAttemptComparison` its ERG implementation.
 
 ### 11.8 Outdoor rides
 
@@ -1566,6 +1606,14 @@ The notebook's plan rationale becomes a dedicated **Methodology** section, so th
 - **Used for:** watts per kilogram in statistics and records; system mass in the virtual-speed model, as rider weight plus a bike weight setting; the weight field in intervals.icu wellness.
 - Weight is shown as a trend in the companion's wellness screen and is available to the agent through `get_wellness`.
 - The game never rewards or reacts to weight.
+
+**Settled in stage A1c of v0.4.0** (ADR 0034, `contracts` `profile.schema.json`, `server/src/wellness/series.ts` `recentWeight`, `core` `Profile.systemMassKgFromWeights`; **not seen on the tablet**):
+
+- *The service:* the profile response gains **`riderWeight`** (read-only, derived: the mean of the daily weights of the last seven local days, kilograms to one decimal, the local date of the newest weighing and how many of the seven days had one;
+  the key is absent when none has) and **`bikeWeightKg`** (writable through `PATCH /v1/profile` and `update_profile`, above 0 and at most 100; absent when not set). Additive: every older profile and fixture is valid.
+- *The mass:* with **both** a rider weight and a bike weight the ride's system mass is their sum and `physics.systemMassKg` stands aside until the bike weight is cleared; otherwise it is `physics.systemMassKg` as before (ADR 0021's precedence of the profile
+  over the tablet's own mass is unchanged). Setting the bike weight is the explicit act, because the profile's mass is always a number and cannot say whether anyone named it. Never stored, computed on every read.
+- *Settings* says where the mass comes from in one line ("Rider 78.4 kg (7-day average) + bike 9 kg"), shows it as a value while it is derived, and has a bike weight row (drawn only with a profile). The game never reacts to weight and nothing shows it on the overlay.
 
 ## Implementation notes (added in the repository, not part of the owner's spec)
 

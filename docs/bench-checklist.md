@@ -621,6 +621,20 @@ a workout's steps without waiting.
 - [ ] **6.17 Without the notification.** Deny notifications (App info → Notifications off), start a ride, leave for the
   video app. Expect: the overlay still shows and the ride goes on; the notification is not in the shade but the app
   is listed under active apps in the Task Manager. Then allow notifications again. Settles: ADR 0006 notification.
+- [ ] **6.18 The overlay around step changes (ADR 0034, spec §11.3).** Ride a workout with at least three steps of different lengths (a
+  step of 15 s among them, if you have one; Demo speed does not change what a second feels like on the overlay, so use real time for this)
+  with the overlay in **compact** over a video. Expect: 10 s before each step change it switches to detailed (the countdown and the next step
+  are there), and 10 s after the change it is compact again; it does not flicker at the edges. Tap it while expanded: it collapses and **stays**
+  compact until the next change. Tap it compact, then wait for a change: it expands again. Choose **detailed** and ride a change: it stays
+  detailed throughout. Press **Next** on the Click or the screen: the new step shows the detail for 10 s. Switch **Settings, Overlay, Expand at
+  step changes** off: nothing expands. Write down whether the switch costs a stutter in the video, and whether 10 s is the right length. Settles: spec §11.3.
+- [ ] **6.19 The cadence guard and the heart-rate step on the overlay (ADR 0033, 0034).** In an ERG step let the cadence fall under 55 rpm for
+  3 s: the fifth cell reads **Cadence guard** with the lower watts, and goes back to **Target** once you pedal above about 65 rpm for 5 s.
+  Then ride a heart-rate step (a planned or opened workout with an `hr` step): under the main row a line says "Easing in" for the first
+  3 minutes, then "Target 135 bpm ±5 · In band", with a small marker that moves; push the heart rate out of the band and read **Above band** or **Below
+  band**; press the gear buttons: the target changes by 2 at once ("137 bpm (+2)"). Take the strap off for 20 s ("Strap lost · holding 140 W") and for
+  over a minute ("Strap lost · power at the minimum"). Write down whether the word and the gauge are readable over video at arm's length, and whether the
+  line is wanted in compact mode. The ride screen shows the same. Settles: ADR 0034 sections 2 and 9.
 
 ---
 
@@ -734,6 +748,15 @@ Everything a ride is, once, on all three devices, then the file it leaves.
     the service (ProtocolException)", Android's `HttpURLConnection` refuses PATCH on this tablet: send the exact words back
     (ADR 0021, section 7).
   Settles: ADR 0021 ("what only the real tablet can settle"), spec §8.3.
+- [ ] **7.12 The previous attempt and the weights (ADR 0034).** Needs 7.9 and two rides of the same **planned** workout (a steady
+  step of at least 6 minutes in it), the first uploaded. Ride the workout again, in the step: after 2 to 5 minutes of it the **detailed**
+  overlay shows one line, "Heart rate 3 below last time" or "…above…" or "same as last time"; compact shows none. Check it against the
+  companion's Repeats page at the end of the step (the figures should agree within a bpm or two). Put the tablet in flight mode before
+  starting: no line, no error, the ride is as always. A workout opened from a file never shows one. Then, with Health Connect weights in
+  the service (spec §12.5): in Settings the mass row says nothing about weight until you set **Bike and kit weight** (the first **+** sets
+  9 kg); then it reads "Rider 78.4 kg (7-day average) + bike 9 kg" with **From your weight**, and the next ride's mass is that sum
+  (virtual speed shifts accordingly). Press **−** until it says **Not set**: the old mass stepper is back. Write down whether the one line
+  is enough. Settles: ADR 0034 sections 4 and 5.
 
 ---
 

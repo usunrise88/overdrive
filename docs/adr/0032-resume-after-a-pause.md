@@ -133,7 +133,7 @@ second makes the first tick come early, so a guard of N covers between N - 1 and
 ### 6. Settings, and where they live
 
 All three new values are `RideSettings` fields with defaults: `autoPauseTargetWatts` (25), `autoResumePowerWatts` (10),
-`autoResumeFlywheelStepKmh` (0.5). **They are engine defaults, not in the Settings screen:** `rampInSeconds` and
+`autoResumeFlywheelStepKmh` (0.5). **(Stage A1c, ADR 0034, put them in Settings, Developer, and the stall guard's on/off and floor in Ride; what follows is how it was before.)** **They are engine defaults, not in the Settings screen:** `rampInSeconds` and
 `pausedTargetWatts` are not persisted either (`AppSettings.toRideSettings()` builds `RideSettings` from the persisted FTP, physics
 and gears only), so there is no Developer section for engine settings to join. Tuning them means a build, until the owner wants
 them there; that is a small follow-up (one Developer row each).

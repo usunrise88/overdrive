@@ -148,6 +148,8 @@ java.base/java.net=ALL-UNNAMED` in those modules' test tasks). So the transport 
 - **No background retry.** An unsent edit is sent when the app starts, when the Ready screen opens (within the minute rule), on the
   refresh button and on a settled settings change.
 
+**Update (stage A1c, ADR 0034):** the mass is the one value the rider's weight can change: with a rider weight (7-day average) and a bike weight in the profile it is their sum; the precedence of the profile over the tablet's own is unchanged.
+
 ## What only the real tablet can settle (bench 7.11)
 
 - Whether Android's `HttpURLConnection` sends `PATCH` with a body to the service as the JDK test server saw it, over TLS through
