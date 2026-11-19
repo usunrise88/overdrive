@@ -366,7 +366,8 @@ private fun RideRoot(
 
                 Page.Settings -> {
                     val bleLogs = rememberBleLogFiles(container.bleLogs)
-                    val profileUi = remember(profileState) { ProfileUi.of(profileState) }
+                    val profileUi =
+                        remember(profileState) { ProfileUi.of(profileState, java.time.LocalDate.now().toString()) }
                     SettingsScreen(
                         settings = rider,
                         actions =

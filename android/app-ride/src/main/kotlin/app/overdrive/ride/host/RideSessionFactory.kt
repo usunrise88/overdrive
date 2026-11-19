@@ -71,19 +71,25 @@ fun interface RideSessionFactory {
 fun AppSettings.toGearSettings(): GearSettings =
     GearSettings(gearCount = gearCount, neutralGear = neutralGear, gradePercentPerGear = gradePerGear)
 
-/** What the engine rides with, from the settings: FTP, the physics of speed and distance, and the gears. */
+/**
+ * What the engine rides with, from the settings: FTP, the physics of speed and distance, the gears, and the tuning numbers of resuming
+ * after a pause, the cadence guard and the heart-rate hold (docs/adr/0034). The tuning is sanitized on the way, so an out-of-range value
+ * cannot make `RideSettings` throw and never reaches the engine.
+ */
 fun AppSettings.toRideSettings(): RideSettings =
-    RideSettings(
-        ftp = ftp,
-        physics =
-            PhysicsSettings(
-                systemMassKg = massKg,
-                cdA = cdA,
-                crr = crr,
-                airDensity = airDensity,
-                drivetrainEfficiency = drivetrainEfficiency,
-            ),
-        gears = toGearSettings(),
+    tuning.applyTo(
+        RideSettings(
+            ftp = ftp,
+            physics =
+                PhysicsSettings(
+                    systemMassKg = massKg,
+                    cdA = cdA,
+                    crr = crr,
+                    airDensity = airDensity,
+                    drivetrainEfficiency = drivetrainEfficiency,
+                ),
+            gears = toGearSettings(),
+        ),
     )
 
 /**
