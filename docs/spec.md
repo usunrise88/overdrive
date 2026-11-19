@@ -191,15 +191,24 @@ Phase 1 delivers a complete offline ride: connect the devices, ride free or play
 
 ### 4.3 Free ride on the flat
 
-- The trainer runs in simulation mode at 0% grade.
-- Virtual speed and distance come from a physics model: power equals rolling resistance plus aerodynamic drag at the given speed. System mass, CdA and Crr are settings.
+- The trainer runs in simulation mode at 0% grade. *On a route (§11.4) it runs at the route's grade, scaled by the difficulty, with the gear's offset on top (§4.4).*
+- Virtual speed and distance come from a physics model: power equals rolling resistance plus aerodynamic drag at the given speed. System mass, CdA and Crr are settings. *On a route the model has a third term, gravity (below).*
 - The trainer's own speed value is ignored for the ride's speed and distance. It reflects flywheel speed, which a single cog ties to cadence. (One use: after an auto-pause a flywheel that speeds up, and one that only winds down, are told apart by it, §4.2.)
+
+**Settled in stage A2b-2** (ADR 0037, `FlatPhysicsSpeedModel`, `RouteGrade`; tests `GradeSpeedModelTest`, `RouteGradeTest`, `RideEngineRouteTest`): *the speed includes the grade.* The model solves
+`η·P = (Crr·m·g·cos θ + m·g·sin θ)·v + ½·ρ·CdA·v³` with `θ = atan(grade/100)`: with grade 0 it is the flat model to the last bit, a climb adds the gravity term (150 W is 30 km/h on the flat
+and 12.1 km/h on a 5% road) and a descent subtracts it, so that a steep one pushes the rider along. There is exactly one positive root, found by Newton's method started above it (the drag-only
+speed, plus `√(−a/c)` on a steep descent), and the tests compare it with an independent bisection over a grid and 3000 random riders, bikes and roads. It is steady state, with no inertia, like the
+flat model: a rider who stops pedalling on a climb stops at once, while one on a descent steeper than the rolling resistance coasts at the terminal speed. **A descent is capped at 80 km/h.**
+**The grade the speed uses is the route's grade as the trainer feels it with no gear on it** (scaled by the difficulty, clamped to the trainer's limit, rounded to 0.01%), so speed and
+resistance agree; the gear's offset is a feel and does not change the road's speed (§4.4). The distance along a route starts at 0 when the workout's step changes and counts only while
+riding; at the end of the route the grade is 0, the ride goes on flat and the route does not loop (§11.4).
 
 ### 4.4 Virtual gears
 
 - Gears are applied through FTMS simulation parameters: each gear adds a fixed grade offset on top of the route grade.
 - Defaults: 24 gears, 1% per gear, neutral gear equals the flat. Gear count and step are settings, to be tuned by feel on the D500.
-- The total offset stays inside the trainer's 15% simulation limit.
+- The total offset stays inside the trainer's 15% simulation limit. *On a route the total is the route's grade plus the gear's offset, clamped to the limit both ways (climbing and descending), and rounded to 0.01% (`GearSettings.gradePercent`, unchanged).*
 - Known difference from a real drivetrain: flywheel inertia does not change with the gear. Zwift's own virtual shifting on a Cog has the same property.
 - The Zwift-protocol shifting built into the trainer is not used in Phase 1.
 
@@ -345,6 +354,13 @@ left puck, what it does after about three minutes, and every acceptance criterio
   (the system file picker, suggested name `YYYY-MM-DD HH-mm <title>.fit`). If storing fails it says so and offers **Retry**.
   The Ready screen shows the last saved ride with **Share** and **Save to folder**, so the file stays reachable.
 - Every ride is kept; there is no history screen or retention rule in Phase 1.
+
+**Settled in stage A2b-2** (ADR 0037, `FitWriter.write(record, routes)`, `FitRoutes`, `docs/protocols/fit.md` 4.3 and 8.10; test `FitRouteTest`): a ride on a route (§11.4) writes into each `record`
+**`position_lat` and `position_long`** (semicircles) for a route that has coordinates and **`altitude` and `enhanced_altitude`** (the same value) for any route, a profile's included, found
+from the route's points at the distance ridden along the route (the sample's distance minus the distance at the start of its lap, which is how the engine counts it, so the ride record needs no
+new field); a profile writes the altitude and no position, so no map. The seconds of a workout that are not on a route have the fields as gaps, and **a ride with no route is byte for byte the
+file it was** (the golden of the worked example is unchanged). `FitOptions.positions` and `altitude` turn the new fields off after a bench finding. A ride completed after an interruption gets
+its positions only when it had no workout (the record names the route; the points are on the disk). Whether Strava draws a map from a virtual activity is open until a real upload.
 
 ### 4.9 Sync stub
 
@@ -552,6 +568,10 @@ Phase 2 connects the ride app to a plan: an AI agent schedules workouts, they ap
     reason. A planned workout whose id matches a stored ride is marked "Done 18:04" with a check (the date too when it was
     ridden on another day than it is planned for) and can still be ridden again. Local workout files and the bundled
     workouts are unchanged.
+
+- *Settled in stage A2b-2 (ADR 0037, `design/system.md` §6.1):* a planned row names the route a `free` step uses ("Route: North road", or "Route not downloaded yet" and the ride is flat there)
+  and, when the agent wrote an **easier version** (§11.5), is followed by an "Easier version" row with the agent's note: one tap each, then Start, with "Recovery: caution" (today's state from
+  `GET /v1/recovery`, asked only then) under the two. A planned workout with neither looks as before.
 
 ## 6. Phase 3: Statistics and analysis
 
@@ -907,7 +927,7 @@ The FIT file is generated from this record and can be regenerated at any time.
 - Beyond the schema, a record is valid only if its samples run 1, 2, 3, … in order, its laps follow each other from
   0 to the last second with each ending after it starts, and `summary.durationSeconds` is the number of samples.
   Kotlin and TypeScript both check this, against the same fixtures in `contracts/fixtures/rides/`.
-- **Settled in stage A2b-1** (ADR 0036, `contracts/schema/ride-record.schema.json`; fixtures `contracts/fixtures/routes/ride-record/`): `ride` has three new optional keys, absent unless there is something to say. `routeId` (the service's route id, 1 to 64 characters) and `routeName` (1 to 100) when a route (§11.4) backed the ride (the first route-backed `free` step of a workout); a route deleted later leaves the ride valid, because the ride keeps only the id and the name. `variantRidden: true` when the rider chose the planned workout's easier variant (§11.5): `workoutId` is then the planned workout's id and the steps ridden are the variant's. `routeName` needs `routeId` and `variantRidden: true` needs `workoutId` (checked by `rideRecordConsistencyErrors` in TypeScript; the Kotlin model learns the keys in the tablet's stage).
+- **Settled in stage A2b-1** (ADR 0036, `contracts/schema/ride-record.schema.json`; fixtures `contracts/fixtures/routes/ride-record/`): `ride` has three new optional keys, absent unless there is something to say. `routeId` (the service's route id, 1 to 64 characters) and `routeName` (1 to 100) when a route (§11.4) backed the ride (the first route-backed `free` step of a workout); a route deleted later leaves the ride valid, because the ride keeps only the id and the name. `variantRidden: true` when the rider chose the planned workout's easier variant (§11.5): `workoutId` is then the planned workout's id and the steps ridden are the variant's. `routeName` needs `routeId` and `variantRidden: true` needs `workoutId` (checked by `rideRecordConsistencyErrors` in TypeScript and, since stage A2b-2, by the Kotlin model, which reads and writes the three keys; the writer leaves them out when there is nothing to say, so an old record is byte for byte what it was; the engine records the first route-backed step **whose route the tablet had**).
 - The ride in progress is stored not as this document but as the append-only log of §4.2: a `header` line, a
   `sample` line per second, an `rr` line when the strap sent intervals and a `finished` line, each one line of the
   same JSON behind a CRC-32. The record is rebuilt from it with `RideRecordBuilder`.
@@ -1086,7 +1106,7 @@ yet", and sent first by the next refresh; a `4xx` other than 401, 408 and 429 dr
 - `GET /v1/notebook` answers `{ scope: "coach", generatedAt, limits: { maxChars, logMaxChars }, totalChars, sections }` with all **seven sections, always present and in this order**: `profile`, `what_works`, `what_does_not`, `injuries`, `methodology`, `open_questions`, `log`, each `{ key, title, text, version, updatedAt, reason }` (a section never written is version 0, empty text, no reason, `updatedAt` null). Not cached. **Only the coach notebook**: the route has no parameter that could name another, so the game master's notebook (§11.6) is never served to a device token. The notebook is written over MCP, never over REST.
 - `POST /v1/plan-events` takes `{ "kind": "illness" | "travel", "until": "YYYY-MM-DD"? }` and answers the plan event (`{ id, kind, day, workoutId, detail, status, createdAt, resolvedAt, resolutionNote, dropped }`): **`201`** for a new one, **`200`** when the same declaration (kind, day, `until`) was made before. The day is today in the rider's time zone. A body that is not a declaration, or an `until` before today or more than a year away, is `400 invalid_json`: **no new error code** was added to the closed list.
 
-**Settled in stage A2b-1 (routes and the easier variant; ADR 0036, `contracts/schema/route.schema.json`, `routes-response.schema.json`, `workout.schema.json`, `ride-record.schema.json`, `workouts-response.schema.json`; fixtures `contracts/fixtures/routes/`; the Kotlin side is the tablet's stage):**
+**Settled in stage A2b-1 (routes and the easier variant; ADR 0036, `contracts/schema/route.schema.json`, `routes-response.schema.json`, `workout.schema.json`, `ride-record.schema.json`, `workouts-response.schema.json`; fixtures `contracts/fixtures/routes/`; the Kotlin side was settled in stage A2b-2, ADR 0037: the tablet and the companion read `route_id`, `variant`, the routes and the ride record's three keys strictly, so they must be installed before the agent writes a route or a variant):**
 
 - `GET /v1/routes` answers `{ generatedAt, routes: [{ id, name, source, distanceMeters, ascentMeters, hasCoordinates, createdAt }] }`, newest first, without points, not cached. `GET /v1/routes/{id}` answers the same keys plus `points: [{ d, e, lat?, lon? }]`: **`d` metres along the route (the first is 0, strictly increasing), `e` smoothed elevation in metres, `lat` and `lon` in degrees on all points or none** (`hasCoordinates`), 2 to 5000 points, one every 20 m (`ROUTE_STEP_METERS`) or the smallest whole-metre step that keeps them under 5000. `source` is `gpx`, `waypoints` or `profile`; a profile has no coordinates. `distanceMeters` is the last `d` rounded and `ascentMeters` the sum of the rises of the points, both worked out by code. **The service sends no grade: the tablet computes it.** `404 not_found` for an id that is not a route, whatever the reason; `Cache-Control: private, max-age=300` (a route never changes; no ETag, as nowhere else). A route deleted later leaves the rides on it valid. Device token as for every `/v1` route.
 - `GET /v1/workouts` entries gain an optional **`variant`** `{ steps, note?, structureHash }` when the agent wrote an easier version (§11.5), present only then, so an answer with no variant is exactly what it was. `steps` are in the workout's own format, `note` is at most 200 characters, `structureHash` is `workoutHash` of the primary workout with the variant's steps (16 hex), which is how a variant ride is a session of its own. The tablet plays `workout` with `steps` replaced; the ride's `workoutId` stays the planned workout's id. A `free` step of `workout.steps` (and of `variant.steps`, also inside a repeat) may carry `route_id`.
@@ -1397,7 +1417,17 @@ An optional alternative to the flat free ride. Routes come from the agent, never
 - *A route on a free step:* `route_id` on a `free` step (§8.1). The calendar cannot hold it, so the service keeps it beside the calendar's primary and lays it over the workout when it reads it; it is valid while the primary's steps are unchanged. `create_workout` and `update_workout` check the route exists. Deleting a route takes it off the workouts that name it.
 - *Repeats:* `routeKey` (§11.7) is the route id and the hash of its points; two rides on the same route that were played from no workout are one session.
 - *FIT positions:* only the tablet writes the FIT file (the service checks its framing and forwards it), so the positions are written by the tablet's stage from the route's points.
-- *Not built:* the Kotlin models, the route choice and the difficulty setting on the tablet, the grade in the trainer's simulation, positions in the FIT, the companion's routes screen, the time-gap line for a route (§11.7: a field for it in the repeat contracts).
+- *Not built:* the companion's routes screen, the time-gap line for a route (§11.7: a field for it in the repeat contracts).
+
+**Settled in stage A2b-2** (ADR 0037; `core/.../route/`, `FitRoutes`, `android/app-ride` `RouteUi`, `RouteChooser`, `AppContainer`; tests `RouteGradeTest`, `GradeSpeedModelTest`, `RideEngineRouteTest`, `RouteLibraryTest`, `FitRouteTest`, `RideHostRouteTest`, `AppContainerRoutesTest`, `RouteUiTest`):
+
+- *Models:* `Route`, `RouteSummary`, `RoutesResponse` with every rule of the schema, strictly; `FreeStep.routeId`; the ride header's `routeId`, `routeName` and `variantRidden` (§8.2). The fixtures stay under `contracts/fixtures/routes/` and the Kotlin contract tests read them there.
+- *Routes on the tablet:* the list is cached on disk, shown at once and offline; the points of a route are fetched when it is chosen and for the routes the next days' planned `free` steps name (the variant's too), **kept on disk one file a route (at most 30)**, read before the network and never asked for again; a ride is built from the routes the tablet has and **never waits for the network**: a route that is not there is "Route not downloaded yet" and the ride is flat, until the points arrive and the ready ride is built again.
+- *The grade:* the rise over a **40 m window** centred on the rider, which slides inside the route at the ends instead of shrinking; multiplied by the **difficulty** (Settings, in the ride group, **0 to 100% in steps of 10, default 50**); the gear's offset on top and the total **clamped to ±15%, climbing and descending alike**, to 0.01% (the gear model of §4.4, unchanged). The speed uses the same route grade (§4.3).
+- *The end:* at the end of the route the grade is 0, `RideSnapshot.route` says `finished` and the ride goes on flat. **No looping.** The snapshot's `route` (id, name, distance along the route, length, grade, finished) is for the overlay later; nothing draws it yet.
+- *Which route:* a ride with no workout follows the route chosen for it; a `free` step with a `route_id` the tablet has follows it, starting at the start of the route when the step starts; **every other step is flat**. The record's `routeId` and `routeName` are the first route the ride followed.
+- *Choosing:* the Ready screen's free ride has one row, "Route" with "Flat road" or the route's name (hidden when there are no routes), which opens a short list (name, distance, ascent, "has a map" or "profile only").
+- *FIT:* positions and altitude, §4.8.
 
 ### 11.5 Easier variant
 
@@ -1416,6 +1446,12 @@ An optional alternative to the flat free ride. Routes come from the agent, never
 - *Ridden* (`ride.variantRidden`, §8.2): the **ride's workout copy is the variant** (the primary with the variant's steps), so compliance and repeats see what was ridden; a **plan event `variant`** is made once per ride (`variant:<ride id>`, §12.2); the **intervals.icu event is changed to what was ridden** (its description: "Easier version ridden: <note>." and the variant's steps as text) through a durable queue with retries, **idempotent** (an event that already says it, or is gone, is not written) and the variant is consumed when done; the ride's **facts** carry `plan.easierVersionRidden: true` (present only when true), the template note says so, the ride prompt (version 2) tells a model to, and `get_ride` shows `variantRidden`. When the variant is no longer known the primary is the copy and the calendar is left alone.
 - *Not ridden:* nothing is sent anywhere; the variant goes with its day.
 - *Telegram:* the evening and lead reminders add "An easier version is ready on the tablet." to a session that has one.
+
+**Settled in stage A2b-2** (ADR 0037; `PlanUi`, `PlannedSection`, `RouteUi.RecoveryLine`, `RideChoice.Planned`; tests `PlanUiVariantTest`, `RouteUiTest`, `RideHostRouteTest`, `AppContainerRoutesTest`, `PlanApiContractTest`):
+
+- *Offered:* a planned workout with a `variant` shows its own row as before and **an "Easier version" row right under it**, the agent's `note` as its line (else the kinds of step it has), its length and IF on the right: **one tap each**, then Start as always. A planned workout without one looks exactly as before. A variant the player cannot run (12 hours, 2000 steps) is shown disabled with the reason.
+- *Recovery:* "Recovery: ready", "caution" or "rest" is one plain label under the two for a workout of today, worded from `GET /v1/recovery` (the tablet did not read it before). It is asked **only when a workout of today has a variant** (at start, when the Ready screen opens, after a change of settings; at most once a minute), kept on disk, and **nothing is shown** for `learning`, `noData`, another day's answer or no answer.
+- *Played:* the planned workout with the variant's steps, so the ride's `workoutId` is the planned workout's id and its header says `variantRidden: true`; the previous attempt (§11.7) is asked for by the **variant's** `structureHash`, a session of its own. The easier version is chosen on the Ready screen only; the choice is not changeable once the ride has started.
 
 ### 11.6 Coach notebook
 
