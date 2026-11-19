@@ -1,5 +1,6 @@
 package app.overdrive.data.rides
 
+import app.overdrive.core.record.RideEvent
 import app.overdrive.core.record.RideHeader
 import app.overdrive.core.record.RideLogRecorder
 import app.overdrive.core.record.RideRecorder
@@ -48,6 +49,11 @@ class RideLogWriter(
 
     override fun onRrIntervals(intervals: List<RrInterval>) {
         log?.onRrIntervals(intervals)
+        update()
+    }
+
+    override fun onEvent(event: RideEvent) {
+        log?.onEvent(event)
         update()
     }
 
