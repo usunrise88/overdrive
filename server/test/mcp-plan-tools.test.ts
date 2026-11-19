@@ -105,11 +105,13 @@ describe("the tools and what they say about themselves", () => {
   it("lists the tools, each described with its units and its limits", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
+      "append_notebook_log",
       "create_workout",
       "delete_workout",
       "get_activity",
       "get_facts",
       "get_fitness",
+      "get_notebook",
       "get_profile",
       "get_recovery",
       "get_repeat",
@@ -118,10 +120,15 @@ describe("the tools and what they say about themselves", () => {
       "list_activities",
       "list_discussion_topics",
       "list_insights",
+      "list_notebook_versions",
+      "list_plan_events",
       "list_planned_workouts",
       "list_repeats",
       "list_rides",
       "mark_discussion_topic",
+      "resolve_plan_event",
+      "rollback_notebook_section",
+      "update_notebook_section",
       "update_profile",
       "update_workout",
     ]);

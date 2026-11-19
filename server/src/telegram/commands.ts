@@ -1,7 +1,14 @@
-import { ACTIVITY_FIT_MAX_BYTES, addDaysToIsoDate, isIsoDate } from "@overdrive/contracts";
+import {
+  ACTIVITY_FIT_MAX_BYTES,
+  addDaysToIsoDate,
+  type DeclaredPlanEventKind,
+  isIsoDate,
+} from "@overdrive/contracts";
 import { IntervalsError } from "../intervals/client.ts";
 import { eventIdOf } from "../intervals/ids.ts";
 import { ImportError } from "../outdoor/fit-ride.ts";
+import { declaredText } from "../plan-events/messages.ts";
+import { PlanEventError } from "../plan-events/service.ts";
 import { shortDate, weekdayName } from "../zoned.ts";
 import { type IncomingDocument, type InlineButton, TelegramError } from "./client.ts";
 import { type BotContext, findEntry, loadDays, nextOpenWorkouts, todayOf } from "./context.ts";
@@ -218,6 +225,36 @@ export function createCommands(ctx: BotContext): Commands {
     await io.edit(`Moved ${entry.name} from ${shortDate(entry.date)} to ${shortDate(date)}.`);
   }
 
+  // ---- /ill and /travel -------------------------------------------------------------------------
+
+  /** `/ill`, `/ill 3` (three days, today included) or `/ill 2026-11-25` (until that day): the coach rebuilds the days ahead. */
+  async function declare(kind: DeclaredPlanEventKind, argument: string, io: ChatIo): Promise<void> {
+    const command = kind === "illness" ? "/ill" : "/travel";
+    if (ctx.planEvents === null) return io.reply("I cannot note that here.");
+    const today = todayOf(ctx);
+    const given = argument.trim();
+    let until: string | null = null;
+    if (given !== "") {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(given) && isIsoDate(given)) {
+        until = given;
+      } else if (/^\d{1,2}$/.test(given) && Number(given) >= 1 && Number(given) <= 60) {
+        until = addDaysToIsoDate(today, Number(given) - 1);
+      } else {
+        return io.reply(
+          `Say ${command} for no end date, ${command} 3 for three days (today included) or ${command} 2026-11-25 for until that day.`,
+        );
+      }
+    }
+    try {
+      const { created } = await ctx.planEvents.declare(kind, until);
+      log.info({ kind, created }, "plan event declared from Telegram");
+      await io.reply(declaredText(kind, today, until, !created));
+    } catch (error) {
+      if (error instanceof PlanEventError) return io.reply(`I cannot note that: ${error.message}.`);
+      throw error;
+    }
+  }
+
   // ---- A FIT file -------------------------------------------------------------------------------
 
   /** A document that is plainly something else: it has a name that does not end in .fit and a type that is not FIT or "a file". */
@@ -267,7 +304,7 @@ export function createCommands(ctx: BotContext): Commands {
     onDocument: importDocument,
 
     async onText(text, io) {
-      const match = /^\/([A-Za-z_]+)(?:@\w+)?(?:\s.*)?$/s.exec(text.trim());
+      const match = /^\/([A-Za-z_]+)(?:@\w+)?(?:\s+(.*))?$/s.exec(text.trim());
       switch (match?.[1]?.toLowerCase()) {
         case "start":
         case "help":
@@ -280,6 +317,10 @@ export function createCommands(ctx: BotContext): Commands {
           return skip(io);
         case "move":
           return move(io);
+        case "ill":
+          return declare("illness", match?.[2] ?? "", io);
+        case "travel":
+          return declare("travel", match?.[2] ?? "", io);
         default:
           return io.reply(UNKNOWN_COMMAND);
       }

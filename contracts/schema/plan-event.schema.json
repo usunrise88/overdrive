@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive plan event",
+  "description": "A plan event (spec §12.2, ADR 0035): a fact that tells the coach agent the plan may need rebuilding. The service only detects and queues events; no algorithm in the service moves a workout. kind is missed (a planned day ended with no matching activity), moved (the rider moved a planned session to another day in intervals.icu), deleted (the rider deleted a planned session there), variant (the easier variant of a session was ridden) or illness and travel (the rider declared them: POST /v1/plan-events). day is the rider's local day the event is about: the planned day for missed, moved (the day it was planned for) and deleted, and the day it was declared for illness and travel. workoutId is the planned workout (icu-123) the event is about, null exactly for illness and travel. detail holds what the kind knows: missed {name, plannedSeconds, plannedLoad}, moved {name, from, to}, deleted {name}, variant {name, rideId}, illness and travel {until} with until a date or null when no end was given. status is open until the coach agent resolves the event (resolve_plan_event), then resolved, with resolvedAt, a resolutionNote (what changed and why, in the agent's words, which the rider is sent in Telegram) and dropped (true when the session was dropped and not rescheduled: a valid outcome). While open, resolvedAt, resolutionNote and dropped are null. Rules a schema cannot state, checked by every implementation: day is a real calendar date; createdAt and resolvedAt are real UTC instants and resolvedAt is not before createdAt; workoutId is null exactly for kind illness and travel; for those kinds detail.until is null or a real date not before day; status open goes with null resolvedAt, resolutionNote and dropped, and resolved with all three set.",
+  "type": "object",
+  "required": [
+    "id",
+    "kind",
+    "day",
+    "workoutId",
+    "detail",
+    "status",
+    "createdAt",
+    "resolvedAt",
+    "resolutionNote",
+    "dropped"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "integer", "minimum": 1 },
+    "kind": { "enum": ["missed", "moved", "deleted", "variant", "illness", "travel"] },
+    "day": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "workoutId": {
+      "oneOf": [
+        { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+        { "type": "null" }
+      ]
+    },
+    "detail": { "type": "object" },
+    "status": { "enum": ["open", "resolved"] },
+    "createdAt": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "resolvedAt": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+        },
+        { "type": "null" }
+      ]
+    },
+    "resolutionNote": {
+      "oneOf": [{ "type": "string", "minLength": 1, "maxLength": 600 }, { "type": "null" }]
+    },
+    "dropped": { "oneOf": [{ "type": "boolean" }, { "type": "null" }] }
+  }
+}

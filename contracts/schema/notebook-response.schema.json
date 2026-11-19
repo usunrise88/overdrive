@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive coach notebook",
+  "description": "The answer to GET /v1/notebook (spec §11.6, §12.4, §8.3, ADR 0035): the coach agent's persistent working memory about the rider, read-only for the companion app. It is the notebook of the default coach scope only: the game master's notebook is never served here. The document has seven fixed sections, always all present and in this order: profile (rider profile and constraints), what_works, what_does_not, injuries (injuries and niggles), methodology (the current plan rationale: the approach in use and why it suits this rider; changing it is deliberate and is announced to the rider), open_questions and log (the dated log of decisions, one dated line per entry, oldest first). A section never written has version 0, empty text, no reason and a null updatedAt (and only such a section has version 0: every written version, even one that blanks the section, has an updatedAt). Every edit of a section is a new numbered version (a rollback is a new version carrying an old text); version and updatedAt are those of the current text, and reason is the reason given for it (null when none was given; always given for methodology). limits are the server's caps in characters (UTF-16 code units, the length of a string in JavaScript and in Kotlin): maxChars for the whole document, logMaxChars for the log section. totalChars is the sum of the sections' text lengths. The notebook is the agent's, written by an AI agent over MCP: the rider corrects it through feedback or a note in Telegram, not here. Rules a schema cannot state, checked by every implementation: the sections are exactly the seven keys in the order above with their titles; version 0 has empty text, no reason and a null updatedAt, and a version above 0 has an updatedAt; generatedAt and every updatedAt are real UTC instants; totalChars is the sum of the text lengths.",
+  "type": "object",
+  "required": ["scope", "generatedAt", "limits", "totalChars", "sections"],
+  "additionalProperties": false,
+  "properties": {
+    "scope": { "const": "coach" },
+    "generatedAt": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "limits": {
+      "type": "object",
+      "required": ["maxChars", "logMaxChars"],
+      "additionalProperties": false,
+      "properties": {
+        "maxChars": { "type": "integer", "minimum": 1 },
+        "logMaxChars": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "totalChars": { "type": "integer", "minimum": 0 },
+    "sections": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": { "$ref": "#/$defs/section" }
+    }
+  },
+  "$defs": {
+    "section": {
+      "type": "object",
+      "required": ["key", "title", "text", "version", "updatedAt", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "enum": [
+            "profile",
+            "what_works",
+            "what_does_not",
+            "injuries",
+            "methodology",
+            "open_questions",
+            "log"
+          ]
+        },
+        "title": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "text": { "type": "string", "maxLength": 100000 },
+        "version": { "type": "integer", "minimum": 0 },
+        "updatedAt": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+            },
+            { "type": "null" }
+          ]
+        },
+        "reason": {
+          "oneOf": [{ "type": "string", "minLength": 1, "maxLength": 500 }, { "type": "null" }]
+        }
+      }
+    }
+  }
+}

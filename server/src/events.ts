@@ -44,6 +44,19 @@ export interface InsightStoredEvent {
   kind: "morning" | "ride" | "week" | "deviation" | "drift";
 }
 
+/** A section of a notebook got a new version (ADR 0035): the Telegram bot looks for a methodology change to announce. */
+export interface NotebookChangedEvent {
+  scope: "coach" | "game-master";
+  section: string;
+  version: number;
+}
+
+/** A plan event was created or resolved (ADR 0035): the Telegram bot looks for a resolution to tell the rider about. */
+export interface PlanEventChangedEvent {
+  eventId: number;
+  status: "open" | "resolved";
+}
+
 export interface AppEvents {
   "ride-stored": RideStoredEvent;
   "plan-changed": PlanChangedEvent;
@@ -51,6 +64,8 @@ export interface AppEvents {
   "activity-stored": ActivityStoredEvent;
   "wellness-updated": WellnessUpdatedEvent;
   "insight-stored": InsightStoredEvent;
+  "notebook-changed": NotebookChangedEvent;
+  "plan-event-changed": PlanEventChangedEvent;
 }
 
 export type AppEventName = keyof AppEvents;

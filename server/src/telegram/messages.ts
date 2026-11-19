@@ -191,6 +191,8 @@ export const HELP_TEXT = [
   "/week: the next 7 days",
   "/skip: skip the next workout (asks first)",
   "/move: move the next workout to another day",
+  "/ill: tell your coach you are ill (/ill 3 for 3 days, /ill 2026-11-25 until a day)",
+  "/travel: tell your coach you are travelling (same forms)",
   "/help: this list",
   "",
   "I also send a reminder the evening before and shortly before a workout, a summary after each ride, and a summary of the week.",

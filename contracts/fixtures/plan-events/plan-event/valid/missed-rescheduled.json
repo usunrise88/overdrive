@@ -1,0 +1,16 @@
+{
+  "id": 3,
+  "kind": "missed",
+  "day": "2026-11-17",
+  "workoutId": "icu-5001",
+  "detail": {
+    "name": "Sweet spot 3x10",
+    "plannedSeconds": 3600,
+    "plannedLoad": 62
+  },
+  "status": "resolved",
+  "createdAt": "2026-11-18T02:00:00Z",
+  "resolvedAt": "2026-11-18T07:15:00Z",
+  "resolutionNote": "Moved the session to Friday and shortened the Saturday ride.",
+  "dropped": false
+}

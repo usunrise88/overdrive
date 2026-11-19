@@ -1,0 +1,14 @@
+{
+  "id": 8,
+  "kind": "travel",
+  "day": "2026-11-18",
+  "workoutId": null,
+  "detail": {
+    "until": "2026-11-22"
+  },
+  "status": "resolved",
+  "createdAt": "2026-11-18T02:00:00Z",
+  "resolvedAt": "2026-11-18T07:15:00Z",
+  "resolutionNote": "Replaced Thursday and Friday with short sessions for the hotel bike; Saturday is a rest day.",
+  "dropped": false
+}

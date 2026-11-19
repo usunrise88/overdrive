@@ -4,7 +4,7 @@ import type { Logger } from "../log.ts";
 import { localDate } from "../time.ts";
 import { realTimers, type Timers } from "../timers.ts";
 import { PLAN_SOURCE, readPlanEvent } from "./entries.ts";
-import type { PlanChange, PlanEntry, PlanStore } from "./store.ts";
+import type { MirrorChange, PlanChange, PlanEntry, PlanStore } from "./store.ts";
 
 export { PLAN_SOURCE };
 
@@ -40,6 +40,11 @@ export interface PlanRefresherOptions {
   log: Logger;
   /** For the tests: ticks by hand. */
   timers?: Timers;
+  /**
+   * Told what a refresh found moved or deleted in the calendar behind the service's back (the rider's own doing: plan events,
+   * ADR 0035). Never called when there is nothing; a failure is logged and does not fail the refresh.
+   */
+  onCalendarChanges?: (change: Pick<MirrorChange, "moved" | "deleted">) => Promise<unknown>;
 }
 
 export function createPlanRefresher(options: PlanRefresherOptions): PlanRefresher {
@@ -115,6 +120,13 @@ export function createPlanRefresher(options: PlanRefresherOptions): PlanRefreshe
           },
           "plan refreshed",
         );
+      }
+      if (change.moved.length + change.deleted.length > 0) {
+        await options
+          .onCalendarChanges?.({ moved: change.moved, deleted: change.deleted })
+          .catch((error: unknown) => {
+            log.error({ err: error }, "plan events for the calendar changes could not be stored");
+          });
       }
       return { ok: true, change, unsupported };
     } catch (error) {

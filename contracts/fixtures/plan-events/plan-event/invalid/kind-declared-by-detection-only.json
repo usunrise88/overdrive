@@ -1,0 +1,16 @@
+{
+  "id": 1,
+  "kind": "alert",
+  "day": "2026-11-17",
+  "workoutId": "icu-5001",
+  "detail": {
+    "name": "Sweet spot 3x10",
+    "plannedSeconds": 3600,
+    "plannedLoad": 62
+  },
+  "status": "open",
+  "createdAt": "2026-11-18T02:00:00Z",
+  "resolvedAt": null,
+  "resolutionNote": null,
+  "dropped": null
+}

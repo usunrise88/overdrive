@@ -5,6 +5,7 @@ import type { OutdoorService } from "../outdoor/service.ts";
 import type { PlanRefresher } from "../plan/refresher.ts";
 import type { PlanEntry, PlanStore } from "../plan/store.ts";
 import { workoutDurationSeconds } from "../plan/workout-summary.ts";
+import type { PlanEventsService } from "../plan-events/service.ts";
 import { localDate } from "../time.ts";
 import { type Clock, zonedInstant } from "../zoned.ts";
 import type { PlanHistory } from "./history.ts";
@@ -22,6 +23,8 @@ export interface BotContext {
   refresher: PlanRefresher | null;
   /** Imports a FIT file sent to the bot as an outdoor ride (spec §11.8); null where the service has no such import (some tests). */
   outdoor: OutdoorService | null;
+  /** Where `/ill` and `/travel` go (spec §12.2); null where the service has no plan events (some tests). */
+  planEvents: PlanEventsService | null;
   timezone: string;
   /** The time of day a workout starts (`GCAL_WORKOUT_START`). */
   workoutStart: Clock;

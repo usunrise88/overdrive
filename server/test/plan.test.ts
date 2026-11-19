@@ -132,8 +132,16 @@ describe("PlanStore", () => {
       entry("icu-2", "2026-11-19"),
       entry("icu-5", "2026-11-25"),
     ]);
-    expect(change).toEqual({ added: ["icu-5"], updated: [], removed: ["icu-1", "icu-3"] });
-    expect(changes).toEqual([change]);
+    expect(change).toEqual({
+      added: ["icu-5"],
+      updated: [],
+      removed: ["icu-1", "icu-3"],
+      moved: [],
+      // icu-1 only passed; icu-3 vanished from a day that has not passed: that is a deletion in the calendar (ADR 0035).
+      deleted: [{ id: "icu-3", name: "Workout icu-3", date: "2026-11-20" }],
+    });
+    // The announcement is the change as the other modules know it: no more than what was added, updated and removed.
+    expect(changes).toEqual([{ added: ["icu-5"], updated: [], removed: ["icu-1", "icu-3"] }]);
     const left = await store.entries({ from: "2026-01-01", to: "2026-12-31" });
     expect(left.map((e) => e.id)).toEqual(["icu-2", "icu-5", "icu-4"]);
   });
@@ -144,7 +152,7 @@ describe("PlanStore", () => {
       "intervals.icu",
       [],
     );
-    expect(change).toEqual({ added: [], updated: [], removed: [] });
+    expect(change).toEqual({ added: [], updated: [], removed: [], moved: [], deleted: [] });
     expect(changes).toEqual([]);
   });
 

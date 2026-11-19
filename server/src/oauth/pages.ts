@@ -60,6 +60,8 @@ export interface AuthorizePage {
   hidden: Record<string, string>;
   /** A line to show under the form: a wrong passphrase, a lock. */
   problem?: string;
+  /** The client also asks for the game master's notebook, which the rider's apps and the coach agent never see. */
+  gameMaster?: boolean;
 }
 
 /** Where the owner types the passphrase and approves or refuses the client. */
@@ -76,7 +78,12 @@ export function authorizePage(page: AuthorizePage): string {
   return shell(
     "Connect to Overdrive",
     `<h1>Connect to Overdrive</h1>
-<p><strong>${escapeHtml(page.clientName)}</strong> asks to read your rides and profile, and to change your workout plan and profile.</p>
+<p><strong>${escapeHtml(page.clientName)}</strong> asks to read your rides and profile, and to change your workout plan and profile.</p>${
+      page.gameMaster === true
+        ? `
+<p><strong>It also asks for the game master's notebook</strong>, the part of the coach's memory that is kept from you. Approve it only for the agent that is meant to play the game master.</p>`
+        : ""
+    }
 <p>After you decide, your browser goes back to ${where}.</p>
 <form method="post" action="/oauth/authorize">${hidden}
 <label for="passphrase">Passphrase</label>

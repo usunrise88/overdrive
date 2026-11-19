@@ -165,6 +165,8 @@ describe("who the bot answers", () => {
       "week",
       "skip",
       "move",
+      "ill",
+      "travel",
       "help",
     ]);
   });

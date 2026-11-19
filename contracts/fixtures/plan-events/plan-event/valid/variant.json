@@ -1,0 +1,15 @@
+{
+  "id": 6,
+  "kind": "variant",
+  "day": "2026-11-18",
+  "workoutId": "icu-5001",
+  "detail": {
+    "name": "Sweet spot 3x10",
+    "rideId": "ride-1795000000000"
+  },
+  "status": "open",
+  "createdAt": "2026-11-18T02:00:00Z",
+  "resolvedAt": null,
+  "resolutionNote": null,
+  "dropped": null
+}

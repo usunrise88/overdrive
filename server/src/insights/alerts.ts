@@ -114,6 +114,16 @@ export interface DriftEvaluation {
   load: { planned: number; ridden: number } | null;
 }
 
+/** The sessions of `planned` that no ride completed, by the rule the Telegram summaries use (`pairRides`). The plan events' "missed" uses it too (ADR 0035). */
+export function findMissed<P extends { id: string; date: string; name: string }>(
+  planned: readonly P[],
+  rides: readonly RideBrief[],
+  timezone: string,
+): P[] {
+  const paired = pairRides(planned, rides, timezone);
+  return planned.filter((row) => !paired.has(row.id));
+}
+
 /**
  * Plan drift over the `windowDays` days before `today`. `rows` are the plan history of those days and `rides` the rides that
  * started in them. Skipped sessions (the rider's own choice) are neither missed nor planned.
@@ -130,10 +140,10 @@ export function evaluateDrift(
   const planned = rows.filter(
     (row) => row.status === "planned" && row.date >= from && row.date <= to,
   );
-  const paired = pairRides(planned, rides, timezone);
-  const missed = planned
-    .filter((row) => !paired.has(row.id))
-    .map((row) => ({ name: row.name, date: row.date }));
+  const missed = findMissed(planned, rides, timezone).map((row) => ({
+    name: row.name,
+    date: row.date,
+  }));
 
   const reasons: DriftReason[] = [];
   if (missed.length >= settings.missedSessions) reasons.push("missed");

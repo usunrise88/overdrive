@@ -1,0 +1,67 @@
+{
+  "scope": "coach",
+  "generatedAt": "2026-11-19T07:30:00Z",
+  "limits": {
+    "maxChars": 12000,
+    "logMaxChars": 3000
+  },
+  "totalChars": 622,
+  "sections": [
+    {
+      "key": "profile",
+      "title": "Rider profile and constraints",
+      "text": "Works full-time, rides 4 mornings a week before 07:30. Indoor only until March. Prefers short, hard sessions to long easy ones.",
+      "version": 3,
+      "updatedAt": "2026-11-12T19:02:11Z",
+      "reason": "The rider said Friday is no longer free."
+    },
+    {
+      "key": "what_works",
+      "title": "What works",
+      "text": "Two quality sessions a week with a rest day after each.",
+      "version": 2,
+      "updatedAt": "2026-11-10T06:50:00Z",
+      "reason": null
+    },
+    {
+      "key": "what_does_not",
+      "title": "What does not work",
+      "text": "Three hard days in a row: fatigue shows by day three.",
+      "version": 1,
+      "updatedAt": "2026-11-03T08:00:00Z",
+      "reason": null
+    },
+    {
+      "key": "injuries",
+      "title": "Injuries and niggles",
+      "text": "Left knee niggle after long standing efforts; keep cadence above 85.",
+      "version": 1,
+      "updatedAt": "2026-11-05T08:00:00Z",
+      "reason": "Reported by the rider."
+    },
+    {
+      "key": "methodology",
+      "title": "Methodology",
+      "text": "Base block, then sweet spot progression. Weekly structure: two key sessions, one endurance ride, two rest days. Review on 2027-01-10.",
+      "version": 2,
+      "updatedAt": "2026-11-16T18:00:00Z",
+      "reason": "Rider's FTP test came in lower than assumed; moving the build back by two weeks."
+    },
+    {
+      "key": "open_questions",
+      "title": "Open questions",
+      "text": "Does the rider have access to a heart-rate strap on every ride?",
+      "version": 1,
+      "updatedAt": "2026-11-17T08:00:00Z",
+      "reason": null
+    },
+    {
+      "key": "log",
+      "title": "Decisions log",
+      "text": "2026-11-10 Moved Thursday's threshold to Friday after the rider's long day.\n2026-11-16 FTP lowered to 240 W after the test.",
+      "version": 4,
+      "updatedAt": "2026-11-16T18:05:00Z",
+      "reason": "log entry"
+    }
+  ]
+}

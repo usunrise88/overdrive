@@ -13,9 +13,18 @@ import {
 } from "./store.ts";
 import type { LoginLockout, RateLimiter } from "./throttle.ts";
 
-/** The one scope: everything the MCP tools can do. */
+/** The scope every MCP session has: everything the MCP tools can do for the rider's coach agent. */
 export const MCP_SCOPE = "mcp";
+/**
+ * The scope of the game master's notebook (spec §11.6, ADR 0035): a session whose token carries it, besides `mcp`, can read and
+ * write that notebook, which no other session and no REST route can see. It is **not advertised** in the discovery documents (the
+ * scope the challenge asks for is `mcp`, so a client that follows the metadata never asks for it); a client has to request
+ * `scope=mcp game-master` explicitly, and the owner's passphrase approves it like any other grant, the page saying so.
+ */
+export const GAME_MASTER_SCOPE = "game-master";
 const SUPPORTED_SCOPES = [MCP_SCOPE];
+/** What a client may ask for: the advertised scope and the unlisted one. */
+const ACCEPTED_SCOPES = [MCP_SCOPE, GAME_MASTER_SCOPE];
 const AUTH_METHODS: ClientAuthMethod[] = ["none", "client_secret_basic", "client_secret_post"];
 const MAX_REDIRECT_URIS = 5;
 const MAX_CLIENT_NAME = 100;
@@ -214,7 +223,7 @@ export function oauthRoutes(app: FastifyInstance, options: OAuthRoutesOptions): 
     if (scopeText !== undefined) {
       if (
         typeof scopeText !== "string" ||
-        !scopeText.split(" ").every((s) => s === "" || SUPPORTED_SCOPES.includes(s))
+        !scopeText.split(" ").every((s) => s === "" || ACCEPTED_SCOPES.includes(s))
       ) {
         return invalid(
           "invalid_client_metadata",
@@ -340,8 +349,12 @@ export function oauthRoutes(app: FastifyInstance, options: OAuthRoutesOptions): 
       return fail("invalid_request", "code_challenge_method must be S256");
     }
     const scopes = (params.get("scope") ?? MCP_SCOPE).split(" ").filter((s) => s !== "");
-    if (scopes.length === 0 || !scopes.every((s) => SUPPORTED_SCOPES.includes(s))) {
+    if (scopes.length === 0 || !scopes.every((s) => ACCEPTED_SCOPES.includes(s))) {
       return fail("invalid_scope", `scope may only name: ${SUPPORTED_SCOPES.join(" ")}`);
+    }
+    // The game master's scope adds to the MCP scope, it does not replace it: a token without `mcp` opens nothing.
+    if (scopes.includes(GAME_MASTER_SCOPE) && !scopes.includes(MCP_SCOPE)) {
+      return fail("invalid_scope", `${GAME_MASTER_SCOPE} is asked for together with ${MCP_SCOPE}`);
     }
     const resources = params.getAll("resource");
     if (resources.length > 1 || (resources[0] !== undefined && !resourceIsOurs(resources[0]))) {
@@ -384,6 +397,7 @@ export function oauthRoutes(app: FastifyInstance, options: OAuthRoutesOptions): 
       redirectIsLocal: redirect.protocol === "http:" && isLoopbackHost(redirect.hostname),
       hidden,
       ...(problem === undefined ? {} : { problem }),
+      ...(approval.scope.split(" ").includes(GAME_MASTER_SCOPE) ? { gameMaster: true } : {}),
     });
   };
 

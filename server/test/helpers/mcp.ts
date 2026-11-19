@@ -13,7 +13,7 @@ import { buildApp } from "../../src/app.ts";
 import type { Db } from "../../src/db.ts";
 import type { McpTestOptions } from "../../src/mcp/index.ts";
 import { hashPassphrase } from "../../src/oauth/passphrase.ts";
-import { createServices, type Services } from "../../src/services.ts";
+import { createServices, type Services, type ServicesConfig } from "../../src/services.ts";
 import { COMPANION, TABLET } from "./app.ts";
 import type { FakeIntervals } from "./fake-intervals.ts";
 import { FAKE_API_KEY, FAKE_ATHLETE_ID } from "./fake-intervals.ts";
@@ -62,6 +62,8 @@ export interface McpHarnessOptions {
   off?: boolean;
   now?: string;
   timezone?: string;
+  /** More settings for the services (the notebook's caps, a Telegram bot), overriding the defaults. */
+  config?: ServicesConfig;
 }
 
 /**
@@ -83,6 +85,7 @@ export async function startMcpHarness(
       INTERVALS_ATHLETE_ID: FAKE_ATHLETE_ID,
       INTERVALS_BASE_URL: fake.url,
       TIMEZONE: options.timezone ?? "Europe/Paris",
+      ...options.config,
     },
     db,
     log: logging.log,

@@ -36,6 +36,9 @@ src/         @overdrive/contracts: the schema plus a validator for the TypeScrip
 | One repeated session (`GET /v1/repeats/{hash}`) | `schema/repeat-detail-response.schema.json` | §11.7, §8.3, ADR 0026 |
 | The attempt before a ride (`GET /v1/repeats/{hash}/previous`) | `schema/repeat-previous-response.schema.json` | §11.7, §8.3, ADR 0026 |
 | Outdoor ride import answer (`POST /v1/activities/fit`) | `schema/activity-import-response.schema.json` | §11.8, §8.3, ADR 0026 |
+| Coach notebook (`GET /v1/notebook`) | `schema/notebook-response.schema.json` | §11.6, §12.4, §8.3, ADR 0035 |
+| Plan event (`POST /v1/plan-events` answer; MCP `list_plan_events`) | `schema/plan-event.schema.json` | §12.2, §8.3, ADR 0035 |
+| Plan event declaration (`POST /v1/plan-events` body) | `schema/plan-event-declaration.schema.json` | §12.2, §8.3, ADR 0035 |
 
 The remaining sync API payloads and the MCP tool inputs (spec §8.3–§8.4) get schemas here as they are fixed during
 implementation. The sync outbox of the ride app (ADR 0012) is a local journal, not a wire format, and has no schema.
@@ -141,6 +144,16 @@ tile the ride; the summary's duration is the number of samples). Kotlin's `RideR
 `fixtures/zwo/` holds golden files for the Zwift ZWO import (spec §4.5, §8.1): each `valid/*.zwo` has a
 `*.expected.json` beside it, the native workout it must convert to, and every `invalid/*.zwo` must be
 rejected. Kotlin's `ZwoFixturesTest` checks them; any other ZWO importer (the web service, later) should too.
+
+`fixtures/notebook/` and `fixtures/plan-events/` hold the golden files of stage A2a (ADR 0035), each in `{valid,invalid}`: `notebook/notebook-response`
+(`GET /v1/notebook`: the coach notebook's seven fixed sections, always all present and in order, each with its text, version, time
+and reason, the server's caps in characters, and the scope, which is only ever `coach`: the game master's notebook is never served),
+`plan-events/plan-event` (a plan event of any kind and either status, as `POST /v1/plan-events` answers and `list_plan_events` lists it)
+and `plan-events/declaration` (the body of `POST /v1/plan-events`: `illness` or `travel` and an optional `until` date). What a schema
+cannot say (the sections' order and titles, version 0 meaning never written, `totalChars`, `workoutId` null exactly for illness and
+travel, an open event having no resolution, `resolvedAt` not before `createdAt`, real dates and instants) is in each schema's
+description and checked by `validateNotebookResponse`, `validatePlanEvent` and `validatePlanEventDeclaration` here. The Kotlin side
+is a later stage. A body that is not a declaration is `400 invalid_json` (no new error code).
 
 `fixtures/ble/` holds raw Bluetooth session recordings in the text format of `docs/protocols/ftms-hr.md` §7.1 (spec §7.5,
 ADR 0009 §6): a trainer and a strap file for each of two synthetic rides (`erg-workout`, `dropouts`). They are not a wire
