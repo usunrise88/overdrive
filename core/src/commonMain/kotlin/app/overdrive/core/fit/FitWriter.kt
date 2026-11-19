@@ -41,10 +41,22 @@ public class FitWriter(
      * @throws IllegalArgumentException if the record has no samples or is not self-consistent, or if its start time
      * cannot be a FIT date.
      */
-    public fun write(record: RideRecord): ByteArray {
+    public fun write(record: RideRecord): ByteArray = write(record, FitRoutes.None)
+
+    /**
+     * The FIT file for [record] with the places the ride went (spec §11.4, fit.md 4.3): the seconds that [routes] says followed a route
+     * get its altitude and, when it has coordinates, a position, found at the distance ridden along it. With [FitRoutes.None] this is
+     * [write] of [record] alone, byte for byte.
+     *
+     * @throws IllegalArgumentException as [write].
+     */
+    public fun write(
+        record: RideRecord,
+        routes: FitRoutes,
+    ): ByteArray {
         require(record.samples.isNotEmpty()) { "A ride without samples has nothing to export" }
         record.requireConsistent()
-        return Encoder(record, options).encode()
+        return Encoder(record, options, routeFixes(record, routes)).encode()
     }
 }
 
@@ -218,8 +230,15 @@ private class Readings(
 private class Encoder(
     private val record: RideRecord,
     private val options: FitOptions,
+    private val fixes: Array<RouteFix?>,
 ) {
     private val samples = record.samples
+
+    /** Whether the records carry a position: some second followed a route that has coordinates. */
+    private val withPositions = options.positions && fixes.any { it?.position != null }
+
+    /** Whether the records carry an altitude: some second followed a route. */
+    private val withAltitude = options.altitude && fixes.any { it != null }
     private val startFit = fitTime(record.ride.startEpochMillis)
     private val stampShift = if (options.recordStamp == FitRecordStamp.SECOND_START) 1 else 0
     private val lastTimestamp = timestampOf(samples.size)
@@ -292,6 +311,9 @@ private class Encoder(
         if (options.speedFields != FitSpeedFields.ENHANCED_SPEED) fields += FitField(6, U16)
         fields += FitField(7, U16)
         if (options.speedFields != FitSpeedFields.SPEED) fields += FitField(73, U32)
+        // The places of a ride on a route, after the fields every file has, so a ride without one is laid out as it always was.
+        if (withPositions) fields += listOf(FitField(0, FitBaseType.SINT32), FitField(1, FitBaseType.SINT32))
+        if (withAltitude) fields += listOf(FitField(2, U16), FitField(78, U32))
         return FitMessageType(LOCAL_RECORD, MESG_RECORD, fields)
     }
 
@@ -307,6 +329,16 @@ private class Encoder(
         if (options.speedFields != FitSpeedFields.ENHANCED_SPEED) values += speed
         values += sample.power?.toLong()
         if (options.speedFields != FitSpeedFields.SPEED) values += speed
+        val fix = fixes[sample.timeOffsetSeconds - 1]
+        if (withPositions) {
+            values += fix?.position?.let { semicircles(it.latitude) }
+            values += fix?.position?.let { semicircles(it.longitude) }
+        }
+        if (withAltitude) {
+            val altitude = fix?.let { rawAltitude(it.altitudeMeters) }
+            values += altitude
+            values += altitude
+        }
         out.data(type, *values.toTypedArray())
     }
 

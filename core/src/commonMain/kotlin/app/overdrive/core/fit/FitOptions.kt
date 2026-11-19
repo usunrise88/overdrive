@@ -52,6 +52,17 @@ public data class FitOptions(
      * a normalised power (fit.md 4.5). A ride under 30 s of power has none and the fields are left out.
      */
     val loadFields: Boolean = true,
+    /**
+     * Whether a ride on a route that has coordinates writes `position_lat` and `position_long` into its records (fit.md 4.3,
+     * spec §11.4): what should make Strava draw a map. A route with no coordinates (a profile) never writes positions, and a ride
+     * with no route has none in this file at all. Open until a real upload (fit.md 8.10).
+     */
+    val positions: Boolean = true,
+    /**
+     * Whether a ride on a route writes the route's altitude into its records, `altitude` and `enhanced_altitude` with the same value
+     * (fit.md 4.3), a profile's included. Open until a real upload (fit.md 8.10).
+     */
+    val altitude: Boolean = true,
 ) {
     init {
         require(protocolVersion in 0..BYTE_MAX) { "Protocol version is one byte, got $protocolVersion" }
