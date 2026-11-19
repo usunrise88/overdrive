@@ -1,4 +1,4 @@
-import { addDaysToIsoDate, type RideHeader } from "@overdrive/contracts";
+import { addDaysToIsoDate, type RideHeader, workoutHash } from "@overdrive/contracts";
 import type { Db } from "../db.ts";
 import type { EventBus } from "../events.ts";
 import { type IntervalsClient, IntervalsError } from "../intervals/client.ts";
@@ -141,8 +141,13 @@ export function createVariants(options: VariantsOptions): VariantsService {
     );
   }
 
-  /** Changes the event to the steps that were ridden; true when it wrote, false when the event was already so or is gone. */
-  async function updateEvent(row: QueueRow): Promise<"written" | "already" | "gone" | "no-copy"> {
+  /**
+   * Changes the event to the steps that were ridden. `already`: it was so; `gone`: there is no event; `same-as-primary`: the ride's copy
+   * is the primary itself (the variant was no longer known when the ride was stored), so nothing is said about an easier version.
+   */
+  async function updateEvent(
+    row: QueueRow,
+  ): Promise<"written" | "already" | "gone" | "same-as-primary" | "no-copy"> {
     const eventId = eventIdOf(row.workout_id);
     if (intervals === null || eventId === null) return "gone";
     const header = { id: row.ride_id, workoutId: row.workout_id, variantRidden: true as const };
@@ -156,10 +161,18 @@ export function createVariants(options: VariantsOptions): VariantsService {
       description: `Easier version ridden${note === undefined ? "" : `: ${note}`}.`,
     });
     if ((event.description ?? "").trim() === text.trim()) return "already";
+    const before = readPlanEvent(event);
+    if (
+      before.kind === "entry" &&
+      before.entry.workout !== null &&
+      workoutHash(before.entry.workout) === workoutHash(copy.workout)
+    ) {
+      return "same-as-primary";
+    }
     const updated = await intervals.updateEvent(eventId, { description: text });
     // The cache says what the calendar now says, without waiting for the next refresh.
-    const reading = readPlanEvent(updated);
-    if (reading.kind === "entry") await plan.upsert(reading.entry);
+    const after = readPlanEvent(updated);
+    if (after.kind === "entry") await plan.upsert(after.entry);
     return "written";
   }
 

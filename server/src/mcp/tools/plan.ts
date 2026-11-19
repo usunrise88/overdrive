@@ -488,14 +488,14 @@ export function registerPlanTools(server: McpServer, ctx: ToolContext): void {
       const calendar = client();
       const eventId = requireEventId(id);
       const variantChange = variant !== undefined || removeVariant === true;
-      if (name === undefined && date === undefined && steps === undefined && !variantChange) {
-        throw new ToolError("nothing to change: give a name, a date, steps or a variant");
+      if (variantNote !== undefined && variant === undefined) {
+        throw new ToolError("variantNote goes with a variant: give the variant's steps too");
       }
       if (variant !== undefined && removeVariant === true) {
         throw new ToolError("give a variant or removeVariant, not both");
       }
-      if (variantNote !== undefined && variant === undefined) {
-        throw new ToolError("variantNote goes with a variant: give the variant's steps too");
+      if (name === undefined && date === undefined && steps === undefined && !variantChange) {
+        throw new ToolError("nothing to change: give a name, a date, steps or a variant");
       }
       if (date !== undefined) checkDate("date", date);
       const newName = name?.trim();
