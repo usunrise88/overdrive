@@ -61,6 +61,8 @@ class BleRideSessionFactory(
                 workout = request.workout,
                 settings = request.settings.toRideSettings(),
                 recorder = request.recorder,
+                routes = request.routes,
+                variantRidden = request.variantRidden,
             )
         val controls =
             object : DeviceControls {

@@ -102,8 +102,10 @@ public class RouteLibrary(
     private val downloads = Mutex()
     private val resources = MutableStateFlow<Map<String, RemoteResource<Route>>>(emptyMap())
 
-    /** The service the routes on the tablet came from: a checksum of its address, as the caches key it. */
-    private val source = MutableStateFlow(CacheText.sourceOf(config().baseUrl))
+    /** The service the routes on the tablet came from: a checksum of its address, as the caches key it; null while none is set up. */
+    private val source = MutableStateFlow(sourceNow())
+
+    private fun sourceNow(): String? = config().takeIf { it.isConfigured }?.let { CacheText.sourceOf(it.baseUrl) }
 
     /** Reads the list's cache from disk. Call once at start, before the first [refreshList]. */
     public suspend fun load() {
@@ -121,8 +123,10 @@ public class RouteLibrary(
      */
     public fun settingsChanged() {
         list.settingsChanged()
-        val now = CacheText.sourceOf(config().baseUrl)
-        if (source.getAndUpdate { now } != now) {
+        val now = sourceNow()
+        // Setting a service up for the first time is not a change of service: what was read from disk for it stays.
+        val before = source.getAndUpdate { now }
+        if (before != null && before != now) {
             resources.value = emptyMap()
             mutableDetails.value = RouteDetailsState()
         }
@@ -151,10 +155,10 @@ public class RouteLibrary(
         downloads.withLock {
             if (id in mutableDetails.value.downloaded) return
             mutableDetails.update { it.copy(downloading = it.downloading + id, failed = it.failed - id) }
-            val askedFor = source.value
+            val askedFor = sourceNow()
             val outcome = fetch(id, why)
             // The address changed while this was under way: the answer is another rider's, and what it was for is gone.
-            if (source.value != askedFor) return
+            if (sourceNow() != askedFor) return
             mutableDetails.update {
                 val ready = outcome.route
                 it.copy(

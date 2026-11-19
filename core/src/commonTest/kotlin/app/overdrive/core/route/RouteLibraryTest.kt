@@ -237,6 +237,22 @@ class RouteLibraryTest {
         }
 
     @Test
+    fun `setting the service up for the first time does not drop what was read from disk for it`() =
+        runTest {
+            val disk = Disk()
+            library(ScriptedTransport(ok(hill)), disk).ensure("route-hill")
+            // A new process: the library is built before the settings are read, and the cached route is loaded the moment they are.
+            config = SyncConfig("", "")
+            val offline = ScriptedTransport(TransportException(TransportFailure.NoNetwork))
+            val library = library(offline, disk)
+            config = SyncConfig(ADDRESS, TOKEN)
+            library.ensure("route-hill")
+            library.settingsChanged() // the container's first call, a moment after
+            assertEquals(RouteStatus.READY, library.details.value.statusOf("route-hill"))
+            assertTrue(offline.gets.isEmpty())
+        }
+
+    @Test
     fun `a refused token is a failure that says so`() =
         runTest {
             val library =

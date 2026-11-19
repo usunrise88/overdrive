@@ -1,6 +1,7 @@
 package app.overdrive.data.rides
 
 import app.overdrive.core.fit.FitOptions
+import app.overdrive.core.fit.FitRoutes
 import app.overdrive.core.fit.FitWriter
 import app.overdrive.core.record.ByteSink
 import app.overdrive.core.record.FileByteSink
@@ -113,12 +114,15 @@ class RideStore(
     /**
      * Stores a finished (or recovered) ride: the meta file, the record as JSON and the FIT file, each atomically, then
      * deletes the log. [utcOffsetSeconds] is the device's offset from UTC at the ride's start, for the FIT file's local
-     * time (ADR 0007). A ride without samples keeps nothing and fails as not [StoreResult.Failed.retryable].
+     * time (ADR 0007). A ride without samples keeps nothing and fails as not [StoreResult.Failed.retryable]. [routes] says which
+     * route each stretch of the ride followed, for the positions and the altitude of the FIT file (spec §11.4); without it the file
+     * is the one every ride had before routes.
      */
     fun finalize(
         record: RideRecord,
         title: String,
         utcOffsetSeconds: Int,
+        routes: FitRoutes = FitRoutes.None,
     ): StoreResult<StoredRide> {
         val id = idFor(record.ride.id)
         if (record.samples.isEmpty()) {
@@ -136,7 +140,7 @@ class RideStore(
                             record.ride.workoutId,
                         ).toBytes(),
                     json = RideRecordJson.encode(record).encodeToByteArray(),
-                    fit = FitWriter(FitOptions(utcOffsetSeconds = utcOffsetSeconds)).write(record),
+                    fit = FitWriter(FitOptions(utcOffsetSeconds = utcOffsetSeconds)).write(record, routes),
                 )
             } catch (e: Exception) {
                 // The record cannot be written in a format (a start the FIT format cannot date): retrying changes nothing.
@@ -162,11 +166,19 @@ class RideStore(
      * Completes a ride found on disk: an interrupted one the rider chose to keep, or a finished one whose export was cut
      * off. It is rebuilt from its log (the intact part of it) or, when there is no log, from its stored record, and then
      * stored like any finished ride, which also writes a missing FIT file again. [utcOffsetSeconds] is asked for the
-     * ride's start, which is only known once it is read.
+     * ride's start, which is only known once it is read. [routes] is asked for the routes of the ride once it is read (the record
+     * names its route, the points are the tablet's), so a recovered ride gets its positions too when they can be found.
      */
     fun finalizeStored(
         id: String,
         utcOffsetSeconds: (startEpochMillis: Long) -> Int,
+    ): StoreResult<StoredRide> = finalizeStored(id, utcOffsetSeconds) { FitRoutes.None }
+
+    /** [finalizeStored] with the routes of the ride (spec §11.4), asked for once the ride is read. */
+    fun finalizeStored(
+        id: String,
+        utcOffsetSeconds: (startEpochMillis: Long) -> Int,
+        routes: (RideRecord) -> FitRoutes,
     ): StoreResult<StoredRide> {
         val title = readMeta(id)?.title
         val record =
@@ -182,6 +194,7 @@ class RideStore(
             record,
             title ?: titleFallback(record.ride.workoutId),
             utcOffsetSeconds(record.ride.startEpochMillis),
+            routes(record),
         )
     }
 

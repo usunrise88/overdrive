@@ -14,7 +14,9 @@ import java.util.concurrent.Executors
  * A stand-in for the ride intake of `server/` on the loopback address (ADR 0014 section 3), for the tests that run the real
  * container: bearer authentication, `PUT /v1/rides/{id}` and `PUT /v1/rides/{id}/fit`, answered as the real service does, and
  * `GET /v1/workouts` (ADR 0017), which answers [plan] with [planStatus], and `GET`/`PATCH /v1/profile` (ADR 0021), which hold
- * [profile]. [down] makes every request answer 503.
+ * [profile]. `GET /v1/routes` answers [routes] and `GET /v1/routes/{id}` the body in [routePoints] (ADR 0037), and `GET /v1/recovery`
+ * answers [recovery]; each is a 404 until a test sets it, and each is counted apart from the ride upload's [received]. [down] makes
+ * every request answer 503.
  */
 class LocalService(
     val token: String = "tok-3f9a7c1e5b2d4a6f8091a2b3c4d5e6f7",
@@ -53,6 +55,20 @@ class LocalService(
     /** The GETs and PATCHes of the profile, in order, apart from [received] and [planRequests]. */
     val profileRequests = CopyOnWriteArrayList<Received>()
 
+    /** What `GET /v1/routes` answers with (the list's JSON), or null for a service without the route (404). */
+    @Volatile
+    var routes: String? = null
+
+    /** What `GET /v1/routes/{id}` answers with, by id; an id that is not here is a 404. */
+    val routePoints = ConcurrentHashMap<String, String>()
+
+    /** What `GET /v1/recovery` answers with, or null for a 404. */
+    @Volatile
+    var recovery: String? = null
+
+    /** The GETs of the routes and of the recovery state, in order, apart from [received], [planRequests] and [profileRequests]. */
+    val routeRequests = CopyOnWriteArrayList<Received>()
+
     private val records = ConcurrentHashMap<String, ByteArray>()
     private val fits = ConcurrentHashMap<String, ByteArray>()
     private val executor = Executors.newCachedThreadPool()
@@ -77,9 +93,22 @@ class LocalService(
             val path = exchange.requestURI.path
             val request = Received(path, auth, body, exchange.requestMethod, exchange.requestURI.rawQuery)
             when {
-                request.method == "GET" && path == "/v1/workouts" -> planRequests += request
-                path == "/v1/profile" -> profileRequests += request
-                else -> received += request
+                request.method == "GET" && path == "/v1/workouts" -> {
+                    planRequests += request
+                }
+
+                path == "/v1/profile" -> {
+                    profileRequests += request
+                }
+
+                path == "/v1/routes" || path.startsWith("/v1/routes/") || path == "/v1/recovery" -> {
+                    routeRequests +=
+                        request
+                }
+
+                else -> {
+                    received += request
+                }
             }
             val (status, text) = answer(exchange.requestMethod, path, auth, body)
             val bytes = text.encodeToByteArray()
@@ -100,6 +129,20 @@ class LocalService(
         if (auth != "Bearer $token") return 401 to error("unauthorized", "Missing or invalid bearer token")
         if (method == "GET" && path == "/v1/workouts") return planStatus to plan
         if (path == "/v1/profile") return profileAnswer(method, body)
+        if (method == "GET" &&
+            path == "/v1/routes"
+        ) {
+            return routes?.let { 200 to it } ?: (404 to error("not_found", "No routes"))
+        }
+        if (method == "GET" && path.startsWith("/v1/routes/")) {
+            val body = routePoints[path.removePrefix("/v1/routes/")]
+            return if (body != null) 200 to body else 404 to error("not_found", "No such route")
+        }
+        if (method == "GET" &&
+            path == "/v1/recovery"
+        ) {
+            return recovery?.let { 200 to it } ?: (404 to error("not_found", "No recovery"))
+        }
         val match = ROUTE.matchEntire(path) ?: return 404 to error("not_found", "No such route")
         val id = match.groupValues[1]
         val store = if (match.groupValues[2].isEmpty()) records else fits

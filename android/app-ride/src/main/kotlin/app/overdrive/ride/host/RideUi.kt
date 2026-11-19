@@ -24,9 +24,15 @@ sealed interface RideChoice {
         override val title: String = "Free ride"
     }
 
-    /** A workout, played step by step. */
+    /**
+     * A workout, played step by step. [variant] says it is the easier version of a planned workout (spec §11.5): [workout] is then
+     * the planned workout with the variant's steps, so its id is the planned workout's, and [variantNote] is what the agent wrote with
+     * it.
+     */
     data class Planned(
         val workout: Workout,
+        val variant: Boolean = false,
+        val variantNote: String? = null,
     ) : RideChoice {
         override val title: String get() = workout.name
     }

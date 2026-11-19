@@ -29,8 +29,10 @@ import app.overdrive.ride.host.DevicesUi
 import app.overdrive.ride.host.RideChoice
 import app.overdrive.ride.overlay.OverlayAccess
 import app.overdrive.ride.plan.PlanUi
+import app.overdrive.ride.plan.VariantRow
 import app.overdrive.ride.rides.RecoveryState
 import app.overdrive.ride.rides.ride
+import app.overdrive.ride.routes.RouteChoiceUi
 import app.overdrive.ride.settings.AppSettings
 import app.overdrive.ride.workouts.StepRow
 import app.overdrive.ride.workouts.WorkoutDescriber
@@ -70,6 +72,8 @@ class ReadyActions(
     val onOpenDevices: () -> Unit = {},
     /** The Planned section's refresh button: asks the service for the plan now (spec §5.7, ADR 0017). */
     val onRefreshPlan: () -> Unit = {},
+    /** The route chosen for a free ride in the route list, or null for the flat road (spec §11.4, ADR 0037). */
+    val onChooseRoute: (String?) -> Unit = {},
 )
 
 /**
@@ -85,7 +89,9 @@ class ReadyActions(
  * @param lastRide the ride saved last, with **Share** and **Save to folder** so its FIT file is reachable after the summary.
  * @param files share and save of a FIT file; the screen only calls them. [fileMessage] is what the last one said.
  * @param plan the planned workouts from the service (spec §5.7): a **Planned** section above the list, drawn only when there is
- * a plan to show ([PlanUi.visible]). Choosing one of its rows selects it like any workout; the ride's `workoutId` is its id.
+ * a plan to show ([PlanUi.visible]). Choosing one of its rows selects it like any workout; the ride's `workoutId` is its id. A planned
+ * workout that has an easier version (spec §11.5) offers both under one name, one tap each, with today's recovery state beside them.
+ * @param routeChoice the route row of a free ride and the list behind it (spec §11.4), or null when there are no routes to choose from.
  */
 @Composable
 fun ReadyScreen(
@@ -106,8 +112,10 @@ fun ReadyScreen(
     forceDiscardConfirm: Boolean = false,
     bluetooth: BluetoothFix = BluetoothFix.None,
     plan: PlanUi = PlanUi.Hidden,
+    routeChoice: RouteChoiceUi? = null,
 ) {
     var confirmDiscard by rememberSaveable { mutableStateOf(false) }
+    var routeSheet by rememberSaveable { mutableStateOf(false) }
     Box(modifier.fillMaxSize().background(OverdriveColors.bg)) {
         Column(Modifier.fillMaxSize()) {
             RideTopBar(
@@ -141,9 +149,20 @@ fun ReadyScreen(
                     lastRide = lastRide,
                     files = files,
                     fileMessage = fileMessage,
+                    routeChoice = routeChoice,
+                    onOpenRoutes = { routeSheet = true },
                 )
             }
         }
+        RouteSheet(
+            visible = routeSheet && routeChoice != null,
+            choice = routeChoice,
+            onChoose = {
+                routeSheet = false
+                actions.onChooseRoute(it)
+            },
+            onDismiss = { routeSheet = false },
+        )
         // Throwing a ride away cannot be undone, so it asks once (the same sheet as finishing a ride).
         ConfirmSheet(
             visible = confirmDiscard || forceDiscardConfirm,
@@ -173,7 +192,7 @@ private fun WorkoutList(
             PlannedSection(
                 plan,
                 choice,
-                onSelect = { actions.onSelect(RideChoice.Planned(it)) },
+                onSelect = actions.onSelect,
                 onRefresh = actions.onRefreshPlan,
             )
             SectionLabel("Ride", Modifier.padding(start = 16.dp, bottom = 12.dp))
@@ -188,7 +207,8 @@ private fun WorkoutList(
                 SelectableRow(
                     title = workout.name,
                     subtitle = description.meta,
-                    selected = (choice as? RideChoice.Planned)?.workout?.id == workout.id,
+                    selected =
+                        (choice as? RideChoice.Planned)?.let { it.workout.id == workout.id && !it.variant } == true,
                     onClick = { actions.onSelect(RideChoice.Planned(workout)) },
                 )
             }
@@ -220,6 +240,8 @@ private fun Detail(
     lastRide: StoredRide?,
     files: RideFileActions,
     fileMessage: String?,
+    routeChoice: RouteChoiceUi?,
+    onOpenRoutes: () -> Unit,
 ) {
     Column(modifier.padding(horizontal = 40.dp, vertical = 32.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         RecoveryNotice(recovery, onSave = { recovery.ride?.let(actions.onRecoverySave) }, onDiscard = onAskDiscard)
@@ -237,8 +259,8 @@ private fun Detail(
         }
         if (lastRide != null) LastRideRow(lastRide, files, fileMessage)
         when (choice) {
-            RideChoice.Free -> FreeRideDetail(settings, Modifier.weight(1f))
-            is RideChoice.Planned -> WorkoutDetail(choice.workout, settings, Modifier.weight(1f))
+            RideChoice.Free -> FreeRideDetail(settings, routeChoice, onOpenRoutes, Modifier.weight(1f))
+            is RideChoice.Planned -> WorkoutDetail(choice, settings, Modifier.weight(1f))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
             OdButton(
@@ -291,17 +313,24 @@ private fun StatItem(
 @Composable
 private fun FreeRideDetail(
     settings: AppSettings,
+    routeChoice: RouteChoiceUi?,
+    onOpenRoutes: () -> Unit,
     modifier: Modifier,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(24.dp)) {
         Column {
             OdText("Free ride", style = OdType.title)
             OdText(
-                "Simulation on the flat with virtual gears. Ride as long as you like, then finish.",
+                if (routeChoice != null && routeChoice.title != RouteChoiceUi.FLAT_ROAD) {
+                    "Simulation on the route's grade with virtual gears. Ride as long as you like, then finish."
+                } else {
+                    "Simulation on the flat with virtual gears. Ride as long as you like, then finish."
+                },
                 style = OdType.body,
                 color = OverdriveColors.textSecondary,
             )
         }
+        if (routeChoice != null) RouteRow(routeChoice, onOpenRoutes)
         Row(horizontalArrangement = Arrangement.spacedBy(40.dp)) {
             StatItem("FTP", settings.ftp.toString(), "W")
             StatItem("Gears", settings.gearCount.toString())
@@ -313,14 +342,23 @@ private fun FreeRideDetail(
 
 @Composable
 private fun WorkoutDetail(
-    workout: Workout,
+    choice: RideChoice.Planned,
     settings: AppSettings,
     modifier: Modifier,
 ) {
+    val workout = choice.workout
     val description = remember(workout, settings.ftp) { WorkoutDescriber.describe(workout, settings.ftp) }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(24.dp)) {
         Column {
             OdText(description.title, style = OdType.title, maxLines = 1)
+            // The easier version says so, with the note the agent wrote with it (spec §11.5), under the name it shares with the plan.
+            if (choice.variant) {
+                OdText(
+                    listOfNotNull(VariantRow.TITLE, choice.variantNote).joinToString(" · "),
+                    style = OdType.bodyStrong,
+                    maxLines = 2,
+                )
+            }
             if (description.description != null) {
                 OdText(
                     description.description,

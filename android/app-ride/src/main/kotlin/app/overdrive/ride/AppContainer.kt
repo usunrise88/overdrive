@@ -14,10 +14,20 @@ import app.overdrive.ble.log.BleSessionLogger
 import app.overdrive.core.ble.GattTransportFactory
 import app.overdrive.core.control.ActionRouter
 import app.overdrive.core.control.GestureTiming
+import app.overdrive.core.fit.FitRoutes
 import app.overdrive.core.plan.PlanRefresh
 import app.overdrive.core.plan.PlanRepository
 import app.overdrive.core.profile.ProfileRefresh
 import app.overdrive.core.profile.ProfileRepository
+import app.overdrive.core.record.RideRecord
+import app.overdrive.core.remote.CacheText
+import app.overdrive.core.remote.Refresh
+import app.overdrive.core.remote.RemoteResource
+import app.overdrive.core.remote.ServiceClient
+import app.overdrive.core.remote.recoveryResource
+import app.overdrive.core.route.Route
+import app.overdrive.core.route.RouteLibrary
+import app.overdrive.core.route.RoutesApiJson
 import app.overdrive.core.sync.HttpGetTransport
 import app.overdrive.core.sync.HttpPatchTransport
 import app.overdrive.core.sync.HttpSyncProvider
@@ -25,8 +35,11 @@ import app.overdrive.core.sync.HttpTransport
 import app.overdrive.core.sync.OutboxEntry
 import app.overdrive.core.sync.SyncConfig
 import app.overdrive.core.sync.SyncCoordinator
+import app.overdrive.core.wellness.RecoveryResponse
 import app.overdrive.data.plan.FilePlanCache
 import app.overdrive.data.profile.FileProfileCache
+import app.overdrive.data.remote.FileTextStore
+import app.overdrive.data.remote.FileTextStores
 import app.overdrive.data.rides.RideStore
 import app.overdrive.data.sync.FileOutbox
 import app.overdrive.data.sync.LastUploadFile
@@ -52,6 +65,7 @@ import app.overdrive.ride.overlay.ContainerOverlayModel
 import app.overdrive.ride.overlay.OverlayController
 import app.overdrive.ride.overlay.OverlayModel
 import app.overdrive.ride.rides.RideLibrary
+import app.overdrive.ride.routes.RoutesView
 import app.overdrive.ride.settings.AppSettings
 import app.overdrive.ride.settings.SettingsRepository
 import app.overdrive.ride.settings.effectiveSettingsOf
@@ -70,6 +84,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
@@ -100,6 +115,10 @@ import java.util.concurrent.atomic.AtomicLong
  * `HttpURLConnection` refuses that verb, passes one with a way round it.
  * @param profileFile the profile's cache (`filesDir/profile/profile`): the service's last answer and the unsent edit; a test
  * passes a temporary one.
+ * @param routesTransport the network under the routes' and the recovery state's `GET` (ADR 0037): the same `HttpURLConnection` class.
+ * @param routesDirectory where the routes are kept on disk (`filesDir/routes`: the list, and one file for the points of each route
+ * the tablet has fetched); a test passes a temporary one.
+ * @param recoveryFile the recovery state's cache (`filesDir/cache/recovery`); a test passes a temporary one.
  * @param today the tablet's local date, `YYYY-MM-DD`, for the range asked of the service; a test fixes it.
  * @param syncSettleMillis how long the service address and token must stay as typed before the upload is tried again with
  * them, so that typing a token does not send one request per letter.
@@ -122,12 +141,17 @@ class AppContainer(
     profileTransport: HttpGetTransport = UrlConnectionTransport(),
     profilePatchTransport: HttpPatchTransport = UrlConnectionTransport(),
     profileFile: File = File(context.applicationContext.filesDir, "profile/profile"),
+    routesTransport: HttpGetTransport = UrlConnectionTransport(),
+    routesDirectory: File = File(context.applicationContext.filesDir, "routes"),
+    recoveryFile: File = File(context.applicationContext.filesDir, "cache/recovery"),
     today: () -> String = { LocalDate.now().toString() },
     syncSettleMillis: Long = SYNC_SETTLE_MILLIS,
     mediaFactory: (Context) -> MediaController = { AudioManagerMediaController(it) },
     elapsedMillis: () -> Long = SystemClock::elapsedRealtime,
 ) {
     private val appContext = context.applicationContext
+    private val localToday = today
+    private val routePointsDirectory = File(routesDirectory, "points")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     /** One thread for everything that touches the rides folder: the log writes, the stores, the scan (ADR 0008). */
@@ -211,6 +235,46 @@ class AppContainer(
             elapsedMillis = { System.nanoTime() / NANOS_PER_MILLI },
         )
 
+    /** The service the routes and the recovery state are asked from: the same address and token, read at every request. */
+    private val serviceClient =
+        ServiceClient(config = { serviceConfig.value ?: SyncConfig("", "") }, reader = routesTransport)
+
+    /** One file for each route's points, at most [MAX_ROUTE_FILES]: a ride on a route never needs the network (spec §11.4, ADR 0037). */
+    private val routePointFiles = FileTextStores(routePointsDirectory, maxFiles = MAX_ROUTE_FILES)
+
+    /**
+     * The routes on the tablet (spec §11.4, ADR 0037): the list of `GET /v1/routes`, cached on disk and shown at once and offline, and the
+     * points of a route (`GET /v1/routes/{id}`), fetched when the rider chooses it and for the routes the next days' planned workouts
+     * name, and kept on disk. With no address or token nothing is asked and nothing is shown.
+     */
+    val routeLibrary: RouteLibrary =
+        RouteLibrary(
+            client = serviceClient,
+            config = { serviceConfig.value ?: SyncConfig("", "") },
+            listStore = FileTextStore(File(routesDirectory, "list")),
+            detailStore = routePointFiles::store,
+            wallMillis = System::currentTimeMillis,
+            elapsedMillis = { System.nanoTime() / NANOS_PER_MILLI },
+        )
+
+    /** What the Ready screen reads of the routes: the list and which routes' points are on the tablet. */
+    val routes: StateFlow<RoutesView> =
+        combine(routeLibrary.list.state, routeLibrary.details) { list, details -> RoutesView.of(list, details) }
+            .stateIn(scope, SharingStarted.Eagerly, RoutesView.None)
+
+    /**
+     * Today's recovery state (`GET /v1/recovery`, spec §11.5), read **only** to say "Recovery: caution" beside the easier version of a
+     * planned workout: asked when a workout of today has one, at most once a minute, and kept on disk so that it shows offline too.
+     */
+    val recovery: RemoteResource<RecoveryResponse> =
+        recoveryResource(
+            client = serviceClient,
+            config = { serviceConfig.value ?: SyncConfig("", "") },
+            store = FileTextStore(recoveryFile),
+            wallMillis = System::currentTimeMillis,
+            elapsedMillis = { System.nanoTime() / NANOS_PER_MILLI },
+        )
+
     /**
      * The tablet's settings with the profile in force on top (ADR 0021, [withProfile]): FTP and the physics of the ride. A cold
      * flow that **waits until the profile is known** (the cache read and the settings looked at), so the ride built first uses the
@@ -259,6 +323,7 @@ class AppContainer(
                     ),
                 )
             },
+            routesOf = ::fitRoutesOf,
         ).also { it.start() }
 
     /**
@@ -362,7 +427,12 @@ class AppContainer(
             settings = effectiveSource,
             initialChoice = library.workouts.value.firstOrNull()?.let { RideChoice.Planned(it) } ?: RideChoice.Free,
             persistence = rides,
-            rideTriggers = pairedDevices.changes,
+            // A route whose points arrive while the ride is ready is followed from the start: the ready ride is built again.
+            rideTriggers =
+                combine(pairedDevices.changes, routeLibrary.details) { changes, routes ->
+                    changes to routes.downloaded.keys
+                },
+            downloadedRoutes = { routeLibrary.details.value.downloaded },
         )
 
     /** The media keys of the ride bar and of the Click: system volume and a media key for whichever app plays. */
@@ -475,6 +545,34 @@ class AppContainer(
                 }
             }
         }
+        // The routes the same way, on a coroutine of their own: the cached list first, then one request and a change of address or token.
+        // What the next days' planned workouts name is fetched as soon as the plan is known and whenever it changes (ADR 0037).
+        scope.launch {
+            routeLibrary.load()
+            recovery.load()
+            var first = true
+            serviceConfig.filterNotNull().collectLatest {
+                routeLibrary.settingsChanged()
+                recovery.settingsChanged()
+                if (first) {
+                    first = false
+                    routeLibrary.refreshList(Refresh.START)
+                } else {
+                    delay(syncSettleMillis)
+                    routeLibrary.refreshList(Refresh.SETTINGS_CHANGED)
+                    if (hasVariantToday(plan.state.value.workouts)) recovery.refresh(Refresh.SETTINGS_CHANGED)
+                }
+            }
+        }
+        scope.launch {
+            plan.state
+                .map { it.workouts }
+                .distinctUntilChanged()
+                .collectLatest { workouts ->
+                    routeLibrary.ensure(RouteLibrary.routeIdsOf(workouts, today()), Refresh.START)
+                    if (hasVariantToday(workouts)) recovery.refresh(Refresh.START)
+                }
+        }
         // The last success survives a restart; a disk that refuses the one-line file costs nothing but that.
         scope.launch(Dispatchers.IO) {
             var written = lastUploadAtStart
@@ -514,13 +612,62 @@ class AppContainer(
     fun planScreenOpened() {
         scope.launch { plan.refresh(PlanRefresh.SCREEN_OPENED) }
         scope.launch { profile.refresh(ProfileRefresh.SCREEN_OPENED) }
+        scope.launch { routeLibrary.refreshList(Refresh.SCREEN_OPENED) }
+        scope.launch {
+            routeLibrary.ensure(RouteLibrary.routeIdsOf(plan.state.value.workouts, localToday()), Refresh.SCREEN_OPENED)
+        }
+        scope.launch { if (hasVariantToday(plan.state.value.workouts)) recovery.refresh(Refresh.SCREEN_OPENED) }
     }
 
     /** The Planned section's refresh button: asks the service now for the plan and the profile (one gesture, both), however recently. */
     fun refreshPlan() {
         scope.launch { plan.refresh(PlanRefresh.REQUESTED) }
         scope.launch { profile.refresh(ProfileRefresh.REQUESTED) }
+        scope.launch { routeLibrary.refreshList(Refresh.REQUESTED) }
+        scope.launch {
+            routeLibrary.ensure(RouteLibrary.routeIdsOf(plan.state.value.workouts, localToday()), Refresh.REQUESTED)
+        }
     }
+
+    /**
+     * The rider chose the route for a free ride, or the flat road for null (spec §11.4, ADR 0037): the ride is built on it at once and,
+     * if its points are not on the tablet yet, they are fetched now. The ride never waits for them: until they are here it is flat.
+     */
+    fun chooseRoute(id: String?) {
+        host.selectFreeRoute(id)
+        if (id != null) scope.launch { routeLibrary.ensure(id, Refresh.REQUESTED) }
+    }
+
+    /** Whether a workout planned for today has an easier version: the only time the recovery state is worth asking for. */
+    private fun hasVariantToday(workouts: List<app.overdrive.core.plan.PlannedWorkout>): Boolean {
+        val day = localToday()
+        return workouts.any { it.date == day && it.variant != null }
+    }
+
+    /**
+     * The routes of a ride that is completed from its log or its stored record at a start (spec §11.4): a ride with no workout names its
+     * route in its header, and the points are read from the tablet's disk. A ride of a workout has no way to say which step was on which
+     * route, so its file has no positions.
+     */
+    private fun fitRoutesOf(record: RideRecord): FitRoutes {
+        val id = record.ride.routeId.takeIf { record.ride.workoutId == null } ?: return FitRoutes.None
+        val route = routeLibrary.details.value.downloaded[id] ?: routeOnDisk(id) ?: return FitRoutes.None
+        return FitRoutes { step -> route.takeIf { step == null } }
+    }
+
+    /** The points of a route as the tablet kept them, read synchronously, or null when there are none or they are damaged. */
+    private fun routeOnDisk(id: String): Route? =
+        try {
+            File(routePointsDirectory, id)
+                .takeIf { it.isFile }
+                ?.readText()
+                ?.let { CacheText.decode("route", it) }
+                ?.let { RoutesApiJson.decodeRoute(it.body) }
+        } catch (e: IOException) {
+            null
+        } catch (e: IllegalArgumentException) {
+            null
+        }
 
     /** Changes the settings from the UI; validation happens in the repository. */
     fun updateSettings(change: (AppSettings) -> AppSettings) {
@@ -590,5 +737,8 @@ class AppContainer(
 
         private const val TAG = "OverdriveRides"
         private const val NANOS_PER_MILLI = 1_000_000L
+
+        /** Routes kept on the tablet: 30 files of at most a few hundred kilobytes (5000 points), the oldest dropped first. */
+        private const val MAX_ROUTE_FILES = 30
     }
 }
