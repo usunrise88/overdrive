@@ -101,6 +101,30 @@ class BleRideTest {
             )
         }
 
+    @Test
+    fun `an auto-paused ERG ride holds a little resistance on the wire and resumes on the first stroke`() =
+        runTest {
+            val ride = BleRide(this, workout = steadyWorkout(120, 0.8))
+            ride.start()
+            ride.rig.advance(10_000)
+            ride.rig.fakeTrainer.cadenceRpm = 0 // the rider stops
+            ride.rig.advance(6_000)
+            assertEquals(PauseReason.AUTO, ride.now.pauseReason)
+            assertEquals(25, ride.rig.fakeTrainer.targetPowerWatts, "a hold of 25 W, not 0")
+
+            ride.rig.fakeTrainer.cadenceRpm = 90 // the first stroke; the trainer notifies once a second
+            ride.rig.advance(1_000)
+            assertEquals(RideState.RIDING, ride.now.state)
+            ride.rig.advance(4_000)
+            assertEquals(160, ride.rig.fakeTrainer.targetPowerWatts)
+            assertEquals(
+                1,
+                ride.commands().count { it == "TARGET 0" },
+                "0 W only before the start of the ride: the pause never asked for it",
+            )
+            ride.rig.assertNoViolations()
+        }
+
     // endregion
 
     // region dropouts (spec §4.1, §4.2)

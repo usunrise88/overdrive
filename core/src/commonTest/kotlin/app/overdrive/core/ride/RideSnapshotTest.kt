@@ -29,6 +29,7 @@ class RideSnapshotTest {
         assertNull(snapshot.cadence)
         assertNull(snapshot.zone)
         assertNull(snapshot.workout)
+        assertNull(snapshot.secondsSinceResume)
         assertEquals(100, snapshot.intensityPercent)
         assertEquals(24, snapshot.gearCount)
         assertEquals(12, snapshot.neutralGear)
@@ -50,6 +51,9 @@ class RideSnapshotTest {
                 ftp = 200,
                 elapsedSeconds = -1,
             )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            RideSnapshot(state = RideState.RIDING, ftp = 200, secondsSinceResume = -1)
         }
     }
 

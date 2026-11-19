@@ -185,9 +185,11 @@ class RideEngineSimulatedBikeTest {
             advanceSeconds(28)
 
             val samples = ride.record.samples
-            assertEquals((33..40).toList(), samples.filter { it.paused }.map { it.timeOffsetSeconds })
+            // Pedalling is noticed on the notification that carries it, which the bike delivers just before the engine's
+            // tick of second 40: that second is already riding (docs/adr/0032).
+            assertEquals((33..39).toList(), samples.filter { it.paused }.map { it.timeOffsetSeconds })
             assertEquals(RideState.RIDING, ride.now.state)
-            assertEquals(52, ride.record.summary.movingSeconds)
+            assertEquals(53, ride.record.summary.movingSeconds)
             assertTrue(samples.drop(29).take(10).all { it.cadence == 0 })
         }
 

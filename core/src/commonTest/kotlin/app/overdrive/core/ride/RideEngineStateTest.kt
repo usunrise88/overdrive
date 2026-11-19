@@ -223,16 +223,17 @@ class RideEngineStateTest {
             assertEquals(RideState.PAUSED, rig.now.state)
             assertEquals(8, rig.now.elapsedSeconds)
 
-            rig.second(cadence = 60) // pedalling again
+            rig.second(cadence = 60) // pedalling again, noticed on a notification, not at a tick
             assertEquals(RideState.RIDING, rig.now.state)
             assertNull(rig.now.pauseReason)
+            assertEquals(9, rig.now.elapsedSeconds, "the second in which pedalling restarted is riding time")
             rig.second()
-            assertEquals(9, rig.now.elapsedSeconds)
+            assertEquals(10, rig.now.elapsedSeconds)
 
             assertEquals(
-                List(8) { false } + List(3) { true } + false,
+                List(8) { false } + List(2) { true } + false + false,
                 rig.record.samples.map { it.paused },
-                "seconds 9 to 11 were paused; the one in which pedalling restarted still was, the next is not",
+                "seconds 9 and 10 were paused; a second is paused or riding by the state at the moment of its tick",
             )
         }
 

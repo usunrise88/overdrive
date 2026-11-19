@@ -254,20 +254,27 @@ class RideEngineTrainerTest {
         }
 
     @Test
-    fun `auto-pause drops and ramps the target like a manual one`() =
+    fun `auto-pause drops the target to the small hold and ramps it back in from there`() =
         runTest {
-            val rig = EngineRig(this, workout = abcWorkout)
+            val rig = EngineRig(this, workout = abcWorkout) // step A is 100 W at FTP 200
             rig.start()
             rig.seconds(5)
             rig.seconds(3, cadence = 0, power = 0)
             assertEquals(PauseReason.AUTO, rig.now.pauseReason)
-            assertEquals(target(0), rig.commands.last())
-            rig.second(cadence = 70) // pedalling again
+            assertEquals(target(25), rig.commands.last(), "autoPauseTargetWatts, not the 0 W of a manual pause")
+            val before = rig.commands.size
+            val strokeAt = testScheduler.currentTime
+            rig.second(cadence = 70) // pedalling again: the first step of the ramp is not a second late
             assertEquals(RideState.RIDING, rig.now.state)
-            rig.second(cadence = 70)
-            assertEquals(target(33), rig.commands.last())
+            assertEquals(target(75), rig.commands.last(), "the second step came with the tick")
+            assertEquals(
+                strokeAt,
+                rig.trainer.received[before].timeMillis,
+                "the first step was sent in the instant of the notification, not at the tick",
+            )
             rig.seconds(2)
             assertEquals(target(100), rig.commands.last())
+            assertEquals(listOf(target(50), target(75), target(100)), rig.commands.drop(before))
         }
 
     @Test
