@@ -19,10 +19,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overdrive.companion.CompanionContainer
+import app.overdrive.companion.R
 import app.overdrive.companion.settings.OnboardingStep
 import app.overdrive.uikit.BackTopBar
 import app.overdrive.uikit.BottomNav
 import app.overdrive.uikit.EmptyBlock
+import app.overdrive.uikit.IntroHost
 import app.overdrive.uikit.LocalMotionEnabled
 import app.overdrive.uikit.NavItem
 import app.overdrive.uikit.OdText
@@ -32,12 +34,31 @@ import app.overdrive.uikit.tokens.OverdriveColors
 import app.overdrive.uikit.tokens.OverdriveMotion
 
 /**
+ * The companion: [CompanionScreens], and over it the launch film when [playIntro] is true (cold start, ADR 0031). The film's layer
+ * covers the whole window, so [modifier] (the insets) reaches the screens only, not the film. The screens are composed from the
+ * first frame under the film. The film ends, or a tap ends it, in a fade of [INTRO_FADE_MS] ms, with no button.
+ */
+@Composable
+fun CompanionRoot(
+    container: CompanionContainer,
+    modifier: Modifier = Modifier,
+    playIntro: Boolean = false,
+) {
+    IntroHost(play = playIntro, rawRes = R.raw.overdrive_intro, fadeMillis = INTRO_FADE_MS) {
+        CompanionScreens(container, modifier)
+    }
+}
+
+/** How long the film's layer takes to fade out into the app (design/system.md §9). */
+private const val INTRO_FADE_MS = 400
+
+/**
  * The whole companion (design/companion.md §2): the first run until there is a service address and token, then the five tabs with
  * their own back stacks, and the screens pushed over them (Settings, a ride, an activity). The bottom navigation shows on the
  * tabs' roots only.
  */
 @Composable
-fun CompanionRoot(
+private fun CompanionScreens(
     container: CompanionContainer,
     modifier: Modifier = Modifier,
 ) {

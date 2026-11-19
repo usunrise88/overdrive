@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overdrive.core.ride.RideState
 import app.overdrive.ride.AppContainer
+import app.overdrive.ride.R
 import app.overdrive.ride.devices.DeviceRole
 import app.overdrive.ride.host.RideChoice
 import app.overdrive.ride.host.RideMapping
@@ -46,6 +47,7 @@ import app.overdrive.ride.workouts.WorkoutFileError
 import app.overdrive.ride.workouts.WorkoutFileReader
 import app.overdrive.ride.workouts.WorkoutFileResult
 import app.overdrive.uikit.DeviceStatus
+import app.overdrive.uikit.IntroHost
 import app.overdrive.uikit.LocalMotionEnabled
 import app.overdrive.uikit.overlay.OverlayContent
 import app.overdrive.uikit.overlay.OverlayMode
@@ -78,12 +80,37 @@ private enum class Page {
 }
 
 /**
+ * The ride app: [RideRoot], and over it the launch film when [playIntro] is true (cold start, spec §4.6, ADR 0031). The film's
+ * layer covers the whole window, so [modifier] (the insets and the background) reaches the root only, not the film. The root is
+ * composed from the first frame under the film: the app's own start-up does not wait for it.
+ */
+@Composable
+fun RideApp(
+    container: AppContainer,
+    modifier: Modifier = Modifier,
+    overlay: OverlayController = container.overlay,
+    playIntro: Boolean = false,
+) {
+    IntroHost(
+        play = playIntro,
+        rawRes = R.raw.overdrive_intro,
+        fadeMillis = INTRO_FADE_MS,
+        continueLabel = "Continue",
+    ) {
+        RideRoot(container, modifier, overlay)
+    }
+}
+
+/** How long the film's layer takes to fade out into the app (design/system.md §9). */
+private const val INTRO_FADE_MS = 300
+
+/**
  * The root of the ride app: the current screen with a 200 ms crossfade, the system Back button, and the in-app preview
  * of the overlay. Reads the ride from the [AppContainer]'s host and writes settings through it; everything below is
  * stateless screens that take plain values and callbacks.
  */
 @Composable
-fun RideApp(
+private fun RideRoot(
     container: AppContainer,
     modifier: Modifier = Modifier,
     overlay: OverlayController = container.overlay,
