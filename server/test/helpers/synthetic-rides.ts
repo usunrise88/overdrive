@@ -1,5 +1,6 @@
 import {
   type Lap,
+  type RideEvent,
   type RideRecord,
   type RideSample,
   validateRideRecord,
@@ -27,6 +28,8 @@ export interface SyntheticRide {
   step?: (second: number) => number | null;
   paused?: (second: number) => boolean;
   workoutId?: string | null;
+  /** The record's events (spec §11.1), in the order they happened. */
+  events?: RideEvent[];
 }
 
 export function syntheticRide(spec: SyntheticRide): RideRecord {
@@ -86,6 +89,7 @@ export function syntheticRide(spec: SyntheticRide): RideRecord {
       distanceMeters: 0,
       workKilojoules: 0,
     },
+    ...(spec.events === undefined ? {} : { events: spec.events }),
   };
 
   // The tablet's own summary, from the same definitions, so the record looks as one would.

@@ -146,8 +146,9 @@ export function registerActivityTools(server: McpServer, ctx: ToolContext, rides
       kind: "read",
       description:
         "One activity in detail, by the id list_activities gives. A ride on the tablet (an id like ride-1794996000000; type cycling) is " +
-        "answered as get_ride does: power, heart-rate and cadence statistics, laps, compliance with the planned workout, and the time " +
-        "series on request. An outdoor ride imported from a FIT file (an id like fit-<16 hex>; type cycling-outdoor, source fit) answers as a " +
+        "answered as get_ride does: power, heart-rate and cadence statistics, laps, compliance with the planned workout (a heart-rate hold step has no " +
+        "planned power: its compliance is the time inside its band), stallGuard (how many times the ERG stall guard cut the target, in which steps and " +
+        "when), and the time series on request. An outdoor ride imported from a FIT file (an id like fit-<16 hex>; type cycling-outdoor, source fit) answers as a " +
         "workout from the watch does, with its distance and climb in metres when the file says them. A workout from the watch (an id like " +
         "watch-<record id>) has: type and name as the watch gave them, start, end " +
         "and duration, average and maximum heart rate, load (heart-rate load on the scale of the training stress score: one hour at " +
