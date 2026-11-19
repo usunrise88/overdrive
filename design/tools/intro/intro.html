@@ -1,0 +1,107 @@
+<!doctype html><meta charset="utf-8">
+<style>
+@font-face{font-family:Geist;font-weight:600;src:url("/fonts/Geist-SemiBold.ttf")}
+@font-face{font-family:Geist;font-weight:400;src:url("/fonts/Geist-Regular.ttf")}
+html,body{margin:0;background:#05070a;overflow:hidden}
+#stage{position:relative;width:100vw;height:100vh;overflow:hidden;background:#05070a}
+#glow,#vig,#title{position:absolute;inset:0}
+canvas{position:absolute;inset:0;display:block}
+#title{display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
+</style>
+<script type="importmap">{"imports":{"three":"/three/build/three.module.js"}}</script>
+<!-- /brand-glyph.js is written by build-intro.mjs from design/tools/brand/mark.mjs; /three, /bike3d and /fonts are served by it too -->
+<script src="/brand-glyph.js"></script>
+<body><div id="stage">
+  <div id="glow"></div>
+  <div id="vig"></div>
+  <div id="title"></div>
+</div>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <filter id="grainy" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.30" numOctaves="2" seed="11" result="t"/>
+    <feColorMatrix in="t" type="matrix" values="2.6 0 0 0 -0.75  2.6 0 0 0 -0.75  2.6 0 0 0 -0.75  2.6 0 0 0 -0.75" result="n"/>
+    <feComposite in="SourceGraphic" in2="n" operator="arithmetic" k1="2.1" k2="0.2" k3="0" k4="0"/>
+  </filter></defs></svg>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "/three/examples/jsm/loaders/GLTFLoader.js";
+const q = new URLSearchParams(location.search);
+const A = "#" + (q.get("accent") || "ffb020"), B = "#" + (q.get("accent2") || "ff5a1f");
+const sub = q.get("sub") || "";
+const W = innerWidth, H = innerHeight, aspect = W / H;
+const SPEED = +(q.get("speed") || 1);            // 1.3 = 30% faster: the whole timeline is shortened
+const DUR = +(q.get("dur") || 6.4) / SPEED;
+window.DUR = DUR;
+const ease = { out: (x) => 1 - Math.pow(1 - x, 3), inout: (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2, lin: (x) => x };
+const cl = (x) => Math.max(0, Math.min(1, x));
+const seg = (t, a, b, f = ease.lin) => f(cl((t - a) / (b - a)));
+
+// ---------- three ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H); renderer.setPixelRatio(1);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.4;
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.setClearColor(0x000000, 0);
+document.getElementById("stage").insertBefore(renderer.domElement, document.getElementById("vig"));
+const scene = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(24, aspect, 0.05, 200);
+scene.add(cam);
+// lights ride with the camera, so every view is lit the same way
+cam.add(new THREE.HemisphereLight(0x5a6678, 0x0a0c10, 1.2));
+const key = new THREE.DirectionalLight(0xffffff, 2.4); key.position.set(-2, 3, 3); cam.add(key); cam.add(key.target); key.target.position.set(0, 0, -5);
+const fill = new THREE.DirectionalLight(0xcfe0ff, 1.2); fill.position.set(3, 1, 2); cam.add(fill); cam.add(fill.target); fill.target.position.set(0, 0, -5);
+const rim = new THREE.DirectionalLight(0xffffff, 9); rim.position.set(2.5, 2, -3); cam.add(rim); cam.add(rim.target); rim.target.position.set(0, 0, -5);
+// a soft pool of the app's colour under the bike
+const cv = document.createElement("canvas"); cv.width = cv.height = 256;
+const g2 = cv.getContext("2d"), gr = g2.createRadialGradient(128, 128, 0, 128, 128, 128);
+gr.addColorStop(0, A + "cc"); gr.addColorStop(0.45, B + "55"); gr.addColorStop(1, "#00000000");
+g2.fillStyle = gr; g2.fillRect(0, 0, 256, 256);
+const pool = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 2.6), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+pool.rotation.x = -Math.PI / 2; scene.add(pool);
+const bike = new THREE.Group(); scene.add(bike);
+
+// ---------- the choreography ----------
+const R_TOP = 6.6, EL_TOP = 88, AZ_TOP = 90;      // looking straight down; the screen's up is the world's -Z
+const fit = +(q.get("fit") || 0.56);              // the bike's share of the width at the end
+const R_END = Math.max(5.2, 1 / (fit * 0.2126 * aspect)), EL_END = +(q.get("el") || 7), AZ_END = 0;
+const LIFT = +(q.get("lift") || 0.12);            // lifts the bike on the screen to leave room for the name
+const T = { enter: [0.25, 2.35], orbit: [2.2, 4.6], text: [3.7, 5.4] };
+let bikeH = 0.6;
+function setT(real) {
+  const t = real * SPEED;
+  // the bike rides in from the bottom edge to the centre, along -Z, ahead of the camera's own move
+  const e = seg(t, T.enter[0], T.enter[1], ease.out);
+  bike.position.set(0, 0, 3.3 * (1 - e));
+  // the camera flies over and round: elevation 88 -> 7 deg, azimuth 90 -> 0, and backs away
+  const o = seg(t, T.orbit[0], T.orbit[1], ease.inout);
+  const el = (EL_TOP + (EL_END - EL_TOP) * o) * Math.PI / 180, az = (AZ_TOP + (AZ_END - AZ_TOP) * o) * Math.PI / 180;
+  const R = R_TOP + (R_END - R_TOP) * o;
+  const ty = -LIFT * o * (R / R_END) * 0.0 - 0;      // look-at height stays 0; the lift is done with a view offset below
+  cam.position.set(R * Math.cos(el) * Math.cos(az), R * Math.sin(el), R * Math.cos(el) * Math.sin(az));
+  cam.up.set(0, 1, 0); cam.lookAt(0, 0, 0);
+  const off = LIFT * o; cam.clearViewOffset(); cam.setViewOffset(W, H, 0, off * H * 0.5, W, H); // a window lower in the frame: the picture moves up
+  pool.position.set(bike.position.x, -bikeH * 0.97, bike.position.z); pool.material.opacity = 0.7 * seg(t, T.enter[0], T.enter[0] + 1.0) * (1 - 0.0 * o);
+  renderer.render(scene, cam);
+  // the app's colour rises from the bottom, then the mark and the name
+  const gl = seg(t, T.text[0] - 0.2, T.text[1] + 0.2, ease.out);
+  document.getElementById("glow").style.cssText = `position:absolute;inset:0;filter:url(#grainy);opacity:${gl};transform:translateY(${(1 - gl) * 18}%);background:
+    radial-gradient(70% 42% at 50% 112%, ${A}, ${A}00 70%), radial-gradient(55% 40% at 14% 108%, ${B}, ${B}00 70%), radial-gradient(55% 40% at 88% 108%, ${B}, ${B}00 70%)`;
+  const m = seg(t, T.text[0] + 0.1, T.text[0] + 1.0, ease.out), n = seg(t, T.text[0] + 0.45, T.text[1], ease.out);
+  const u = Math.min(W, H * 0.62);
+  document.getElementById("title").innerHTML = `
+    <div style="display:flex;align-items:center;gap:${u * 0.03}px;margin-bottom:${H * 0.055}px;opacity:${m};transform:translateY(${(1 - m) * H * 0.04}px)">
+      <svg width="${u * 0.17}" height="${u * 0.17}" viewBox="0 0 1000 1000"><path d="${GLYPH.d}" fill="#fff"/></svg>
+      <div style="opacity:${n}"><div style="font:600 ${u * 0.105}px/1 Geist,system-ui;color:#fff;letter-spacing:-0.04em">Overdrive</div>
+      ${sub ? `<div style="font:400 ${u * 0.042}px/1.3 Geist,system-ui;color:rgba(255,255,255,.85);margin-top:${u * 0.012}px;letter-spacing:.02em">${sub}</div>` : ""}</div></div>`;
+  document.getElementById("vig").style.cssText = "position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%, #0000 40%, #000b 100%)";
+}
+window.setT = setT;
+new GLTFLoader().load("/bike3d/bwhite.glb", (gltf) => {
+  const obj = gltf.scene;
+  const box = new THREE.Box3().setFromObject(obj), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+  obj.position.sub(c); const k = 2 / Math.max(size.x, size.y, size.z); obj.scale.setScalar(k);
+  bikeH = size.y * k / 2;
+  const pivot = new THREE.Group(); pivot.add(obj); pivot.rotation.y = 270 * Math.PI / 180; // its front points to -Z
+  bike.add(pivot);
+  document.fonts.load("600 20px Geist").then(() => { setT(+(q.get("t") || 0)); document.body.setAttribute("data-state", "done"); });
+}, undefined, (e) => document.body.setAttribute("data-state", "error " + (e && e.message)));
+</script>

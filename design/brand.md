@@ -40,3 +40,20 @@ icon is scaled down. Never draw a small icon by scaling a large one in one step:
 
 The foreground is the mark at 52% of the 108 dp canvas, which keeps the ring inside the 66 dp safe circle; only the hairline
 tip of the tail may be cut by a round mask.
+
+## The launch animation
+
+A short film that opens each app on a cold start (about 4.9 s, 30 fps, WebM/VP8, no sound): the camera looks straight down, a white
+road bike rides in from the bottom edge to the centre, the camera flies round it to a side view and backs away (the bike centred,
+handlebars to the right), and from below the app's colour rises as a noisy gradient with the mark and the name. The bike is a 3D
+model made with Meshy from a picture of a white road bike; it is rendered white, with no tint (owner's decision), and only the
+light behind the name carries the app's colour.
+
+| App | Video | Size |
+|---|---|---|
+| Ride app (tablet) | `android/app-ride/src/main/res/raw/overdrive_intro.webm`, 1600 × 1000, gold | about 1.5 MB |
+| Companion (phone) | `android/app-companion/src/main/res/raw/overdrive_intro.webm`, 720 × 1600, lime, "Companion" under the name | about 1.5 MB |
+
+`design/tools/intro/build-intro.mjs` renders both from `intro.html` (see the header of the script for what it needs: three r160,
+the bike's GLB, Chromium and the ffmpeg that Playwright installs). The 44 MB GLB is not in the repository. The apps play the video
+with Android's own player: no library and no Play Services.
