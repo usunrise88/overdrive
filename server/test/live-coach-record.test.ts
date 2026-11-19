@@ -8,6 +8,7 @@ import {
   validateWorkoutsResponse,
   type Workout,
   type WorkoutsResponse,
+  withoutLiveCoach,
   workoutHash,
 } from "@overdrive/contracts";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -226,6 +227,37 @@ describe("create_workout with the live coach", () => {
     const entry = (await tablet()).workouts[0];
     expect(entry?.workout).toMatchObject({ live_coach: true, coach_brief: BRIEF });
     expect(JSON.stringify(entry?.workout.steps)).toContain("First one. Ease into it.");
+  });
+
+  it("loses the lines, not the session's flag and brief, when the rider rewrites the steps in the calendar", async () => {
+    const { stored } = await create({ live_coach: true, coach_brief: BRIEF });
+    const planned = await on.services.plan.get(stored.id);
+    if (planned === null) throw new Error("not planned");
+    // What the plan cache holds after a refresh in which the steps are no longer those the lines were written for.
+    const rewritten: Workout = {
+      ...withoutLiveCoach(planned.workout),
+      steps: withoutLiveCoach(planned.workout).steps.map((step) =>
+        step.type === "ramp" ? { ...step, duration: 660 } : step,
+      ),
+    };
+    await on.services.plan.upsert({
+      id: stored.id,
+      source: "intervals.icu",
+      externalId: stored.id.replace(/^icu-/, ""),
+      date: "2026-11-20",
+      name: "Threshold 2x10",
+      workout: {
+        schema: 1,
+        id: stored.id,
+        name: "Threshold 2x10",
+        steps: rewritten.steps.map((s) => JSON.parse(JSON.stringify(s))),
+      },
+      unsupportedReason: null,
+    });
+    const entry = (await tablet()).workouts[0];
+    expect(entry?.workout).toMatchObject({ live_coach: true, coach_brief: BRIEF });
+    expect(JSON.stringify(entry?.workout.steps)).not.toContain("First one.");
+    expect(entry?.workout.steps[0]).toMatchObject({ type: "ramp", duration: 660 });
   });
 
   it("says in a warning when the coach is off on this server, and keeps the settings", async () => {

@@ -344,6 +344,8 @@ export function createSession(options: SessionOptions): LiveSession {
       working?.abort();
       broadcast({ kind: "end", reason });
       listeners.clear();
+      // The speech of a cue is large and is of no use to a session that is over.
+      replay.length = 0;
     },
 
     heartbeat() {
