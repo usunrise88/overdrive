@@ -70,6 +70,8 @@ services:
       STRAVA_BASE_URL: ${STRAVA_BASE_URL:-}
       # BRouter road routing (spec §11.4): empty means routing is off. Set to http://brouter:17777. docs/deploy.md, section 20.
       BROUTER_URL: ${BROUTER_URL:-}
+      BROUTER_TIMEOUT_SECONDS: ${BROUTER_TIMEOUT_SECONDS:-}
+      ROUTE_STEP_METERS: ${ROUTE_STEP_METERS:-}
     ports:
       - "127.0.0.1:${SERVER_PORT:-8080}:8080"
 
