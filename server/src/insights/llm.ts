@@ -38,11 +38,19 @@ export type LlmResult =
   | { ok: true; text: string }
   | { ok: false; kind: LlmFailureKind; status: number | null };
 
+/** What one completion may be told besides the messages. */
+export interface CompleteOptions {
+  /** Cancels the request (and any wait before a repeat): a caller that has given up on the answer. */
+  signal?: AbortSignal | undefined;
+  /** Shorter than the client's own timeout, for a caller with a deadline of its own. */
+  timeoutMs?: number | undefined;
+}
+
 export interface LlmClient {
   /** The model name the requests carry. */
   readonly model: string;
   /** One completion; never throws. Retries what may pass, up to `maxAttempts` requests in all. */
-  complete(messages: readonly LlmMessage[]): Promise<LlmResult>;
+  complete(messages: readonly LlmMessage[], options?: CompleteOptions): Promise<LlmResult>;
 }
 
 export interface LlmClientOptions {
@@ -122,7 +130,10 @@ export function createLlmClient(options: LlmClientOptions): LlmClient {
   /** One request. */
   async function attempt(
     messages: readonly LlmMessage[],
+    call: CompleteOptions,
   ): Promise<LlmResult & { retryAfterMs?: number | null }> {
+    const timeout = AbortSignal.timeout(Math.min(options.timeoutMs, call.timeoutMs ?? Infinity));
+    const signal = call.signal === undefined ? timeout : AbortSignal.any([timeout, call.signal]);
     let response: Response;
     try {
       response = await doFetch(endpoint, {
@@ -141,7 +152,7 @@ export function createLlmClient(options: LlmClientOptions): LlmClient {
         }),
         // A redirect would carry the key and the health data somewhere the owner did not choose.
         redirect: "error",
-        signal: AbortSignal.timeout(options.timeoutMs),
+        signal,
       });
     } catch (cause) {
       const name = cause instanceof Error ? cause.name : "";
@@ -184,10 +195,11 @@ export function createLlmClient(options: LlmClientOptions): LlmClient {
 
   return {
     model: options.model,
-    async complete(messages) {
+    async complete(messages, call = {}) {
       let last: LlmResult = { ok: false, kind: "unreachable", status: null };
       for (let n = 1; n <= maxAttempts; n++) {
-        const result = await attempt(messages);
+        if (call.signal?.aborted === true) return { ok: false, kind: "timeout", status: null };
+        const result = await attempt(messages, call);
         if (result.ok) return result;
         last = { ok: false, kind: result.kind, status: result.status };
         if (permanent.has(result.kind) || n === maxAttempts) {

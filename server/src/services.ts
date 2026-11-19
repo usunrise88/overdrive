@@ -3,6 +3,7 @@ import { DEFAULT_INTERVALS_BASE_URL } from "./config.ts";
 import type { CoachSettings } from "./config-coach.ts";
 import type { InsightsSettings } from "./config-insights.ts";
 import type { IntegrationsSettings } from "./config-integrations.ts";
+import type { LiveCoachSettings } from "./config-live-coach.ts";
 import type { RoutesSettings } from "./config-routes.ts";
 import { type StravaConfig, stravaSettings } from "./config-strava.ts";
 import type { Db } from "./db.ts";
@@ -15,6 +16,8 @@ import {
   INTERVALS_DESTINATION,
   type UploadWorker,
 } from "./intervals/uploads.ts";
+import { createLiveCoach, type LiveCoachService } from "./live-coach/service.ts";
+import { createLiveCueStore } from "./live-coach/store.ts";
 import type { Logger } from "./log.ts";
 import { createMetricsService, type MetricsService } from "./metrics/service.ts";
 import { createNotebookService, type NotebookService } from "./notebook/service.ts";
@@ -58,6 +61,7 @@ export type ServicesConfig = Partial<
   InsightsSettings &
   CoachSettings &
   RoutesSettings &
+  LiveCoachSettings &
   StravaConfig;
 
 /**
@@ -115,8 +119,13 @@ export interface Services {
   planEvents: PlanEventsService;
   /** Routes with elevation, created by the agent and ridden on the tablet (spec §11.4, ADR 0036). */
   routes: RoutesService;
-  /** What the service keeps about a planned workout that intervals.icu cannot hold: its easier variant and its route ids (ADR 0036). */
+  /** What the service keeps about a planned workout that intervals.icu cannot hold: its easier variant, its route ids (ADR 0036), and what is for the live coach (ADR 0038). */
   extras: ExtrasStore;
+  /**
+   * The live coach (spec §12.1, ADR 0038): sessions, snapshots, the trigger rules, the model's line, the speech service and the stream of
+   * cues to the tablet. Always present: without a model and a speech service a session start says why the coach is off.
+   */
+  liveCoach: LiveCoachService;
   /** The easier variant's life: the plan event and the intervals.icu update when it is ridden, its removal when the session moves (spec §11.5). */
   variants: VariantsService;
   /** Starts the refresher, the upload worker, the calendar mirror, the bot, the wellness pull and its forwarding, the insights. */
@@ -319,6 +328,20 @@ export function createServices(options: ServicesOptions): Services {
   });
   riderWeightOf = () => wellness.riderWeight();
   const outdoor = createOutdoor({ db, bus, wellness, timezone, log });
+  // The cue log of the live coach is part of what a ride's note and the planning agent know (spec §12.1).
+  const liveCues = createLiveCueStore(db);
+  const liveCoach = createLiveCoach({
+    config,
+    store: liveCues,
+    plan,
+    profile,
+    notebook,
+    repeats,
+    log,
+    now,
+    fetch: options.fetch,
+    timers: options.timers,
+  });
   const insights = createInsights({
     config,
     db,
@@ -332,6 +355,7 @@ export function createServices(options: ServicesOptions): Services {
     metrics,
     wellness,
     profile,
+    liveCues,
     now,
     fetch: options.fetch,
     sleep: options.sleep,
@@ -419,6 +443,7 @@ export function createServices(options: ServicesOptions): Services {
     routes,
     extras,
     variants,
+    liveCoach,
     start() {
       void uploads?.start();
       void strava?.start();
@@ -431,6 +456,7 @@ export function createServices(options: ServicesOptions): Services {
       insights.start();
       planEvents.start();
       variants.start();
+      liveCoach.start();
     },
     async stop() {
       await Promise.all([
@@ -445,6 +471,7 @@ export function createServices(options: ServicesOptions): Services {
         insights.stop(),
         planEvents.stop(),
         variants.stop(),
+        liveCoach.stop(),
       ]);
     },
   };

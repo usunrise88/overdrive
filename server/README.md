@@ -8,7 +8,7 @@ served to the tablet), the rider's profile (`GET`/`PATCH /v1/profile`), the MCP 
 OAuth server for AI clients (ADR 0018), the Google Calendar mirror and the Telegram bot (ADR 0019), the Strava upload (ADR 0020), the
 training metrics (ADR 0022), wellness, recovery and the watch's other activities (ADR 0023), the written insights, alerts and discussion
 topics (ADR 0025), the repeat-session comparison and the outdoor rides imported from FIT files (ADR 0026), the coach notebook and the plan events
-(ADR 0035), the routes with elevation and the easier variant (ADR 0036) and `GET /healthz`.
+(ADR 0035), the routes with elevation and the easier variant (ADR 0036), the live coach (ADR 0038) and `GET /healthz`.
 
 ```bash
 pnpm --filter @overdrive/server dev      # node --watch src/main.ts, http://127.0.0.1:8080 (needs DATABASE_URL)
@@ -57,6 +57,13 @@ and names the variable, never its value):
 | `BROUTER_URL` | unset | The BRouter routing server, such as `http://brouter:17777` (`docs/deploy.md`, section 20). **Empty: road routing is off** and `create_route` mode `waypoints` says so; GPX files and synthetic profiles need no engine. ADR 0036 |
 | `BROUTER_TIMEOUT_SECONDS` | `30` | 1 to 300: how long a routing request may take before the service says routing is unavailable. `compose.yaml` does not pass it yet: add `BROUTER_TIMEOUT_SECONDS: ${BROUTER_TIMEOUT_SECONDS:-}` to its `environment:` to set it from `.env` |
 | `ROUTE_STEP_METERS` | `20` | 5 to 200: a route is resampled to one point every this many metres (coarser for a route that would pass 5000 points). Same note as above for `compose.yaml` |
+| `LIVE_COACH_ENABLED` | `true` | `false` turns the live coach off whatever else is set (a session start answers `feature-off`). ADR 0038 |
+| `TTS_BASE_URL`, `TTS_MODEL`, `TTS_VOICE` | unset | The rider's own OpenAI-compatible speech service: `POST {TTS_BASE_URL}/audio/speech`. **The live coach speaks only when all three are set and the language model of the insights is** (`LLM_BASE_URL` and `LLM_MODEL`); the address is http or https with no credentials or query (validated like `BROUTER_URL`). Only a cue's text, at most 80 characters, is sent there |
+| `TTS_API_KEY` | unset | The speech service's key, if it needs one. A secret: only in the server's environment, never logged |
+| `TTS_SPEED`, `TTS_FORMAT`, `TTS_TIMEOUT_SECONDS` | `1`, `mp3`, `4` | 0.25 to 4; `mp3`, `opus`, `aac`, `flac` or `wav`; 1 to 60 seconds per request |
+| `LIVE_COACH_LANGUAGE`, `LIVE_COACH_LLM_MODEL` | `INSIGHTS_LANGUAGE`, `LLM_MODEL` | The language of the cues; a model for the cues other than the one that writes the notes (same endpoint and key) |
+| `LIVE_COACH_CUE_MAX_CHARS`, `LIVE_COACH_SILENT_FINAL_SECONDS`, `LIVE_COACH_RECOVERY_MAX_CUES`, `LIVE_COACH_RECOVERY_BELOW_PERCENT`, `LIVE_COACH_MAX_PER_TRIGGER_PER_STEP`, `LIVE_COACH_TRIGGER_COOLDOWN_SECONDS`, `LIVE_COACH_MIN_GAP_SECONDS`, `LIVE_COACH_MAX_CUES_PER_HOUR` | `80`, `15`, `1`, `60`, `2`, `180`, `60`, `12` | The limits on talking (spec §12.1), enforced by the server; the order they apply in is in `docs/adr/0038-live-coach.md` and `docs/deploy.md` section 21 |
+| `LIVE_COACH_LEAD_SECONDS`, `LIVE_COACH_DEADLINE_SECONDS` | `6`, `5` | A line known beforehand is triggered this many seconds early (0 to 20); a cue not ready this many seconds after its trigger is dropped (1 to 30) |
 | `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_REFRESH_TOKEN` | unset | The Strava upload (ADR 0020). **The feature is off unless all three are set**; with only some set it is off and the log names the missing ones. The client id is the number of the application on strava.com/settings/api; the refresh token (which only seeds the first run, Strava rotates it) comes from `strava-auth` (below). Letters, digits and `. _ ~ + / = : -` only |
 | `STRAVA_BACKFILL` | `false` | `true` also sends the rides stored before Strava was turned on, at start. Off, turning Strava on does not post the history |
 | `STRAVA_BASE_URL` | `https://www.strava.com` | Another http(s) address; the tests point it at a fake |
@@ -124,6 +131,11 @@ general 1 to 128 characters from `A-Z a-z 0-9 . _ -`, starting with a letter or 
 | `GET /v1/routes` | none | `200` the routes the agent created, newest first, without points, not cached (`routes-response.schema.json`, ADR 0036): `{ id, name, source, distanceMeters, ascentMeters, hasCoordinates, createdAt }` |
 | `GET /v1/routes/{id}` | none | `200` one route with its points `[{ d, e, lat?, lon? }]` (`route.schema.json`), `Cache-Control: private, max-age=300`; **no grade**: the tablet computes it · `404 not_found` an id that is not a route |
 | `GET /v1/notebook` | none | `200` the coach notebook, read-only, not cached (`notebook-response.schema.json`, ADR 0035): the seven fixed sections with their text, version, time and reason, the caps and the total. **Only the coach scope; the game master's notebook is never served** |
+| `POST /v1/live/sessions` | `{ rideId, workoutId?, structureHash?, variantRidden?, clock }` (`live-session-start.schema.json`, ADR 0038) | `201` `{ sessionId \| null, coach: { on, reason }, serverTime, snapshotEverySeconds: 5 }` (`live-session-start-response.schema.json`): the coach is on for the workouts that ask for it; off, it says why (`feature-off`, `no-tts`, `no-llm`, `no-workout`, `no-live-coach`, `structure-changed`) and the ride is unaffected. A start ends the live session before it (one at a time) · `400 invalid_json` · `413` · `415` |
+| `POST /v1/live/sessions/{id}/snapshots` | The ride now, every 5 s (`live-snapshot.schema.json`): ride time, paused, muted, the step with its time left and target, the means of power, heart rate and cadence, compliance, the stall guard, recent events | `204` · `404 not_found` a session that is not the live one (it ended, a newer one replaced it, the service restarted): start a new one · `400 invalid_json` (the message names the path and the rule, never a reading) |
+| `GET /v1/live/sessions/{id}/cues` | none | `200 text/event-stream` (Server-Sent Events): `retry: 3000`, a comment `: open`, a `cue` event per cue with its number as the SSE `id` and its speech inline as base64 (`live-cue.schema.json`), `: hb` every 15 s, a last `end` event (`ended`, `superseded` or `shutdown`) and the connection closes. Resume with `Last-Event-ID`: the cues after it that have not expired · `404 not_found` |
+| `POST /v1/live/sessions/{id}/end` | Optional `{ reason?, clock? }` | `200` `{ sessionId, status: "ended" \| "already-ended", cues }` · `404 not_found` |
+| `POST /v1/live/sessions/{id}/cues/{cueId}/played` | `{ played, clock? }` (`live-cue-played.schema.json`), optional for the app | `204` · `404 not_found` a cue the session never made |
 | `POST /v1/plan-events` | `{ "kind": "illness" or "travel", "until": "YYYY-MM-DD"? }` (`plan-event-declaration.schema.json`) | `201` the plan event (`plan-event.schema.json`) / `200` when the same declaration was made before · `400 invalid_json` a body that is not a declaration, or an `until` before today |
 
 Also `401 unauthorized` everywhere, `404 not_found` for any other path or method, and `500
@@ -170,8 +182,38 @@ Migration 0011 (ADR 0036) adds `routes` (a route's points as compact JSON), `rid
 `planned_workout_extras` (what the service keeps about a planned workout that intervals.icu cannot hold: the easier variant and which route
 backs which free step) and `variant_rides` (the queue that changes an intervals.icu event to the variant that was ridden).
 
+Migration 0012 (ADR 0038) adds `live_cues` (every cue the live coach made, on its ride: trigger, text, the ride's time, whether the tablet
+reported it played) and three columns of `planned_workout_extras` for what the agent writes for the live coach (`live_coach`, `coach_brief`, and
+`must_say` by the position of its step). **Private: a cue's text is derived from the rider's ride; nothing in them is ever logged.**
+
 Tests run on PGlite and need nothing installed. To run them on a real PostgreSQL as well (CI does),
 set `TEST_DATABASE_URL`: **the `public` schema of that database is dropped**, so point it at a scratch one.
+
+## The live coach (ADR 0038)
+
+`src/live-coach/`, mounted under `/v1/live` (spec §12.1). While a workout whose `live_coach` is true is ridden, the tablet streams a snapshot of the
+ride every 5 s over plain `POST`s and listens on a Server-Sent Events stream; **rules decide when a cue may happen**, a fast model writes the line,
+the rider's own speech service speaks it, and the audio is pushed to the tablet. It never changes a target or the workout, and the service never
+calls the tablet.
+
+| File | Role |
+|---|---|
+| `structure.ts` | The workout flattened as the ride record does it, with which steps are hard (a fixed target of 85% of FTP or more), which are recovery (below 60% of FTP, or a label that says so) and each step's `must_say` lines. Pure |
+| `triggers.ts` | The trigger rules: a hard step begins (a few seconds early), two minutes remain, power off target for 20 s, cadence sagging, heart rate above the previous attempt's average for the step and rising, a strong finish, and the agent's lines. Pure and deterministic, in the time of the snapshots |
+| `limits.ts` | The limits on talking, in the order they are checked (below). Pure |
+| `cue-facts.ts`, `prompt.ts` | The facts a cue is written from (every number computed by code and listed as quotable) and the prompt: the rules, the workout's purpose, the agent's brief, the coach notebook's profile, what-works and methodology sections (never the game master's), the cues already said |
+| `cue-check.ts` | What the model wrote, checked by code: length, no number that was not in the facts (the insights' validator), no word of the deny list, no repeat, the sentinel `NO_CUE` for nothing worth saying |
+| `tts.ts`, `cue-maker.ts` | The speech service's client (no redirect, no retry, a kind and a status and nothing else) and the pipeline with its 5 s deadline, aborted when the session ends or the rider mutes; the timings of each stage are logged, never a line or a reading |
+| `session.ts`, `service.ts`, `routes.ts`, `store.ts` | One session in memory, the service (one at a time; a start ends the one before; idle after 10 minutes), the routes and SSE framing, the cue log in `live_cues` |
+
+**The limits and their order**: 1 muted (sticky for the session), 2 one cue at a time, 3 the final 15 s of a step are silent (a cue about the
+step that is about to begin is the exception), 4 a recovery step gets one cue, 5 the same trigger twice per step, 6 and not within 3 minutes of
+its last cue, 7 60 s between any two cues, 8 12 an hour, 9 a trigger that produced no cue is not tried again for a minute; then the line's
+length (80), its numbers, its words and its novelty, and the deadline. Every one is a setting (`LIVE_COACH_*`); the agent's `must_say` lines skip
+4 to 6, 8 and 9 and use an 8 s gap.
+
+Tests (`test/live-coach-*.test.ts`, `config-live-coach.test.ts`) use a fake model and a fake speech service on local ports
+(`test/helpers/fake-tts.ts`, `live.ts`), the injected clock and timers, no network beyond them and no real sleep.
 
 ## intervals.icu (ADR 0016)
 

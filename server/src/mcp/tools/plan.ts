@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   addDaysToIsoDate,
   isIsoDate,
+  LIVE_COACH_BRIEF_MAX_CHARS,
   MAX_WORKOUTS_RANGE_DAYS,
   type PlannedVariant,
   type Profile,
@@ -10,6 +11,7 @@ import {
   VARIANT_NOTE_MAX_CHARS,
   validateWorkout,
   type Workout,
+  withoutLiveCoach,
 } from "@overdrive/contracts";
 import { z } from "zod";
 import { canonicalJson } from "../../hash.ts";
@@ -23,10 +25,13 @@ import { convertIntervalsEvent, workoutToEventPayload } from "../../intervals/wo
 import { renderWorkoutText } from "../../intervals/workout-text.ts";
 import { PLAN_SOURCE, readPlanEvent } from "../../plan/entries.ts";
 import {
+  mustSayOfSteps,
   routeIdList,
   routeIdsOf,
   type StoredVariant,
+  stepAtPosition,
   stepsFingerprint,
+  withMustSay,
   withRouteIds,
 } from "../../plan/extras.ts";
 import {
@@ -83,6 +88,8 @@ function describeEntry(entry: PlanEntry, detail: "summary" | "full") {
     estimatedTss: load.estimatedTss,
     ...(load.freeSeconds > 0 ? { freeSeconds: load.freeSeconds } : {}),
     ...(load.heartRateSeconds === undefined ? {} : { heartRateSeconds: load.heartRateSeconds }),
+    // The live coach (spec §12.1) speaks in this session; its brief and lines are in the workout with detail full.
+    ...(workout.live_coach === true ? { liveCoach: true as const } : {}),
     outline: workoutOutline(workout),
     ...(detail === "full" ? { workout } : {}),
     // The easier version lives only in this service (spec §11.5): the calendar holds the primary.
@@ -92,13 +99,16 @@ function describeEntry(entry: PlanEntry, detail: "summary" | "full") {
   };
 }
 
-/** The steps without their cues (a cue's words may be changed on the way through the calendar's text) and route ids (the calendar has no place for them). */
+/**
+ * The steps without their cues (a cue's words may be changed on the way through the calendar's text), route ids and spoken lines (the
+ * calendar has no place for either).
+ */
 function withoutLabels(node: unknown): unknown {
   if (Array.isArray(node)) return node.map(withoutLabels);
   if (typeof node !== "object" || node === null) return node;
   return Object.fromEntries(
     Object.entries(node)
-      .filter(([key]) => key !== "label" && key !== "route_id")
+      .filter(([key]) => key !== "label" && key !== "route_id" && key !== "must_say")
       .map(([key, value]) => [key, withoutLabels(value)]),
   );
 }
@@ -150,7 +160,8 @@ export function registerPlanTools(server: McpServer, ctx: ToolContext): void {
         );
       }
     } else if (fallback !== null) {
-      workout = { ...fallback, id };
+      // What is for the live coach is kept beside the plan (the extras), not in the cached workout.
+      workout = { ...withoutLiveCoach(fallback), id };
       warnings.push(
         `intervals.icu stored the workout, but the server could not read it back (${converted.reason}); the workout shown is the one you sent, and the next plan refresh may differ`,
       );
@@ -255,6 +266,93 @@ export function registerPlanTools(server: McpServer, ctx: ToolContext): void {
       routeIds: placed,
       stepsHash: stepsFingerprint(entry.workout.steps),
     });
+  }
+
+  /**
+   * Keeps the `must_say` lines the steps carry (the calendar's text cannot hold them): by position in the steps as the calendar returned
+   * them, valid while those steps are unchanged, like the route ids. A line that does not land on the step it was written for is said in
+   * a warning and not kept.
+   */
+  async function keepMustSay(
+    entry: PlanEntry,
+    sent: readonly Step[],
+    warnings: string[],
+  ): Promise<void> {
+    const wanted = mustSayOfSteps(sent);
+    if (Object.keys(wanted).length === 0) {
+      await services.extras.setCoach(entry.id, entry.date, { mustSay: null });
+      return;
+    }
+    if (entry.workout === null) {
+      warnings.push(
+        "the must_say lines were not kept: the workout cannot be read back from the calendar",
+      );
+      return;
+    }
+    const calendar = entry.workout.steps;
+    const placed = mustSayOfSteps(withMustSay(calendar, wanted));
+    const misplaced = Object.keys(wanted).filter((position) => {
+      const asked = stepAtPosition(sent, position);
+      const there = stepAtPosition(calendar, position);
+      return (
+        placed[position] === undefined ||
+        asked === null ||
+        there === null ||
+        asked.type !== there.type ||
+        asked.duration !== there.duration
+      );
+    });
+    for (const position of misplaced) delete placed[position];
+    if (misplaced.length > 0) {
+      warnings.push(
+        "a must_say line did not land on the step it was written for (intervals.icu laid the steps out differently), so it was not kept: check the steps below",
+      );
+    }
+    await services.extras.setCoach(entry.id, entry.date, {
+      mustSay:
+        Object.keys(placed).length === 0
+          ? null
+          : { lines: placed, stepsHash: stepsFingerprint(calendar) },
+    });
+  }
+
+  /** The `must_say` lines of these steps are refused when one would never be spoken: it is inside the final seconds of its step. */
+  function requireSpeakableLines(steps: readonly Step[]): void {
+    const silent = services.liveCoach.limits.silentFinalSeconds;
+    for (const [position, lines] of Object.entries(mustSayOfSteps(steps))) {
+      const step = stepAtPosition(steps, position);
+      if (step === null) continue;
+      for (const line of lines) {
+        const moment = line.at === "start" ? 0 : line.at;
+        if (step.duration - moment <= silent) {
+          throw new ToolError(
+            `a must_say line of step ${position} (${step.duration} s long) would never be spoken: ${
+              line.at === "start" ? "the step is" : `second ${line.at} is`
+            } inside the final ${silent} s of a step, where the live coach is silent so the countdown stays clear; nothing was changed`,
+          );
+        }
+      }
+    }
+  }
+
+  /** What the live coach is told for this session, kept beside the plan: the flag and the brief; the agent hears when the coach is off here. */
+  async function keepCoachFields(
+    entry: PlanEntry,
+    change: { liveCoach?: boolean | undefined; coachBrief?: string | null | undefined },
+    warnings: string[],
+  ): Promise<void> {
+    await services.extras.setCoach(entry.id, entry.date, {
+      ...(change.liveCoach === undefined ? {} : { liveCoach: change.liveCoach }),
+      ...(change.coachBrief === undefined ? {} : { coachBrief: change.coachBrief }),
+    });
+    if (change.liveCoach === true) {
+      const state = services.liveCoach.availability();
+      if (!state.on) {
+        warnings.push(
+          `live_coach is saved, but the live coach is off on this server (${state.message}); the rider's rides are unaffected`,
+        );
+      }
+    }
   }
 
   const requireEventId = (id: string): number => {
@@ -422,6 +520,14 @@ export function registerPlanTools(server: McpServer, ctx: ToolContext): void {
         "is kept only by this server: the calendar entry, intervals.icu and the rider's other calendars hold the primary, so nothing needs deleting " +
         "if it is not ridden (it disappears with the day, or if the session is moved or deleted). If it is ridden, the server changes the calendar " +
         "entry to what was ridden so that planned and completed line up, and tells you in list_plan_events (kind variant). " +
+        "LIVE COACH: set live_coach true for key or strict sessions (threshold work, a test, a session where form matters): during the ride a " +
+        "coach on the server speaks short cues (at most 80 characters) through the tablet, written by a fast model from the live ride within " +
+        "rules that limit when it may talk; it needs the tablet online and never changes a target or the workout. WRITE A BRIEF with it, " +
+        "coach_brief (at most 1000 characters): what the session is for, what to watch in this rider, what tone to take. It is the only steer " +
+        'the coach has about this session. must_say on a step is up to 3 lines {at: "start" or a second of the step, text: at most 80 ' +
+        "characters} that are spoken exactly as written, with no model: use them sparingly, for what the coach could not know (a line the coach " +
+        "could write itself is better left to it); a line inside the final 15 seconds of its step is never spoken and is refused. live_coach, " +
+        "coach_brief and must_say live only in this server: intervals.icu and the calendars never see them. " +
         "A workout that does not validate is refused with the path of the mistake. The calendar entry appears on the tablet and in " +
         "the rider's other calendars within minutes. It writes to the real calendar: do not create a workout the rider did not ask for.",
       input: {
@@ -450,6 +556,7 @@ export function registerPlanTools(server: McpServer, ctx: ToolContext): void {
         throw new ToolError(`workout does not validate: ${valid.errors.slice(0, 5).join("; ")}`);
       await requireThreshold(valid.value, services.profile);
       await requireRoutes(valid.value.steps, "the workout");
+      requireSpeakableLines(valid.value.steps);
       if (variantNote !== undefined && variant === undefined) {
         throw new ToolError("variantNote goes with a variant: give the variant's steps too");
       }
@@ -464,14 +571,33 @@ export function registerPlanTools(server: McpServer, ctx: ToolContext): void {
         if (checkedVariant !== null) {
           await services.extras.setVariant(entry.id, entry.date, checkedVariant);
         }
+        await keepMustSay(entry, valid.value.steps, warnings);
+        const brief = valid.value.coach_brief?.trim();
+        await keepCoachFields(
+          entry,
+          {
+            liveCoach: valid.value.live_coach === true,
+            coachBrief: brief === undefined || brief === "" ? null : brief,
+          },
+          warnings,
+        );
       } catch (error) {
-        ctx.log.error({ err: error, id: entry.id }, "the routes or the variant could not be saved");
+        ctx.log.error(
+          { err: error, id: entry.id },
+          "the routes, the variant or the live coach's part could not be saved",
+        );
         warnings.push(
-          "the workout is in the calendar, but its route ids or easier version could not be saved; send them again with update_workout",
+          "the workout is in the calendar, but its route ids, easier version or live coach settings could not be saved; send them again with update_workout",
         );
       }
       ctx.log.info(
-        { tool: "create_workout", id: entry.id, date, variant: checkedVariant !== null },
+        {
+          tool: "create_workout",
+          id: entry.id,
+          date,
+          variant: checkedVariant !== null,
+          liveCoach: valid.value.live_coach === true,
+        },
         "workout planned through the MCP",
       );
       return stored(entry, warnings);
@@ -493,8 +619,11 @@ export function registerPlanTools(server: McpServer, ctx: ToolContext): void {
         "again if it should keep its route. variant replaces the easier version of the session (a complete list of steps, with variantNote " +
         "one short line on how it differs), removeVariant true takes it away; changing steps keeps the old easier version, so send a new " +
         "one or remove it if it no longer fits. MOVING a session to another day drops its easier version (give a new variant in the same " +
-        "call to keep one). The easier version lives only in this server, never in the calendar. Only workouts can be changed here, " +
-        "not other calendar entries. Does not ask for confirmation: change only what the rider asked for.",
+        "call to keep one). The easier version lives only in this server, never in the calendar. live_coach true turns the live coach on for the " +
+        "session (key or strict sessions, see create_workout), false turns it off; coach_brief (at most 1000 characters: what the session is for, what to " +
+        "watch in this rider, what tone) replaces the brief, and an empty one removes it. steps carrying must_say lines replace the lines too (steps without " +
+        "them remove them); a name or a date alone keeps them. live_coach, coach_brief and must_say live only in this server, never in the calendar. " +
+        "Only workouts can be changed here, not other calendar entries. Does not ask for confirmation: change only what the rider asked for.",
       input: {
         id: z.string().describe("The planned workout's id, icu-123."),
         name: z.string().optional().describe("The new name."),
@@ -508,20 +637,50 @@ export function registerPlanTools(server: McpServer, ctx: ToolContext): void {
             `One short line saying how the easier version differs, at most ${VARIANT_NOTE_MAX_CHARS} characters.`,
           ),
         removeVariant: z.boolean().optional().describe("true: remove the easier version."),
+        live_coach: z
+          .boolean()
+          .optional()
+          .describe("true: the live coach speaks during this session; false: it does not."),
+        coach_brief: z
+          .string()
+          .max(LIVE_COACH_BRIEF_MAX_CHARS)
+          .optional()
+          .describe(
+            `The brief to the live coach, at most ${LIVE_COACH_BRIEF_MAX_CHARS} characters; an empty string removes it.`,
+          ),
       },
     },
-    async ({ id, name, date, steps, variant, variantNote, removeVariant }) => {
+    async ({
+      id,
+      name,
+      date,
+      steps,
+      variant,
+      variantNote,
+      removeVariant,
+      live_coach,
+      coach_brief,
+    }) => {
       const calendar = client();
       const eventId = requireEventId(id);
       const variantChange = variant !== undefined || removeVariant === true;
+      const coachChange = live_coach !== undefined || coach_brief !== undefined;
       if (variantNote !== undefined && variant === undefined) {
         throw new ToolError("variantNote goes with a variant: give the variant's steps too");
       }
       if (variant !== undefined && removeVariant === true) {
         throw new ToolError("give a variant or removeVariant, not both");
       }
-      if (name === undefined && date === undefined && steps === undefined && !variantChange) {
-        throw new ToolError("nothing to change: give a name, a date, steps or a variant");
+      if (
+        name === undefined &&
+        date === undefined &&
+        steps === undefined &&
+        !variantChange &&
+        !coachChange
+      ) {
+        throw new ToolError(
+          "nothing to change: give a name, a date, steps, a variant, live_coach or coach_brief",
+        );
       }
       if (date !== undefined) checkDate("date", date);
       const newName = name?.trim();
@@ -549,6 +708,7 @@ export function registerPlanTools(server: McpServer, ctx: ToolContext): void {
           throw new ToolError(`workout does not validate: ${valid.errors.slice(0, 5).join("; ")}`);
         await requireThreshold(valid.value, services.profile);
         await requireRoutes(valid.value.steps, "the steps");
+        requireSpeakableLines(valid.value.steps);
         fallback = valid.value;
         payload.description = renderWorkoutText(valid.value);
       }
@@ -566,8 +726,21 @@ export function registerPlanTools(server: McpServer, ctx: ToolContext): void {
         Object.keys(payload).length === 0 ? existing : await calendar.updateEvent(eventId, payload);
       const { entry, warnings } = await remember(updated, fallback);
       try {
-        if (steps !== undefined && fallback !== null)
+        if (steps !== undefined && fallback !== null) {
           await keepRoutes(entry, fallback.steps, warnings);
+          await keepMustSay(entry, fallback.steps, warnings);
+        }
+        if (coachChange) {
+          const brief = coach_brief?.trim();
+          await keepCoachFields(
+            entry,
+            {
+              liveCoach: live_coach,
+              coachBrief: brief === undefined ? undefined : brief === "" ? null : brief,
+            },
+            warnings,
+          );
+        }
         if (checkedVariant !== null) {
           await services.extras.setVariant(entry.id, entry.date, checkedVariant);
         } else if (removeVariant === true) {
@@ -581,9 +754,12 @@ export function registerPlanTools(server: McpServer, ctx: ToolContext): void {
           }
         }
       } catch (error) {
-        ctx.log.error({ err: error, id }, "the routes or the variant could not be saved");
+        ctx.log.error(
+          { err: error, id },
+          "the routes, the variant or the live coach's part could not be saved",
+        );
         warnings.push(
-          "the calendar was changed, but the routes or the easier version could not be saved; send them again",
+          "the calendar was changed, but the routes, the easier version or the live coach settings could not be saved; send them again",
         );
       }
       ctx.log.info({ tool: "update_workout", id }, "workout changed through the MCP");

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { coachConfigShape } from "./config-coach.ts";
 import { insightsConfigShape } from "./config-insights.ts";
 import { integrationsShape } from "./config-integrations.ts";
+import { liveCoachConfigShape } from "./config-live-coach.ts";
 import { routesConfigShape } from "./config-routes.ts";
 import { stravaConfigShape } from "./config-strava.ts";
 import { wellnessConfigShape } from "./config-wellness.ts";
@@ -219,6 +220,7 @@ const schema = z.object({
   ...insightsConfigShape, // Insights, alerts and the language-model endpoint (ADR 0025): config-insights.ts
   ...coachConfigShape, // The coach notebook's caps and the plan events' day end (ADR 0035): config-coach.ts
   ...routesConfigShape, // Routes: the BRouter address, its timeout and the resampling step (ADR 0036): config-routes.ts
+  ...liveCoachConfigShape, // The live coach, its limits on talking and the rider's speech service (ADR 0038): config-live-coach.ts
   // The rider's time zone: which day "today" is for the plan, and which day a ride belongs to.
   TIMEZONE: z.preprocess(
     blankIsUnset,

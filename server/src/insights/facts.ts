@@ -9,6 +9,7 @@ import type {
   Workout,
 } from "@overdrive/contracts";
 import { addDaysToIsoDate } from "@overdrive/contracts";
+import type { LiveCueRow } from "../live-coach/store.ts";
 import { workoutOutline } from "../plan/summary.ts";
 import type { Compliance, StallGuardSummary, StepCompliance } from "../ride-stats.ts";
 import { epochDay } from "../wellness/dates.ts";
@@ -422,6 +423,8 @@ export interface RideInput {
   form: FormInput | null;
   /** What the ride record says about the ERG stall guard (spec §11.1); null when it cannot be told. */
   stallGuard?: StallGuardSummary | null;
+  /** What the live coach said in the ride (spec §12.1), in the order it was said; absent or empty: it said nothing. */
+  liveCues?: readonly LiveCueRow[] | undefined;
 }
 
 /** The standard durations whose best power a ride note compares, in seconds. */
@@ -542,6 +545,21 @@ export interface RideFacts extends FactsBase {
     activations: number;
     steps: { step: number; label: string | null; activations: number }[];
     atMinutes: number[];
+  };
+  /**
+   * What the live coach said to the rider during the ride (spec §12.1), so that the planning agent knows what the rider was told:
+   * each line with its trigger, the step it was about and the minute of the ride. Present only when it said something.
+   * `played` is what the tablet reported: absent when it did not say.
+   */
+  liveCoach?: {
+    cues: number;
+    said: {
+      trigger: string;
+      atMinute: number;
+      step: number | null;
+      text: string;
+      played?: boolean;
+    }[];
   };
   efforts: EffortFact[];
   drift: { percent: number } | null;
@@ -737,6 +755,27 @@ export function buildRideFacts(input: RideInput): RideFacts {
           ),
         };
 
+  const cues = input.liveCues ?? [];
+  const liveCoach: RideFacts["liveCoach"] =
+    cues.length === 0
+      ? undefined
+      : {
+          cues: q.n("live coach: lines said in the ride", cues.length, "lines") ?? cues.length,
+          said: cues.map((cue) => ({
+            trigger: cue.trigger,
+            atMinute:
+              q.n("live coach: minute of the ride a line was said", cue.atSeconds / 60, "min", 1) ??
+              0,
+            step:
+              cue.stepIndex === null
+                ? null
+                : (q.n("live coach: step number a line was about", cue.stepIndex + 1, "step") ??
+                  cue.stepIndex + 1),
+            text: cue.text,
+            ...(cue.played === null ? {} : { played: cue.played }),
+          })),
+        };
+
   const efforts: EffortFact[] = [];
   for (const duration of EFFORT_DURATIONS) {
     const point = input.curve.find((p) => p.durationSec === duration);
@@ -788,6 +827,7 @@ export function buildRideFacts(input: RideInput): RideFacts {
     ride,
     plan,
     ...(stallGuard === undefined ? {} : { stallGuard }),
+    ...(liveCoach === undefined ? {} : { liveCoach }),
     efforts,
     drift,
     wPrime,

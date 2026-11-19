@@ -49,6 +49,12 @@ const INSTRUCTIONS =
   "update_workout); the rider sees their recovery state at the start of the ride and picks one version with a tap. It lives only in this server. " +
   "When it is ridden the server updates the calendar entry to what was done and list_plan_events shows a variant event: treat it as a fact about the " +
   "rider's day (they chose the easier version) when you plan the next sessions, and resolve it. " +
+  // The live coach (spec §12.1, ADR 0038).
+  "LIVE COACH: for key or strict sessions (threshold work, a test, a session where form matters) set live_coach true in create_workout or update_workout and " +
+  "write a coach_brief (what the session is for, what to watch in this rider, what tone): during the ride a coach on the server speaks short cues through the " +
+  "tablet, written by a fast model within rules that limit when it may talk, and it never changes a target or the workout. Add must_say lines to a step (spoken " +
+  "exactly as written) only sparingly, for what the coach could not know. Read the notebook's profile and what-works sections before you write a brief. After a " +
+  "ride, get_ride and get_facts show what the coach said (liveCoach): that is what the rider was told, so plan the next session knowing it. " +
   "Results are compact by default; ask for detail only when needed.";
 
 /** What a session that holds the game master's scope is told in addition. */
