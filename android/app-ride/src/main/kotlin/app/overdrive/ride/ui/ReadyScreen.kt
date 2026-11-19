@@ -173,7 +173,7 @@ private fun WorkoutList(
             PlannedSection(
                 plan,
                 choice,
-                onSelect = { actions.onSelect(RideChoice.Planned(it)) },
+                onSelect = { actions.onSelect(RideChoice.Planned(it.workout, it.structureHash)) },
                 onRefresh = actions.onRefreshPlan,
             )
             SectionLabel("Ride", Modifier.padding(start = 16.dp, bottom = 12.dp))

@@ -14,7 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import app.overdrive.core.workout.Workout
+import app.overdrive.core.plan.PlannedWorkout
 import app.overdrive.ride.host.RideChoice
 import app.overdrive.ride.plan.PlanMark
 import app.overdrive.ride.plan.PlanRow
@@ -47,7 +47,7 @@ import app.overdrive.uikit.tokens.OverdriveColors
 fun PlannedSection(
     plan: PlanUi,
     choice: RideChoice,
-    onSelect: (Workout) -> Unit,
+    onSelect: (PlannedWorkout) -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -123,12 +123,12 @@ private fun PlanStatus(plan: PlanUi) {
 private fun PlanRowItem(
     row: PlanRow,
     chosen: String?,
-    onSelect: (Workout) -> Unit,
+    onSelect: (PlannedWorkout) -> Unit,
 ) {
     ValueRow(
         title = row.title,
         subtitle = row.subtitle,
-        onClick = { onSelect(row.workout.workout) },
+        onClick = { onSelect(row.workout) },
         value = row.duration,
         caption = row.intensity,
         selected = chosen == row.workout.id,
