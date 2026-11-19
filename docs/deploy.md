@@ -548,6 +548,89 @@ unreachable: the log says which); `skipped` has its reason in `last_error` (the 
 **Repeated sessions** (spec §11.7) need nothing either: when you ride the same planned workout again (the same steps, whatever it is called) the
 service notices and the companion shows the attempts side by side; the agent reads them with `list_repeats`, `get_repeat` and `get_ride`.
 
+## 19. BRouter (road routing)
+
+The routes with elevation (spec §11.4) are routed on the roads by a self-hosted **BRouter** server (https://github.com/abrensch/brouter), not by a
+public service: the tablet never talks to it, and the web service asks it for a route over HTTP on the Docker network. It is optional. With
+`BROUTER_URL` empty, routing is off and the service does without it. It runs as the `brouter` service of `compose.yaml`, built from `deploy/brouter`.
+
+**The image is ours, not the one on ghcr.io.** The `ghcr.io/abrensch/brouter:latest` image is from 2025 and cannot read the current tiles: it answers
+`400 lookup version mismatch`. `deploy/brouter/Dockerfile` builds BRouter **1.7.10** from its release zip on `eclipse-temurin:17-jre-jammy`. The zip's
+SHA-256 is pinned in the Dockerfile, and the build fails if the download does not match.
+
+1. **Build** (once, and after an update):
+
+   ```bash
+   docker compose build brouter
+   ```
+
+   The image is about 266 MB.
+
+2. **Get the tiles.** They are large and are **not in the repository** (`data/` is git-ignored). Each tile is one 5 by 5 degree square of roads and
+   elevation, from https://brouter.de/brouter/segments4/. The script puts them in `./data/brouter/segments4`, skips the tiles it already has, and
+   resumes a download that was interrupted:
+
+   ```bash
+   deploy/brouter/fetch-tiles.sh --list --region serbia   # the sizes, and what is already there
+   deploy/brouter/fetch-tiles.sh --region serbia          # the four tiles that cover Serbia
+   deploy/brouter/fetch-tiles.sh E10_N45                  # any other tile, by name
+   ```
+
+   The four Serbia tiles (`E15_N40 E20_N40 E15_N45 E20_N45`) are about 305 MiB together (52, 64, 125 and 65 MiB). A tile in general can be 190 MiB
+   (E10_N45, Lake Garda and Trento).
+
+3. **Start it:**
+
+   ```bash
+   docker compose up -d brouter
+   docker compose ps brouter
+   ```
+
+   It listens on port 17777 **only on the Docker network**: nothing is published on the host, and nothing else can reach it. The health check
+   reports `healthy` once it answers.
+
+4. **Point the server at it.** In `.env`:
+
+   ```bash
+   BROUTER_URL=http://brouter:17777
+   ```
+
+   Then `docker compose up -d server`. The server does not wait for BRouter at start: `compose.yaml` has no `depends_on` from the server to it.
+
+5. **Smoke test.** A route between two points in Belgrade (the tile E20_N40), from BRouter's own container:
+
+   ```bash
+   docker compose exec brouter curl -sS -o /dev/null -w '%{http_code}\n' \
+     'http://127.0.0.1:17777/brouter?lonlats=20.46,44.81%7C20.52,44.85&profile=trekking&format=geojson'
+   # 200
+   ```
+
+   and from the server, the way the service calls it (its image has Node but no curl):
+
+   ```bash
+   docker compose exec server node -e 'fetch("http://brouter:17777/brouter?lonlats=20.46,44.81%7C20.52,44.85&profile=trekking&format=geojson").then((r) => console.log(r.status))'
+   # 200
+   ```
+
+   `404` on `/brouter` with no parameters is normal: it means BRouter is up. A `400` with `datafile E20_N40.rd5 not found` means the tile for that
+   area is not downloaded yet (run the script for it). A `400` with `lookup version mismatch` means the tiles are older than the BRouter version:
+   fetch them again.
+
+**Updating BRouter.** Check the new release (https://github.com/abrensch/brouter/releases), download its zip once and compute its hash:
+
+```bash
+curl -fsSL -o /tmp/brouter.zip https://github.com/abrensch/brouter/releases/download/vX.Y.Z/brouter-X.Y.Z.zip
+sha256sum /tmp/brouter.zip
+```
+
+Set `BROUTER_VERSION` and `BROUTER_SHA256` (the two `ARG` lines in `deploy/brouter/Dockerfile`, with the release page's name in the comment above
+them) to the new values, then `docker compose build brouter && docker compose up -d brouter`. A new version can need new tiles, so run the
+smoke test again. The tiles are not versioned by the image: if the new BRouter cannot read the old tiles, the `400` above says so; fetch them again.
+
+**What it costs.** Memory: the container is capped at 640 MB (`mem_limit`); the JVM heap is at most 256 MB (`JAVA_OPTS`), and the probe measured
+107 to 173 MiB resident for the four tiles in use. Two routing threads (`MAXTHREADS=2`). Disk: the image about 266 MB, and the Serbia tiles about
+305 MiB (sizes as the server reported them when this section was written).
+
 ## Troubleshooting
 
 - `Invalid configuration:` at start: the message names the variable. Fix it in `.env`, then `docker compose up -d server`.
