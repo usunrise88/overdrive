@@ -5,6 +5,9 @@ import app.overdrive.core.click.ButtonChange
 import app.overdrive.core.click.ClickBits
 import app.overdrive.core.control.ButtonLearner
 import app.overdrive.core.control.ButtonMapping
+import app.overdrive.core.control.CoachButtonLearner
+import app.overdrive.core.control.CoachLearnRejection
+import app.overdrive.core.control.CoachLearnState
 import app.overdrive.core.control.HandlebarButton
 import app.overdrive.core.control.LearnRejection
 import app.overdrive.core.control.LearnState
@@ -36,6 +39,11 @@ data class LearnUi(
     val clashesWith: HandlebarButton? = null,
     /** Every role has its button and the mapping was saved. */
     val done: Boolean = false,
+    /**
+     * The flow is the **one extra button** for the live coach's mute (spec §12.1, docs/adr/0039) and not the five roles: [role] is then of no use (it is
+     * the first role, a placeholder), [step] and [total] are 1, and [done] says the button was taken and saved.
+     */
+    val coach: Boolean = false,
 )
 
 /**
@@ -85,6 +93,71 @@ class ButtonLearning(
                 scope.launch(start = CoroutineStart.UNDISPATCHED) {
                     buttons.collect { change -> handle(learner.feed(change.held)) }
                 }
+        }
+    }
+
+    /**
+     * Starts asking for **one** press: the button that mutes the live coach (spec §12.1, docs/adr/0039), which is on none of the five roles and unmapped by
+     * default. A combination, or a button a role already has, is refused with a reason and the question is asked again; the five roles keep their buttons.
+     * Saved when taken. Offered under the same conditions as [begin].
+     */
+    fun beginCoach() {
+        synchronized(lock) {
+            if (mutableUi.value != null || !canLearn()) return
+            val learner = CoachButtonLearner(base = current(), ignoredBits = ignoredBits())
+            mutableUi.value = coachUi()
+            job =
+                scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    buttons.collect { change -> handleCoach(learner.feed(change.held)) }
+                }
+        }
+    }
+
+    /** Gives the live coach's mute no button again (the **Clear** button): the five roles are untouched. */
+    fun clearCoachButton() {
+        scope.launch { current().withCoachMute(0)?.let { save(it) } }
+    }
+
+    private fun coachUi(
+        rejection: LearnRejection? = null,
+        clashesWith: HandlebarButton? = null,
+        done: Boolean = false,
+        learned: Map<HandlebarButton, List<String>> = emptyMap(),
+    ) = LearnUi(HandlebarButton.entries.first(), 1, 1, learned, rejection, clashesWith, done, coach = true)
+
+    private suspend fun handleCoach(state: CoachLearnState) {
+        if (mutableUi.value == null) return
+        when (state) {
+            CoachLearnState.Asking -> {
+                mutableUi.value = coachUi()
+            }
+
+            is CoachLearnState.Rejected -> {
+                val reason =
+                    if (state.reason ==
+                        CoachLearnRejection.COMBO
+                    ) {
+                        LearnRejection.COMBO
+                    } else {
+                        LearnRejection.DUPLICATE
+                    }
+                mutableUi.value = coachUi(rejection = reason, clashesWith = state.takenBy)
+            }
+
+            is CoachLearnState.Complete -> {
+                save(state.mapping)
+                synchronized(lock) {
+                    if (mutableUi.value != null && job?.isActive == true) {
+                        mutableUi.value =
+                            coachUi(
+                                done = true,
+                                learned =
+                                    mapOf(HandlebarButton.entries.first() to names(state.mapping.coachMuteMask)),
+                            )
+                        job?.cancel()
+                    }
+                }
+            }
         }
     }
 

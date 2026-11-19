@@ -15,6 +15,7 @@ import app.overdrive.core.route.RouteLibrary
 import app.overdrive.core.route.RouteStatus
 import app.overdrive.core.workout.Step
 import app.overdrive.core.workout.Workout
+import app.overdrive.core.workout.wantsLiveCoach
 import app.overdrive.ride.rides.RiddenWorkout
 import app.overdrive.ride.routes.RouteChoiceUi
 import app.overdrive.ride.routes.RoutesView
@@ -128,13 +129,25 @@ data class PlanUi(
             locale: Locale = Locale.getDefault(),
             routes: RoutesView = RoutesView.None,
             recovery: String? = null,
+            liveCoach: Boolean = true,
         ): PlanUi {
             if (!state.visible) return Hidden
             val agenda = PlanAgenda.of(state.workouts, today)
             val last = ridden.groupBy { it.workoutId }.mapValues { (_, rides) -> rides.maxOf { it.startEpochMillis } }
 
+            // The last refresh could not reach the service: the tablet is offline as far as the live coach is concerned (docs/adr/0039).
+            val offline = state.problem is PlanProblem.Failed
+
             fun row(workout: PlannedWorkout) =
-                rowOf(workout, last[workout.id], zone, locale, routes, recovery.takeIf { workout.date == today })
+                rowOf(
+                    workout,
+                    last[workout.id],
+                    zone,
+                    locale,
+                    routes,
+                    recovery.takeIf { workout.date == today },
+                    LiveCoachNote(liveCoach, offline),
+                )
             val tomorrow = PlanCalendar.addDays(today, 1)
             val (status, alert, detail) = statusOf(state, nowMillis, zone, locale)
             return PlanUi(
@@ -158,10 +171,11 @@ data class PlanUi(
             locale: Locale,
             routes: RoutesView,
             recovery: String?,
+            coach: LiveCoachNote,
         ): PlanRow {
             val workout = planned.workout
             val description = describe(planned)
-            val variant = variantOf(planned, routes)
+            val variant = variantOf(planned, routes, coach)
             return when (val playability = workout.playability()) {
                 is Playability.Unrunnable -> {
                     PlanRow(
@@ -189,6 +203,7 @@ data class PlanUi(
                                 done,
                                 description,
                                 routeText(workout.steps, routes),
+                                coach.textFor(workout),
                             ).joinToString(" · "),
                         mark = if (done == null) PlanMark.None else PlanMark.Done,
                         duration = UiFormat.minutes(workout.flatSteps().totalDurationSeconds()),
@@ -204,12 +219,18 @@ data class PlanUi(
         private fun variantOf(
             planned: PlannedWorkout,
             routes: RoutesView,
+            coach: LiveCoachNote,
         ): VariantRow? {
             val variant = planned.variant ?: return null
             val workout = planned.variantWorkout() ?: return null
             val note = variant.note
             val kinds = WorkoutDescriber.kinds(workout).replaceFirstChar { it.uppercase() }
-            val subtitle = listOfNotNull(note ?: kinds, routeText(variant.steps, routes)).joinToString(" · ")
+            val subtitle =
+                listOfNotNull(
+                    note ?: kinds,
+                    routeText(variant.steps, routes),
+                    coach.textFor(workout),
+                ).joinToString(" · ")
             return when (val playability = workout.playability()) {
                 is Playability.Unrunnable -> {
                     VariantRow(
@@ -253,6 +274,25 @@ data class PlanUi(
             if (ids.any { routes.statusOf(it) != RouteStatus.READY }) return RouteChoiceUi.NOT_DOWNLOADED
             val names = ids.mapNotNull(routes::nameOf)
             return (if (names.size == 1) "Route: " else "Routes: ") + names.joinToString(", ")
+        }
+
+        /**
+         * What a row says of the live coach (spec §12.1, docs/adr/0039): nothing for a workout that does not ask for it, **"Live coach"** for one that does,
+         * with **"needs the connection"** when the tablet could not reach the service at its last refresh, and **"Live coach off"** when the rider switched it
+         * off in Settings (then nothing about the connection: it is not going to be asked). One short part of the subtitle; the `coach_brief` and the lines the
+         * coach is to say are never shown.
+         */
+        class LiveCoachNote(
+            private val on: Boolean,
+            private val offline: Boolean,
+        ) {
+            fun textFor(workout: Workout): String? =
+                when {
+                    !workout.wantsLiveCoach -> null
+                    !on -> "Live coach off"
+                    offline -> "Live coach · needs the connection"
+                    else -> "Live coach"
+                }
         }
 
         /** The workout's own description (its first line), else the kinds of step it has: one plain line. */

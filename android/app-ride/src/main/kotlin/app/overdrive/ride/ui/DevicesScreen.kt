@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -66,6 +67,10 @@ class DevicesActions(
     val onLearnButtons: () -> Unit = {},
     /** **Reset to default**: the default mapping again. */
     val onResetButtons: () -> Unit = {},
+    /** **Set** on the live coach's mute button (spec §12.1, docs/adr/0039): asks for one press. */
+    val onLearnCoachButton: () -> Unit = {},
+    /** **Clear** on the live coach's mute button: it has none again. */
+    val onClearCoachButton: () -> Unit = {},
 )
 
 /**
@@ -159,6 +164,7 @@ fun DevicesScreen(
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OdText("Click buttons", style = OdType.label, color = OverdriveColors.textTertiary)
                 ClickMap(mapping)
+                CoachButton(devices, mapping, actions)
                 LearnButtons(devices, mapping, actions)
             }
         }
@@ -402,6 +408,51 @@ private fun MapLine(
                 style = OdType.label,
                 color = if (holdDim) OverdriveColors.textSecondary else OverdriveColors.textPrimary,
             )
+        }
+    }
+}
+
+/**
+ * The live coach's mute button (spec §12.1, docs/adr/0039): **on no button by default**, so the five roles above are what they always were. One row: what it
+ * does, the Click's name for the button it has or "Not set", and **Set** (or **Change**) and **Clear**. Offered under the same conditions as learning.
+ */
+@Composable
+private fun CoachButton(
+    devices: DevicesUi,
+    mapping: ButtonMapping,
+    actions: DevicesActions,
+) {
+    val canLearn = !devices.simulated && devices.canChange && devices.click.status == DeviceStatus.Connected
+    OdCard(padding = PaddingValues(0.dp)) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(horizontal = 20.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                OdText("Live coach", style = OdType.bodyStrong, maxLines = 1)
+                OdText(
+                    if (mapping.coachMuteMask ==
+                        0
+                    ) {
+                        "Mute button: not set"
+                    } else {
+                        "Mute button: " + buttonNames(mapping.coachMuteMask)
+                    },
+                    style = OdType.label,
+                    color = OverdriveColors.textSecondary,
+                    maxLines = 1,
+                )
+            }
+            OdButton(
+                if (mapping.coachMuteMask == 0) "Set" else "Change",
+                actions.onLearnCoachButton,
+                enabled = canLearn,
+                height = 40.dp,
+            )
+            if (mapping.coachMuteMask != 0) {
+                OdButton("Clear", actions.onClearCoachButton, variant = ButtonVariant.Ghost, height = 40.dp)
+            }
         }
     }
 }

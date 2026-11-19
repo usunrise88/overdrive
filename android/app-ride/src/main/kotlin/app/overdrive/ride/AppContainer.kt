@@ -13,8 +13,11 @@ import app.overdrive.ble.log.BleLogStore
 import app.overdrive.ble.log.BleSessionLogger
 import app.overdrive.core.ble.GattTransportFactory
 import app.overdrive.core.control.ActionRouter
+import app.overdrive.core.control.CoachControl
 import app.overdrive.core.control.GestureTiming
 import app.overdrive.core.fit.FitRoutes
+import app.overdrive.core.live.CuePlayer
+import app.overdrive.core.live.LiveCoachClient
 import app.overdrive.core.plan.PlanRefresh
 import app.overdrive.core.plan.PlanRepository
 import app.overdrive.core.profile.ProfileRefresh
@@ -61,6 +64,8 @@ import app.overdrive.ride.host.PreviousAttemptSource
 import app.overdrive.ride.host.RideChoice
 import app.overdrive.ride.host.RideHost
 import app.overdrive.ride.host.SimulatedRideSessionFactory
+import app.overdrive.ride.live.AndroidCuePlayer
+import app.overdrive.ride.live.LiveCoach
 import app.overdrive.ride.overlay.AndroidOverlayController
 import app.overdrive.ride.overlay.AppVisibility
 import app.overdrive.ride.overlay.ContainerOverlayModel
@@ -129,6 +134,9 @@ import java.util.concurrent.atomic.AtomicLong
  * @param mediaFactory the media keys of the ride bar and of the Click; a test records them.
  * @param elapsedMillis the monotonic clock of the gesture layer (a hold is 500 ms of it); Robolectric's is a fake one, so a
  * test of real holds passes a real clock.
+ * @param liveTransport the network under the live coach (docs/adr/0039): its POSTs and its cue stream, the same `HttpURLConnection` class; a test points
+ * it at a local server.
+ * @param cuePlayer speaks one cue (`MediaPlayer` with audio focus); a test gives one that records and makes no sound.
  */
 class AppContainer(
     context: Context,
@@ -153,8 +161,11 @@ class AppContainer(
     syncSettleMillis: Long = SYNC_SETTLE_MILLIS,
     mediaFactory: (Context) -> MediaController = { AudioManagerMediaController(it) },
     elapsedMillis: () -> Long = SystemClock::elapsedRealtime,
+    liveTransport: UrlConnectionTransport = UrlConnectionTransport(),
+    cuePlayer: (Context) -> CuePlayer = { AndroidCuePlayer(it) },
 ) {
     private val appContext = context.applicationContext
+    private var liveScope: CoroutineScope? = null
     private val localToday = today
     private val routePointsDirectory = File(routesDirectory, "points")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -425,6 +436,29 @@ class AppContainer(
     private val previousClient = ServiceClient({ serviceConfig.value ?: SyncConfig("", "") }, previousTransport)
 
     /**
+     * The live coach (spec §12.1, docs/adr/0039): during a workout that asks for it, and with the rider's switch on, the service speaks short cues over the
+     * video and the overlay shows them. Owned here, with the process, so it needs no activity (the video app is in front): the foreground service of a live
+     * ride keeps the process alive. Its requests go through the same service client as everything else (the address and token read at every request, the
+     * same `HttpURLConnection` stack), on a thread of its own that nothing else uses; it never speaks to anything but the service.
+     */
+    val liveCoach: LiveCoach =
+        LiveCoach(
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1)).also { liveScope = it },
+            client =
+                LiveCoachClient(
+                    ServiceClient(
+                        { serviceConfig.value ?: SyncConfig("", "") },
+                        liveTransport,
+                        liveTransport,
+                        streamer = liveTransport,
+                    ),
+                ),
+            player = cuePlayer(appContext),
+            enabled = { settings.value.liveCoach },
+            nowMillis = { System.nanoTime() / NANOS_PER_MILLI },
+        )
+
+    /**
      * The one ride. The first bundled workout is selected at start. The developer setting chooses the real devices (the
      * default) or the simulated ones; a change of what is paired rebuilds a ride that has not started.
      */
@@ -445,6 +479,7 @@ class AppContainer(
                 },
             downloadedRoutes = { routeLibrary.details.value.downloaded },
             previousAttempts = PreviousAttemptSource { hash -> previousAttemptOf(previousClient, hash) },
+            liveCoach = liveCoach,
         )
 
     /** The media keys of the ride bar and of the Click: system volume and a media key for whichever app plays. */
@@ -455,7 +490,7 @@ class AppContainer(
      * The Click's gesture layer calls it, and so do the ride screen's buttons (`RideActions` delegates to it), so the two
      * cannot diverge.
      */
-    val router: ActionRouter = ActionRouter({ host.currentSession() }, media)
+    val router: ActionRouter = ActionRouter({ host.currentSession() }, media, CoachControl { liveCoach.mute() })
 
     /**
      * The *Learn buttons* flow: asks for the five roles in turn, from the Click's presses, and saves the mapping. Offered
@@ -721,6 +756,7 @@ class AppContainer(
 
     /** Stops the ride and everything else the container started. Only tests call it; the process owns it otherwise. */
     fun close() {
+        liveCoach.close()
         handlebar.close()
         learning.cancel()
         sync.close()
@@ -729,6 +765,7 @@ class AppContainer(
         pairedDevices.close()
         ble.close()
         scope.cancel()
+        liveScope?.cancel()
         bleLogScope.cancel()
         diskScope.cancel()
         settingsScope.cancel()

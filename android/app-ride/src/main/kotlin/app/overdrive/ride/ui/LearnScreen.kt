@@ -79,7 +79,7 @@ fun LearnScreen(
                     } else {
                         OdButton("Cancel", actions.onCancel)
                     }
-                    OdButton("Reset to default", actions.onReset, variant = ButtonVariant.Ghost)
+                    if (!ui.coach) OdButton("Reset to default", actions.onReset, variant = ButtonVariant.Ghost)
                 }
             }
             Column(Modifier.weight(1f)) { Roles(ui) }
@@ -93,7 +93,9 @@ private fun Prompt(
     clickReady: Boolean,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (ui.done) {
+        if (ui.coach) {
+            CoachPrompt(ui, clickReady)
+        } else if (ui.done) {
             OdText("All five set", style = OdType.label, color = OverdriveColors.textTertiary)
             OdText("The Click has its new buttons", style = OdType.title)
             OdText(
@@ -122,18 +124,54 @@ private fun Prompt(
     }
 }
 
+/** The prompt of the one extra button, the live coach's mute (spec §12.1, docs/adr/0039). */
+@Composable
+private fun CoachPrompt(
+    ui: LearnUi,
+    clickReady: Boolean,
+) {
+    if (ui.done) {
+        OdText("Set", style = OdType.label, color = OverdriveColors.textTertiary)
+        OdText("The Click can mute the coach", style = OdType.title)
+        OdText(
+            "It is saved. The Click does nothing until you press Done, so a press cannot move the ride.",
+            style = OdType.label,
+            color = OverdriveColors.textSecondary,
+        )
+    } else {
+        OdText("Live coach", style = OdType.label, color = OverdriveColors.textTertiary)
+        OdText("Press the button that mutes the coach", style = OdType.title)
+        OdText(COACH_SUMMARY, style = OdType.label, color = OverdriveColors.textSecondary)
+        val instruction =
+            if (clickReady) {
+                "Press and release one button, then wait."
+            } else {
+                "The Click is not connected. Reconnect it to go on."
+            }
+        OdText(
+            instruction,
+            style = OdType.label,
+            color = if (clickReady) OverdriveColors.textTertiary else OverdriveColors.textPrimary,
+        )
+    }
+}
+
+/** What the live coach's button does, in one line. */
+const val COACH_SUMMARY: String = "Mutes the coach for the rest of the ride · does nothing else"
+
 /** Why the last press was not taken, in plain words, and what to do instead. */
 @Composable
 private fun Refusal(
     ui: LearnUi,
     reason: LearnRejection,
 ) {
+    val wanted = if (ui.coach) "the live coach" else ui.role.label
     when (reason) {
         LearnRejection.COMBO -> {
             Notice(
                 icon = OverdriveIcons.Info,
                 title = "One button at a time",
-                text = "Two buttons were pressed together. Press just the one you want as ${ui.role.label}.",
+                text = "Two buttons were pressed together. Press just the one you want as $wanted.",
             )
         }
 
@@ -143,7 +181,7 @@ private fun Refusal(
                 title = "That button is taken",
                 text =
                     "It is already ${ui.clashesWith?.label ?: "another button"}. " +
-                        "Press a different one for ${ui.role.label}.",
+                        "Press a different one for $wanted.",
             )
         }
     }
@@ -152,6 +190,10 @@ private fun Refusal(
 /** The five roles, the Click's names for what each has so far, and the one being asked for marked. */
 @Composable
 private fun Roles(ui: LearnUi) {
+    if (ui.coach) {
+        CoachRow(ui)
+        return
+    }
     OdCard(padding = PaddingValues(8.dp)) {
         HandlebarButton.entries.forEachIndexed { index, role ->
             if (index > 0) HorizontalRule(Modifier.padding(horizontal = 8.dp))
@@ -184,6 +226,35 @@ private fun Roles(ui: LearnUi) {
                     maxLines = 1,
                 )
             }
+        }
+    }
+}
+
+/** The one row of the extra-button flow: the live coach's mute and the Click's name for the button it has, or "Press now". */
+@Composable
+private fun CoachRow(ui: LearnUi) {
+    val learned = ui.learned.values.firstOrNull()?.let(::buttonNames)
+    OdCard(padding = PaddingValues(8.dp)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = OverdriveDimens.sizeListRowTwoLine)
+                .background(if (!ui.done) OverdriveColors.surface2 else Color.Transparent, RoundedCornerShape(8.dp))
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Marker(done = learned != null, asking = !ui.done)
+            Column(Modifier.weight(1f)) {
+                OdText("Live coach", style = OdType.bodyStrong, maxLines = 1)
+                OdText(COACH_SUMMARY, style = OdType.label, color = OverdriveColors.textSecondary, maxLines = 1)
+            }
+            OdText(
+                learned ?: "Press now",
+                style = OdType.bodyStrong,
+                textAlign = TextAlign.End,
+                maxLines = 1,
+            )
         }
     }
 }
