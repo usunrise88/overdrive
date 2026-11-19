@@ -83,6 +83,23 @@ class PlanApiContractTest {
     }
 
     @Test
+    fun `reads the structure hash and keeps it, and an answer without one has none`() {
+        val hashed =
+            PlanApiJson.decodeWorkoutsResponse(
+                File(contracts, "fixtures/plan/workouts-response/valid/week-with-structure-hashes.json").readText(),
+            )
+        assertEquals(3, hashed.workouts.size)
+        assertTrue(hashed.workouts.all { it.structureHash != null && it.structureHash.length == 16 })
+        val plain =
+            PlanApiJson.decodeWorkoutsResponse(
+                File(contracts, "fixtures/plan/workouts-response/valid/week.json").readText(),
+            )
+        assertTrue(plain.workouts.all { it.structureHash == null })
+        // The tablet never works a hash out: what it reads is what it writes back.
+        assertEquals(hashed, PlanApiJson.decodeWorkoutsResponse(PlanApiJson.encodeWorkoutsResponse(hashed)))
+    }
+
+    @Test
     fun `the week fixture has the expected shape`() {
         val week =
             PlanApiJson.decodeWorkoutsResponse(

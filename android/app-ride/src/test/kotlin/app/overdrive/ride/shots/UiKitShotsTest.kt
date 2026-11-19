@@ -5,6 +5,7 @@ import app.overdrive.uikit.preview.ChromeSample
 import app.overdrive.uikit.preview.ComponentSheet
 import app.overdrive.uikit.preview.IconSheet
 import app.overdrive.uikit.preview.ListSample
+import app.overdrive.uikit.preview.OverlayEngineStatesSheet
 import app.overdrive.uikit.preview.OverlayOverVideo
 import app.overdrive.uikit.preview.OverlayStatesSheet
 import app.overdrive.uikit.preview.ProfileSample
@@ -26,6 +27,8 @@ class UiKitShotsTest : ShotTest() {
     @Test fun chrome() = shot("kit--chrome") { ChromeSample() }
 
     @Test fun overlayStates() = shot("overlay--states") { OverlayStatesSheet() }
+
+    @Test fun overlayEngineStates() = shot("overlay--engine-states") { OverlayEngineStatesSheet() }
 
     @Test fun overlayDark() = shot("overlay--dark") { OverlayOverVideo(Backdrop.Dark) }
 

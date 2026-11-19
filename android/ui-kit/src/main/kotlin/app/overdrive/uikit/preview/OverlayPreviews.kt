@@ -102,6 +102,34 @@ fun OverlayStatesSheet() {
     }
 }
 
+/** The overlay's states for the engine's new features (docs/adr/0034): the stall guard, the heart-rate step and the previous-attempt line. */
+@Composable
+fun OverlayEngineStatesSheet() {
+    OverdriveTheme {
+        Box(Modifier.size(1280.dp, 900.dp)) {
+            VideoBackdrop(Backdrop.Busy, Modifier.fillMaxSize())
+            val compact = OverlaySettings(mode = OverlayMode.Compact)
+            val detailed = OverlaySettings(mode = OverlayMode.Detailed)
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                OverlayCompact(PreviewSamples.overlayGuard, compact)
+                OverlayCompact(PreviewSamples.overlayHeartRate, compact)
+                OverlayCompact(PreviewSamples.overlayHeartRateAbove, compact)
+                OverlayCompact(PreviewSamples.overlayHeartRateBelow, compact)
+                OverlayCompact(PreviewSamples.overlayHeartRateEasingIn, compact)
+                OverlayCompact(PreviewSamples.overlayStrapLost, compact)
+                OverlayCompact(PreviewSamples.overlayStrapDropped, compact)
+            }
+            Column(
+                Modifier.align(Alignment.TopEnd).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+            ) {
+                OverlayDetailed(PreviewSamples.overlayPreviousAttempt, detailed)
+                OverlayDetailed(PreviewSamples.overlayHeartRateAbove, detailed)
+            }
+        }
+    }
+}
+
 /** Compact and detailed side by side over a [kind] frame, as in `overlay--dark`, `--bright` and `--busy`. */
 @Composable
 fun OverlayOverVideo(

@@ -1,4 +1,9 @@
-import { MAX_WORKOUTS_RANGE_DAYS, rangeDays, type WorkoutsResponse } from "@overdrive/contracts";
+import {
+  MAX_WORKOUTS_RANGE_DAYS,
+  rangeDays,
+  type WorkoutsResponse,
+  workoutHash,
+} from "@overdrive/contracts";
 import type { FastifyInstance } from "fastify";
 import { HttpError } from "../errors.ts";
 import { resolveHeartRateTargets } from "./heart-rate.ts";
@@ -38,7 +43,7 @@ function dateParam(name: string, value: unknown): string {
  *   unless `refresh=true`, and then for at most ten seconds; if the source cannot be reached the
  *   answer is the cache with `stale: true`. With no plan source configured it is an empty list
  *   with `configured: false`. A heart-rate step (spec §11.2) whose target is a fraction of the threshold heart rate is served with
- *   the beats worked out from the profile's threshold (docs/adr/0033).
+ *   the beats worked out from the profile's threshold (docs/adr/0033). Every workout carries its `structureHash` (docs/adr/0034).
  */
 export function planRoutes(app: FastifyInstance, options: PlanRoutesOptions): void {
   const { store, refresher, thresholdHeartRate } = options;
@@ -87,10 +92,12 @@ export function planRoutes(app: FastifyInstance, options: PlanRoutesOptions): vo
     const planned = await store.list({ from, to });
     // The tablet holds a number of beats: a target that is a fraction of the threshold is resolved here, on the way out.
     const threshold = thresholdHeartRate === undefined ? null : await thresholdHeartRate();
-    const workouts = planned.map((entry) => ({
-      ...entry,
-      workout: resolveHeartRateTargets(entry.workout, threshold),
-    }));
+    // Each carries its structure hash, worked out from the workout as it is served (docs/adr/0034): the tablet asks for the previous
+    // attempt with it and never computes a hash itself.
+    const workouts = planned.map((entry) => {
+      const workout = resolveHeartRateTargets(entry.workout, threshold);
+      return { ...entry, workout, structureHash: workoutHash(workout) };
+    });
     const body: WorkoutsResponse = {
       from,
       to,

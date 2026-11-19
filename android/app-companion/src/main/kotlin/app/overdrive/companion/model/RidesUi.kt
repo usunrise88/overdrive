@@ -267,7 +267,13 @@ object RideDetailUi {
         val flat = ride.plan?.workout?.flatSteps().orEmpty()
         val steps =
             flat.takeIf { it.isNotEmpty() }?.map {
-                ProfileStep(it.startSeconds, it.durationSeconds, it.targetFrom?.toFloat(), it.targetTo?.toFloat())
+                ProfileStep(
+                    it.startSeconds,
+                    it.durationSeconds,
+                    it.targetFrom?.toFloat(),
+                    it.targetTo?.toFloat(),
+                    heartRate = it.heartRate != null,
+                )
             }
         val spec =
             RideChartSpec.of(

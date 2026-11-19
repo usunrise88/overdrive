@@ -39,13 +39,20 @@ import app.overdrive.ride.settings.ClickReplyCheck
 import app.overdrive.ride.settings.ClickRules
 import app.overdrive.ride.settings.ClickSettings
 import app.overdrive.ride.settings.ClickSilence
+import app.overdrive.ride.settings.DecimalTuning
 import app.overdrive.ride.settings.DemoSpeed
 import app.overdrive.ride.settings.DeviceSource
+import app.overdrive.ride.settings.IntTuning
 import app.overdrive.ride.settings.OverlayStartMode
+import app.overdrive.ride.settings.RideTuning
 import app.overdrive.ride.settings.SecretText
 import app.overdrive.ride.settings.SettingsRules
 import app.overdrive.ride.settings.SimulatedClick
+import app.overdrive.ride.settings.SwitchTuning
 import app.overdrive.ride.settings.SyncRules
+import app.overdrive.ride.settings.TuningField
+import app.overdrive.ride.settings.TuningFields
+import app.overdrive.ride.settings.TuningGroup
 import app.overdrive.ride.settings.UrlCheck
 import app.overdrive.uikit.BackTopBar
 import app.overdrive.uikit.ButtonVariant
@@ -109,9 +116,13 @@ fun SettingsScreen(
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(24.dp)) {
                 OverlayGroup(settings, overlayAccess, actions)
                 DeveloperGroup(settings, actions, bleLogs)
+                TuningGroupCard(TuningGroup.ResumeAfterPause, settings, actions)
+                TuningGroupCard(TuningGroup.StallGuard, settings, actions)
+                TuningGroupCard(TuningGroup.HeartRateHold, settings, actions)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(24.dp)) {
                 RiderGroup(settings, actions, profile)
+                TuningGroupCard(TuningGroup.Ride, settings, actions)
                 PhysicsGroup(settings, actions, profile)
                 SyncGroup(settings, actions, sync)
                 ClickDeveloperGroup(settings, actions)
@@ -174,6 +185,16 @@ private fun OverlayGroup(
                 options = listOf("Compact", "Detailed"),
                 selectedIndex = settings.overlayMode.ordinal,
                 onSelect = { index -> actions.onChange { it.copy(overlayMode = OverlayStartMode.entries[index]) } },
+            )
+        }
+        SettingRow(
+            "Expand at step changes",
+            description = "Shows the detail 10 s before and after each new step. A tap collapses it. No sound",
+        ) {
+            OdSwitch(
+                settings.overlayExpandsAtSteps,
+                { value -> actions.onChange { it.copy(overlayExpandsAtSteps = value) } },
+                contentDescription = "Expand at step changes",
             )
         }
         SettingRow("Opacity", description = "85–100%", titleWidth = 200.dp) {
@@ -317,16 +338,41 @@ private fun PhysicsGroup(
     profile: ProfileUi,
 ) {
     Group("Physics for speed and distance") {
-        SettingRow("Rider and bike mass", first = true) {
+        SettingRow("Rider and bike mass", description = profile.massLine, first = true) {
             SourceMarker(profile.mass)
-            Stepper(
-                "${UiFormat.decimal(settings.massKg, 0)} kg",
-                onDecrement = { actions.onRiderChange { it.copy(massKg = SettingsRules.mass.stepped(it.massKg, -1)) } },
-                onIncrement = { actions.onRiderChange { it.copy(massKg = SettingsRules.mass.stepped(it.massKg, +1)) } },
-                canDecrement = SettingsRules.mass.canStep(settings.massKg, -1),
-                canIncrement = SettingsRules.mass.canStep(settings.massKg, +1),
-                label = "mass",
-            )
+            if (profile.massFromWeights) {
+                // Worked out from the weights: the line above says how, and the bike's weight below is the switch (spec §12.5).
+                OdText(
+                    "${UiFormat.decimal(settings.massKg, 1)} kg",
+                    style = OdType.numXS,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                )
+            } else {
+                Stepper(
+                    "${UiFormat.decimal(settings.massKg, 0)} kg",
+                    onDecrement = {
+                        actions.onRiderChange {
+                            it.copy(
+                                massKg = SettingsRules.mass.stepped(it.massKg, -1),
+                            )
+                        }
+                    },
+                    onIncrement = {
+                        actions.onRiderChange {
+                            it.copy(
+                                massKg = SettingsRules.mass.stepped(it.massKg, +1),
+                            )
+                        }
+                    },
+                    canDecrement = SettingsRules.mass.canStep(settings.massKg, -1),
+                    canIncrement = SettingsRules.mass.canStep(settings.massKg, +1),
+                    label = "mass",
+                )
+            }
+        }
+        if (profile.bikeWeightShown) {
+            BikeWeightRow(settings, actions, profile)
         }
         SettingRow("Drag area (CdA)") {
             SourceMarker(profile.cdA)
@@ -665,6 +711,158 @@ private fun ClickDeveloperGroup(
                 height = 40.dp,
             )
         }
+    }
+}
+
+// ---- Tuning (docs/adr/0034) --------------------------------------------------------------------
+
+/**
+ * A group of tuning numbers (docs/adr/0034): one row for each of [TuningFields.of], each with its plain label, a note, its unit and its
+ * default, and a **Reset** at the end that puts the group back to the engine's defaults. The rows are steppers and switches that cannot leave
+ * their rule; a limit that depends on another number (the strap times) says why a step is refused. A change applies to the next ride.
+ */
+@Composable
+private fun TuningGroupCard(
+    group: TuningGroup,
+    settings: AppSettings,
+    actions: SettingsActions,
+) {
+    val fields = TuningFields.of(group)
+    Group(group.title) {
+        fields.forEachIndexed { index, field -> TuningRow(field, settings.tuning, actions, first = index == 0) }
+        SettingRow("Reset to defaults", description = "Back to the engine's own numbers") {
+            OdButton(
+                "Reset",
+                { actions.onChange { it.copy(tuning = it.tuning.resetGroup(group)) } },
+                enabled = fields.any { !it.isDefault(settings.tuning) },
+                height = 40.dp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TuningRow(
+    field: TuningField,
+    tuning: RideTuning,
+    actions: SettingsActions,
+    first: Boolean,
+) {
+    val note = tuningNote(field, tuning)
+    SettingRow(field.label, description = note, first = first) {
+        when (field) {
+            is SwitchTuning -> {
+                OdSwitch(
+                    field.read(tuning),
+                    { value -> actions.onChange { it.copy(tuning = field.write(it.tuning, value)) } },
+                    contentDescription = field.label,
+                )
+            }
+
+            is IntTuning -> {
+                Stepper(
+                    "${field.read(tuning)} ${field.unit}",
+                    onDecrement = { actions.onChange { it.stepTuning(field, -1) } },
+                    onIncrement = { actions.onChange { it.stepTuning(field, +1) } },
+                    canDecrement = field.stepped(tuning, -1) != null,
+                    canIncrement = field.stepped(tuning, +1) != null,
+                    label = field.label,
+                )
+            }
+
+            is DecimalTuning -> {
+                Stepper(
+                    "${field.show(field.read(tuning))} ${field.unit}",
+                    onDecrement = { actions.onChange { it.stepTuning(field, -1) } },
+                    onIncrement = { actions.onChange { it.stepTuning(field, +1) } },
+                    canDecrement = field.rule.canStep(field.read(tuning), -1),
+                    canIncrement = field.rule.canStep(field.read(tuning), +1),
+                    label = field.label,
+                )
+            }
+        }
+    }
+}
+
+private fun AppSettings.stepTuning(
+    field: IntTuning,
+    direction: Int,
+): AppSettings = field.stepped(tuning, direction)?.let { copy(tuning = field.write(tuning, it)) } ?: this
+
+private fun AppSettings.stepTuning(
+    field: DecimalTuning,
+    direction: Int,
+): AppSettings = copy(tuning = field.write(tuning, field.rule.stepped(field.read(tuning), direction)))
+
+/**
+ * The row's note: what it does and its default. Where a step is refused because of another number (the power drops after the strap signal
+ * is held, never before), the note says so in text 1, so a disabled button is never a mystery.
+ */
+internal fun tuningNote(
+    field: TuningField,
+    tuning: RideTuning,
+): String {
+    val own = "${field.note}. Default ${field.defaultText()}"
+    if (field !is IntTuning) return own
+    val blocked =
+        listOf(-1, +1).firstNotNullOfOrNull { direction ->
+            val next = field.rule.stepped(field.read(tuning), direction)
+            if (next != field.read(tuning) &&
+                field.stepped(tuning, direction) == null
+            ) {
+                field.refusal(next, tuning)
+            } else {
+                null
+            }
+        }
+    return if (blocked == null) own else "$blocked (the other strap time). $own"
+}
+
+/**
+ * The bike's weight, which lives in the rider's profile (spec §12.5, docs/adr/0034): "Not set" until the first step, which sets a typical
+ * 9 kg; stepping below the lowest value clears it. Setting it is what puts the rider's weight into the mass.
+ */
+@Composable
+private fun BikeWeightRow(
+    settings: AppSettings,
+    actions: SettingsActions,
+    profile: ProfileUi,
+) {
+    val rule = SettingsRules.bikeWeight
+    val bike = settings.bikeWeightKg
+    SettingRow("Bike and kit weight", description = profile.bikeNote) {
+        SourceMarker(profile.bike)
+        Stepper(
+            if (bike == null) "Not set" else "${UiFormat.decimal(bike, 1)} kg",
+            onDecrement = {
+                actions.onRiderChange {
+                    val now = it.bikeWeightKg
+                    when {
+                        now == null -> it
+                        now <= rule.min -> it.copy(bikeWeightKg = null)
+                        else -> it.copy(bikeWeightKg = rule.stepped(now, -1))
+                    }
+                }
+            },
+            onIncrement = {
+                actions.onRiderChange {
+                    val now = it.bikeWeightKg
+                    it.copy(
+                        bikeWeightKg =
+                            if (now ==
+                                null
+                            ) {
+                                SettingsRules.DEFAULT_BIKE_WEIGHT_KG
+                            } else {
+                                rule.stepped(now, +1)
+                            },
+                    )
+                }
+            },
+            canDecrement = bike != null,
+            canIncrement = bike == null || rule.canStep(bike, +1),
+            label = "bike weight",
+        )
     }
 }
 

@@ -152,6 +152,30 @@ export function weightAverage(
   return values.length === 0 ? null : values.reduce((a, b) => a + b, 0) / values.length;
 }
 
+/**
+ * The rider's weight for the profile (spec §12.5): the mean of the daily weights of the seven local days up to and including `date`
+ * ({@link weightAverage}) in kilograms to one decimal, the local date of the newest weighing in it and how many of the seven days had
+ * one; null when none has. Days without a weighing are left out of the mean.
+ */
+export function recentWeight(
+  table: ReadonlyMap<string, DailyValue> | undefined,
+  date: string,
+): { kg: number; date: string; days: number } | null {
+  if (table === undefined) return null;
+  const values: number[] = [];
+  let newest: string | null = null;
+  for (let back = 0; back < WEIGHT_AVERAGE_DAYS; back++) {
+    const day = shiftDate(date, -back);
+    const value = table.get(day)?.value;
+    if (value === undefined) continue;
+    values.push(value);
+    if (newest === null) newest = day;
+  }
+  if (newest === null) return null;
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  return { kg: roundTo(mean, 1), date: newest, days: values.length };
+}
+
 const asInstant = (ms: number | undefined): string | null =>
   ms === undefined ? null : new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
 

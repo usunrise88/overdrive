@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import type { Validation } from "./index.ts";
+import { isIsoDate } from "./plan.ts";
 
 // ---- Sync API: the rider's profile (spec §8.3, ADR 0018) --------------------------------------
 // Hand-written mirror of schema/profile.schema.json and schema/profile-patch.schema.json, which are
@@ -38,6 +39,16 @@ export const DEFAULT_PHYSICS: Readonly<Physics> = {
 /** The W′ in kilojoules the service uses while the profile has none: a typical value, a placeholder until the rider sets their own. */
 export const DEFAULT_W_PRIME_KJ = 20;
 
+/** The rider's weight as the service has it (spec §12.5): the mean of the daily weights of the last seven days. Read-only and derived. */
+export interface RiderWeight {
+  /** Kilograms, to one decimal. */
+  kg: number;
+  /** The local date of the newest weighing in the average. */
+  date: string;
+  /** How many of the last seven days had a weighing, 1 to 7. */
+  days: number;
+}
+
 export interface Profile {
   /** Watts, or null when not set. */
   ftp: number | null;
@@ -60,6 +71,11 @@ export interface Profile {
   estimatedMaxHeartRate?: number | null;
   /** 95% of the best 20-minute average heart rate in the stored rides; read-only, null when not enough. */
   estimatedThresholdHeartRate?: number | null;
+  // Written only when they have a value: an absent key is "not set" (spec §12.5, ADR 0034).
+  /** The bike, kit and bottles in kilograms; with `riderWeight` known and this set, the ride's system mass is their sum. */
+  bikeWeightKg?: number | null;
+  /** The rider's 7-day average weight from Health Connect; read-only and derived, absent when no weighing is recent. */
+  riderWeight?: RiderWeight | null;
 }
 
 /** What `PATCH /v1/profile` takes (see `profile-patch.schema.json`). */
@@ -76,6 +92,8 @@ export interface ProfilePatch {
   maxHeartRate?: number | null;
   /** null clears it. */
   thresholdHeartRate?: number | null;
+  /** null clears it. */
+  bikeWeightKg?: number | null;
 }
 
 /** The profile of a rider who has set nothing. */
@@ -133,8 +151,8 @@ function errorsOf(errors: typeof checkPatch.errors): string[] {
 }
 
 /**
- * What the schema cannot say: the six zone bounds strictly increase, no goal is blank and a threshold
- * heart rate is below the maximum when both are set. Returns the violations, or an empty list.
+ * What the schema cannot say: the six zone bounds strictly increase, no goal is blank, a threshold
+ * heart rate is below the maximum when both are set and the date of the rider's weight is a real one. Returns the violations, or an empty list.
  */
 export function profileConsistencyErrors(profile: Profile): string[] {
   const errors: string[] = [];
@@ -154,6 +172,9 @@ export function profileConsistencyErrors(profile: Profile): string[] {
       errors.push(`/goals/${index} is blank`);
       break;
     }
+  }
+  if (profile.riderWeight != null && !isIsoDate(profile.riderWeight.date)) {
+    errors.push("/riderWeight/date is not a real calendar date");
   }
   const { maxHeartRate: max, thresholdHeartRate: threshold } = profile;
   if (max != null && threshold != null && threshold >= max) {
@@ -207,6 +228,7 @@ export function applyProfilePatch(profile: Profile, patch: unknown): Validation<
   if (change.goals !== undefined) next.goals = [...change.goals];
   if (change.maxHeartRate !== undefined) next.maxHeartRate = change.maxHeartRate;
   if (change.thresholdHeartRate !== undefined) next.thresholdHeartRate = change.thresholdHeartRate;
+  if (change.bikeWeightKg !== undefined) next.bikeWeightKg = change.bikeWeightKg;
   if (change.physics !== undefined) {
     next.physics = { ...next.physics, ...change.physics };
   }

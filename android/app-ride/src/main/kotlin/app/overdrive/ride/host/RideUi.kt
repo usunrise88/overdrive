@@ -24,9 +24,13 @@ sealed interface RideChoice {
         override val title: String = "Free ride"
     }
 
-    /** A workout, played step by step. */
+    /**
+     * A workout, played step by step. [structureHash] is the service's hash of its structure (docs/adr/0034) for a workout that came
+     * from the plan, null for one opened from a file: only the former can be compared with an earlier attempt.
+     */
     data class Planned(
         val workout: Workout,
+        val structureHash: String? = null,
     ) : RideChoice {
         override val title: String get() = workout.name
     }
@@ -111,6 +115,11 @@ data class RideUi(
     val rideNumber: Int,
     /** True while the ride is not being written to disk (a full disk, a missing folder); the ride itself is unaffected. */
     val logFailed: Boolean = false,
+    /**
+     * The one line against the previous attempt of the workout's session (spec §11.7, docs/adr/0034), such as "Heart rate 3 below last
+     * time", or null: not a session the service knows, no connection, nothing earlier, or not enough of this step ridden yet.
+     */
+    val previousLine: String? = null,
 )
 
 /** One row of the Devices screen. */

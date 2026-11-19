@@ -4,6 +4,7 @@ import {
   type ActivitySummary,
   addDaysToIsoDate,
   type RecoveryResponse,
+  type RiderWeight,
   type WellnessResponse,
   type WellnessUpload,
   type WellnessUploadResponse,
@@ -33,7 +34,7 @@ import { createRideHeartRateIndex, type RideHeartRateIndex } from "./heart-rate-
 import { DEFAULT_WELLNESS_SETTINGS, type WellnessSettings } from "./metrics.ts";
 import { createWellnessPuller, type PullResult, type WellnessPuller } from "./puller.ts";
 import { evaluateRecovery, type RecoveryOutcome } from "./recovery.ts";
-import { buildDays, nightsLogged, STREAK_LOOKBACK_DAYS } from "./series.ts";
+import { buildDays, nightsLogged, recentWeight, STREAK_LOOKBACK_DAYS } from "./series.ts";
 import {
   createIntervalsWellnessSource,
   DEFAULT_SOURCE_ORDER,
@@ -81,6 +82,11 @@ export interface WellnessService {
   readonly settings: WellnessSettings;
   /** The daily figures from `from` to `to` with the baselines in force each day. */
   wellness(from: string, to: string): Promise<WellnessResponse>;
+  /**
+   * The rider's weight for the profile (spec §12.5, ADR 0034): the 7-day average of the daily weights from Health Connect, with the date of
+   * the newest weighing and the number of days that had one; null when none of the last seven local days has a weighing.
+   */
+  riderWeight(): Promise<RiderWeight | null>;
   /** The state of this morning (or yesterday's while this morning's data has not arrived). */
   recovery(): Promise<RecoveryResponse>;
   /**
@@ -245,6 +251,12 @@ export function createWellness(options: WellnessOptions): WellnessService {
         usual,
         days,
       };
+    },
+
+    async riderWeight() {
+      const today = localDate(now(), timezone);
+      const table = await store.dailyTable(addDaysToIsoDate(today, -7), today, order);
+      return recentWeight(table.weightKg, today);
     },
 
     async recovery() {

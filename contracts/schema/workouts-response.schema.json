@@ -75,6 +75,11 @@
             "note": { "type": "string", "minLength": 1, "maxLength": 200 },
             "structureHash": { "type": "string", "pattern": "^[0-9a-f]{16}$" }
           }
+        },
+        "structureHash": {
+          "description": "The structure hash of workout: 16 lower-case hex characters, the same hash GET /v1/repeats/{hash} is keyed by (spec §11.7, ADR 0026), worked out by the service from the workout as it serves it (a heart-rate step already in bpm), so the tablet asks for the previous attempt without computing a hash itself (ADR 0034). Optional: an answer from a service that predates it stays valid, and the tablet then shows no previous-attempt line.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{16}$"
         }
       }
     }

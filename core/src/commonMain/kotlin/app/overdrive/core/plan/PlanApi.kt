@@ -24,14 +24,25 @@ public data class PlannedWorkout(
     val name: String,
     val source: PlanSource,
     val workout: Workout,
+    /**
+     * The structure hash of [workout] (16 lower-case hex characters) that the service keys the repeated sessions by (spec §11.7, ADR 0026),
+     * worked out by the **service** from the workout as it serves it; the tablet never computes it (docs/adr/0034). Null from a service that
+     * predates it: the previous-attempt line then has nothing to ask for.
+     */
+    val structureHash: String? = null,
 ) {
     init {
+        require(structureHash == null || STRUCTURE_HASH.matches(structureHash)) {
+            "A structure hash is 16 lower-case hex characters"
+        }
         require(PlanApiJson.isValidPlannedWorkoutId(id)) { "Not a planned workout id: '$id'" }
         require(PlanDates.epochDay(date) != null) { "Not a calendar date: '$date'" }
         require(name.isNotEmpty()) { "A planned workout needs a name" }
         require(workout.id == id) { "Workout id '${workout.id}' differs from the planned workout's id '$id'" }
     }
 }
+
+private val STRUCTURE_HASH = Regex("^[0-9a-f]{16}$")
 
 /**
  * The service's answer to `GET /v1/workouts?from&to` (spec §5.1, §8.3, ADR 0016): the planned workouts from [from] to [to]
