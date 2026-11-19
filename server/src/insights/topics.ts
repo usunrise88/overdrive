@@ -6,8 +6,8 @@ import type { RideFacts } from "./facts.ts";
  * question the rider can paste to open the chat. Both are written by code from the ride's facts, so every number in them was
  * computed by the service and no model is involved.
  *
- * The table is explicit and meant to grow. A row needs a signal; the signals Phase 3 has are the ride's compliance with its plan,
- * its power records, its load against the plan, and repeated plan drift. The rows for signals that come in later stages are
+ * The table is explicit and meant to grow. A row needs a signal; the signals the service has are the ride's compliance with its plan,
+ * its power records, its load against the plan, repeated plan drift, and the ERG stall guard firing repeatedly. The rows for signals that come in later stages are
  * listed, named and unavailable, so the day a stage brings its signal, the row is switched on here and nowhere else.
  *
  * Limits (`store.ts`, `service.ts`): a ride has at most one topic, at most two are written in any 7 days, an open topic closes when
@@ -40,6 +40,8 @@ export interface TopicSettings {
   minPlannedLoad: number;
   /** Plan-drift alerts in 28 days that make drift "repeated". */
   repeatedDriftAlerts: number;
+  /** Times the ERG stall guard took hold in one ride that make it "firing repeatedly" (spec §11.1). */
+  stallGuardActivations: number;
 }
 
 export const DEFAULT_TOPIC_SETTINGS: TopicSettings = {
@@ -52,6 +54,7 @@ export const DEFAULT_TOPIC_SETTINGS: TopicSettings = {
   loadBelowPercent: 40,
   minPlannedLoad: 30,
   repeatedDriftAlerts: 2,
+  stallGuardActivations: 3,
 };
 
 /** At most this many topics in any 7 days; a topic stays open for 14 days. */
@@ -164,18 +167,32 @@ const repeatedDrift: TopicRule = {
   },
 };
 
+/**
+ * The ERG stall guard (spec §11.1, v0.4.0 stage A1b): in one ride it took hold at least `stallGuardActivations` times (3 by default),
+ * counted by code from the ride record's events. Once or twice is a slip; three times is a pattern worth a chat: the target may be
+ * too high at the moment.
+ */
+const stallGuard: TopicRule = {
+  id: "stall-guard",
+  available: true,
+  evaluate({ ride, settings }) {
+    const guard = ride.stallGuard;
+    if (guard === undefined || guard.activations < settings.stallGuardActivations) return null;
+    return candidate(
+      `The ERG stall guard cut the target ${guard.activations} times in this ride: cadence fell below its floor and the trainer was held at 70% until you were pedalling again.`,
+      `The stall guard cut my target ${guard.activations} times in ${ride.ride.name}. Is the target too high for me right now, or is something else going on?`,
+    );
+  },
+};
+
 /** The rows, in the order they are tried. The rows with `available: false` are the hooks of later stages. */
 export const TOPIC_RULES: readonly TopicRule[] = [
   cutShort,
   powerRecord,
   loadOffPlan,
   repeatedDrift,
-  // Hooks: the signal does not exist in Phase 3. Each is switched on by writing its `evaluate` here when its stage lands.
-  {
-    id: "stall-guard",
-    available: false,
-    needs: "the ERG stall guard firing repeatedly in a ride (spec §11.1, v0.4.0 stage A1)",
-  },
+  stallGuard,
+  // Hooks: the signal does not exist yet. Each is switched on by writing its `evaluate` here when its stage lands.
   {
     id: "effort-rating",
     available: false,

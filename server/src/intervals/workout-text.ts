@@ -1,4 +1,4 @@
-import type { LeafStep, Workout } from "@overdrive/contracts";
+import type { HrStep, LeafStep, Workout } from "@overdrive/contracts";
 import { type DocStep, type DocValue, Unsupported } from "./workout-doc.ts";
 
 /**
@@ -19,6 +19,22 @@ import { type DocStep, type DocValue, Unsupported } from "./workout-doc.ts";
  * a cadence (`90rpm`, `90-100rpm`). A line that ends in `Nx` opens a repeat of the steps that follow,
  * up to the next blank line. Other lines are headings and notes. Everything is parsed into the shape
  * of `workout_doc`, so the converter treats text and parsed events alike.
+ *
+ * **A heart-rate step** (native `hr`, spec §11.2) has no native counterpart in this syntax: intervals.icu's heart-rate targets
+ * are `70% HR`, `85% LTHR` and `Z2 HR`, never a number of beats, a step cannot carry a power band next to one (the documentation
+ * does not say it can), and the controller's limits would be lost. So the step is written as a step with its **power limits as a
+ * power range**, `- Zone by heart rate 40m 80-220w`, which intervals.icu shows and counts as a planned effort of 150 W on average,
+ * and the target heart rate and the band travel in **a note after the steps** (a line intervals.icu treats as a note), one per
+ * heart-rate step, numbered by the step lines in the order they are written, repeat bodies once:
+ *
+ *     Overdrive heart-rate step 1: 135 bpm, band 5, 80-220 W, label Zone 2 by heart rate
+ *     Overdrive heart-rate step 2: 88% of threshold heart rate, 100-260 W
+ *
+ * The band is there only when the step gave one, and the label is there so that it keeps its digits (a cue loses the words that
+ * start with one, because the parser might take them for a target); both make the way back exact.
+ *
+ * {@link parseHrNotes} reads them back and the converter applies them to the steps they number, when the step is still the one
+ * written (its power range agrees); see ADR 0033.
  */
 
 const NUMBER = String.raw`\d+(?:\.\d+)?`;
@@ -221,6 +237,7 @@ function renderLeaf(step: LeafStep): string {
   const parts = [cue, formatDuration(step.duration)];
   if (step.type === "steady") parts.push(`${percent(step.target)}%`);
   else if (step.type === "ramp") parts.push("ramp", `${percent(step.from)}-${percent(step.to)}%`);
+  else if (step.type === "hr") parts.push(`${step.power_min}-${step.power_max}w`);
   else parts.push("freeride");
   if (step.cadence !== undefined) parts.push(`${Math.round(step.cadence)}rpm`);
   return `- ${parts.filter((part) => part !== "").join(" ")}`;
@@ -248,12 +265,76 @@ export function renderWorkoutText(workout: Workout): string {
       blank();
       const cue = cueOf(step.label);
       lines.push(`${cue === "" ? "" : `${cue} `}${step.count}x`);
-      for (const inner of step.steps) lines.push(renderLeaf(inner));
+      for (const inner of step.steps) {
+        lines.push(renderLeaf(inner));
+      }
       lines.push("");
     } else {
       lines.push(renderLeaf(step));
     }
   }
   while (lines[lines.length - 1] === "") lines.pop();
+  // The step lines, in order: the heart-rate steps among them are numbered by their place.
+  const leaves = workout.steps.flatMap((step) => (step.type === "repeat" ? step.steps : [step]));
+  const notes = leaves.flatMap((step, index) =>
+    step.type === "hr" ? [hrNote(index + 1, step)] : [],
+  );
+  if (notes.length > 0) lines.push("", ...notes);
   return lines.join("\n");
+}
+
+// ---- The note that carries a heart-rate step's target ----------------------------------------------------------
+
+/** What a heart-rate note says about the step it numbers. */
+export interface HrNote {
+  /** 1-based, among the step lines in the order they are written (a repeat's body once). */
+  step: number;
+  targetBpm: number | null;
+  /** A fraction of the threshold heart rate (0.88), when that is the target. */
+  targetLthr: number | null;
+  /** Null when the step did not give one (the default applies). */
+  band: number | null;
+  powerMin: number;
+  powerMax: number;
+  /** The step's label, whole; null when it had none. */
+  label: string | null;
+}
+
+const HR_NOTE =
+  /^Overdrive heart-rate step (\d+): (?:(\d+) bpm|(\d+(?:\.\d+)?)% of threshold heart rate)(?:, band (\d+))?, (\d+)-(\d+) W(?:, label (.+))?$/;
+
+function hrNote(index: number, step: HrStep): string {
+  const target =
+    step.target_bpm !== undefined
+      ? `${step.target_bpm} bpm`
+      : `${percent(step.target_lthr ?? 0)}% of threshold heart rate`;
+  const band = step.band === undefined ? "" : `, band ${step.band}`;
+  const label = step.label?.replace(/\s+/g, " ").trim();
+  const tail = label === undefined || label === "" ? "" : `, label ${label}`;
+  return `Overdrive heart-rate step ${index}: ${target}${band}, ${step.power_min}-${step.power_max} W${tail}`;
+}
+
+/**
+ * The heart-rate notes of a description, by the step they number. Lines that are not notes of this shape are ignored. A step
+ * numbered twice keeps its first note.
+ */
+export function parseHrNotes(text: string | null | undefined): Map<number, HrNote> {
+  const notes = new Map<number, HrNote>();
+  for (const raw of (text ?? "").split(/\r?\n/)) {
+    const match = HR_NOTE.exec(raw.trim());
+    if (match === null) continue;
+    const step = Number(match[1]);
+    if (notes.has(step)) continue;
+    notes.set(step, {
+      step,
+      targetBpm: match[2] === undefined ? null : Number(match[2]),
+      targetLthr:
+        match[3] === undefined ? null : Math.round((Number(match[3]) / 100) * 1000) / 1000,
+      band: match[4] === undefined ? null : Number(match[4]),
+      powerMin: Number(match[5]),
+      powerMax: Number(match[6]),
+      label: match[7] === undefined ? null : match[7].trim(),
+    });
+  }
+  return notes;
 }

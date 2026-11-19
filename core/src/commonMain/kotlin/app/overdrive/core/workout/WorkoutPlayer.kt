@@ -83,6 +83,9 @@ public class WorkoutPlayer(
     private var rampSteps = rampInSeconds
     private var rampFromWatts = 0
 
+    // The power a heart-rate step's controller asks for (spec §11.2); the caller keeps it up to date with setHeartRateWatts.
+    private var heartRateWatts = 0
+
     /** The current step. */
     public val step: FlatStep get() = steps[stepIndex]
 
@@ -101,10 +104,24 @@ public class WorkoutPlayer(
     /** What the trainer should do now. */
     public val target: PlayerTarget
         get() {
+            if (step.heartRate != null) {
+                // A heart-rate step (spec §11.2): ERG at the power a controller chose; intensity does not apply.
+                return PlayerTarget.Erg(watts = rampedWatts(heartRateWatts.toDouble()), nominalWatts = heartRateWatts)
+            }
             val fraction = step.targetFractionAt(stepElapsedSeconds) ?: return PlayerTarget.Free
             val nominal = fraction * ftp * intensityPercent / PERCENT
             return PlayerTarget.Erg(watts = rampedWatts(nominal), nominalWatts = roundWatts(nominal))
         }
+
+    /**
+     * Tells the player the power the heart-rate controller asks for (spec §11.2). In a heart-rate step [target] is ERG at
+     * these watts (after a pause with the ramp-in on top); the player does not choose it, because it has no clock to
+     * judge a heart rate by. Ignored outside a heart-rate step.
+     */
+    public fun setHeartRateWatts(watts: Int) {
+        require(watts >= 0) { "A target cannot be negative, got $watts" }
+        heartRateWatts = watts
+    }
 
     /** Moves the workout on by [seconds] seconds of ride time. Does nothing once [isComplete]. */
     public fun advance(seconds: Int = 1) {
@@ -174,7 +191,8 @@ public class WorkoutPlayer(
     }
 
     private fun changeIntensity(delta: Int): Boolean {
-        if (mode != TrainerMode.ERG) return false
+        // A heart-rate step has no fixed power for a percentage to scale: its buttons move the target heart rate instead.
+        if (mode != TrainerMode.ERG || step.heartRate != null) return false
         val next =
             (intensityPercent + delta).coerceIn(RideSnapshot.MIN_INTENSITY_PERCENT, RideSnapshot.MAX_INTENSITY_PERCENT)
         if (next == intensityPercent) return false

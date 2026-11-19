@@ -1,15 +1,17 @@
 package app.overdrive.core.ride
 
 import app.overdrive.core.workout.FreeStep
+import app.overdrive.core.workout.HeartRateStep
 import app.overdrive.core.workout.LeafStep
 import app.overdrive.core.workout.RampStep
 import app.overdrive.core.workout.RepeatStep
 import app.overdrive.core.workout.SteadyStep
 import app.overdrive.core.workout.Workout
+import kotlin.math.roundToInt
 
 /** How the trainer is driven during a step (spec §4.5). */
 public enum class TrainerMode {
-    /** The trainer holds a target power: steady and ramp steps. */
+    /** The trainer holds a target power: steady and ramp steps, and heart-rate steps (a controller chooses the power). */
     ERG,
 
     /** The trainer simulates a road at the rider's virtual gear: free-ride steps. */
@@ -17,10 +19,29 @@ public enum class TrainerMode {
 }
 
 /**
+ * What a heart-rate step (spec §11.2) asks for, with the target resolved to beats per minute: hold the heart rate at
+ * [targetBpm], inside a band of [band] bpm either side of it, with a power never below [powerMin] nor above [powerMax].
+ */
+public data class HeartRateTarget(
+    val targetBpm: Int,
+    val band: Int,
+    val powerMin: Int,
+    val powerMax: Int,
+) {
+    init {
+        require(targetBpm >= 1) { "A target heart rate is positive, got $targetBpm" }
+        require(band >= 1) { "A band is at least 1 bpm, got $band" }
+        require(powerMin in 1 until powerMax) { "The power limits are 1 <= min < max, got $powerMin and $powerMax" }
+    }
+}
+
+/**
  * One step of a workout with repeats expanded, which is what a player and a profile chart walk over.
  *
  * Targets are fractions of FTP (1.0 = FTP), as in the workout file. A steady step has
- * `targetFrom == targetTo`, a ramp keeps its `from` and `to`, and a free-ride step has both null.
+ * `targetFrom == targetTo`, a ramp keeps its `from` and `to`, and a free-ride step has both null. A heart-rate step
+ * (spec §11.2) has both null too and runs in [TrainerMode.ERG]: its [heartRate] says what the controller holds, and
+ * the power comes from the controller, not from a fraction of FTP.
  */
 public data class FlatStep(
     /** The step's own label, else its repeat's label, else a default ("Steady", "Ramp", "Free ride"). */
@@ -39,13 +60,16 @@ public data class FlatStep(
     val repeatIteration: Int? = null,
     /** Iteration count of the repeat set the step comes from, else null. */
     val repeatCount: Int? = null,
+    /** Set for a heart-rate step (spec §11.2), else null. */
+    val heartRate: HeartRateTarget? = null,
 ) {
     init {
         require(durationSeconds >= 1) { "A step lasts at least one second, got $durationSeconds" }
         require(startSeconds >= 0) { "Step start must not be negative, got $startSeconds" }
         require((targetFrom == null) == (targetTo == null)) { "Both targets or neither must be set" }
+        require(heartRate == null || targetFrom == null) { "A heart-rate step has no fraction of FTP" }
         require(
-            (mode == TrainerMode.ERG) == (targetFrom != null),
+            (mode == TrainerMode.ERG) == (targetFrom != null || heartRate != null),
         ) { "ERG steps have a target, simulation steps do not" }
         require((repeatIteration == null) == (repeatCount == null)) { "Repeat iteration and count go together" }
         require(repeatIteration == null || repeatIteration in 1..checkNotNull(repeatCount)) {
@@ -78,8 +102,13 @@ public fun List<FlatStep>.totalDurationSeconds(): Int = lastOrNull()?.endSeconds
  *
  * `repeat { count = 3, steps = [A, B] }` becomes `A B A B A B`, each carrying its 1-based
  * iteration. Every step gets its [FlatStep.startSeconds], so the list can be drawn as a profile.
+ *
+ * A heart-rate step (spec §11.2) becomes a step with a [FlatStep.heartRate]. One whose target is a fraction of the
+ * threshold heart rate needs [thresholdHeartRate] to become bpm; the service resolves it before the tablet sees the
+ * workout (docs/adr/0033), so without a threshold such a step is a free-ride step: the ride still plays, and nothing
+ * can hold a heart rate that nobody knows.
  */
-public fun Workout.flatSteps(): List<FlatStep> {
+public fun Workout.flatSteps(thresholdHeartRate: Int? = null): List<FlatStep> {
     val flat = ArrayList<FlatStep>()
     var start = 0
 
@@ -89,11 +118,32 @@ public fun Workout.flatSteps(): List<FlatStep> {
         iteration: Int?,
         count: Int?,
     ) {
+        var heartRate: HeartRateTarget? = null
         val (default, from, to) =
             when (leaf) {
-                is SteadyStep -> Triple("Steady", leaf.target, leaf.target)
-                is RampStep -> Triple("Ramp", leaf.from, leaf.to)
-                is FreeStep -> Triple("Free ride", null, null)
+                is SteadyStep -> {
+                    Triple("Steady", leaf.target, leaf.target)
+                }
+
+                is RampStep -> {
+                    Triple("Ramp", leaf.from, leaf.to)
+                }
+
+                is FreeStep -> {
+                    Triple("Free ride", null, null)
+                }
+
+                is HeartRateStep -> {
+                    val bpm =
+                        leaf.targetBpm
+                            ?: thresholdHeartRate?.let { (checkNotNull(leaf.targetLthr) * it).roundToInt() }
+                    if (bpm != null) {
+                        heartRate = HeartRateTarget(bpm, leaf.band, leaf.powerMin, leaf.powerMax)
+                        Triple("Heart rate", null, null)
+                    } else {
+                        Triple("Free ride", null, null)
+                    }
+                }
             }
         flat +=
             FlatStep(
@@ -101,7 +151,8 @@ public fun Workout.flatSteps(): List<FlatStep> {
                 durationSeconds = leaf.duration,
                 targetFrom = from,
                 targetTo = to,
-                mode = if (from == null) TrainerMode.SIMULATION else TrainerMode.ERG,
+                mode = if (from == null && heartRate == null) TrainerMode.SIMULATION else TrainerMode.ERG,
+                heartRate = heartRate,
                 startSeconds = start,
                 cadence = leaf.cadence,
                 repeatIteration = iteration,

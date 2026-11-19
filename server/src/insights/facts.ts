@@ -10,7 +10,7 @@ import type {
 } from "@overdrive/contracts";
 import { addDaysToIsoDate } from "@overdrive/contracts";
 import { workoutOutline } from "../plan/summary.ts";
-import type { Compliance, StepCompliance } from "../ride-stats.ts";
+import type { Compliance, StallGuardSummary, StepCompliance } from "../ride-stats.ts";
 import { epochDay } from "../wellness/dates.ts";
 import { RULE_MEANINGS } from "../wellness/recovery.ts";
 import { plannedStats } from "./planned.ts";
@@ -226,11 +226,17 @@ export function plannedFact(q: Quotes, input: PlannedInput, ftp: number | null):
   }
   const stats = plannedStats(input.workout);
   const label = `planned workout "${input.name}"`;
+  // A heart-rate step (spec §11.2) has no planned power: the load of a workout that has one is only part of it, so it is not given.
+  const wholeLoad = stats.heartRateSeconds === 0;
   return {
     name: input.name,
     minutes: q.minutes(`${label}: length`, stats.seconds),
-    plannedLoad: q.n(`${label}: planned load if ridden as planned`, stats.load, "load"),
-    intensityFactor: q.n(`${label}: intensity factor`, stats.intensityFactor, "IF", 2),
+    plannedLoad: wholeLoad
+      ? q.n(`${label}: planned load if ridden as planned`, stats.load, "load")
+      : null,
+    intensityFactor: wholeLoad
+      ? q.n(`${label}: intensity factor`, stats.intensityFactor, "IF", 2)
+      : null,
     topStepWatts:
       ftp === null || stats.topFraction === null
         ? null
@@ -407,6 +413,8 @@ export interface RideInput {
   wPrime: { capacityKj: number; lowestKj: number; atSec: number } | null;
   /** Fitness, fatigue and form at the end of the ride's day. */
   form: FormInput | null;
+  /** What the ride record says about the ERG stall guard (spec §11.1); null when it cannot be told. */
+  stallGuard?: StallGuardSummary | null;
 }
 
 /** The standard durations whose best power a ride note compares, in seconds. */
@@ -434,6 +442,23 @@ export interface StepFact {
   plannedWatts: number | null;
   actualWatts: number | null;
   deltaPercent: number | null;
+}
+
+/** How a heart-rate step (spec §11.2) went: the time inside its band, all of it computed by code from the record. */
+export interface HeartRateStepFact {
+  step: number;
+  label: string;
+  plannedMinutes: number | null;
+  /** The target in force (the planned one unless the rider moved it with the gear buttons); null when none was judged. */
+  targetBpm: number | null;
+  band: number | null;
+  powerMin: number | null;
+  powerMax: number | null;
+  /** Minutes judged: the controller was in charge (not the start ramp) and a heart rate was heard. */
+  judgedMinutes: number | null;
+  minutesInBand: number | null;
+  inBandPercent: number | null;
+  averageHeartRate: number | null;
 }
 
 export interface EffortFact {
@@ -494,7 +519,18 @@ export interface RideFacts extends FactsBase {
     steps: StepFact[];
     /** Why the ride could not be compared step by step, when it could not. */
     comparisonProblem: string | null;
+    /** The heart-rate steps of the workout and the time inside their band; absent when it had none. */
+    heartRateSteps?: HeartRateStepFact[];
   } | null;
+  /**
+   * The ERG stall guard (spec §11.1): how often it took hold in this ride and in which steps, so that the coach knows what the
+   * rider's cadence did. Present only when it took hold at least once.
+   */
+  stallGuard?: {
+    activations: number;
+    steps: { step: number; label: string | null; activations: number }[];
+    atMinutes: number[];
+  };
   efforts: EffortFact[];
   drift: { percent: number } | null;
   wPrime: {
@@ -555,7 +591,8 @@ export function buildRideFacts(input: RideInput): RideFacts {
     const compared = "problem" in compliance ? null : compliance;
     const riddenSeconds = compared === null ? input.movingSeconds : compared.actualSeconds;
     const completion = stats.seconds > 0 ? (riddenSeconds / stats.seconds) * 100 : null;
-    const plannedLoadValue = stats.load > 0 ? stats.load : null;
+    // A heart-rate step has no planned power, so a workout with one has no planned load to hold the ride against.
+    const plannedLoadValue = stats.load > 0 && stats.heartRateSeconds === 0 ? stats.load : null;
     const loadVsPlan =
       plannedLoadValue === null || input.load === null
         ? null
@@ -573,6 +610,33 @@ export function buildRideFacts(input: RideInput): RideFacts {
       actualWatts: q.n(`plan step ${s.step}: ridden power`, s.actualWatts, "W"),
       deltaPercent: q.n(`plan step ${s.step}: ridden against planned`, s.deltaPercent, "%"),
     }));
+    const heartRateSteps: HeartRateStepFact[] = (compared === null ? [] : compared.steps)
+      .flatMap((s) => (s.heartRate === null ? [] : [{ step: s, hr: s.heartRate }]))
+      .slice(0, MAX_STEPS)
+      .map(({ step: s, hr }) => ({
+        step: q.n(`plan step number`, s.step, "step") ?? s.step,
+        label: s.label,
+        plannedMinutes: q.minutes(`heart-rate step ${s.step}: planned length`, s.plannedSeconds),
+        targetBpm: q.n(`heart-rate step ${s.step}: target heart rate`, hr.targetBpm, "bpm"),
+        band: q.n(`heart-rate step ${s.step}: band (either side of the target)`, hr.band, "bpm"),
+        powerMin: q.n(`heart-rate step ${s.step}: least power`, hr.powerMin, "W"),
+        powerMax: q.n(`heart-rate step ${s.step}: most power`, hr.powerMax, "W"),
+        judgedMinutes: q.minutes(`heart-rate step ${s.step}: minutes judged`, hr.judgedSeconds),
+        minutesInBand: q.minutes(
+          `heart-rate step ${s.step}: minutes inside the band`,
+          hr.secondsInBand,
+        ),
+        inBandPercent: q.n(
+          `heart-rate step ${s.step}: share of the judged time inside the band`,
+          hr.inBandPercent,
+          "%",
+        ),
+        averageHeartRate: q.n(
+          `heart-rate step ${s.step}: average heart rate`,
+          hr.averageHeartRate,
+          "bpm",
+        ),
+      }));
     plan = {
       workoutName: workout.name,
       plannedMinutes: q.minutes(`${label}: planned length`, stats.seconds),
@@ -634,8 +698,31 @@ export function buildRideFacts(input: RideInput): RideFacts {
             ),
       steps: stepFacts,
       comparisonProblem: "problem" in compliance ? compliance.problem : null,
+      ...(heartRateSteps.length > 0 ? { heartRateSteps } : {}),
     };
   }
+
+  const guard = input.stallGuard;
+  const stallGuard: RideFacts["stallGuard"] =
+    guard === undefined || guard === null || guard.activations === 0
+      ? undefined
+      : {
+          activations: q.n("ERG stall guard: times it took hold", guard.activations, "times") ?? 0,
+          steps: guard.steps.map((s) => ({
+            step: q.n("ERG stall guard: step number", s.step, "step") ?? s.step,
+            label: s.label,
+            activations:
+              q.n(
+                `ERG stall guard: times it took hold in step ${s.step}`,
+                s.activations,
+                "times",
+              ) ?? s.activations,
+          })),
+          atMinutes: guard.minutes.map(
+            (minute) =>
+              q.n("ERG stall guard: minute of the ride it took hold", minute, "min", 1) ?? minute,
+          ),
+        };
 
   const efforts: EffortFact[] = [];
   for (const duration of EFFORT_DURATIONS) {
@@ -687,6 +774,7 @@ export function buildRideFacts(input: RideInput): RideFacts {
     weekday: weekdayOf(input.date),
     ride,
     plan,
+    ...(stallGuard === undefined ? {} : { stallGuard }),
     efforts,
     drift,
     wPrime,

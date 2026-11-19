@@ -28,7 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
  * | [nextInterval] | `RIDING` or `PAUSED`, a workout, and not in the last step | Jumps to the start of the next step. | everything else |
  * | [previousInterval] | `RIDING` or `PAUSED` and a workout | Restarts the current step if more than 3 s into it, else jumps to the start of the previous step. In the first step it restarts that step. | everything else |
  * | [gearUp], [gearDown] | `READY`, `RIDING` or `PAUSED`, in a simulation step | Moves the gear by one, clamped to `1..gearCount`. | ERG steps, `IDLE`, `FINISHED`, and at the ends of the range |
- * | [intensityUp], [intensityDown] | `READY`, `RIDING` or `PAUSED`, in an ERG step | Moves the intensity by 5 points, clamped to 50..150. | simulation steps, `IDLE`, `FINISHED`, and at the ends of the range |
+ * | [intensityUp], [intensityDown] | `READY`, `RIDING` or `PAUSED`, in an ERG step | Moves the intensity by 5 points, clamped to 50..150; in a heart-rate step (spec §11.2) the target heart rate by 2 bpm instead. | simulation steps, `IDLE`, `FINISHED`, and at the ends of the range |
  *
  * **Pauses.** A ride is `PAUSED` for one or more reasons, reported as [RideSnapshot.pauseReason]: the rider paused it
  * ([PauseReason.MANUAL]), the real engine paused it because the rider stopped pedalling ([PauseReason.AUTO], spec §4.2),
@@ -79,9 +79,9 @@ public interface RideSession {
     /** One gear easier. Simulation steps only. */
     public fun gearDown()
 
-    /** Workout intensity up by 5 points. ERG steps only. */
+    /** Workout intensity up by 5 points, or the target heart rate up by 2 bpm in a heart-rate step. ERG steps only. */
     public fun intensityUp()
 
-    /** Workout intensity down by 5 points. ERG steps only. */
+    /** Workout intensity down by 5 points, or the target heart rate down by 2 bpm in a heart-rate step. ERG steps only. */
     public fun intensityDown()
 }

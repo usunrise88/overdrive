@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "id": "bad-hr-no-limits",
+  "name": "No power limits",
+  "steps": [
+    { "type": "hr", "duration": 600, "target_bpm": 135 }
+  ]
+}

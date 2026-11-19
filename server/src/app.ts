@@ -8,6 +8,7 @@ import { type McpConfig, type McpTestOptions, mcpModule, mcpSettings } from "./m
 import { metricsRoutes } from "./metrics/routes.ts";
 import { notebookRoutes } from "./notebook/routes.ts";
 import { outdoorRoutes } from "./outdoor/routes.ts";
+import { thresholdHeartRate } from "./plan/heart-rate.ts";
 import { planRoutes } from "./plan/routes.ts";
 import { planEventsRoutes } from "./plan-events/routes.ts";
 import { profileRoutes } from "./profile/routes.ts";
@@ -88,7 +89,11 @@ export function buildApp(options: AppOptions): FastifyInstance {
         events: services.bus,
         destinations: services.destinations,
       });
-      v1.register(planRoutes, { store: services.plan, refresher: services.refresher });
+      v1.register(planRoutes, {
+        store: services.plan,
+        refresher: services.refresher,
+        thresholdHeartRate: async () => thresholdHeartRate(await services.profile.get()),
+      });
       v1.register(profileRoutes, { store: services.profile });
       v1.register(metricsRoutes, { metrics: services.metrics });
       v1.register(wellnessRoutes, { service: services.wellness });

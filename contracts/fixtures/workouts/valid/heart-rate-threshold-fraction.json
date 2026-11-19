@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "id": "2026-12-03-tempo-by-heart-rate",
+  "name": "Tempo by heart rate",
+  "steps": [
+    { "type": "ramp", "duration": 600, "from": 0.45, "to": 0.65, "label": "Warm-up" },
+    { "type": "repeat", "count": 2, "steps": [
+      { "type": "hr", "duration": 900, "target_lthr": 0.88, "power_min": 100, "power_max": 260, "cadence": 90, "label": "Tempo" },
+      { "type": "free", "duration": 180, "label": "Easy" }
+    ] }
+  ]
+}

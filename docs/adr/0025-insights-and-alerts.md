@@ -171,7 +171,7 @@ The post-ride analysis may attach **one** topic, for a real reason only, from th
 | `repeated-drift` | the plan has drifted again | the second plan-drift alert within 28 days |
 
 Four more rows are **named hooks, not available** (`stall-guard`, `effort-rating`, `tag-streak`, `repeat-trend`: the signals come in
-later stages): the day a stage brings its signal, its row is switched on in the table and nowhere else. The topic's text (one sentence) and
+later stages): the day a stage brings its signal, its row is switched on in the table and nowhere else. *(Stage A1b of v0.4.0, ADR 0033: `stall-guard` is now an available row, at least 3 activations in one ride.)* The topic's text (one sentence) and
 opening question (in the rider's voice) are **templates filled from the ride's facts**, so every number in them was computed and no model
 is involved. **At most two topics in any rolling 7 days** and one per ride, enforced in the database transaction that writes the note
 (the note is written whatever the limit says); an open topic **closes when the coach marks it discussed** (`mark_discussion_topic`) or

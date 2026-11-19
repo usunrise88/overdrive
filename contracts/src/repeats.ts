@@ -43,12 +43,19 @@ function leafToken(step: Exclude<Step, { type: "repeat" }>): string {
       return `r${step.duration}@${permille(step.from)}-${permille(step.to)}`;
     case "free":
       return `f${step.duration}`;
+    case "hr":
+      // A heart-rate step has no fixed power: its identity is its length and its target (bpm, or thousandths of the
+      // threshold heart rate behind an `l`). The band, the power limits, the label and the cadence are not in it.
+      return step.target_bpm !== undefined
+        ? `h${step.duration}@${step.target_bpm}`
+        : `h${step.duration}@l${permille(step.target_lthr ?? 0)}`;
   }
 }
 
 /**
  * The canonical text of a workout's structure: its steps with repeats expanded, in order, each as a token (`s600@880` a steady
- * step of 600 s at 88% of FTP, `r300@450-700` a ramp from 45% to 70%, `f300` a free step), joined by commas. In it: the step type, the
+ * step of 600 s at 88% of FTP, `r300@450-700` a ramp from 45% to 70%, `f300` a free step, `h2400@135` a heart-rate step of 40 min
+ * at 135 bpm or `h900@l880` at 88% of the threshold heart rate), joined by commas. In it: the step type, the
  * duration in whole seconds, the targets in thousandths of FTP (rounded, so float noise from a converter does not matter) and
  * the order. **Not** in it: the workout's id, name and description, every label, every cadence target, the schema number and
  * whether steps were written as a repeat or one by one. Two workouts with the same structure are the same session.

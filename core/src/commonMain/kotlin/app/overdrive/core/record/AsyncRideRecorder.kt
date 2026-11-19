@@ -51,6 +51,10 @@ public class AsyncRideRecorder(
             val endEpochMillis: Long,
         ) : Call
 
+        class Event(
+            val event: RideEvent,
+        ) : Call
+
         class Barrier(
             val reached: CompletableDeferred<Unit>,
         ) : Call
@@ -81,6 +85,10 @@ public class AsyncRideRecorder(
 
     override fun onRideFinished(endEpochMillis: Long) {
         enqueue(Call.Finished(endEpochMillis))
+    }
+
+    override fun onEvent(event: RideEvent) {
+        enqueue(Call.Event(event))
     }
 
     /**
@@ -124,6 +132,7 @@ public class AsyncRideRecorder(
                 is Call.Sample -> delegate.onSample(call.sample)
                 is Call.Rr -> delegate.onRrIntervals(call.intervals)
                 is Call.Finished -> delegate.onRideFinished(call.endEpochMillis)
+                is Call.Event -> delegate.onEvent(call.event)
                 is Call.Barrier -> call.reached.complete(Unit)
             }
         } catch (e: Exception) {

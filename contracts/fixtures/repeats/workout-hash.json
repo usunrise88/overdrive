@@ -461,6 +461,144 @@
       },
       "structure": "f3600",
       "hash": "da2b6fdd397b6f36"
+    },
+    {
+      "name": "zone-2-by-heart-rate",
+      "workout": {
+        "schema": 1,
+        "id": "2026-12-01-zone-2-by-heart-rate",
+        "name": "Zone 2 by heart rate",
+        "steps": [
+          {
+            "type": "hr",
+            "duration": 2400,
+            "target_bpm": 135,
+            "band": 4,
+            "power_min": 80,
+            "power_max": 220,
+            "label": "Zone 2 by heart rate"
+          },
+          {
+            "type": "steady",
+            "duration": 300,
+            "target": 0.45,
+            "label": "Cool-down"
+          }
+        ]
+      },
+      "structure": "h2400@135,s300@450",
+      "hash": "574f429f3132a081"
+    },
+    {
+      "name": "zone-2-by-heart-rate-other-band-limits-and-labels",
+      "workout": {
+        "schema": 1,
+        "id": "icu-7001",
+        "name": "Base (copy)",
+        "steps": [
+          {
+            "type": "hr",
+            "duration": 2400,
+            "target_bpm": 135,
+            "power_min": 100,
+            "power_max": 260,
+            "cadence": 90
+          },
+          {
+            "type": "steady",
+            "duration": 300,
+            "target": 0.45
+          }
+        ]
+      },
+      "structure": "h2400@135,s300@450",
+      "hash": "574f429f3132a081"
+    },
+    {
+      "name": "zone-2-by-heart-rate-one-bpm-higher",
+      "workout": {
+        "schema": 1,
+        "id": "2026-12-01-zone-2-by-heart-rate",
+        "name": "Zone 2 by heart rate",
+        "steps": [
+          {
+            "type": "hr",
+            "duration": 2400,
+            "target_bpm": 136,
+            "band": 4,
+            "power_min": 80,
+            "power_max": 220
+          },
+          {
+            "type": "steady",
+            "duration": 300,
+            "target": 0.45
+          }
+        ]
+      },
+      "structure": "h2400@136,s300@450",
+      "hash": "cb286583b107ac35"
+    },
+    {
+      "name": "zone-2-by-heart-rate-as-a-steady-step",
+      "workout": {
+        "schema": 1,
+        "id": "x",
+        "name": "Same length, a power target",
+        "steps": [
+          {
+            "type": "steady",
+            "duration": 2400,
+            "target": 0.65
+          },
+          {
+            "type": "steady",
+            "duration": 300,
+            "target": 0.45
+          }
+        ]
+      },
+      "structure": "s2400@650,s300@450",
+      "hash": "29370496e1387fb4"
+    },
+    {
+      "name": "tempo-by-threshold-fraction",
+      "workout": {
+        "schema": 1,
+        "id": "2026-12-03-tempo-by-heart-rate",
+        "name": "Tempo by heart rate",
+        "steps": [
+          {
+            "type": "ramp",
+            "duration": 600,
+            "from": 0.45,
+            "to": 0.65,
+            "label": "Warm-up"
+          },
+          {
+            "type": "repeat",
+            "count": 2,
+            "steps": [
+              {
+                "type": "hr",
+                "duration": 900,
+                "target_lthr": 0.88,
+                "power_min": 100,
+                "power_max": 260,
+                "cadence": 90,
+                "label": "Tempo"
+              },
+              {
+                "type": "free",
+                "duration": 180,
+                "label": "Easy"
+              }
+            ]
+          }
+        ]
+      },
+      "structure": "r600@450-650,h900@l880,f180,h900@l880,f180",
+      "hash": "6d6f0f5d4ab2785b"
     }
   ],
   "same": [
@@ -472,6 +610,10 @@
     [
       "zone-2-hour",
       "zone-2-hour-renamed"
+    ],
+    [
+      "zone-2-by-heart-rate",
+      "zone-2-by-heart-rate-other-band-limits-and-labels"
     ]
   ],
   "different": [
@@ -498,6 +640,14 @@
     [
       "zone-2-hour",
       "free-ride-hour"
+    ],
+    [
+      "zone-2-by-heart-rate",
+      "zone-2-by-heart-rate-one-bpm-higher"
+    ],
+    [
+      "zone-2-by-heart-rate",
+      "zone-2-by-heart-rate-as-a-steady-step"
     ]
   ]
 }

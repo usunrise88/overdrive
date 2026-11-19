@@ -177,7 +177,7 @@ export interface RidesResponse {
 export interface DetailLap {
   stepIndex: number | null;
   label: string | null;
-  type: "steady" | "ramp" | "free" | null;
+  type: "steady" | "ramp" | "free" | "hr" | null;
   startSeconds: number;
   endSeconds: number;
   averagePower: number | null;

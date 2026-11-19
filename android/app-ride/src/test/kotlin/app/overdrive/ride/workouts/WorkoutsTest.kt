@@ -117,6 +117,38 @@ class WorkoutsTest {
     }
 
     @Test
+    fun aHeartRateStepIsDescribedInPlainWordsAndNeedsNoFtp() {
+        val workout = WorkoutImport.fromJson(File(fixtures, "workouts/valid/heart-rate-hold.json").readText())
+        val description = WorkoutDescriber.describe(workout, ftp = 250)
+        assertEquals("ERG", description.mode)
+        assertEquals("45 min · steady, heart rate", description.meta)
+        // Only a step with a fraction of FTP has a hardest power; the heart-rate step is the controller's.
+        assertEquals(113, description.hardestWatts)
+        val row = description.rows[0]
+        assertEquals("Zone 2 by heart rate", row.name)
+        assertEquals(2400, row.durationSeconds)
+        assertEquals("135 bpm", row.percentText)
+        assertEquals("80–220 W", row.wattsText)
+        assertNull(row.zone)
+        assertEquals("Cool-down", description.rows[1].name)
+
+        val step = workout.flatSteps().first()
+        assertEquals("Zone 2 by heart rate · 40:00 · 135 bpm", WorkoutDescriber.nextLine(step, 250, 100))
+    }
+
+    @Test
+    fun aHeartRateTargetThatIsStillAFractionOfTheThresholdIsSaidAsSuch() {
+        val workout =
+            WorkoutImport.fromJson(
+                File(fixtures, "workouts/valid/heart-rate-threshold-fraction.json").readText(),
+            )
+        val description = WorkoutDescriber.describe(workout, ftp = 250)
+        assertEquals("88% of threshold", description.rows.first { it.name.startsWith("Tempo") }.percentText)
+        // The tablet cannot hold a heart rate nobody has resolved: the step flattens to a free ride, the workout still plays.
+        assertTrue(workout.flatSteps().none { it.heartRate != null })
+    }
+
+    @Test
     fun uiKitZonesAgreeWithCoreAtEveryWholePercentAndTheBoundaries() {
         for (pct in 0..200) {
             assertEquals("at $pct%", PowerZone.of(pct, 100).number, Zones.ofFraction(pct / 100.0))

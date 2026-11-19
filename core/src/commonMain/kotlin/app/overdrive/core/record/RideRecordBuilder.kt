@@ -13,6 +13,7 @@ public class RideRecordBuilder(
 ) {
     private val samples = mutableListOf<RideSample>()
     private val rrIntervals = mutableListOf<RrInterval>()
+    private val events = mutableListOf<RideEvent>()
     private val laps = mutableListOf<Lap>()
     private val summary = SummaryAccumulator(header.ftp)
     private var openLap: LapAccumulator? = null
@@ -46,6 +47,21 @@ public class RideRecordBuilder(
     }
 
     /**
+     * Adds an event of the ride, in the order they happened.
+     *
+     * @throws IllegalArgumentException if it is at a second no sample has reached yet, or earlier than the event before it.
+     */
+    public fun addEvent(event: RideEvent) {
+        require(event.timeOffsetSeconds <= samples.size) {
+            "An event at second ${event.timeOffsetSeconds} comes before its sample (${samples.size} so far)"
+        }
+        require(events.lastOrNull()?.let { event.timeOffsetSeconds >= it.timeOffsetSeconds } != false) {
+            "Events are in the order they happened"
+        }
+        events += event
+    }
+
+    /**
      * The record as it stands, which may be called at any time and as often as needed: the last lap is
      * included as far as it goes. [endEpochMillis] overrides the header's end time.
      */
@@ -56,6 +72,7 @@ public class RideRecordBuilder(
             rrIntervals = rrIntervals.toList(),
             laps = laps + listOfNotNull(openLap?.close()),
             summary = summary.summary(),
+            events = events.toList(),
         )
 
     public companion object {
@@ -68,10 +85,12 @@ public class RideRecordBuilder(
             samples: List<RideSample>,
             rrIntervals: List<RrInterval> = emptyList(),
             endEpochMillis: Long? = header.endEpochMillis,
+            events: List<RideEvent> = emptyList(),
         ): RideRecord {
             val builder = RideRecordBuilder(header)
             samples.forEach(builder::addSample)
             builder.addRrIntervals(rrIntervals)
+            events.forEach(builder::addEvent)
             return builder.build(endEpochMillis)
         }
     }

@@ -406,6 +406,52 @@ describe("the note after a ride", () => {
   });
 });
 
+describe("the ERG stall guard in a ride note", () => {
+  const start = "2026-11-18T05:00:00Z";
+
+  it("attaches the stall-guard topic when the guard took hold three times in a ride that went to plan, and keeps the count in the facts", async () => {
+    const h = await boot(env);
+    const [planId] = await planDays(env, h, ["2026-11-18"]);
+    const spec = {
+      ...sweetSpotRide(`ride-${Date.parse(start)}`, start, 2400, 220, planId ?? null),
+      events: [120, 700, 1500].map((timeOffsetSeconds) => ({
+        type: "stall-guard" as const,
+        timeOffsetSeconds,
+        stepIndex: 1,
+      })),
+    };
+    await uploadRide(h, spec);
+    await until(() => expect(notes(env)).toHaveLength(1));
+
+    const topics = await h.services.insights.topics(null, 10);
+    expect(topics).toHaveLength(1);
+    expect(topics[0]?.text).toBe(
+      "The ERG stall guard cut the target 3 times in this ride: cadence fell below its floor and the trainer was held at 70% until you were pedalling again.",
+    );
+    expect(topics[0]?.openingQuestion).toBe(
+      "The stall guard cut my target 3 times in Sweet spot. Is the target too high for me right now, or is something else going on?",
+    );
+    const answer = await h.services.insights.facts({ kind: "ride", rideId: spec.id });
+    const facts = (answer?.facts ?? {}) as { stallGuard?: unknown };
+    expect(facts.stallGuard).toEqual({
+      activations: 3,
+      steps: [{ step: 2, label: "Steady", activations: 3 }],
+      atMinutes: [2, 11.7, 25],
+    });
+  });
+
+  it("has no stall-guard fact and no topic for a ride where it never took hold", async () => {
+    const h = await boot(env);
+    const [planId] = await planDays(env, h, ["2026-11-18"]);
+    await uploadRide(
+      h,
+      sweetSpotRide(`ride-${Date.parse(start)}`, start, 2400, 220, planId ?? null),
+    );
+    await until(() => expect(notes(env)).toHaveLength(1));
+    expect(await h.services.insights.topics(null, 10)).toHaveLength(0);
+  });
+});
+
 describe("the weekly review", () => {
   it("is written at the weekly summary's time, once, and sent", async () => {
     const h = await boot(env, { now: "2026-11-15T17:59:00Z" }); // Sunday

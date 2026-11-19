@@ -2,9 +2,11 @@ package app.overdrive.ride.workouts
 
 import androidx.compose.runtime.Immutable
 import app.overdrive.core.ride.FlatStep
+import app.overdrive.core.ride.TrainerMode
 import app.overdrive.core.ride.flatSteps
 import app.overdrive.core.ride.totalDurationSeconds
 import app.overdrive.core.workout.FreeStep
+import app.overdrive.core.workout.HeartRateStep
 import app.overdrive.core.workout.LeafStep
 import app.overdrive.core.workout.RampStep
 import app.overdrive.core.workout.RepeatStep
@@ -21,9 +23,9 @@ import kotlin.math.floor
 data class StepRow(
     val name: String,
     val durationSeconds: Int,
-    /** "88%", "45–70%" or "Gears". */
+    /** "88%", "45–70%", "Gears", or "135 bpm" for a heart-rate step. */
     val percentText: String,
-    /** "220 W", "113–175 W", or empty for a free-ride step. */
+    /** "220 W", "113–175 W" (a heart-rate step: its power limits), or empty for a free-ride step. */
     val wattsText: String,
     /** 1 to 7, or null for a free-ride step. */
     val zone: Int?,
@@ -60,8 +62,10 @@ object WorkoutDescriber {
         ftp: Int,
     ): WorkoutDescription {
         val flat = workout.flatSteps()
-        val erg = flat.filter { it.targetFrom != null }
-        val hardest = erg.maxOfOrNull { maxOf(it.targetFrom ?: 0.0, it.targetTo ?: 0.0) }
+        // A fraction of FTP gives the hardest effort; a heart-rate step is ERG too, but its power is the controller's.
+        val powered = flat.filter { it.targetFrom != null }
+        val erg = flat.filter { it.mode == TrainerMode.ERG }
+        val hardest = powered.maxOfOrNull { maxOf(it.targetFrom ?: 0.0, it.targetTo ?: 0.0) }
         return WorkoutDescription(
             title = workout.name,
             description = workout.description,
@@ -86,6 +90,7 @@ object WorkoutDescriber {
         return buildList {
             if (leaves.any { it is SteadyStep }) add("steady")
             if (leaves.any { it is RampStep }) add("ramp")
+            if (leaves.any { it is HeartRateStep }) add("heart rate")
             if (workout.steps.any { it is RepeatStep && it.count > 1 }) add("intervals")
             if (leaves.any { it is FreeStep }) add("free")
         }.joinToString(", ")
@@ -135,14 +140,23 @@ object WorkoutDescriber {
             is FreeStep -> {
                 StepRow(name, leaf.duration, "Gears", "", null)
             }
+
+            is HeartRateStep -> {
+                StepRow(name, leaf.duration, heartRateWords(leaf), "${leaf.powerMin}–${leaf.powerMax} W", null)
+            }
         }
     }
+
+    /** "135 bpm", or "88% of threshold" for a step the service has not resolved to bpm. */
+    private fun heartRateWords(step: HeartRateStep): String =
+        step.targetBpm?.let { "$it bpm" } ?: "${percent(checkNotNull(step.targetLthr))}% of threshold"
 
     private fun defaultName(leaf: LeafStep): String =
         when (leaf) {
             is SteadyStep -> "Steady"
             is RampStep -> "Ramp"
             is FreeStep -> "Free ride"
+            is HeartRateStep -> "Heart rate"
         }
 
     private fun percent(fraction: Double): Int = floor(fraction * PERCENT + 0.5 + ROUNDING_ALLOWANCE).toInt()
@@ -169,6 +183,9 @@ object WorkoutDescriber {
         ftp: Int,
         intensityPercent: Int,
     ): String {
+        step.heartRate?.let { hold ->
+            return "${step.label} · ${UiFormat.elapsed(step.durationSeconds)} · ${hold.targetBpm} bpm"
+        }
         val from = step.targetFrom ?: return "${step.label} · ${UiFormat.elapsed(step.durationSeconds)}"
         val to = step.targetTo ?: from
         val watts = UiFormat.range(watts(from, ftp, intensityPercent), watts(to, ftp, intensityPercent))

@@ -8,6 +8,8 @@ import app.overdrive.core.device.TrainerDevice
 import app.overdrive.core.device.TrainerReading
 import app.overdrive.core.physics.FlatPhysicsSpeedModel
 import app.overdrive.core.record.NoRideRecorder
+import app.overdrive.core.record.RideEvent
+import app.overdrive.core.record.RideEventType
 import app.overdrive.core.record.RideHeader
 import app.overdrive.core.record.RideRecorder
 import app.overdrive.core.record.RideSample
@@ -68,6 +70,12 @@ import kotlin.time.Duration.Companion.seconds
  * - While paused or before the start: [RideSettings.pausedTargetWatts] in ERG steps, so the rider can spin up; during an
  *   auto-pause [RideSettings.autoPauseTargetWatts] instead (not above the step's target), so that the trainer has a little
  *   resistance with which to register the first stroke.
+ * - Heart-rate step (spec §11.2): ERG at the power [HeartRateHold] chooses, within the step's limits, from the heart rate;
+ *   the intensity does not apply, and the two gear buttons move the target heart rate by 2 bpm instead.
+ * - **The stall guard** (spec §11.1, [StallGuard], docs/adr/0033) caps the target of any ERG step while it has hold: 70% of
+ *   whatever the step, the ramp-in or the heart-rate controller asks for. It is not judged while paused, in the first seconds
+ *   after a resume or before the rider has pedalled up to the floor, and at 0 rpm the auto-pause wins. Each time it takes hold
+ *   an event is recorded ([RideRecorder.onEvent]).
  * - Free-ride step, or a ride without a workout: simulation parameters from the gear (spec §4.4) and the physics
  *   settings (spec §4.3), at 0% route grade.
  * - After the ride: simulation at the neutral gear, i.e. flat, so the trainer is not left holding an ERG target.
@@ -149,6 +157,19 @@ public class RideEngine(
     private val player: WorkoutPlayer? =
         if (steps.isEmpty()) null else WorkoutPlayer(steps, settings.ftp, settings.rampInSeconds)
     private val gears = settings.gears
+
+    // The ERG stall guard (spec §11.1, docs/adr/0033) and the heart-rate step's controller (spec §11.2, docs/adr/0033).
+    private val stallGuard = StallGuard(settings.stallGuard, zeroCadenceIsAStop = settings.autoPause)
+    private var heartRateHold: HeartRateHold? = null
+    private var holdStepIndex = -1
+    private var holdStepElapsedSeconds = 0
+
+    // The rider's adjustment of the target heart rate, kept for the rest of the ride like the intensity is.
+    private var heartRateOffsetBpm = 0
+
+    init {
+        syncHeartRateStep()
+    }
 
     private var started = false
     private var finished = false
@@ -297,15 +318,56 @@ public class RideEngine(
             Input.Previous -> if (isLive()) player?.previousInterval()
             Input.GearUp -> shiftGear(+1)
             Input.GearDown -> shiftGear(-1)
-            Input.IntensityUp -> if (isAdjustable()) player?.intensityUp()
-            Input.IntensityDown -> if (isAdjustable()) player?.intensityDown()
+            Input.IntensityUp -> if (isAdjustable()) adjustIntensity(+1)
+            Input.IntensityDown -> if (isAdjustable()) adjustIntensity(-1)
             Input.Tick -> if (isLive()) tick()
             is Input.TrainerLink -> onTrainerLink(input.state == ConnectionState.CONNECTED)
             is Input.HeartRateLink -> onHeartRateLink(input.state == ConnectionState.CONNECTED)
             is Input.TrainerData -> if (trainerConnected) onTrainerData(input.reading)
             is Input.HeartRateData -> onHeartRateData(input.reading)
         }
+        syncHeartRateStep()
         if (!finished) updateOrder()
+    }
+
+    /**
+     * The two gear buttons in an ERG step: the intensity up or down by 5 points, or in a heart-rate step (spec §11.2) the
+     * target heart rate by [HeartRateHoldSettings.targetStepBpm] (2 bpm). The Click and the on-screen buttons both end here.
+     */
+    private fun adjustIntensity(direction: Int) {
+        val active = player ?: return
+        val hold = heartRateHold
+        if (hold != null && active.step.heartRate != null) {
+            if (hold.adjustTarget(direction)) heartRateOffsetBpm = hold.targetOffsetBpm
+        } else if (direction > 0) {
+            active.intensityUp()
+        } else {
+            active.intensityDown()
+        }
+    }
+
+    /**
+     * Keeps the heart-rate controller in step with the player: a controller for the step the workout is in when that is a
+     * heart-rate step (a new one when the step changed or was restarted, so its start ramp runs again), none otherwise,
+     * and the player told the power it asks for. Idempotent; it runs after every input.
+     */
+    private fun syncHeartRateStep() {
+        val active = player ?: return
+        val target = active.step.heartRate
+        if (target == null) {
+            heartRateHold = null
+            holdStepIndex = -1
+            return
+        }
+        val elapsed = active.stepElapsedSeconds
+        var hold = heartRateHold
+        if (hold == null || holdStepIndex != active.stepIndex || elapsed < holdStepElapsedSeconds) {
+            hold = HeartRateHold(target, settings.heartRateHold, heartRateOffsetBpm)
+            heartRateHold = hold
+            holdStepIndex = active.stepIndex
+        }
+        holdStepElapsedSeconds = elapsed
+        active.setHeartRateWatts(hold.watts)
     }
 
     private fun shiftGear(delta: Int) {
@@ -416,9 +478,15 @@ public class RideEngine(
                 manualPause || autoPaused || !trainerConnected -> RideState.PAUSED
                 else -> RideState.RIDING
             }
-        if (state != RideState.RIDING) zeroCadenceSeconds = 0
+        if (state != RideState.RIDING) {
+            zeroCadenceSeconds = 0
+            // Nothing is judged while the ride is not running; the guard starts again unarmed (docs/adr/0033).
+            stallGuard.reset()
+        }
         if (before == RideState.PAUSED && state == RideState.RIDING) {
             player?.beginRampIn(pauseHoldWatts)
+            // The heart rate fell during the pause: what the controller had smoothed is stale.
+            heartRateHold?.resume()
             secondsSinceResume = 0
         } else if (state != RideState.RIDING) {
             secondsSinceResume = null
@@ -441,6 +509,7 @@ public class RideEngine(
 
         // The sample describes the second that just ended: readings now, plan as it was during the second.
         val target = player?.target
+        val sampleStepIndex = player?.stepIndex
         recorder.onSample(
             RideSample(
                 timeOffsetSeconds = rideSeconds,
@@ -451,8 +520,10 @@ public class RideEngine(
                 distanceMeters = distanceMeters,
                 gear = if (currentMode() == TrainerMode.SIMULATION) gear else null,
                 targetPower = (target as? PlayerTarget.Erg)?.nominalWatts,
-                stepIndex = player?.stepIndex,
+                stepIndex = sampleStepIndex,
                 paused = !wasRiding,
+                // Only once the controller is in charge: the start ramp is not judged (spec §11.2).
+                targetHeartRate = heartRateHold?.takeIf { !it.startRamp }?.targetBpm,
             ),
         )
         if (pendingRrIntervals.isNotEmpty()) {
@@ -467,6 +538,8 @@ public class RideEngine(
         if (wasRiding) {
             movingSeconds++
             secondsSinceResume = secondsSinceResume?.plus(1)
+            // The controller belongs to the step the second was ridden in: it hears the heart rate before the step moves on.
+            heartRateHold?.tick(bpmNow, frozen = stallGuard.active)
             player?.let {
                 it.advance()
                 if (it.isComplete) {
@@ -474,9 +547,27 @@ public class RideEngine(
                     return
                 }
             }
+            syncHeartRateStep()
+            updateStallGuard(cadenceNow, sampleStepIndex)
         }
         updateAutoPause(cadenceNow, wasRiding)
         refreshState()
+    }
+
+    /**
+     * The stall guard (spec §11.1) judges the second that just ended, if the next second is an ERG one: a free-ride step has no
+     * target to hold, so there is nothing to limit. The tick it takes hold at is recorded as an event of the step it was
+     * ridden in. Auto-pause is updated right after and wins at 0 rpm: the guard does not count a stop (docs/adr/0033).
+     */
+    private fun updateStallGuard(
+        cadenceNow: Int?,
+        sampleStepIndex: Int?,
+    ) {
+        if (!settings.stallGuard.enabled || currentMode() != TrainerMode.ERG) {
+            stallGuard.reset()
+        } else if (stallGuard.tick(cadenceNow, secondsSinceResume)) {
+            recorder.onEvent(RideEvent(RideEventType.STALL_GUARD, rideSeconds, sampleStepIndex))
+        }
     }
 
     /**
@@ -518,7 +609,9 @@ public class RideEngine(
             }
 
             target is PlayerTarget.Erg -> {
-                val watts = if (state == RideState.RIDING) target.watts else holdWatts(target)
+                // The stall guard caps whatever the player would send (step target, ramp-in, heart-rate controller); a ride
+                // that is not running is never limited by it.
+                val watts = if (state == RideState.RIDING) stallGuard.limit(target.watts) else holdWatts(target)
                 TrainerCommand.TargetPower(watts.coerceIn(0, settings.maxTargetWatts))
             }
 
@@ -620,6 +713,18 @@ public class RideEngine(
             workout = workout?.let { player?.progress(it.name) },
             pauseReason = pauseReason(),
             secondsSinceResume = secondsSinceResume,
+            stallGuardActive = stallGuard.active,
+            stallGuardWatts =
+                if (stallGuard.active) {
+                    (target as? PlayerTarget.Erg)?.let {
+                        stallGuard.limit(
+                            it.watts,
+                        )
+                    }
+                } else {
+                    null
+                },
+            heartRateHold = if (finished) null else heartRateHold?.state(),
         )
     }
 

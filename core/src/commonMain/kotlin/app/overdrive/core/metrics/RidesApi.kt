@@ -156,6 +156,10 @@ public enum class LapKind {
 
     @SerialName("free")
     FREE,
+
+    /** A heart-rate hold step (spec §11.2): no fixed power, so no [DetailLap.targetPower]. */
+    @SerialName("hr")
+    HR,
 }
 
 /**

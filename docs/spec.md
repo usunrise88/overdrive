@@ -844,9 +844,31 @@ Native JSON, version-tagged. Targets are fractions of FTP. Durations are seconds
 }
 ```
 
-- Step types: `steady`, `ramp`, `repeat`, `free`.
+- Step types: `steady`, `ramp`, `repeat`, `free` and, from stage A1b of v0.4.0, `hr` (below).
 - Optional per-step fields: `cadence` target for display, `label`.
 - ZWO files and intervals.icu workouts are converted to this format on import.
+
+**Settled in stage A1b of v0.4.0** (the heart-rate hold, §11.2; ADR 0033; `contracts/schema/workout.schema.json`, Kotlin `HeartRateStep`):
+
+```json
+{ "type": "hr", "duration": 2400, "target_bpm": 135, "band": 5, "power_min": 80, "power_max": 220, "label": "Zone 2 by heart rate" }
+```
+
+- `hr` is ERG whose target power a controller chooses (§11.2); it needs **no FTP**. **Exactly one** of `target_bpm` (40 to 230) and
+  `target_lthr` (0.5 to 1.2, a fraction of the rider's threshold heart rate); `band` (1 to 30 bpm, default 5) is the half-width of the
+  band around the target, so the heart rate is inside it within `band` bpm of the target; `power_min` and `power_max` are absolute watts
+  (1 to 2000, `power_min` below `power_max`: checked beyond the schema by every implementation, see the invalid fixtures); `cadence` and
+  `label` as for any step. An `hr` step may be inside a `repeat`.
+- **The tablet needs beats.** A target given as `target_lthr` is **resolved by the service when it serves the workout to the tablet**
+  (`GET /v1/workouts`, §8.3): the profile's `thresholdHeartRate`, else its estimate from the rides, times the fraction, in whole bpm. The
+  stored plan and what an agent reads keep the fraction. `create_workout` and `update_workout` **refuse** a fraction while no threshold is
+  known (`a heart-rate step gives its target as a fraction of the threshold heart rate … set thresholdHeartRate with update_profile, or
+  give the target in beats per minute`); a plan that keeps one after the threshold has gone is served as it is, and the tablet plays that
+  step as a free ride, since nothing can hold a heart rate nobody has.
+- The structure hash of a session (§11.7) has a token for the step, `h2400@135` (length and target; `h900@l880` for a fraction of the
+  threshold), and none of the older tokens or golden numbers changed.
+- A step has **no heart-rate-at-power figure** (§11.7: it has no fixed power), no planned load (a workout that has one has only part of
+  its load planned, and says so), and its compliance is the time inside the band (§8.2).
 
 ### 8.2 Ride record
 
@@ -888,6 +910,22 @@ The FIT file is generated from this record and can be regenerated at any time.
 - The ride in progress is stored not as this document but as the append-only log of §4.2: a `header` line, a
   `sample` line per second, an `rr` line when the strap sent intervals and a `finished` line, each one line of the
   same JSON behind a CRC-32. The record is rebuilt from it with `RideRecordBuilder`.
+
+**Settled in stage A1b of v0.4.0** (§11.1, §11.2; ADR 0033; `contracts/schema/ride-record.schema.json`, Kotlin `RideEvent`), additive, so every
+earlier record and fixture stays valid and the Kotlin writer leaves the new key out when it is empty:
+
+- **`events`** (top level, optional): `[{ "type": "stall-guard", "timeOffsetSeconds": 13, "stepIndex": 0 }]`, in the order they happened.
+  `type` is a closed list (today one kind; the live coach's cues, §12.1, will add theirs here, contracts first); `timeOffsetSeconds` is the
+  tick at which the event was decided (1 to the number of samples; for the guard: it took hold at that tick and the target is lowered from
+  the next second); `stepIndex` is the flattened workout step it happened in. Beyond the schema an event must not lie after the last
+  sample, and events are in order. The crash-safe log has an `event` line for them.
+- **`targetHeartRate`** (sample, optional): in a heart-rate step the bpm the controller aimed at during the second, the step's target moved
+  by the rider's gear buttons. **Absent during the step's start ramp**, so a second without it is not judged.
+- **Compliance of a heart-rate step** is computed by the service from these (`rideCompliance`, `get_ride`, the ride facts): the seconds
+  that were not paused, have a `targetHeartRate` and a heart rate are **judged**; one is inside the band when the heart rate is within the
+  step's `band` of that second's target. The figure is `secondsInBand` of `judgedSeconds` (percent to one decimal), with the target in force
+  (the one most judged seconds had, so the rider's adjustments show), the planned one, the band, the power limits and the mean heart rate.
+  A step with no judged second says so and gives no percent. The ride detail's laps may be of kind `hr` (`ride-detail-response.schema.json`).
 
 ### 8.3 Sync API
 
@@ -945,6 +983,9 @@ path: everything is under `/v1`.
   list is then the last known one) or none has finished yet. `configured: false` means no plan source is set up: the list is empty,
   `stale` is false and `generatedAt` null. The cache holds today and the next 14 days, so a range beyond that comes back short.
 - Workouts the native format cannot hold are left out of the list (the service logs why); the answer does not mention them.
+- *Stage A1b of v0.4.0:* a heart-rate step (§8.1) whose target is a fraction of the threshold heart rate is served with `target_bpm` worked out
+  from the profile's threshold (the rider's own, else the estimate from the rides) and no `target_lthr`; the stored plan keeps the fraction.
+  How the step travels to and from intervals.icu: ADR 0033 section 6.
 
 **Settled in stage P2-3 (the profile; ADR 0018, `contracts/schema/profile.schema.json`, `profile-patch.schema.json`, Kotlin `ProfileApiJson`):**
 
@@ -1089,6 +1130,13 @@ Read tools return compact summaries by default and full series only on request, 
 - Results are compact JSON; failures are tool errors in plain words (`plan source not configured: …`). Without an intervals.icu key
   the plan tools say so and the others work.
 
+**Settled in stage A1b of v0.4.0 (ADR 0033):** `create_workout` and `update_workout` accept the `hr` step (§8.1) and say, for a model, **when to use
+it**: base training and endurance where the heart rate and not the power is the aim, a day when the rider's condition is uncertain (tired, ill,
+hot, after travel) so that the effort adapts to it, and whenever the FTP is unknown or doubtful; hard intervals stay power steps. They refuse a
+target as a fraction of the threshold while the profile has none. `list_planned_workouts` outlines the step (`40m hr 135bpm (80-220W)`) and counts its
+seconds apart as `heartRateSeconds`, which `estimatedTss` leaves out. `get_ride` (and `get_activity` for a ride) gains **`stallGuard`** (how many times the
+guard took hold, in which steps, at which minutes; 0 when it never did) and, for each heart-rate step in `compliance`, the time inside the band.
+
 **Settled in stage P3-1 (ADR 0022):** `get_fitness` gives load, fitness, fatigue and form (today and the change over 7 and 28 days, the weekly
 loads, optionally every day), the best efforts at 5 s, 1, 5, 20 and 60 minutes in the range and ever, the aerobic drift of steady rides and the
 FTP with its **suggestion and basis**; the eFTP is described, and returned, as only a suggestion that is not to be written to the profile
@@ -1218,6 +1266,27 @@ In ERG a falling cadence makes the trainer raise torque, which drops cadence fur
 - The overlay shows that the guard is active.
 - Each activation is recorded as an implicit feedback event with its step.
 
+**Settled in stage A1b of v0.4.0** (ADR 0033, `core` `StallGuard`, `RideEngine`; **nothing here was ridden on the bike**; the settings are first guesses):
+
+- **A pure class in virtual time**, wired into the engine and ticked once per ride second. `RideSettings.stallGuard` (`StallGuardSettings`): `enabled`
+  (**on**), `cadenceFloorRpm` 55, `triggerSeconds` 3, `targetFraction` 0.70, `releaseMarginRpm` 10, `releaseSeconds` 5, `rampBackSeconds` 5,
+  `resumeGraceSeconds` 5, `armTimeoutSeconds` 30. They are engine defaults, not in Settings (stage A1c adds the on/off and the floor there).
+- **It caps whatever the player would command**: the commanded watts are the watts of the step, the intensity setting, the ramp-in after a resume or the
+  heart-rate controller's power, times the guard's factor (0.70 while it holds, rising in whole-second steps back to 1 over 5 s). The snapshot's
+  `targetPower` stays what the step asks, so the overlay can show both; `stallGuardActive` is true from the moment it takes hold until the climb back is over
+  and `stallGuardWatts` is what the trainer is held at. The ride record keeps the workout's target, not the guard's. It applies in **ERG steps only**
+  (steady, ramp, heart-rate); a free-ride step and a ride without a workout have none.
+- **Not judged:** while paused (a pause forgets a guard that had hold: after the resume the ramp-in goes to the full target); for 5 s after a resume
+  (`secondsSinceResume`, ADR 0032); and, after the start or a resume, **until the rider has pedalled at or above the floor once**, at most 30 s: getting
+  up to speed is not a stall, and a rider who restarts after a pause must not trip it. **A missing cadence is not a low cadence** (it breaks the run of
+  low seconds and never counts toward letting go).
+- **Auto-pause wins at 0 rpm** (with auto-pause on): a cadence of exactly 0 is a stop, not a slow rider; it does not count toward taking hold, and a
+  guard that already has hold stays until the pause resets it. With auto-pause off, 0 rpm is below the floor like any cadence.
+- **A new stall while it climbs back takes hold again at once**, and is a new event. **Release** needs 5 ticks in a row at or above floor + 10 rpm.
+- **Recorded** as an event of the ride record (§8.2). The service counts them into `get_ride` and the ride facts, and the discussion-topic row
+  `stall-guard` (§12.3) is switched on: **at least 3 activations in one ride** (`TopicSettings.stallGuardActivations`), after the rows that were there before it;
+  the limit of two topics in any 7 days is unchanged.
+
 ### 11.2 Heart-rate hold
 
 A workout step that holds heart rate in a band by adjusting power. It needs no FTP and matches the load to the day's condition, which suits base training.
@@ -1235,6 +1304,27 @@ A workout step that holds heart rate in a band by adjusting power. It needs no F
 - The two gear buttons shift the target by 2 bpm during the step.
 - Compliance for this step type is time inside the band.
 - Controller gains are tuned on the bike. They are a setting, not a constant.
+
+**Settled in stage A1b of v0.4.0** (ADR 0033, `core` `HeartRateHold`, `HeartRateStep`; the format is §8.1; **found on a first-order model of the heart rate, not
+on a rider**: the owner tunes the numbers, and ADR 0033 lists what to look for):
+
+- **The player treats the step as ERG** whose watts come from `HeartRateHold` (pure, one `tick` per second of riding, no clock); the intensity setting does
+  not apply. The engine makes one controller per heart-rate step (a skip back that restarts the step starts it again), and a pause stops its clock.
+- **Start:** a fixed ramp from `power_min` for `startRampSeconds` (180), ending at `startRampFraction` (0.3) of the way up the range `[power_min, power_max]`,
+  heart rate not judged (`HeartRateHoldState.startRamp`, and no `targetHeartRate` in the record). Then the controller takes over from the power reached.
+- **Decisions every 10 s**, deliberately slow: the heart rate is smoothed (time constant `smoothingSeconds` 15), its slope is taken over `trendWindowSeconds`
+  (30), the error is the target minus where the trend is heading (`smoothed + leadSeconds (30) x slope`), and the power moves by `gainWattsPerBpm` (0.5) times
+  the error, **at most `maxStepUpWatts` (5) up and `maxStepDownWatts` (10) down**, nothing inside `deadbandBpm` (1); no decision until the window is full.
+  Power never leaves `[power_min, power_max]` (in the engine also not above `maxTargetWatts`). After a resume the filter starts over, the power stays where it was
+  and nothing is decided for 30 s (the heart rate fell while the rider rested); while the stall guard holds the controller is frozen (it does not wind up against it).
+- **Strap loss:** no heart rate for 15 s (`signalHoldSeconds`): `signalLost`, the last power is held (it was from the first missing second: a second without a
+  heart rate decides nothing); for 60 s (`signalDropSeconds`): the power drops to `power_min`, `strapLost` is set and the overlay can say so; when the strap is back the filter
+  starts over and the controller continues from `power_min` within its step limits. (The engine reuses a reading for `heartRateTimeoutSeconds`, 5, first.)
+- **The two gear buttons** (the Click's and the on-screen ones, through `intensityUp`/`intensityDown`) move the target by `targetStepBpm` (2) within
+  `maxTargetOffsetBpm` (20) instead of the intensity; the adjustment stays for the rest of the ride and carries into the next heart-rate step.
+- **Snapshot** (`RideSnapshot.heartRateHold`, null outside the step): `targetBpm`, `band`, `inBand` (null without a signal), `startRamp`, `signalLost`, `strapLost`, `powerMin`,
+  `powerMax`; `targetPower` is the controller's power. **Compliance** is the time inside the band over the judged seconds (§8.2).
+- **Settings** are `RideSettings.heartRateHold` (`HeartRateHoldSettings`) with the defaults above: engine defaults, not in Settings (stage A1c).
 
 ### 11.3 Overlay expands around step changes
 
@@ -1452,7 +1542,7 @@ The automatic post-ride note from 6.5 gains one job: saying when a ride is worth
 createdAt, status }` (`open`, `discussed`, `expired`), attached to the ride note (`GET /v1/insights` carries it), and its text and question are filled in by
 code from the ride's facts, so every number was computed. The reasons are an explicit **rule table**, first match wins: `cut-short` (under 75% of the planned
 length), `power-record` (a new best at 5, 20 or 60 minutes, at least 3 earlier rides, at least 1% above), `load-off-plan` (+30% or −40% against the planned load),
-`repeated-drift` (the second plan-drift alert in 28 days). The signals of later stages (the stall guard, the effort rating, tag streaks, a heart-rate-at-power
+`repeated-drift` (the second plan-drift alert in 28 days), and, since stage A1b of v0.4.0, `stall-guard` (the ERG stall guard took hold at least 3 times in the ride, §11.1). The signals of later stages (the effort rating, tag streaks, a heart-rate-at-power
 trend over repeats) are **named, unavailable rows** to switch on when their stage lands. At most **two topics in any rolling 7 days** and one per ride; a topic
 closes when marked discussed or **14 days** after it was written. Telegram shows the topic after the ride note with the opening question as a monospace block to
 copy. MCP: `list_discussion_topics` (open by default), `mark_discussion_topic` (only to `discussed`).

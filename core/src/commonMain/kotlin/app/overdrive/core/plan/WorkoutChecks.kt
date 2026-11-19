@@ -61,8 +61,8 @@ public fun Workout.playability(): Playability {
 /**
  * The intensity factor the workout's own targets add up to: the normalised power of the targeted power (a 30 s rolling
  * average, the mean of its fourth powers, the fourth root) as a fraction of FTP, which is what a rider calls IF. Targets are
- * already fractions of FTP, so no FTP is needed. Free-ride steps prescribe no power and are left out: the figure describes
- * the structured part. Null when that part is shorter than one 30 s window (nothing to normalise), or when the workout is
+ * already fractions of FTP, so no FTP is needed. Free-ride steps prescribe no power and are left out, and so are heart-rate
+ * steps (spec §11.2), whose power is the controller's: the figure describes the structured part. Null when that part is shorter than one 30 s window (nothing to normalise), or when the workout is
  * one [playability] refuses.
  */
 public fun Workout.intensityFactor(): Double? {

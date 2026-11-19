@@ -48,6 +48,7 @@ the first 16 hex characters. (`workoutStructure` and `workoutHash` in `contracts
 
 - **In the hash:** the step type, the duration in seconds, the targets, the order, and the expansion of repeats (a repeat of 3 blocks and the
   same six steps written out are one session).
+- *Stage A1b of v0.4.0 (ADR 0033):* a heart-rate step has a token of its own, `h2400@135` (its length and its target in bpm; `h900@l880` for a fraction of the threshold heart rate); its band, power limits, label and cadence are not in it, and no earlier token or golden number changed.
 - **Not in the hash:** the workout's `id`, `name` and `description`, every `label`, every `cadence` target, the schema number. So a renamed
   copy, a copy with other labels or cadence targets, and a workout re-imported from intervals.icu under a new event id all match; a changed
   target, duration, order, count or step type does not (`test/repeats-api.test.ts`, `contracts/test/repeats.test.ts`).

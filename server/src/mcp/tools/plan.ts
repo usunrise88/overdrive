@@ -3,6 +3,7 @@ import {
   addDaysToIsoDate,
   isIsoDate,
   MAX_WORKOUTS_RANGE_DAYS,
+  type Profile,
   rangeDays,
   validateWorkout,
   type Workout,
@@ -18,6 +19,11 @@ import { eventIdOf, plannedIdFor } from "../../intervals/ids.ts";
 import { convertIntervalsEvent, workoutToEventPayload } from "../../intervals/workout-convert.ts";
 import { renderWorkoutText } from "../../intervals/workout-text.ts";
 import { PLAN_SOURCE, readPlanEvent } from "../../plan/entries.ts";
+import {
+  NO_THRESHOLD_MESSAGE,
+  thresholdHeartRate,
+  usesThresholdFraction,
+} from "../../plan/heart-rate.ts";
 import { PLAN_HORIZON_DAYS } from "../../plan/refresher.ts";
 import type { PlanEntry } from "../../plan/store.ts";
 import { plannedLoad, workoutDurationSeconds, workoutOutline } from "../../plan/summary.ts";
@@ -52,6 +58,7 @@ function describeEntry(entry: PlanEntry, detail: "summary" | "full") {
     durationSeconds: workoutDurationSeconds(workout),
     estimatedTss: load.estimatedTss,
     ...(load.freeSeconds > 0 ? { freeSeconds: load.freeSeconds } : {}),
+    ...(load.heartRateSeconds === undefined ? {} : { heartRateSeconds: load.heartRateSeconds }),
     outline: workoutOutline(workout),
     ...(detail === "full" ? { workout } : {}),
   };
@@ -76,6 +83,15 @@ function sameSteps(a: Workout, b: Workout): boolean {
 function checkDate(name: string, value: string): void {
   if (!isIsoDate(value))
     throw new ToolError(`${name} ${value} is not a real calendar date, write YYYY-MM-DD`);
+}
+
+/** The same check for the new steps of a workout: a fraction of the threshold needs a threshold (docs/adr/0033). */
+async function requireThreshold(
+  workout: Workout,
+  profile: { get(): Promise<Profile> },
+): Promise<void> {
+  if (!usesThresholdFraction(workout)) return;
+  if (thresholdHeartRate(await profile.get()) === null) throw new ToolError(NO_THRESHOLD_MESSAGE);
 }
 
 export function registerPlanTools(server: McpServer, ctx: ToolContext): void {
@@ -283,7 +299,16 @@ export function registerPlanTools(server: McpServer, ctx: ToolContext): void {
         "Adds a workout to the calendar on a date and returns it as stored, with its id (icu-123). The workout is the native format: " +
         "a name and a list of steps; each step has a duration in whole seconds and a power target as a FRACTION OF FTP (0.88 is 88%), as " +
         "steady (target), ramp (from, to) or free (no target: the rider rides as they like); a repeat (count, steps) repeats leaf steps and " +
-        "cannot nest. Optional per step: label (a cue shown to the rider) and cadence (rpm, shown only). Optional for the workout: " +
+        "cannot nest. A fifth kind, hr (a heart-rate hold), has no power target and needs no FTP: the trainer holds a power that a slow controller " +
+        "adjusts every 10 seconds so that the heart rate stays at the target. Give it duration, a target as target_bpm (beats per minute) or target_lthr " +
+        "(a fraction of the rider's threshold heart rate, 0.88 is 88%: only while the profile has a threshold heart rate, else the workout is refused), " +
+        "optionally band (bpm either side of the target that counts as on target, default 5), and power_min and power_max (watts, absolute, the controller " +
+        "never leaves them; power_min below power_max). USE hr for base training and endurance (zone 2) where the heart rate, not the power, is the aim, " +
+        "for a day when the rider's condition is uncertain (tired, ill, hot, after travel) so the effort adapts to the day, and whenever the FTP is unknown " +
+        "or doubtful. Choose the limits from what the rider rides at that heart rate (get_ride and get_fitness show it): wide enough for the controller to find " +
+        "the power, narrow enough to be safe; power_min is also where the first minutes start. Leave hard intervals as power steps. Example of such a step: " +
+        '{"type":"hr","duration":2400,"target_bpm":135,"band":5,"power_min":90,"power_max":210,"label":"Zone 2 by heart rate"}. ' +
+        "Optional per step: label (a cue shown to the rider) and cadence (rpm, shown only). Optional for the workout: " +
         'description. Example: {"name":"Sweet spot 2x20","steps":[{"type":"ramp","duration":600,"from":0.45,"to":0.7,' +
         '"label":"Warm-up"},{"type":"repeat","count":2,"steps":[{"type":"steady","duration":1200,"target":0.9},{"type":"steady",' +
         '"duration":300,"target":0.5}]},{"type":"free","duration":300,"label":"Cool-down"}]}. ' +
@@ -306,6 +331,7 @@ export function registerPlanTools(server: McpServer, ctx: ToolContext): void {
       const valid = validateWorkout(candidate);
       if (!valid.ok)
         throw new ToolError(`workout does not validate: ${valid.errors.slice(0, 5).join("; ")}`);
+      await requireThreshold(valid.value, services.profile);
 
       const created = await calendar.createEvent(workoutToEventPayload(valid.value, date));
       const { entry, warnings } = await remember(created, valid.value);
@@ -328,7 +354,7 @@ export function registerPlanTools(server: McpServer, ctx: ToolContext): void {
       description:
         "Changes a planned workout in the calendar: its name, its date (moving it to another day), its steps, or any of them, and returns " +
         "it as stored. Give at least one. id is the workout's id from list_planned_workouts (icu-123). steps replaces all the steps " +
-        "(same format as create_workout: fractions of FTP, whole seconds) and drops the old description. Only workouts can be changed here, " +
+        "(same format as create_workout: fractions of FTP, whole seconds, and heart-rate hold steps hr) and drops the old description. Only workouts can be changed here, " +
         "not other calendar entries. Does not ask for confirmation: change only what the rider asked for.",
       input: {
         id: z.string().describe("The planned workout's id, icu-123."),
@@ -367,6 +393,7 @@ export function registerPlanTools(server: McpServer, ctx: ToolContext): void {
         const valid = validateWorkout(draft);
         if (!valid.ok)
           throw new ToolError(`workout does not validate: ${valid.errors.slice(0, 5).join("; ")}`);
+        await requireThreshold(valid.value, services.profile);
         fallback = valid.value;
         payload.description = renderWorkoutText(valid.value);
       }

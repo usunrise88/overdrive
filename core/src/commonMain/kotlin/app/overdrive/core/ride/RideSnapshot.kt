@@ -63,6 +63,23 @@ public data class RideSnapshot(
      * tick come early, so a guard of *n* seconds covers between *n* - 1 and *n* real seconds.
      */
     val secondsSinceResume: Int? = null,
+    /**
+     * The ERG stall guard is lowering the target (spec §11.1, docs/adr/0033): cadence fell below the floor, so the trainer is
+     * held at a fraction of [targetPower] until the rider is pedalling again, and then the target climbs back for a few
+     * seconds, during which this stays true. False in every other case. The overlay says that the guard is active.
+     */
+    val stallGuardActive: Boolean = false,
+    /**
+     * The power in watts the trainer is held at while [stallGuardActive], else null: [targetPower] scaled by the guard. It
+     * is below [targetPower] while the guard holds and climbs to it as the guard lets go.
+     */
+    val stallGuardWatts: Int? = null,
+    /**
+     * What the overlay shows of a heart-rate step (spec §11.2): the target heart rate, the band, whether the heart rate is in
+     * it, and whether the strap was lost. Null outside a heart-rate step. In such a step [targetPower] is the controller's
+     * current power and [intensityPercent] does not apply.
+     */
+    val heartRateHold: HeartRateHoldState? = null,
 ) {
     init {
         require(ftp > 0) { "FTP must be positive, got $ftp" }
@@ -70,6 +87,7 @@ public data class RideSnapshot(
         require(secondsSinceResume == null || secondsSinceResume >= 0) {
             "Seconds since the resume must not be negative, got $secondsSinceResume"
         }
+        require(stallGuardActive || stallGuardWatts == null) { "A guard target needs an active guard" }
         require(gearCount >= 1) { "Gear count must be at least 1, got $gearCount" }
         require(neutralGear in 1..gearCount) { "Neutral gear $neutralGear is outside 1..$gearCount" }
         require(gear == null || gear in 1..gearCount) { "Gear $gear is outside 1..$gearCount" }
