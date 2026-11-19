@@ -25,6 +25,7 @@ import app.overdrive.core.health.RunReason
 import app.overdrive.core.health.RunResult
 import app.overdrive.core.metrics.MetricsApiJson
 import app.overdrive.core.metrics.RideDetailResponse
+import app.overdrive.core.notebook.NotebookResponse
 import app.overdrive.core.outdoor.FitFlush
 import app.overdrive.core.outdoor.FitFlushReason
 import app.overdrive.core.outdoor.FitImporter
@@ -57,6 +58,7 @@ import app.overdrive.core.remote.ServiceProblem
 import app.overdrive.core.remote.WellnessRange
 import app.overdrive.core.remote.WellnessResources
 import app.overdrive.core.remote.WellnessView
+import app.overdrive.core.remote.notebookResource
 import app.overdrive.core.remote.recoveryResource
 import app.overdrive.core.remote.repeatsResource
 import app.overdrive.core.repeats.RepeatDetailResponse
@@ -150,6 +152,9 @@ sealed interface RefreshTarget {
     data class RepeatDetail(
         val hash: String,
     ) : RefreshTarget
+
+    /** The coach notebook, from its page (design/companion.md §4.13). */
+    data object Notebook : RefreshTarget
 
     data class RideDetail(
         val id: String,
@@ -254,6 +259,10 @@ class CompanionContainer(
     /** The repeated sessions (`GET /v1/repeats`, spec §11.7): the list of the Rides tab's second view. */
     val repeats: RemoteResource<RepeatsResponse> =
         repeatsResource(client, ::config, file("repeats"), wall, elapsedMillis)
+
+    /** The coach notebook (`GET /v1/notebook`, spec §11.6): read-only in the companion, its own page (design/companion.md §4.13). */
+    val notebook: RemoteResource<NotebookResponse> =
+        notebookResource(client, ::config, file("notebook"), wall, elapsedMillis)
 
     private val repeatStores = FileTextStores(File(cache, "repeat-details"))
     private val repeatDetails: RepeatDetails =
@@ -403,6 +412,7 @@ class CompanionContainer(
             recovery.load()
             insights.load()
             repeats.load()
+            notebook.load()
             health.load()
             fits.load()
             var first = true
@@ -418,6 +428,7 @@ class CompanionContainer(
                 insights.settingsChanged()
                 repeats.settingsChanged()
                 repeatDetails.settingsChanged()
+                notebook.settingsChanged()
                 if (!first) delay(settleMillis)
                 val why = if (first) Refresh.START else Refresh.SETTINGS_CHANGED
                 first = false
@@ -563,6 +574,10 @@ class CompanionContainer(
                 launch { repeatDetails.resource(target.hash).refresh(why) }
             }
 
+            RefreshTarget.Notebook -> {
+                launch { notebook.refresh(why) }
+            }
+
             RefreshTarget.Fitness -> {
                 launch { metrics.resource(settings.value?.fitnessRange ?: MetricsRange.DEFAULT).refresh(why) }
             }
@@ -618,6 +633,7 @@ class CompanionContainer(
                     launch { recovery.refresh(Refresh.REQUESTED) }
                     launch { insights.refresh(Refresh.REQUESTED) }
                     launch { repeats.refresh(Refresh.REQUESTED) }
+                    launch { notebook.refresh(Refresh.REQUESTED) }
                     // The files shared from OnelapFit that wait: the rider asked, so the backoff does not apply (ADR 0028).
                     launch { fits.flush(FitFlushReason.MANUAL) }
                     launch {
