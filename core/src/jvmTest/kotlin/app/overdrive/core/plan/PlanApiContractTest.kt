@@ -1,7 +1,12 @@
 package app.overdrive.core.plan
 
 import app.overdrive.core.workout.FreeStep
+import app.overdrive.core.workout.HeartRateStep
+import app.overdrive.core.workout.RampStep
 import app.overdrive.core.workout.RepeatStep
+import app.overdrive.core.workout.SteadyStep
+import app.overdrive.core.workout.Step
+import app.overdrive.core.workout.Workout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -12,7 +17,9 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
+import java.security.MessageDigest
 import java.time.LocalDate
+import kotlin.math.roundToLong
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -29,11 +36,21 @@ import kotlin.test.assertTrue
 class PlanApiContractTest {
     private val contracts = File(System.getProperty("overdrive.contracts.dir"))
 
+    /** The plan fixtures, and those of the easier variant and the route ids of stage A2b-1 under `fixtures/routes/workouts-response`. */
     private fun fixtures(kind: String): List<File> =
-        File(contracts, "fixtures/plan/workouts-response/$kind")
-            .listFiles { f -> f.extension == "json" }
-            .orEmpty()
+        listOf(
+            File(contracts, "fixtures/plan/workouts-response/$kind"),
+            File(contracts, "fixtures/routes/workouts-response/$kind"),
+        ).flatMap { dir -> dir.listFiles { f -> f.extension == "json" }.orEmpty().toList() }
             .sortedBy { it.name }
+
+    /**
+     * The one rule of the schema's description that only the service enforces: a variant's `structureHash` is the `workoutHash` of the
+     * primary with the variant's steps. The tablet never computes it (it only groups sessions on the service), so this fixture, whose hash
+     * is the primary's own, is the one the strict decoder accepts; [the hash of a variant is the service's one] checks the others
+     * against a port of the algorithm.
+     */
+    private val serviceOnly = setOf("variant-hash-of-the-primary.json")
 
     /** Numbers compare by value (the fixtures write `90`, Kotlin writes a Double as `90.0`). */
     private fun normalize(element: JsonElement): JsonElement =
@@ -77,9 +94,98 @@ class PlanApiContractTest {
 
     @Test
     fun `rejects every invalid fixture`() {
-        for (file in fixtures("invalid")) {
+        for (file in fixtures("invalid").filter { it.name !in serviceOnly }) {
             assertFailsWith<IllegalArgumentException>(file.name) { PlanApiJson.decodeWorkoutsResponse(file.readText()) }
         }
+    }
+
+    @Test
+    fun `the hash of a variant is the service's one`() {
+        // A port of `workoutHash` of contracts/src/repeats.ts, test-only: the tablet does not compute it.
+        fun token(step: Step): List<String> =
+            when (step) {
+                is SteadyStep -> {
+                    listOf("s${step.duration}@${(step.target * 1000).roundToLong()}")
+                }
+
+                is RampStep -> {
+                    listOf("r${step.duration}@${(step.from * 1000).roundToLong()}-${(step.to * 1000).roundToLong()}")
+                }
+
+                is FreeStep -> {
+                    listOf("f${step.duration}")
+                }
+
+                is HeartRateStep -> {
+                    listOf(
+                        "h${step.duration}@" +
+                            (step.targetBpm?.toString() ?: "l${((step.targetLthr ?: 0.0) * 1000).roundToLong()}"),
+                    )
+                }
+
+                is RepeatStep -> {
+                    List(step.count) { step.steps.flatMap(::token) }.flatten()
+                }
+            }
+
+        fun hash(workout: Workout): String {
+            val text = "overdrive.workout-structure.v1\n" + workout.steps.flatMap(::token).joinToString(",")
+            return MessageDigest
+                .getInstance("SHA-256")
+                .digest(text.encodeToByteArray())
+                .joinToString("") {
+                    "%02x".format(it)
+                }.take(16)
+        }
+        val all = fixtures("valid")
+        val withVariants =
+            all.flatMap { PlanApiJson.decodeWorkoutsResponse(it.readText()).workouts }.filter {
+                it.variant !=
+                    null
+            }
+        assertTrue(withVariants.size >= 2, "the fixtures have variants")
+        for (planned in withVariants) {
+            assertEquals(hash(checkNotNull(planned.variantWorkout())), planned.variant?.structureHash, planned.id)
+        }
+        // The invalid one carries the hash of the primary, which is not the variant's.
+        val wrong = fixtures("invalid").single { it.name == "variant-hash-of-the-primary.json" }
+        val entry = PlanApiJson.decodeWorkoutsResponse(wrong.readText()).workouts.single()
+        assertEquals(hash(entry.workout), entry.variant?.structureHash)
+        assertTrue(hash(checkNotNull(entry.variantWorkout())) != entry.variant?.structureHash)
+    }
+
+    @Test
+    fun `an entry with a variant is the planned workout and the easier version, and one without is as it was`() {
+        val response =
+            PlanApiJson.decodeWorkoutsResponse(
+                File(contracts, "fixtures/routes/workouts-response/valid/with-variant.json").readText(),
+            )
+        val planned = response.workouts.single()
+        val variant = assertNotNull(planned.variant)
+        assertEquals("Two efforts at 80%, about 25 minutes shorter.", variant.note)
+        assertEquals("7b1d651527c24b0c", variant.structureHash)
+        // The tablet plays the planned workout with the variant's steps; the id, and so the ride's workoutId, stays the planned one.
+        val easier = assertNotNull(planned.variantWorkout())
+        assertEquals(planned.id, easier.id)
+        assertEquals(planned.workout.name, easier.name)
+        assertEquals(variant.steps, easier.steps)
+        assertTrue(easier.steps != planned.workout.steps)
+
+        val noNote =
+            PlanApiJson
+                .decodeWorkoutsResponse(
+                    File(contracts, "fixtures/routes/workouts-response/valid/variant-without-note.json").readText(),
+                ).workouts
+                .single()
+        assertNull(noNote.variant?.note)
+
+        val before =
+            PlanApiJson.decodeWorkoutsResponse(
+                File(contracts, "fixtures/plan/workouts-response/valid/week.json").readText(),
+            )
+        assertTrue(before.workouts.all { it.variant == null && it.variantWorkout() == null })
+        // A variant that is absent is not written: an answer without one is written exactly as it was.
+        assertTrue(!PlanApiJson.encodeWorkoutsResponse(before).contains("variant"))
     }
 
     @Test

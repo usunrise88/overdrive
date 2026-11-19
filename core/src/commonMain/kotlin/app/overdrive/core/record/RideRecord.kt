@@ -1,5 +1,6 @@
 package app.overdrive.core.record
 
+import app.overdrive.core.workout.isValidRouteId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -73,11 +74,40 @@ public data class RideHeader(
     val ftp: Int,
     /** Names of the devices the ride used, trainer first. */
     val devices: List<String> = emptyList(),
+    /**
+     * The id of the route (the service's, spec §11.4) whose grade fed the trainer: the first route-backed free step of the workout,
+     * or the route chosen for a ride without a workout. Null for a ride on the flat, and then **absent from the wire**, so a record
+     * of a ride without a route is byte for byte what it was before routes. A route deleted later leaves the ride valid.
+     */
+    val routeId: String? = null,
+    /** The route's name when it was ridden, kept so the ride still says which route it was after the route is gone; only with [routeId]. */
+    val routeName: String? = null,
+    /**
+     * `true` when the rider chose the planned workout's easier variant (spec §11.5): [workoutId] is the planned workout's and the
+     * steps ridden are the variant's. Null when the workout itself was ridden, and then **absent from the wire**, like the route (the
+     * schema also lets a producer write `false` or `null`; both mean the same, see [wasVariantRidden]).
+     */
+    val variantRidden: Boolean? = null,
 ) {
     init {
         require(id.isNotEmpty()) { "A ride needs an id" }
         require(startEpochMillis >= 0) { "A ride cannot start before 1970, got $startEpochMillis" }
         require(ftp > 0) { "FTP must be positive, got $ftp" }
+        require(routeId == null || isValidRouteId(routeId)) { "Not a route id: '$routeId'" }
+        require(routeName == null || (routeId != null && routeName.length in 1..MAX_ROUTE_NAME_CHARS)) {
+            "A route name has 1 to $MAX_ROUTE_NAME_CHARS characters and goes with a route id"
+        }
+        require(variantRidden != true || workoutId != null) {
+            "A variant is ridden as a version of a planned workout, which has an id"
+        }
+    }
+
+    /** Whether the easier variant was ridden (spec §11.5). */
+    public val wasVariantRidden: Boolean get() = variantRidden == true
+
+    public companion object {
+        /** The longest route name a record keeps, in characters (`contracts/schema/route.schema.json`). */
+        public const val MAX_ROUTE_NAME_CHARS: Int = 100
     }
 }
 

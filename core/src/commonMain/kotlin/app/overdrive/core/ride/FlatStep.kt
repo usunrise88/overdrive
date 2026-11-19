@@ -62,6 +62,8 @@ public data class FlatStep(
     val repeatCount: Int? = null,
     /** Set for a heart-rate step (spec §11.2), else null. */
     val heartRate: HeartRateTarget? = null,
+    /** The route (spec §11.4) that backs a free-ride step, else null: the step is flat. Only a free-ride step has one. */
+    val routeId: String? = null,
 ) {
     init {
         require(durationSeconds >= 1) { "A step lasts at least one second, got $durationSeconds" }
@@ -71,6 +73,7 @@ public data class FlatStep(
         require(
             (mode == TrainerMode.ERG) == (targetFrom != null || heartRate != null),
         ) { "ERG steps have a target, simulation steps do not" }
+        require(routeId == null || mode == TrainerMode.SIMULATION) { "Only a free-ride step has a route" }
         require((repeatIteration == null) == (repeatCount == null)) { "Repeat iteration and count go together" }
         require(repeatIteration == null || repeatIteration in 1..checkNotNull(repeatCount)) {
             "Repeat iteration $repeatIteration is outside 1..$repeatCount"
@@ -119,6 +122,7 @@ public fun Workout.flatSteps(thresholdHeartRate: Int? = null): List<FlatStep> {
         count: Int?,
     ) {
         var heartRate: HeartRateTarget? = null
+        var routeId: String? = null
         val (default, from, to) =
             when (leaf) {
                 is SteadyStep -> {
@@ -130,6 +134,7 @@ public fun Workout.flatSteps(thresholdHeartRate: Int? = null): List<FlatStep> {
                 }
 
                 is FreeStep -> {
+                    routeId = leaf.routeId
                     Triple("Free ride", null, null)
                 }
 
@@ -153,6 +158,7 @@ public fun Workout.flatSteps(thresholdHeartRate: Int? = null): List<FlatStep> {
                 targetTo = to,
                 mode = if (from == null && heartRate == null) TrainerMode.SIMULATION else TrainerMode.ERG,
                 heartRate = heartRate,
+                routeId = routeId,
                 startSeconds = start,
                 cadence = leaf.cadence,
                 repeatIteration = iteration,

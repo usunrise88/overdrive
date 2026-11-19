@@ -1,9 +1,13 @@
 package app.overdrive.core.plan
 
+import app.overdrive.core.workout.Step
 import app.overdrive.core.workout.Workout
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 
 /** Where a planned workout comes from (`contracts/schema/workouts-response.schema.json`). */
 @Serializable
@@ -13,9 +17,42 @@ public enum class PlanSource {
 }
 
 /**
+ * The easier version of a planned session (spec §11.5, ADR 0036), written by the coach agent and kept only in the service:
+ * intervals.icu and Google Calendar hold the primary. The rider chooses between the two at the start of the ride; riding this
+ * one is recorded as `ride.variantRidden`.
+ *
+ * @property steps the steps in the workout's own format: the tablet plays the planned [PlannedWorkout.workout] with these steps
+ * (see [PlannedWorkout.variantWorkout]), so the ride keeps the planned workout's id.
+ * @property note a short line (1 to 200 characters) saying how it differs, shown under the version's name; absent when the agent
+ * wrote none.
+ * @property structureHash `workoutHash` of the primary with these steps, 16 lower-case hex characters. The tablet never computes
+ * it (it is how the service recognises a variant ride as a session of its own); it only checks the syntax.
+ */
+@Serializable
+public data class PlannedVariant(
+    val steps: List<Step>,
+    val note: String? = null,
+    val structureHash: String,
+) {
+    init {
+        require(steps.isNotEmpty()) { "A variant needs at least one step" }
+        require(note == null || note.length in 1..MAX_NOTE_CHARS) {
+            "A variant's note has 1 to $MAX_NOTE_CHARS characters"
+        }
+        require(PlanApiJson.isValidStructureHash(structureHash)) { "Not a structure hash: '$structureHash'" }
+    }
+
+    public companion object {
+        /** The longest note a variant carries, in characters. */
+        public const val MAX_NOTE_CHARS: Int = 200
+    }
+}
+
+/**
  * One workout of the plan, already converted to the native format. [id] is `icu-123` for intervals.icu event 123 and
  * equals [workout]`.id`, so a ride recorded from it can carry that id as `ride.workoutId`. [date] is the day it is planned
- * for, `YYYY-MM-DD`, in the rider's local time. [name] is the calendar title, the same as `workout.name` today.
+ * for, `YYYY-MM-DD`, in the rider's local time. [name] is the calendar title, the same as `workout.name` today. [variant] is the
+ * easier version when the agent wrote one (spec §11.5), else null: an entry without one is exactly what it was before.
  */
 @Serializable
 public data class PlannedWorkout(
@@ -24,6 +61,7 @@ public data class PlannedWorkout(
     val name: String,
     val source: PlanSource,
     val workout: Workout,
+    val variant: PlannedVariant? = null,
 ) {
     init {
         require(PlanApiJson.isValidPlannedWorkoutId(id)) { "Not a planned workout id: '$id'" }
@@ -31,6 +69,12 @@ public data class PlannedWorkout(
         require(name.isNotEmpty()) { "A planned workout needs a name" }
         require(workout.id == id) { "Workout id '${workout.id}' differs from the planned workout's id '$id'" }
     }
+
+    /**
+     * The workout the easier version plays: the planned [workout] with the variant's steps, so its id (and `ride.workoutId`)
+     * stays the planned workout's. Null without a variant.
+     */
+    public fun variantWorkout(): Workout? = variant?.let { workout.copy(steps = it.steps) }
 }
 
 /**
@@ -134,9 +178,29 @@ public object PlanApiJson {
     /** A UTC instant as `generatedAt` writes it: `2026-11-19T07:30:12Z`, with optional milliseconds. */
     public fun isValidInstant(text: String): Boolean = instantPattern.matches(text)
 
-    /** @throws IllegalArgumentException if [text] is not a planned workouts answer of the schema. */
-    public fun decodeWorkoutsResponse(text: String): WorkoutsResponse =
-        json.decodeFromString(WorkoutsResponse.serializer(), text)
+    private val structureHashPattern = Regex("^[0-9a-f]{16}$")
+
+    /** A variant's `structureHash`: 16 lower-case hex characters. */
+    public fun isValidStructureHash(hash: String): Boolean = structureHashPattern.matches(hash)
+
+    /**
+     * @throws IllegalArgumentException if [text] is not a planned workouts answer of the schema. **A `variant` that is present
+     * is an object**, never `null` (the schema leaves it out when there is none), which the model's nullable field would
+     * otherwise let through.
+     */
+    public fun decodeWorkoutsResponse(text: String): WorkoutsResponse {
+        val response = json.decodeFromString(WorkoutsResponse.serializer(), text)
+        if (text.contains(VARIANT_KEY)) {
+            val entries = (json.parseToJsonElement(text) as? JsonObject)?.get("workouts") as? JsonArray
+            for (entry in entries.orEmpty()) {
+                val variant = (entry as? JsonObject)?.get("variant")
+                require(variant !is JsonNull) { "A planned workout's variant is an object when present, not null" }
+            }
+        }
+        return response
+    }
+
+    private const val VARIANT_KEY = "\"variant\""
 
     public fun encodeWorkoutsResponse(response: WorkoutsResponse): String =
         json.encodeToString(WorkoutsResponse.serializer(), response)
