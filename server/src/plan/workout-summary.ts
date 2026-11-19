@@ -57,6 +57,14 @@ function leaf(step: LeafStep): string {
     }
     case "free":
       return `${length} ${label === "" ? "free ride" : label}`;
+    case "hr": {
+      const target =
+        step.target_bpm !== undefined
+          ? `${step.target_bpm} bpm`
+          : `${percent(step.target_lthr ?? 0)}% of threshold heart rate`;
+      const limits = `${step.power_min} to ${step.power_max} W`;
+      return `${length} ${label === "" ? "by heart rate" : `${label} by heart rate`} at ${target} (${limits})`;
+    }
   }
 }
 

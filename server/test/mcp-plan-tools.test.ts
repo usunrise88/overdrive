@@ -180,6 +180,7 @@ describe("the tools and what they say about themselves", () => {
       "steady",
       "ramp",
       "free",
+      "hr",
       "repeat",
     ]);
     expect(create?.inputSchema.required).toEqual(["date", "workout"]);

@@ -1,6 +1,7 @@
 import { MAX_WORKOUTS_RANGE_DAYS, rangeDays, type WorkoutsResponse } from "@overdrive/contracts";
 import type { FastifyInstance } from "fastify";
 import { HttpError } from "../errors.ts";
+import { resolveHeartRateTargets } from "./heart-rate.ts";
 import { PLAN_SOURCE, type PlanRefresher } from "./refresher.ts";
 import type { PlanStore } from "./store.ts";
 
@@ -8,6 +9,11 @@ export interface PlanRoutesOptions {
   store: PlanStore;
   /** null when no plan source is configured. */
   refresher: PlanRefresher | null;
+  /**
+   * The rider's threshold heart rate in bpm (the profile's, else its estimate), or null when none is known: a heart-rate step
+   * that gives its target as a fraction of it is served with the beats worked out (spec §11.2, docs/adr/0033).
+   */
+  thresholdHeartRate?: () => Promise<number | null>;
 }
 
 interface Query {
@@ -31,10 +37,11 @@ function dateParam(name: string, value: unknown): string {
  *   those days (at most 62), converted to the native format. It never waits for intervals.icu
  *   unless `refresh=true`, and then for at most ten seconds; if the source cannot be reached the
  *   answer is the cache with `stale: true`. With no plan source configured it is an empty list
- *   with `configured: false`.
+ *   with `configured: false`. A heart-rate step (spec §11.2) whose target is a fraction of the threshold heart rate is served with
+ *   the beats worked out from the profile's threshold (docs/adr/0033).
  */
 export function planRoutes(app: FastifyInstance, options: PlanRoutesOptions): void {
-  const { store, refresher } = options;
+  const { store, refresher, thresholdHeartRate } = options;
 
   app.get<Query>("/workouts", async (request, reply) => {
     const from = dateParam("from", request.query.from);
@@ -77,7 +84,13 @@ export function planRoutes(app: FastifyInstance, options: PlanRoutesOptions): vo
     }
 
     const state = await store.syncState(PLAN_SOURCE);
-    const workouts = await store.list({ from, to });
+    const planned = await store.list({ from, to });
+    // The tablet holds a number of beats: a target that is a fraction of the threshold is resolved here, on the way out.
+    const threshold = thresholdHeartRate === undefined ? null : await thresholdHeartRate();
+    const workouts = planned.map((entry) => ({
+      ...entry,
+      workout: resolveHeartRateTargets(entry.workout, threshold),
+    }));
     const body: WorkoutsResponse = {
       from,
       to,

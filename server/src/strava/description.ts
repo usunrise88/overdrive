@@ -53,6 +53,13 @@ function leaf(step: LeafStep): string {
   if (step.type === "steady") return `${length} at ${percent(step.target)}% FTP`;
   if (step.type === "ramp")
     return `${length} ramp ${percent(step.from)} to ${percent(step.to)}% FTP`;
+  if (step.type === "hr") {
+    const target =
+      step.target_bpm !== undefined
+        ? `${step.target_bpm} bpm`
+        : `${percent(step.target_lthr ?? 0)}% of threshold heart rate`;
+    return `${length} by heart rate at ${target}, ${step.power_min} to ${step.power_max} W`;
+  }
   return `${length} free`;
 }
 

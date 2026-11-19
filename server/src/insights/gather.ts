@@ -3,7 +3,7 @@ import { addDaysToIsoDate } from "@overdrive/contracts";
 import type { MetricsService } from "../metrics/service.ts";
 import type { PlanStore } from "../plan/store.ts";
 import type { ProfileStore } from "../profile/store.ts";
-import { rideCompliance } from "../ride-stats.ts";
+import { rideCompliance, stallGuardSummary } from "../ride-stats.ts";
 import type { RideStore } from "../ride-store.ts";
 import type { RideWorkoutResolver } from "../ride-workout.ts";
 import type { PlanHistory } from "../telegram/history.ts";
@@ -215,6 +215,7 @@ export function createGatherer(deps: GatherDeps): Gatherer {
           atSec: detail.wPrimeLowest.atSec,
         },
         form: await formOn(detail.date),
+        stallGuard: stallGuardSummary(record, workout),
       };
     },
 

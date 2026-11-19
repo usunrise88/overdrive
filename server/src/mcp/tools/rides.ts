@@ -7,6 +7,7 @@ import {
   rideCompliance,
   rideSeries,
   rideStatistics,
+  stallGuardSummary,
 } from "../../ride-stats.ts";
 import type { RideListing } from "../../ride-store.ts";
 import { dayStartMillis, localDate } from "../../time.ts";
@@ -145,7 +146,10 @@ export function registerRideTools(server: McpServer, ctx: ToolContext): RideTool
         "seconds not paused) and cadence. laps: one per stretch of the ride in one workout step, with its average power and heart rate. " +
         "compliance: when the ride was played from a planned workout, for each step the planned length and power (the target times the " +
         "ride's FTP) against the time actually spent and the average power ridden, with the difference in watts and percent, plus totals " +
-        "over the steps with a power target; otherwise it says why there is nothing to compare. By default no time series is included. " +
+        "over the steps with a power target; a heart-rate hold step (type hr) has no planned power and instead says how long the heart rate was inside its band " +
+        "(heartRate: the target, the band, the seconds judged and inside it, the percent); otherwise it says why there is nothing to compare. " +
+        "stallGuard: how many times the ERG stall guard took hold (cadence fell below its floor and the trainer was held at 70% of the target until the rider was " +
+        "pedalling again), in which steps and at which minutes; 0 when it never did. By default no time series is included. " +
         "series true adds power, heart rate, cadence and target power averaged over steps of seriesStepSeconds (default 10, longer for a " +
         "very long ride so that no series has more than 1200 points); ask for it only when the numbers above are not enough, it is large. " +
         "powerCurve: the best average power over each of 25 durations from 1 s to 2 h in which the ride is long enough, a pause or a missing reading counting as 0 W. " +
@@ -230,6 +234,7 @@ export function registerRideTools(server: McpServer, ctx: ToolContext): RideTool
           averageHeartRate: round(lap.averageHeartRate, 1),
         })),
         compliance,
+        stallGuard: stallGuardSummary(record, resolved.workout),
         powerCurve: computed?.powerCurve ?? [],
         aerobicDrift: computed?.drift ?? null,
         wPrimeBalance: computed?.wPrimeBalance ?? null,

@@ -391,7 +391,7 @@ describe("the writer", () => {
     const user = llm.calls[0]?.body.messages[1]?.content ?? "";
     expect(system).toContain(PROMPTS.ride.limit);
     expect(user).toContain(PROMPTS.ride.instructions);
-    expect(promptVersion("ride")).toBe("ride.v1+rules.v1");
+    expect(promptVersion("ride")).toBe("ride.v2+rules.v1");
   });
 
   it("logs the kind, how it was written and how many requests, but no number, sentence, key or address", async () => {

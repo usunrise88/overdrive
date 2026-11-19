@@ -1,6 +1,7 @@
 import {
   addDaysToIsoDate,
   type FreeStep,
+  type HrStep,
   isIsoDate,
   type LeafStep,
   type RampStep,
@@ -11,7 +12,7 @@ import {
 } from "@overdrive/contracts";
 import type { IntervalsEvent, IntervalsEventPayload } from "./client.ts";
 import { type DocStep, type DocValue, readWorkoutDoc, Unsupported } from "./workout-doc.ts";
-import { parseWorkoutText, renderWorkoutText } from "./workout-text.ts";
+import { type HrNote, parseHrNotes, parseWorkoutText, renderWorkoutText } from "./workout-text.ts";
 
 /**
  * The adapter between intervals.icu workouts and the native workout format (spec §5.1, §8.1;
@@ -35,6 +36,10 @@ interface Context {
   /** The FTP in watts the targets are relative to, when intervals.icu says. */
   ftp: number | null;
   notes: string[];
+  /** The heart-rate notes of the description, by the number of the step line they are for (see `workout-text.ts`). */
+  heartRateNotes: Map<number, HrNote>;
+  /** How many step lines have been read so far: the number of the one being read. */
+  stepLine: number;
 }
 
 /** Fractions of FTP are kept to three decimals: 0.833, not 0.8333333. */
@@ -96,7 +101,39 @@ function cadenceOf(value: DocValue | undefined): number | undefined {
   return rpm > 0 ? rpm : undefined;
 }
 
+/**
+ * The heart-rate step a note describes, when the step line it numbers is still the one written for it: its duration and the
+ * power range that carries the controller's limits agree. Otherwise null, and the step is read as any step.
+ */
+function heartRateStepOf(
+  step: DocStep,
+  note: HrNote | undefined,
+  extras: { cadence?: number; label?: string },
+  duration: number,
+): HrStep | null {
+  if (note === undefined) return null;
+  const power = step.power;
+  const [low, high] = power === undefined ? [] : ends(power);
+  if (power?.units !== "w" || low !== note.powerMin || high !== note.powerMax) return null;
+  // The note keeps the label whole: the step line's cue lost the words that start with a digit.
+  const { label: _cue, ...rest } = extras;
+  return {
+    type: "hr",
+    duration,
+    ...(note.targetBpm === null
+      ? { target_lthr: note.targetLthr ?? 0 }
+      : { target_bpm: note.targetBpm }),
+    ...(note.band === null ? {} : { band: note.band }),
+    power_min: note.powerMin,
+    power_max: note.powerMax,
+    ...rest,
+    ...(note.label === null ? {} : { label: note.label }),
+  };
+}
+
 function leafOf(step: DocStep, context: Context): LeafStep {
+  context.stepLine += 1;
+  const note = context.heartRateNotes.get(context.stepLine);
   if (step.until_lap_press === true) {
     throw new Unsupported("a step that lasts until the lap button is pressed");
   }
@@ -115,6 +152,13 @@ function leafOf(step: DocStep, context: Context): LeafStep {
   if (step.text !== undefined) extras.label = step.text;
 
   if (step.freeride === true) return { type: "free", duration, ...extras } satisfies FreeStep;
+  const held = heartRateStepOf(step, note, extras, duration);
+  if (held !== null) return held;
+  if (note !== undefined) {
+    context.notes.push(
+      `the heart-rate note for step ${context.stepLine} does not match the step as it stands, so it was read as a power step`,
+    );
+  }
   const target = powerTarget(step, context);
   if (target === null) {
     // No power target (nothing, or a heart-rate or pace target a trainer cannot hold): ride free.
@@ -183,6 +227,9 @@ export function convertIntervalsEvent(event: IntervalsEvent, id: string): Conver
   try {
     const name = (event.name ?? "").trim() || "Workout";
     const doc = readWorkoutDoc(event.workout_doc);
+    // A description with heart-rate notes was written by this service from a native workout: its own text is read, not the
+    // parsed steps intervals.icu made of it (which cannot hold a heart-rate step), so the step lines and the notes agree.
+    const heartRateNotes = parseHrNotes(event.description);
     const context: Context = {
       ftp:
         doc?.ftp ??
@@ -190,9 +237,11 @@ export function convertIntervalsEvent(event: IntervalsEvent, id: string): Conver
           ? event.icu_ftp
           : null),
       notes: [],
+      heartRateNotes,
+      stepLine: 0,
     };
 
-    let docSteps: DocStep[] = doc?.steps ?? [];
+    let docSteps: DocStep[] = heartRateNotes.size > 0 ? [] : (doc?.steps ?? []);
     if (docSteps.length === 0 && (event.description ?? "").trim() !== "") {
       docSteps = parseWorkoutText(event.description ?? "");
     }

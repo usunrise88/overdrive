@@ -1,4 +1,5 @@
 import {
+  DEFAULT_HR_BAND_BPM,
   type LeafStep,
   powerZoneOf,
   type RideRecord,
@@ -208,18 +209,37 @@ export function rideSeries(samples: RideSample[], requestedStepSeconds: number):
 
 // ---- Compliance with the plan ----------------------------------------------------------------
 
+/** What a heart-rate step (spec §11.2) asks for, as the workout says it. */
+export interface FlatHeartRate {
+  /** The target in bpm; null when the workout gives it as a fraction of the threshold (which the ride resolved itself). */
+  targetBpm: number | null;
+  /** The fraction of the threshold heart rate, when that is how the workout says it. */
+  targetLthr: number | null;
+  /** Half-width of the band in bpm. */
+  band: number;
+  powerMin: number;
+  powerMax: number;
+}
+
 /** One step of a workout with its repeats expanded, as the ride app's `flatSteps` makes them. */
 export interface FlatStep {
   index: number;
   label: string;
-  type: "steady" | "ramp" | "free";
+  type: "steady" | "ramp" | "free" | "hr";
   durationSeconds: number;
-  /** Fraction of FTP at the start and end of the step; null in a free step. */
+  /** Fraction of FTP at the start and end of the step; null in a free step and in a heart-rate step. */
   fromFraction: number | null;
   toFraction: number | null;
+  /** Set for a heart-rate step: there is no fixed power, the target is a heart rate. */
+  heartRate: FlatHeartRate | null;
 }
 
-const DEFAULT_LABEL = { steady: "Steady", ramp: "Ramp", free: "Free ride" } as const;
+const DEFAULT_LABEL = {
+  steady: "Steady",
+  ramp: "Ramp",
+  free: "Free ride",
+  hr: "Heart rate",
+} as const;
 
 export function flattenWorkout(workout: Workout): FlatStep[] {
   const flat: FlatStep[] = [];
@@ -231,6 +251,16 @@ export function flattenWorkout(workout: Workout): FlatStep[] {
       durationSeconds: step.duration,
       fromFraction: step.type === "steady" ? step.target : step.type === "ramp" ? step.from : null,
       toFraction: step.type === "steady" ? step.target : step.type === "ramp" ? step.to : null,
+      heartRate:
+        step.type === "hr"
+          ? {
+              targetBpm: step.target_bpm ?? null,
+              targetLthr: step.target_lthr ?? null,
+              band: step.band ?? DEFAULT_HR_BAND_BPM,
+              powerMin: step.power_min,
+              powerMax: step.power_max,
+            }
+          : null,
     });
   };
   for (const step of workout.steps) {
@@ -243,10 +273,33 @@ export function flattenWorkout(workout: Workout): FlatStep[] {
   return flat;
 }
 
+/**
+ * How a heart-rate step (spec §11.2) went: the time inside the band. A second is judged when the ride was not paused, the
+ * controller was in charge (the sample has `targetHeartRate`: not the start ramp) and there was a heart rate; it is inside the
+ * band when the heart rate is within `band` bpm of that second's target (the step's, moved by the rider's gear buttons).
+ */
+export interface HeartRateCompliance {
+  /** The target in force: the one most of the judged seconds had (the later on a tie), so the rider's adjustments show; null when none was judged. */
+  targetBpm: number | null;
+  /** The workout's own target in bpm; null when it is a fraction of the threshold. */
+  plannedTargetBpm: number | null;
+  band: number;
+  powerMin: number;
+  powerMax: number;
+  /** Seconds judged: the controller was in charge and the strap was heard. */
+  judgedSeconds: number;
+  /** Of those, the seconds inside the band. */
+  secondsInBand: number;
+  /** `secondsInBand` over `judgedSeconds` in percent, one decimal; null when nothing was judged. */
+  inBandPercent: number | null;
+  /** The mean heart rate over the judged seconds. */
+  averageHeartRate: number | null;
+}
+
 export interface StepCompliance {
   step: number;
   label: string;
-  type: "steady" | "ramp" | "free";
+  type: "steady" | "ramp" | "free" | "hr";
   plannedSeconds: number;
   /** Seconds the ride spent in this step, not counting pauses. */
   actualSeconds: number;
@@ -255,6 +308,8 @@ export interface StepCompliance {
   actualWatts: number | null;
   deltaWatts: number | null;
   deltaPercent: number | null;
+  /** Set for a heart-rate step, which has no planned power: how long the heart rate was inside the band. */
+  heartRate: HeartRateCompliance | null;
 }
 
 export interface Compliance {
@@ -272,6 +327,42 @@ export interface Compliance {
     deltaPercent: number | null;
   };
   steps: StepCompliance[];
+}
+
+function heartRateCompliance(planned: FlatHeartRate, samples: RideSample[]): HeartRateCompliance {
+  const judged = samples.filter(
+    (s) => s.targetHeartRate != null && s.heartRate != null && s.heartRate > 0,
+  );
+  // The target the step spent most of its judged time at (the later one on a tie), so the rider's adjustments show.
+  const seconds = new Map<number, number>();
+  for (const s of judged) {
+    const target = s.targetHeartRate as number;
+    seconds.set(target, (seconds.get(target) ?? 0) + 1);
+  }
+  let targetBpm: number | null = null;
+  let most = 0;
+  for (const target of judged.map((s) => s.targetHeartRate as number)) {
+    const count = seconds.get(target) ?? 0;
+    if (count >= most) {
+      most = count;
+      targetBpm = target;
+    }
+  }
+  const inBand = judged.filter(
+    (s) => Math.abs((s.heartRate as number) - (s.targetHeartRate as number)) <= planned.band,
+  ).length;
+  const average = mean(judged.map((s) => s.heartRate as number));
+  return {
+    targetBpm,
+    plannedTargetBpm: planned.targetBpm,
+    band: planned.band,
+    powerMin: planned.powerMin,
+    powerMax: planned.powerMax,
+    judgedSeconds: judged.length,
+    secondsInBand: inBand,
+    inBandPercent: judged.length === 0 ? null : round((inBand / judged.length) * 100, 1),
+    averageHeartRate: average === null ? null : round(average, 1),
+  };
 }
 
 /**
@@ -305,6 +396,7 @@ export function rideCompliance(
       step.fromFraction === null || step.toFraction === null
         ? null
         : ((step.fromFraction + step.toFraction) / 2) * ftp;
+    const heartRate = step.heartRate === null ? null : heartRateCompliance(step.heartRate, samples);
     return {
       step: step.index + 1,
       label: step.label,
@@ -318,10 +410,12 @@ export function rideCompliance(
         planned === null || watts === null || planned === 0
           ? null
           : round(((watts - planned) / planned) * 100, 1),
+      heartRate,
     };
   });
 
-  const targeted = flat.filter((s) => s.type !== "free");
+  // The steps with a power target: a free step has none, and a heart-rate step's power is the controller's.
+  const targeted = flat.filter((s) => s.fromFraction !== null && s.toFraction !== null);
   const plannedTotal = targeted.reduce((a, s) => a + s.durationSeconds, 0);
   const plannedWeighted = targeted.reduce(
     (a, s) =>
@@ -349,5 +443,42 @@ export function rideCompliance(
           : round(((actualTargetWatts - plannedTargetWatts) / plannedTargetWatts) * 100, 1),
     },
     steps,
+  };
+}
+
+// ---- Events: the stall guard ------------------------------------------------------------------------
+
+/** What the ride record says about the ERG stall guard (spec §11.1): how often it took hold, and where. */
+export interface StallGuardSummary {
+  /** How many times the guard took hold in the ride. */
+  activations: number;
+  /** By workout step (1-based), with the label when the workout is known; in the order of the steps. */
+  steps: { step: number; label: string | null; activations: number }[];
+  /** The ride minute (from the start, pauses included) of each activation. */
+  minutes: number[];
+}
+
+/**
+ * The stall-guard events of a ride, counted by code. `workout` is only for the labels. A ride from before the events existed has
+ * none, which is the same as a ride where the guard never fired.
+ */
+export function stallGuardSummary(record: RideRecord, workout: Workout | null): StallGuardSummary {
+  const flat = workout === null ? [] : flattenWorkout(workout);
+  const events = (record.events ?? []).filter((e) => e.type === "stall-guard");
+  const counts = new Map<number, number>();
+  for (const event of events) {
+    if (event.stepIndex == null) continue;
+    counts.set(event.stepIndex, (counts.get(event.stepIndex) ?? 0) + 1);
+  }
+  return {
+    activations: events.length,
+    steps: [...counts.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([index, activations]) => ({
+        step: index + 1,
+        label: flat[index]?.label ?? null,
+        activations,
+      })),
+    minutes: events.map((e) => Math.round((e.timeOffsetSeconds / 60) * 10) / 10),
   };
 }

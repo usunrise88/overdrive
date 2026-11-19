@@ -134,7 +134,7 @@ describe("the rule table", () => {
 
   it("lists the rules of later stages as named hooks that are not available, and never evaluates them", () => {
     const hooks = TOPIC_RULES.filter((rule) => !rule.available).map((rule) => rule.id);
-    expect(hooks).toEqual(["stall-guard", "effort-rating", "tag-streak", "repeat-trend"]);
+    expect(hooks).toEqual(["effort-rating", "tag-streak", "repeat-trend"]);
     for (const rule of TOPIC_RULES)
       if (!rule.available) expect(rule.needs.length).toBeGreaterThan(10);
     // A table of only hooks finds nothing, and adding an available row is all it takes to switch a signal on.
