@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "id": "icu-5001",
+  "name": "Ride out",
+  "steps": [
+    {
+      "type": "steady",
+      "duration": 600,
+      "target": 0.7,
+      "route_id": "route-gpx-0001"
+    }
+  ]
+}

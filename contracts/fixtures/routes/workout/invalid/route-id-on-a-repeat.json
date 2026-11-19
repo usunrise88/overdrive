@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "id": "icu-5001",
+  "name": "Ride out",
+  "steps": [
+    {
+      "type": "repeat",
+      "count": 2,
+      "route_id": "route-gpx-0001",
+      "steps": [
+        {
+          "type": "free",
+          "duration": 60
+        }
+      ]
+    }
+  ]
+}

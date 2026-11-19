@@ -1,0 +1,93 @@
+{
+  "from": "2026-11-20",
+  "to": "2026-11-26",
+  "generatedAt": "2026-11-19T07:30:12Z",
+  "stale": false,
+  "configured": true,
+  "workouts": [
+    {
+      "id": "icu-5001",
+      "date": "2026-11-20",
+      "name": "Sweet spot 3x10",
+      "source": "intervals.icu",
+      "workout": {
+        "schema": 1,
+        "id": "icu-5001",
+        "name": "Sweet spot 3x10",
+        "steps": [
+          {
+            "type": "ramp",
+            "duration": 600,
+            "from": 0.45,
+            "to": 0.7,
+            "label": "Warm-up"
+          },
+          {
+            "type": "repeat",
+            "count": 3,
+            "steps": [
+              {
+                "type": "steady",
+                "duration": 600,
+                "target": 0.88,
+                "label": "Sweet spot"
+              },
+              {
+                "type": "steady",
+                "duration": 300,
+                "target": 0.5,
+                "label": "Recover"
+              }
+            ]
+          },
+          {
+            "type": "ramp",
+            "duration": 300,
+            "from": 0.55,
+            "to": 0.4,
+            "label": "Cool-down"
+          }
+        ]
+      },
+      "variant": {
+        "steps": [
+          {
+            "type": "ramp",
+            "duration": 600,
+            "from": 0.45,
+            "to": 0.7,
+            "label": "Warm-up"
+          },
+          {
+            "type": "repeat",
+            "count": 2,
+            "steps": [
+              {
+                "type": "steady",
+                "duration": 600,
+                "target": 0.8,
+                "label": "Tempo"
+              },
+              {
+                "type": "steady",
+                "duration": 300,
+                "target": 0.5,
+                "label": "Recover"
+              }
+            ]
+          },
+          {
+            "type": "ramp",
+            "duration": 300,
+            "from": 0.55,
+            "to": 0.4,
+            "label": "Cool-down"
+          }
+        ],
+        "note": "Two efforts at 80%, about 25 minutes shorter.",
+        "structureHash": "7b1d651527c24b0c",
+        "name": "Easy"
+      }
+    }
+  ]
+}

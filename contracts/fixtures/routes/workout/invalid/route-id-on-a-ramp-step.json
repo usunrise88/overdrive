@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "id": "icu-5001",
+  "name": "Ride out",
+  "steps": [
+    {
+      "type": "ramp",
+      "duration": 600,
+      "from": 0.4,
+      "to": 0.6,
+      "route_id": "route-gpx-0001"
+    }
+  ]
+}

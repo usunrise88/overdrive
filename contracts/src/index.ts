@@ -10,6 +10,7 @@ export * from "./plan.ts";
 export * from "./plan-events.ts";
 export * from "./profile.ts";
 export * from "./repeats.ts";
+export * from "./routes.ts";
 export * from "./sync.ts";
 export * from "./wellness.ts";
 
@@ -41,6 +42,8 @@ export interface RampStep extends StepBase {
 export interface FreeStep extends StepBase {
   type: "free";
   duration: number;
+  /** The route (spec §11.4) that backs the step: the tablet rides it and its grade feeds the trainer. Absent: the flat free ride. */
+  route_id?: string;
 }
 
 export type LeafStep = SteadyStep | RampStep | FreeStep;
@@ -103,6 +106,12 @@ export interface RideHeader {
   ftp: number;
   /** Device names, trainer first. */
   devices?: string[];
+  /** The route (spec §11.4) the ride followed; absent for a ride on the flat. A deleted route leaves the ride valid. */
+  routeId?: string | null;
+  /** The route's name when it was ridden, only with `routeId`. */
+  routeName?: string | null;
+  /** true when the rider chose the planned workout's easier variant (spec §11.5); only with `workoutId`. */
+  variantRidden?: boolean | null;
 }
 
 export interface RideSample {
@@ -171,6 +180,12 @@ const checkRideRecord = ajv.compile<RideRecord>(rideRecordSchema);
  */
 export function rideRecordConsistencyErrors(record: RideRecord): string[] {
   const { samples, laps, summary } = record;
+  if (record.ride.routeName != null && record.ride.routeId == null) {
+    return ["/ride/routeName needs a /ride/routeId"];
+  }
+  if (record.ride.variantRidden === true && record.ride.workoutId == null) {
+    return ["/ride/variantRidden needs a /ride/workoutId: a variant belongs to a planned workout"];
+  }
   for (const [index, sample] of samples.entries()) {
     if (sample.timeOffsetSeconds !== index + 1) {
       return [`/samples/${index} is second ${sample.timeOffsetSeconds}, expected ${index + 1}`];

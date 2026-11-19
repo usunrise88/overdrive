@@ -55,6 +55,21 @@
           "description": "Names of the devices the ride used, trainer first. Default: none.",
           "type": "array",
           "items": { "type": "string" }
+        },
+        "routeId": {
+          "description": "The id of the route (the service's, route.schema.json, spec §11.4) the ride followed, which its grade fed to the trainer; absent for a ride on the flat. A workout with several route-backed free steps records the first. A route deleted later leaves the ride valid: the ride keeps this id and routeName only.",
+          "type": ["string", "null"],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        },
+        "routeName": {
+          "description": "The route's name when it was ridden, kept so the ride still says which route it was after the route is deleted; only with routeId.",
+          "type": ["string", "null"],
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "variantRidden": {
+          "description": "true when the rider chose the planned workout's easier variant (spec §11.5) at the start: workoutId then names the planned workout and the steps ridden are the variant's. Absent or false when the workout itself was ridden; only with workoutId.",
+          "type": ["boolean", "null"]
         }
       }
     },

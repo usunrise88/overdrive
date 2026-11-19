@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { Ajv2020 } from "ajv/dist/2020.js";
-import type { Validation, Workout } from "./index.ts";
+import { type Step, type Validation, validateWorkout, type Workout } from "./index.ts";
+import { workoutHash } from "./repeats.ts";
 
 // ---- Sync API: planned workouts (spec §5.1, §8.3, ADR 0016) ----------------------------------
 // Hand-written mirror of schema/workouts-response.schema.json, which is the source of truth; the
@@ -8,6 +9,23 @@ import type { Validation, Workout } from "./index.ts";
 
 /** Where a planned workout comes from. */
 export type PlanSource = "intervals.icu";
+
+/** The longest note a variant carries, in characters. */
+export const VARIANT_NOTE_MAX_CHARS = 200;
+
+/**
+ * The easier version of a planned session (spec §11.5, ADR 0036), written by the agent and kept only in the Overdrive service:
+ * intervals.icu and Google Calendar hold the primary. Offered at the start of the ride; riding it is recorded as
+ * `ride.variantRidden`.
+ */
+export interface PlannedVariant {
+  /** In the workout's own format; the tablet plays the workout with these steps. */
+  steps: Step[];
+  /** A short line saying how it differs from the primary. */
+  note?: string;
+  /** `workoutHash` of the primary workout with these steps: 16 lower-case hex characters. */
+  structureHash: string;
+}
 
 /** One workout of the plan, already converted to the native format. */
 export interface PlannedWorkout {
@@ -19,6 +37,18 @@ export interface PlannedWorkout {
   name: string;
   source: PlanSource;
   workout: Workout;
+  /** The easier version, when the agent wrote one; absent otherwise. */
+  variant?: PlannedVariant;
+}
+
+/** The workout a variant would play: the primary with the variant's steps. */
+export function variantWorkout(primary: Workout, variant: Pick<PlannedVariant, "steps">): Workout {
+  return { ...primary, steps: variant.steps };
+}
+
+/** The `structureHash` of a variant's steps for this primary workout. */
+export function variantStructureHash(primary: Workout, steps: Step[]): string {
+  return workoutHash(variantWorkout(primary, { steps }));
 }
 
 /** The answer to `GET /v1/workouts?from&to`. */
@@ -125,6 +155,16 @@ export function workoutsResponseConsistencyErrors(response: WorkoutsResponse): s
     ids.add(entry.id);
     if (entry.workout.id !== entry.id) {
       errors.push(`${at}/workout/id ${entry.workout.id} differs from the entry's id ${entry.id}`);
+    }
+    if (entry.variant !== undefined) {
+      const valid = validateWorkout(variantWorkout(entry.workout, entry.variant));
+      if (!valid.ok) {
+        errors.push(`${at}/variant/steps do not make a valid workout: ${valid.errors[0] ?? ""}`);
+      } else if (
+        entry.variant.structureHash !== variantStructureHash(entry.workout, entry.variant.steps)
+      ) {
+        errors.push(`${at}/variant/structureHash is not the hash of the variant's steps`);
+      }
     }
   }
   if (!response.configured) {

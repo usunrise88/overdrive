@@ -39,6 +39,8 @@ src/         @overdrive/contracts: the schema plus a validator for the TypeScrip
 | Coach notebook (`GET /v1/notebook`) | `schema/notebook-response.schema.json` | §11.6, §12.4, §8.3, ADR 0035 |
 | Plan event (`POST /v1/plan-events` answer; MCP `list_plan_events`) | `schema/plan-event.schema.json` | §12.2, §8.3, ADR 0035 |
 | Plan event declaration (`POST /v1/plan-events` body) | `schema/plan-event-declaration.schema.json` | §12.2, §8.3, ADR 0035 |
+| Route with points (`GET /v1/routes/{id}`) | `schema/route.schema.json` | §11.4, §8.3, ADR 0036 |
+| Routes (`GET /v1/routes`) | `schema/routes-response.schema.json` | §11.4, §8.3, ADR 0036 |
 
 The remaining sync API payloads and the MCP tool inputs (spec §8.3–§8.4) get schemas here as they are fixed during
 implementation. The sync outbox of the ride app (ADR 0012) is a local journal, not a wire format, and has no schema.
@@ -129,6 +131,16 @@ watch activity's schema (`wellness/activity`) now also covers an imported ride: 
 `cycling-outdoor` and the optional `distanceMeters` and `elevationGainMeters`. The API error codes have two new ones,
 `unsupported_sport` and `empty_activity` (422), for a FIT file that is valid but not a cycling ride; their fixtures are under
 `sync/api-error/valid/`. All the fixtures are synthetic.
+
+`fixtures/routes/` holds the golden files of stage A2b-1 (ADR 0036): routes with elevation (spec §11.4) and the easier variant (§11.5). `route/` (`GET /v1/routes/{id}`:
+points `{ d, e, lat?, lon? }` resampled one every 20 m, at most 5000, distance and ascent computed from the points, `hasCoordinates` all or nothing,
+source `gpx`, `waypoints` or `profile`; the rules a schema cannot state are in the schema's description and checked by `validateRoute`) and `routes-response/`
+(`GET /v1/routes`: the routes without points, newest first, `validateRoutesResponse`). **Additive fields of existing contracts**, which the Kotlin models do not
+read yet and whose fixtures therefore live here and not under `rides/valid`, `workouts/valid` and `plan/workouts-response` (those the Kotlin tests decode strictly,
+and an unknown key fails them): `ride-record/` (the ride header's optional `routeId`, `routeName` and `variantRidden`), `workout/` (the optional `route_id` of a `free`
+step) and `workouts-response/` (the optional `variant` of a planned workout: `steps`, `note`, `structureHash`). The stage that teaches Kotlin these fields moves
+them next to the others. `route-key.json` holds the golden numbers of `routePointsHash` and `routeKey` (the route id and the hash of its points, which makes two
+rides on the same route one session, §11.7). Everything is synthetic, with invented coordinates. Run by `test/routes.test.ts`.
 
 `fixtures/fit/` holds two FIT files for the upload's tests: `fit-golden-3s.fit`, the 376 bytes `FitWriter` writes for
 `rides/valid/fit-golden-3s.json` (the worked example of `docs/protocols/fit.md`; Kotlin's `FitFixturesTest` regenerates it

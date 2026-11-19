@@ -40,6 +40,11 @@
       "description": "Fraction of FTP."
     },
     "label": { "type": "string" },
+    "routeId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "description": "The id of a route (route.schema.json, spec §11.4) that backs a free step: the tablet rides it, its grade feeds the trainer. A free step without it is the flat free ride."
+    },
     "cadence": {
       "type": "number",
       "exclusiveMinimum": 0,
@@ -78,6 +83,7 @@
         "type": { "const": "free" },
         "duration": { "$ref": "#/$defs/duration" },
         "cadence": { "$ref": "#/$defs/cadence" },
+        "route_id": { "$ref": "#/$defs/routeId" },
         "label": { "$ref": "#/$defs/label" }
       }
     },
