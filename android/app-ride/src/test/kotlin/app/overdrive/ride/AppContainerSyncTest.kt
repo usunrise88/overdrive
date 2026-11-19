@@ -213,7 +213,14 @@ class AppContainerSyncTest {
             file: File,
         ) {
             if (!file.isFile) return
-            val bytes = file.readBytes()
+            // A file the app writes through a temporary name can be renamed away between the look and the read: there is
+            // nothing left under that name to leak.
+            val bytes =
+                try {
+                    file.readBytes()
+                } catch (e: java.io.IOException) {
+                    return
+                }
             val text = String(bytes, Charsets.ISO_8859_1)
             if (text.contains(token)) leaks += "$what: ${file.name} holds the token"
             if (text.contains("private-host")) leaks += "$what: ${file.name} holds the address"
@@ -364,6 +371,8 @@ class AppContainerSyncTest {
                 .toString()
                 .contains(token),
         )
+        // The time of the upload is kept on a coroutine of its own, a moment after the ride has left the queue.
+        await("the time of the upload is on disk") { File(extra, "sync/last-upload").isFile }
         val stored = RideStore(directory)
         for (file in listOf(stored.recordFile(id), stored.fitFile(id), outboxFile, File(extra, "sync/last-upload"))) {
             assertFalse(file.name, String(file.readBytes(), Charsets.ISO_8859_1).contains(token))
