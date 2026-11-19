@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.flow.update
 
 /**
  * The range selector of Fitness and Power (design/companion.md §3.4): whole Monday-first weeks ending with the current one, so
@@ -146,7 +146,6 @@ public class RidesRepository(
     )
 
     private val more = MutableStateFlow(More())
-    private val loadingLock = Mutex()
 
     /** What the Rides screen shows: the newest page's state and every page fetched so far, newest first. */
     public val view: StateFlow<RidesView> =
@@ -165,30 +164,67 @@ public class RidesRepository(
         if (newest.state.value.fetchedAtMillis != before) more.value = More()
     }
 
-    /** Fetches the page of older items after the last one, if there is one and none is being fetched. */
+    /** The page [loadMore] has taken to fetch: the pages shown so far, and where the next one starts. */
+    private class Claim(
+        val current: More,
+        val cursor: String,
+    )
+
+    /**
+     * Fetches the page of older items after the last one, if there is one and none is being fetched.
+     *
+     * Whether a page is being fetched is **part of the state** ([More.loading]), taken and given back in single steps of it, and
+     * not a lock held a little longer than the state: the screen asks for the next page the moment it shows one (it is near the
+     * end of the list), which is inside the very change that shows it, and a call dropped there would not come again until the
+     * rider scrolled once more.
+     */
     public suspend fun loadMore() {
         val first = newest.state.value
         val head = first.value ?: return
-        if (!loadingLock.tryLock()) return
+        val claim = claimNextPage(first.fetchedAtMillis, head) ?: return
+        val current = claim.current
+        var result: More? = null
         try {
-            val current = more.value.takeIf { it.after == first.fetchedAtMillis } ?: More(after = first.fetchedAtMillis)
-            val last = current.pages.lastOrNull() ?: head
-            val cursor = last.nextBefore?.takeIf { last.hasMore } ?: return
-            more.value = More(current.pages, loading = true, after = current.after)
             val outcome =
                 client.get(
-                    "/v1/rides?before=$cursor&limit=$pageSize",
+                    "/v1/rides?before=${claim.cursor}&limit=$pageSize",
                     RemoteResource.DEFAULT_MAX_BYTES,
                     MetricsApiJson::decodeRides,
                 )
-            more.value =
+            result =
                 when (outcome) {
                     is Outcome.Ok -> More(current.pages + outcome.value, after = current.after)
                     is Outcome.Failed -> More(current.pages, problem = outcome.problem, after = current.after)
                     Outcome.NotSetUp -> More(current.pages, after = current.after)
                 }
         } finally {
-            loadingLock.unlock()
+            // Whatever happened, the next call finds this one over (a cancelled fetch leaves the pages as they were).
+            more.update {
+                if (it.loading &&
+                    it.after == current.after
+                ) {
+                    result ?: More(current.pages, after = current.after)
+                } else {
+                    it
+                }
+            }
+        }
+    }
+
+    /** Marks the next page as being fetched and says which it is; null when none is to be fetched now. */
+    private fun claimNextPage(
+        newestFetchedAt: Long?,
+        head: RidesResponse,
+    ): Claim? {
+        while (true) {
+            val snapshot = more.value
+            val current = snapshot.takeIf { it.after == newestFetchedAt } ?: More(after = newestFetchedAt)
+            if (current.loading) return null
+            val last = current.pages.lastOrNull() ?: head
+            val cursor = last.nextBefore?.takeIf { last.hasMore } ?: return null
+            if (more.compareAndSet(snapshot, More(current.pages, loading = true, after = current.after))) {
+                return Claim(current, cursor)
+            }
         }
     }
 
