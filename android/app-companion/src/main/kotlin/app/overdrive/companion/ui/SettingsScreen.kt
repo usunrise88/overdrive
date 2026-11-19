@@ -28,6 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overdrive.companion.CompanionContainer
 import app.overdrive.companion.model.AccessAction
 import app.overdrive.companion.model.BackgroundFix
+import app.overdrive.companion.model.FitWords
 import app.overdrive.companion.model.HealthSettingsUi
 import app.overdrive.companion.model.HealthWords
 import app.overdrive.companion.model.HeartRateRowUi
@@ -75,6 +76,9 @@ data class SettingsUiState(
     val health: HealthSettingsUi? = null,
     /** The Heart rate group, or null while the service has sent no profile (nothing to edit yet). */
     val heartRate: HeartRateUi? = null,
+    /** The outdoor rides row (design/companion.md §4.9, §4.11): "2 files waiting" and why, or how to add a ride. */
+    val outdoorValue: String = "No files waiting",
+    val outdoorNote: String = "Share a .fit file from OnelapFit to Overdrive to add an outdoor ride.",
 )
 
 class SettingsActions(
@@ -167,6 +171,7 @@ fun SettingsScreen(
     val settings by container.settings.collectAsStateWithLifecycle()
     val overview by container.syncOverview.collectAsStateWithLifecycle()
     val watch by container.healthStatus.collectAsStateWithLifecycle()
+    val fits by container.fitStatus.collectAsStateWithLifecycle()
     val profile by container.profile.state.collectAsStateWithLifecycle()
     var address by remember { mutableStateOf(settings?.serviceUrl.orEmpty()) }
     var token by remember { mutableStateOf(settings?.token?.value.orEmpty()) }
@@ -196,6 +201,8 @@ fun SettingsScreen(
             version = versionOf(context),
             health = HealthWords.settings(watch, battery, container.words),
             heartRate = profile.profile?.let(HeartRateWords::of),
+            outdoorValue = FitWords.settingsValue(fits),
+            outdoorNote = FitWords.settingsNote(fits, host),
         )
     SettingsView(
         state,
@@ -329,6 +336,25 @@ fun SettingsView(
             state.heartRate?.let { heartRate ->
                 item { GroupLabel("Heart rate") }
                 item { HeartRateGroup(heartRate, actions) }
+            }
+            item { GroupLabel("Outdoor rides") }
+            item {
+                SettingsCard {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = OverdriveDimens.sizeListRowTwoLine)
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            OdText("FIT files from OnelapFit", style = OdType.bodyStrong)
+                            OdText(state.outdoorNote, style = OdType.label, color = OverdriveColors.textSecondary)
+                        }
+                        OdText(state.outdoorValue, style = OdType.numXS, maxLines = 2)
+                    }
+                }
             }
             item { GroupLabel("About") }
             item {

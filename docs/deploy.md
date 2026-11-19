@@ -516,8 +516,13 @@ Settings, or `PATCH /v1/profile`; until you set them it uses estimates from your
 
 **Path A, the one to use: from OnelapFit to Overdrive.** Two ways to hand the file over; both end in the same place:
 
-1. *To the companion* (when it has the share target): in OnelapFit open the ride, **export or share the FIT file** (the share sheet of Android), and
-   choose the Overdrive companion. It uploads the file to `POST /v1/activities/fit` and shows the summary.
+1. *To the companion* (it is a share target from the companion's stage P3-4c, ADR 0028): in OnelapFit open the ride, **export or share the FIT file** (the share
+   sheet of Android), and choose **Add outdoor ride** (the Overdrive companion). It reads the file, keeps it on the phone, uploads it to `POST /v1/activities/fit` and
+   says what came of it: `Imported` with the date, duration, distance, average heart rate and load, `Already imported`, or the plain cause (not a FIT file, a zip
+   archive, not cycling, no ride in it, too large). **With no network the file is kept** ("Saved for later") and goes by itself when the phone can reach the service
+   (a background job that waits for the network, the app opening, **Sync now**); Settings, Outdoor rides, says how many wait. A file the service refuses for good is
+   set aside, not retried. The phone needs the token of section 5 and the address in Settings, nothing else; the file goes only to your service. The generic types
+   (`application/octet-stream`) are taken only when the file's name ends in `.fit`.
 2. *To the Telegram bot* (section 13): in OnelapFit export or share the FIT file, choose **Telegram**, and send it to your Overdrive bot (the chat you
    made the owner). It answers within seconds: `Outdoor ride added: Sun 14 Mar, 2 h 05 min, 52.3 km` with the average heart rate and the load, or
    `Already imported.` when it has the ride. Send it as a **file (document)**, not as a photo; Telegram lets a bot download up to 20 MB and the service takes up
@@ -564,6 +569,10 @@ service notices and the companion shows the attempts side by side; the agent rea
   in `.env`, and the server restarted with `docker compose up -d server`.
 - The log says `Strava upload stopped: it needs the owner`: the reason is in the line and in `last_error` of the waiting rides (a token
   or scope Strava refused, or an account that may not upload: section 15). Fix it and restart; nothing is lost.
+- The companion's import screen says `This is a zip archive, not a FIT file`: OnelapFit shared the export zipped. Open the archive in Files and share the `.fit` inside
+  (opening the archive from the share target is not built; it is the first thing a real export may ask for).
+- The companion's share sheet does not list Overdrive, or answers `This is not a valid FIT file` for a real export: note the type and the name OnelapFit sends (`docs/bench-checklist.md`
+  session 12) and send them back; the rules are the type, the `.fit` name and the file's header, in `ShareIntents` and `FitFileCheck`.
 - A FIT file shared to the bot or the companion is answered `not a valid FIT file` or `422 invalid_fit`: the message says which rule failed (cut off,
   wrong CRC, an unknown structure). Send the file OnelapFit exports, not a screenshot, a zip or a `.gpx`/`.tcx`; if the export really is a FIT file that this
   service cannot read, keep the file (it is your data: do not post it anywhere public) and the decoder, which is small, can be extended to read it.

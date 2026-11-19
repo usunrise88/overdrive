@@ -5,6 +5,7 @@ import app.overdrive.core.metrics.LapKind
 import app.overdrive.core.metrics.RideDetailResponse
 import app.overdrive.core.metrics.RideItem
 import app.overdrive.core.metrics.RideKind
+import app.overdrive.core.outdoor.OUTDOOR_RIDE_SPORT
 import app.overdrive.core.remote.ResourceState
 import app.overdrive.core.remote.RidesView
 import app.overdrive.core.ride.FlatStep
@@ -36,6 +37,8 @@ data class RideRowUi(
     /** "196 W" for a ride, "142 bpm" for an activity. */
     val caption: String,
     val position: CardPosition,
+    /** An outdoor ride imported from a FIT file: a 16 dp `bike` and the word "Outdoor" before the subtitle (design/companion.md §4.6). */
+    val outdoor: Boolean = false,
 )
 
 /** An item of the lazy list: a month's header (sticky) or one of its rows. */
@@ -114,21 +117,30 @@ object RidesUi {
         words: Words,
     ): RideRowUi {
         val whenText = "${words.dayOfMonth(item.date)} · ${words.duration(item.durationSeconds)}"
-        val watch = item.kind == RideKind.ACTIVITY
+        val activity = item.kind == RideKind.ACTIVITY
+        // An outdoor ride from a FIT file is an activity of the service, but it is not from the watch: its own word and icon.
+        val outdoor = activity && item.sport == OUTDOOR_RIDE_SPORT
+        val watch = activity && !outdoor
         return RideRowUi(
             id = item.id,
             kind = item.kind,
             title = item.name,
-            subtitle = if (watch) "Watch · $whenText" else whenText,
+            subtitle =
+                when {
+                    outdoor -> "Outdoor · $whenText"
+                    watch -> "Watch · $whenText"
+                    else -> whenText
+                },
             watch = watch,
             load = words.load(item.load),
             caption =
-                if (watch) {
+                if (activity) {
                     item.averageHeartRate?.let { "${it.roundToInt()} bpm" } ?: UiFormat.EMPTY
                 } else {
                     item.averagePower?.let { "${it.roundToInt()} W" } ?: UiFormat.EMPTY
                 },
             position = position,
+            outdoor = outdoor,
         )
     }
 
@@ -388,7 +400,9 @@ object ActivityWords {
     ): ActivityUi =
         ActivityUi(
             name = item.name,
-            whenLine = "${words.day(item.date)} · from the watch",
+            whenLine = "${words.day(
+                item.date,
+            )} · ${if (item.sport == OUTDOOR_RIDE_SPORT) "from a bike computer file" else "from the watch"}",
             tiles =
                 listOf(
                     TileUi("Duration", words.duration(item.durationSeconds), null),

@@ -15,6 +15,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import app.overdrive.companion.CompanionApp
 import app.overdrive.core.health.RunReason
+import app.overdrive.core.outdoor.FitFlushReason
 import java.time.Duration
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -37,11 +38,34 @@ class WatchWorker(
         val container = (applicationContext as CompanionApp).container
         val reason = if (inputData.getBoolean(KEY_FIRST, false)) RunReason.FIRST_READ else RunReason.DAILY
         val result = container.runWatch(reason)
-        return if (result.shouldRetry && runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.success()
+        // The files shared from OnelapFit that wait for the service go with the day's read (ADR 0028).
+        val files = container.flushFits(FitFlushReason.BACKGROUND)
+        val again = result.shouldRetry || files.failed
+        return if (again && runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.success()
     }
 
     companion object {
         const val KEY_FIRST = "first"
+        const val MAX_ATTEMPTS = 4
+    }
+}
+
+/**
+ * The FIT files that wait for the service (ADR 0028): sends them when the network is there. WorkManager runs it as soon as its network
+ * constraint holds, also with the app closed and after a restart of the phone; a failure is retried with the system's backoff, up to
+ * [MAX_ATTEMPTS] times, and the files wait on disk either way (the daily read and the app opening send them too).
+ */
+class FitFlushWorker(
+    context: Context,
+    params: WorkerParameters,
+) : CoroutineWorker(context, params) {
+    override suspend fun doWork(): Result {
+        val container = (applicationContext as CompanionApp).container
+        val files = container.flushFits(FitFlushReason.BACKGROUND)
+        return if (files.failed && runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.success()
+    }
+
+    companion object {
         const val MAX_ATTEMPTS = 4
     }
 }
@@ -88,6 +112,21 @@ class WorkManagerScheduler(
             false
         }
 
+    override fun scheduleFitFlush() {
+        try {
+            val request =
+                OneTimeWorkRequestBuilder<FitFlushWorker>()
+                    .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                    .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
+                    .build()
+            // Appended: a job that is running has already listed what waits, so a file kept meanwhile needs the next one.
+            manager.enqueueUniqueWork(FIT_FLUSH, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
+        } catch (e: IllegalStateException) {
+            // The system's scheduler is not there (not initialised): the file waits on disk, and the app opening, Sync now and the
+            // daily read send it.
+        }
+    }
+
     override fun cancelAll() {
         manager.cancelUniqueWork(DAILY)
         manager.cancelUniqueWork(FIRST)
@@ -104,6 +143,7 @@ class WorkManagerScheduler(
     companion object {
         const val DAILY = "watch-daily"
         const val FIRST = "watch-first-read"
+        const val FIT_FLUSH = "fit-flush"
         const val DAILY_HOUR = 6
     }
 }

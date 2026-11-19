@@ -105,6 +105,7 @@ fun ChartReadout(
     away: Boolean,
     onToday: () -> Unit,
     modifier: Modifier = Modifier,
+    rest: RestPill = RestPill.Today,
 ) {
     Row(
         modifier.fillMaxWidth().heightIn(min = 24.dp),
@@ -143,8 +144,20 @@ fun ChartReadout(
                 }
             }
         }
-        if (away) TodayPill(onToday)
+        if (away) TodayPill(onToday, rest)
     }
+}
+
+/**
+ * What the pill at the right of a readout says while a past point is selected, and what it is called to TalkBack: **Today** on the charts
+ * whose x is a day, **Latest** on the repeat page, whose x is an attempt (design/companion.md §4.12).
+ */
+enum class RestPill(
+    val label: String,
+    val description: String,
+) {
+    Today("Today", "Back to today"),
+    Latest("Latest", "Back to the latest attempt"),
 }
 
 @Composable
@@ -198,13 +211,16 @@ fun ShowingLine(
 
 /** A 24 dp pill with a 48 dp hit area: the visual is small, the touch target is not. */
 @Composable
-private fun TodayPill(onClick: () -> Unit) {
+private fun TodayPill(
+    onClick: () -> Unit,
+    rest: RestPill = RestPill.Today,
+) {
     val source = rememberInteractionSource()
     Box(
         Modifier
             .reportHeight(24.dp)
             .heightIn(min = 48.dp)
-            .semantics { contentDescription = "Back to today" }
+            .semantics { contentDescription = rest.description }
             .plainClickable(source, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -218,7 +234,13 @@ private fun TodayPill(onClick: () -> Unit) {
                 ).padding(horizontal = 12.dp),
             contentAlignment = Alignment.Center,
         ) {
-            OdText("Today", style = OdType.label, color = OverdriveColors.textSecondary, maxLines = 1, softWrap = false)
+            OdText(
+                rest.label,
+                style = OdType.label,
+                color = OverdriveColors.textSecondary,
+                maxLines = 1,
+                softWrap = false,
+            )
         }
     }
 }

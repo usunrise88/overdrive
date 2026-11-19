@@ -4,11 +4,16 @@ import android.content.Context
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.preferencesDataStoreFile
 import app.overdrive.companion.model.Clock
+import app.overdrive.companion.model.FitShown
 import app.overdrive.companion.model.ProblemWords
 import app.overdrive.companion.model.Words
 import app.overdrive.companion.settings.CompanionSettings
 import app.overdrive.companion.settings.CompanionSettingsRepository
 import app.overdrive.companion.settings.OnboardingStep
+import app.overdrive.companion.share.ContentResolverReader
+import app.overdrive.companion.share.SharedFile
+import app.overdrive.companion.share.SharedFileReader
+import app.overdrive.companion.share.SharedRead
 import app.overdrive.companion.ui.NavState
 import app.overdrive.companion.work.BackgroundScheduler
 import app.overdrive.companion.work.NoBackgroundWork
@@ -20,6 +25,11 @@ import app.overdrive.core.health.RunReason
 import app.overdrive.core.health.RunResult
 import app.overdrive.core.metrics.MetricsApiJson
 import app.overdrive.core.metrics.RideDetailResponse
+import app.overdrive.core.outdoor.FitFlush
+import app.overdrive.core.outdoor.FitFlushReason
+import app.overdrive.core.outdoor.FitImporter
+import app.overdrive.core.outdoor.FitOutcome
+import app.overdrive.core.outdoor.FitStatus
 import app.overdrive.core.plan.PlanApiJson
 import app.overdrive.core.plan.WorkoutsResponse
 import app.overdrive.core.profile.Change
@@ -38,6 +48,7 @@ import app.overdrive.core.remote.Outcome
 import app.overdrive.core.remote.ProblemKind
 import app.overdrive.core.remote.Refresh
 import app.overdrive.core.remote.RemoteResource
+import app.overdrive.core.remote.RepeatDetails
 import app.overdrive.core.remote.ResourceState
 import app.overdrive.core.remote.RideDetails
 import app.overdrive.core.remote.RidesRepository
@@ -47,13 +58,18 @@ import app.overdrive.core.remote.WellnessRange
 import app.overdrive.core.remote.WellnessResources
 import app.overdrive.core.remote.WellnessView
 import app.overdrive.core.remote.recoveryResource
+import app.overdrive.core.remote.repeatsResource
+import app.overdrive.core.repeats.RepeatDetailResponse
+import app.overdrive.core.repeats.RepeatsResponse
 import app.overdrive.core.sync.HttpGetTransport
 import app.overdrive.core.sync.HttpPatchTransport
+import app.overdrive.core.sync.HttpPostBytesTransport
 import app.overdrive.core.sync.HttpPostTransport
 import app.overdrive.core.sync.SyncConfig
 import app.overdrive.core.wellness.RecoveryResponse
 import app.overdrive.data.health.FileBatchStore
 import app.overdrive.data.health.HealthConnectSource
+import app.overdrive.data.outdoor.FileFitOutbox
 import app.overdrive.data.profile.FileProfileCache
 import app.overdrive.data.remote.FileTextStore
 import app.overdrive.data.remote.FileTextStores
@@ -104,6 +120,14 @@ data class SyncOverview(
     val syncing: Boolean = false,
 )
 
+/** The two views of the Rides tab (design/companion.md §4.12): the history of rides and activities, or the sessions ridden more than once. */
+enum class RidesMode(
+    val label: String,
+) {
+    History("History"),
+    Repeats("Repeats"),
+}
+
 /** The screens' refresh targets (design/companion.md §3.3). */
 sealed interface RefreshTarget {
     data object Today : RefreshTarget
@@ -117,6 +141,14 @@ sealed interface RefreshTarget {
     data object Wellness : RefreshTarget
 
     data object Notes : RefreshTarget
+
+    /** The list of repeated sessions in the Rides tab. */
+    data object Repeats : RefreshTarget
+
+    /** One repeated session, by its hash. */
+    data class RepeatDetail(
+        val hash: String,
+    ) : RefreshTarget
 
     data class RideDetail(
         val id: String,
@@ -150,6 +182,8 @@ class CompanionContainer(
     getTransport: HttpGetTransport = UrlConnectionTransport(),
     postTransport: HttpPostTransport = UrlConnectionTransport(),
     patchTransport: HttpPatchTransport = UrlConnectionTransport(),
+    /** The network under the POST of a FIT file (ADR 0028). */
+    bytesTransport: HttpPostBytesTransport = UrlConnectionTransport(),
     val clock: Clock = Clock(),
     private val elapsedMillis: () -> Long = { System.nanoTime() / NANOS_PER_MILLI },
     private val settleMillis: Long = SETTLE_MILLIS,
@@ -163,6 +197,8 @@ class CompanionContainer(
     private val scheduler: BackgroundScheduler = NoBackgroundWork,
     private val retryPolicy: RetryPolicy = RetryPolicy(),
     private val openGapMillis: Long = APP_OPEN_GAP_MILLIS,
+    /** Where a shared file's bytes come from: the content resolver, or a fake in a test (ADR 0028). */
+    private val sharedFiles: SharedFileReader = ContentResolverReader(context),
 ) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -186,7 +222,7 @@ class CompanionContainer(
 
     private fun config(): SyncConfig = settings.value?.config ?: SyncConfig("", "")
 
-    private val client = ServiceClient(::config, getTransport, postTransport)
+    private val client = ServiceClient(::config, getTransport, postTransport, bytesTransport)
     private val wall: () -> Long = { clock.nowMillis() }
 
     private val cache = cacheDirectory
@@ -213,6 +249,14 @@ class CompanionContainer(
 
     private val rideStores = FileTextStores(File(cache, "ride-details"))
     private val rideDetails: RideDetails = RideDetails(client, ::config, { rideStores.store(it) }, wall, elapsedMillis)
+
+    /** The repeated sessions (`GET /v1/repeats`, spec §11.7): the list of the Rides tab's second view. */
+    val repeats: RemoteResource<RepeatsResponse> =
+        repeatsResource(client, ::config, file("repeats"), wall, elapsedMillis)
+
+    private val repeatStores = FileTextStores(File(cache, "repeat-details"))
+    private val repeatDetails: RepeatDetails =
+        RepeatDetails(client, ::config, { repeatStores.store(it) }, wall, elapsedMillis)
 
     /** The rider's profile (ADR 0021): the FTP in force, and the edits that go to the service. */
     val profile: ProfileRepository =
@@ -255,6 +299,28 @@ class CompanionContainer(
             retry = retryPolicy,
         )
 
+    /**
+     * The outdoor ride's way to the service (ADR 0028): a FIT file shared from OnelapFit is kept in `fit-outbox` (private to the app,
+     * on disk before anything is sent) and sent through the same [client] to `POST /v1/activities/fit`.
+     */
+    private val fits: FitImporter = FitImporter(client, FileFitOutbox(File(cache, "fit-outbox")), wall, retryPolicy)
+
+    /** What Settings says of the FIT files that wait or were refused. */
+    val fitStatus: StateFlow<FitStatus> = fits.status
+
+    private val shown = MutableStateFlow<FitShown>(FitShown.Idle)
+
+    /** What the import screen shows: the file being sent, or what came of it. */
+    val fitShown: StateFlow<FitShown> = shown
+
+    /** The segment of the Rides tab: its history, or the repeated sessions (design/companion.md §4.12). */
+    private val mode = MutableStateFlow(RidesMode.History)
+    val ridesMode: StateFlow<RidesMode> = mode
+
+    fun setRidesMode(next: RidesMode) {
+        mode.value = next
+    }
+
     /** What Settings, Today and the first run's steps say of the watch data. */
     val healthStatus: StateFlow<HealthStatus> = health.status
 
@@ -281,6 +347,12 @@ class CompanionContainer(
     fun rideDetail(id: String): RemoteResource<RideDetailResponse> =
         rideDetails.resource(id).also { resource ->
             // Its cache is read as soon as it is first asked for, so the screen has the ride at once and offline.
+            if (!resource.state.value.loaded) scope.launch { resource.load() }
+        }
+
+    /** The state of one repeated session. */
+    fun repeatDetail(hash: String): RemoteResource<RepeatDetailResponse> =
+        repeatDetails.resource(hash).also { resource ->
             if (!resource.state.value.loaded) scope.launch { resource.load() }
         }
 
@@ -329,7 +401,9 @@ class CompanionContainer(
             wellnessResources.load()
             recovery.load()
             insights.load()
+            repeats.load()
             health.load()
+            fits.load()
             var first = true
             settings.filterNotNull().map { it.config }.distinctUntilChanged().collectLatest {
                 metrics.settingsChanged()
@@ -341,6 +415,8 @@ class CompanionContainer(
                 wellnessResources.settingsChanged()
                 recovery.settingsChanged()
                 insights.settingsChanged()
+                repeats.settingsChanged()
+                repeatDetails.settingsChanged()
                 if (!first) delay(settleMillis)
                 val why = if (first) Refresh.START else Refresh.SETTINGS_CHANGED
                 first = false
@@ -372,6 +448,38 @@ class CompanionContainer(
                     if (retry.waiting && at != null) {
                         delay((at - clock.nowMillis()).coerceAtLeast(0))
                         health.run(RunReason.RETRY)
+                    }
+                }
+        }
+    }
+
+    init {
+        // A ride that the service accepted from the queue (not from the share screen) is in the Rides list when the rider looks.
+        scope.launch {
+            fits.status
+                .map { it.accepted }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { rides.refresh(Refresh.REQUESTED) }
+        }
+        // A file that is kept is sent as soon as there is a network, even with the app closed; the system's job is made once per file.
+        scope.launch {
+            fits.status
+                .map { it.waiting }
+                .distinctUntilChanged()
+                .collect { if (it > 0) scheduler.scheduleFitFlush() }
+        }
+        // A file that could not be sent is tried again after its backoff while the app is alive; the system's job does the same later.
+        scope.launch {
+            fits.status
+                .map {
+                    RetryAt(it.nextRetryMillis, it.waiting > 0 && it.problem?.kind != ProblemKind.TOKEN_REJECTED)
+                }.distinctUntilChanged()
+                .collectLatest { retry ->
+                    val at = retry.at
+                    if (retry.waiting && at != null) {
+                        delay((at - clock.nowMillis()).coerceAtLeast(0))
+                        fits.flush(FitFlushReason.RETRY)
                     }
                 }
         }
@@ -446,6 +554,14 @@ class CompanionContainer(
                 launch { insights.refresh(why) }
             }
 
+            RefreshTarget.Repeats -> {
+                launch { repeats.refresh(why) }
+            }
+
+            is RefreshTarget.RepeatDetail -> {
+                launch { repeatDetails.resource(target.hash).refresh(why) }
+            }
+
             RefreshTarget.Fitness -> {
                 launch { metrics.resource(settings.value?.fitnessRange ?: MetricsRange.DEFAULT).refresh(why) }
             }
@@ -500,6 +616,9 @@ class CompanionContainer(
                     launch { ftpAnswers.flush() }
                     launch { recovery.refresh(Refresh.REQUESTED) }
                     launch { insights.refresh(Refresh.REQUESTED) }
+                    launch { repeats.refresh(Refresh.REQUESTED) }
+                    // The files shared from OnelapFit that wait: the rider asked, so the backoff does not apply (ADR 0028).
+                    launch { fits.flush(FitFlushReason.MANUAL) }
                     launch {
                         wellnessResources.refresh(
                             settings.value?.wellnessRange ?: WellnessRange.DEFAULT,
@@ -601,6 +720,7 @@ class CompanionContainer(
             ) {
                 scheduler.scheduleDaily()
             }
+            launch { fits.flush(FitFlushReason.APP_OPENED) }
             val step = settings.value?.onboarding
             // During the first run the steps decide when reading starts.
             if (step == OnboardingStep.Done || step == OnboardingStep.Reading) health.run(RunReason.APP_OPENED)
@@ -608,6 +728,38 @@ class CompanionContainer(
     }
 
     private var lastOpenRun: Long? = null
+
+    // region outdoor rides from a FIT file
+
+    /** Sends the FIT files that wait; what the system's job calls, and what the retry and the app opening use. */
+    suspend fun flushFits(reason: FitFlushReason): FitFlush = fits.flush(reason)
+
+    private var shares = 0
+
+    /**
+     * The rider shared a file to the companion (design/companion.md §4.11): reads it (at most 16 MiB), keeps it, sends it now and says
+     * what came of it on the import screen. It runs in the container's own scope, so leaving the screen does not stop the send, and a
+     * file that cannot be sent stays on disk and goes later.
+     */
+    fun shareFit(file: SharedFile) {
+        val mine = ++shares
+        shown.value = FitShown.Importing
+        scope.launch {
+            val result =
+                when (val read = sharedFiles.read(file)) {
+                    is SharedRead.Bytes -> FitShown.Done(fits.import(read.bytes))
+                    is SharedRead.Refused -> FitShown.Done(FitOutcome.Refused(read.refusal))
+                    SharedRead.Unreadable -> FitShown.Unreadable
+                }
+            // A second share replaced this one while it ran: the screen shows the newer.
+            if (mine == shares) shown.value = result
+        }
+    }
+
+    /** The import screen was left: nothing is shown next time it opens without a file. */
+    fun fitScreenClosed() {
+        if (shown.value !is FitShown.Importing) shown.value = FitShown.Idle
+    }
 
     // region heart rate
 

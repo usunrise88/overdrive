@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overdrive.companion.CompanionContainer
 import app.overdrive.companion.RefreshTarget
+import app.overdrive.companion.RidesMode
 import app.overdrive.companion.model.ActivityUi
 import app.overdrive.companion.model.ActivityWords
 import app.overdrive.companion.model.Body
@@ -57,6 +58,7 @@ import app.overdrive.uikit.OdIcon
 import app.overdrive.uikit.OdText
 import app.overdrive.uikit.OdType
 import app.overdrive.uikit.PartialNote
+import app.overdrive.uikit.RangeSelector
 import app.overdrive.uikit.ScreenHeader
 import app.overdrive.uikit.StatusLine
 import app.overdrive.uikit.chart.ChartCard
@@ -76,13 +78,27 @@ class RidesActions(
     val onPhoneSettings: () -> Unit,
     val onOpen: (RideRowUi) -> Unit,
     val onNearEnd: () -> Unit,
+    /** The segment of History | Repeats was tapped (design/companion.md §4.12). */
+    val onMode: (RidesMode) -> Unit = {},
 )
 
-/** Rides (design/companion.md §4.6) from the container. */
+/** Rides (design/companion.md §4.6, §4.12) from the container: the history, or the sessions ridden more than once. */
 @Composable
 fun RidesScreen(
     container: CompanionContainer,
     modifier: Modifier = Modifier,
+) {
+    val mode by container.ridesMode.collectAsStateWithLifecycle()
+    when (mode) {
+        RidesMode.History -> RidesHistory(container, modifier)
+        RidesMode.Repeats -> RepeatsList(container, modifier)
+    }
+}
+
+@Composable
+private fun RidesHistory(
+    container: CompanionContainer,
+    modifier: Modifier,
 ) {
     val context = LocalContext.current
     val settings by container.settings.collectAsStateWithLifecycle()
@@ -110,9 +126,11 @@ fun RidesScreen(
                 )
             },
             onNearEnd = container::loadMoreRides,
+            onMode = container::setRidesMode,
         ),
         modifier,
         listState,
+        mode = RidesMode.History,
     )
 }
 
@@ -123,6 +141,8 @@ fun RidesView(
     actions: RidesActions,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
+    /** The selected segment of History | Repeats, or null for no selector. */
+    mode: RidesMode? = null,
 ) {
     val content = (ui.body as? Body.Content)?.value
     val nearEnd by remember(listState, content) {
@@ -144,6 +164,7 @@ fun RidesView(
         contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 24.dp),
     ) {
         item(key = "header") { ScreenHeader("Rides", ui.subtitle, ui.refreshing, Modifier.padding(bottom = 16.dp)) }
+        if (mode != null) item(key = "mode") { ModeSelector(mode, actions.onMode) }
         ui.status?.let { problem ->
             item(key = "status") {
                 StatusLine(
@@ -183,6 +204,21 @@ fun RidesView(
             }
         }
     }
+}
+
+/** History | Repeats under the Rides header (design/companion.md §4.12): the range selector's component, two segments, 44 dp. */
+@Composable
+fun ModeSelector(
+    mode: RidesMode,
+    onMode: (RidesMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    RangeSelector(
+        RidesMode.entries.map { it.label },
+        mode.ordinal,
+        { onMode(RidesMode.entries[it]) },
+        modifier.padding(bottom = 16.dp),
+    )
 }
 
 private fun LazyListScope.rideItems(
@@ -246,9 +282,9 @@ private fun RideRow(
         Column(Modifier.weight(1f)) {
             OdText(row.title, style = OdType.bodyStrong, maxLines = 1)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (row.watch) {
+                if (row.watch || row.outdoor) {
                     OdIcon(
-                        OverdriveIcons.HeartPulse,
+                        if (row.outdoor) OverdriveIcons.Bike else OverdriveIcons.HeartPulse,
                         size = InlineIconSize,
                         tint = OverdriveColors.textSecondary,
                     )

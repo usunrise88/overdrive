@@ -864,6 +864,43 @@ where the real records meet the code (`docs/adr/0027-health-connect-reader.md`, 
 
 ---
 
+## Session 12: repeated sessions and the FIT share target on the phone (stage P3-4c)
+
+Needs: the Xiaomi 14 Ultra, the `app-companion` APK from the release, the service (spec §11.7, §11.8, ADR 0026, ADR 0028; deploy guide section 18), **two rides of the same
+planned workout** uploaded from the tablet (a third and a fourth for the trend), and **a real FIT export from OnelapFit** (a ride recorded on the Geoid CC600, or any ride the
+app can export). Companion-only. **The stage was written without a real OnelapFit file and without two real rides of one workout**: everything below is what the JVM tests cannot
+settle (`docs/adr/0028-companion-repeats-and-fit-share.md`, "What only a phone settles"). The files are your own rides: never post them anywhere public.
+
+- [ ] **12.1 Share from OnelapFit.** In OnelapFit open a ride, export or share the FIT file, and look for **Add outdoor ride** (Overdrive) in the share sheet. Does it appear? Choose it:
+  "Importing…" then "Imported" with the date, duration, distance, average heart rate and load; do they match what OnelapFit shows for the ride? Write down what the sheet offered (the
+  file's name, its type) and whether OnelapFit shares the **`.fit` itself or a zip** (a zip is answered "This is a zip archive, not a FIT file"; if that is what it does, say so: the
+  share target will need to open the archive). If the share sheet does not list Overdrive at all, note the type OnelapFit sends (`adb logcat` on the share, or the sheet's behaviour
+  with another app such as Files).
+- [ ] **12.2 The name rule.** The generic types need a display name that ends in `.fit`. Does OnelapFit's file have one? A share of a file whose name does not end in `.fit` as
+  `application/octet-stream` is answered "This is not a valid FIT file": if a real export is refused for that reason, the rule is too tight and the signature check alone should decide.
+- [ ] **12.3 The ride in the lists.** **Open Overdrive**: the Rides tab shows "Outdoor ride", marked by the bike icon and "Outdoor", with the load and the average heart rate; its page says "from a
+  bike computer file". The service's `list_activities` shows it with source `fit`; Fitness (load, form) has moved by the ride; the power curve, the FTP and the drift have not.
+- [ ] **12.4 The same ride again.** Share the same file again: "Already imported", and nothing is added. Export it again from OnelapFit (the bytes may differ) and share: "Already imported"
+  with "A ride with the same start and length is already in your history." (or the overlap sentence). Does intervals.icu have it once?
+- [ ] **12.5 Offline.** Airplane mode, share the file: "Saved for later" with "There is no network connection." Settings, Outdoor rides: "1 file waiting". Switch the network on: within a minute or
+  two the file goes by itself (the system's job, with the app closed) or at once with **Sync now**; the ride appears in Rides. Kill the app while a file waits: it is still there and goes on the next open.
+- [ ] **12.6 Other refusals.** Share a photo (the sheet lists Overdrive for any type; the answer is "This is not a valid FIT file"), a GPX or TCX file, a ride from another sport if you have one
+  ("not a cycling ride"), and a very large file. Each is said in plain words and nothing is kept for the ones the phone can tell are not FIT. With a wrong token in Settings: "Saved, not sent",
+  **Settings** opens the app's Settings, and after the token is fixed **Sync now** sends it.
+- [ ] **12.7 The repeat page.** After two rides of the same planned workout (the same steps, whatever it is called): Rides, **Repeats** lists it with "2 attempts" and the line against last
+  time. Open it: the charts, the attempts (newest first), the step table; "Not enough attempts yet" with two attempts, and after a third "trending down: fitter" or "up" or "steady" as the
+  service says. A tap on a chart selects an attempt in every chart and the pill says **Latest**; **Values** opens; an attempt opens its ride. Is the heart rate at the same power the figure you expected
+  (compare with the ride's own heart-rate plot)? Are the 3%, 60 s and 120 s rules too tight on the trainer (many attempts with "no figure")? Ride a workout with a ramp or a free step: the step table
+  has only the steady steps.
+- [ ] **12.8 Old and offline.** Open a session, switch the network off, close and reopen the app: the page is there, with "Offline · updated ...". Rename the workout on the service side (same steps): the
+  attempts stay together.
+- [ ] **12.9 TalkBack and the large font.** TalkBack reads a chart as its readout, the trend sentence and the two actions (**Previous point**, **Next point**); the step table's rows read as a sentence
+  per step; the import screen's result is spoken when it arrives. At 1.3x the rows wrap and nothing is cut.
+- [ ] **12.10 What to send back.** What the share sheet offered and what the file was (12.1, 12.2), the ride's facts as Overdrive showed them against OnelapFit's (12.1, 12.3), whether it went
+  by itself offline (12.5), the trend sentences after 3 and 4 attempts (12.7), and screenshots of anything that looks wrong. They show your own rides: send them privately, never in a commit.
+
+---
+
 ## Coverage: what settles what
 
 ### Acceptance criteria (`docs/phase1-acceptance.md`)

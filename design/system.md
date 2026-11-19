@@ -647,3 +647,18 @@ What the watch data's screens added (`android/ui-kit`, `android/app-companion`, 
 - **Heart rate group** (Settings): a stepper row (64 dp at least, the note in label text 2 on the left, the `Stepper` at the right) per value, and a 48 dp ghost "Use 184 bpm" under the note
   when the rides suggest another value.
 - **Empty block with a button**: "Overdrive cannot read Health Connect yet." and a primary **Allow** (`EmptyBlock.actionLabel`).
+
+### 13.3 Settled in stage P3-4c
+
+What the repeated sessions and the FIT share target added (`android/ui-kit`, `android/app-companion`, `docs/adr/0028-companion-repeats-and-fit-share.md`); no token changed and no
+component was added to `ui-kit`:
+
+- **ChartReadout** takes `rest: RestPill`: the pill at the right of the readout says **Today** (and to TalkBack "Back to today") where the x is a day, and **Latest** ("Back to the
+  latest attempt") on the repeat page, whose x is an attempt. The pill is the same 24 dp visual with a 48 dp hit area.
+- **Charts over attempts** are `PlotChart` as it is: x is the attempt number (equally spaced), 6 dp dots on a thin text-3 line, gaps for attempts with no figure, one selection for
+  the page (companion.md §6.10).
+- **History | Repeats** is a `RangeSelector` of two segments under the Rides header.
+- **Rows made in the app, not in `ui-kit`:** the repeat row (three lines and a chevron, in the month cards' slice), the attempt row (a 64 dp two-line value row with the service's reason
+  under it and a chevron), and the step table (a fixed column of steps and a horizontally scrolling group of attempt columns, 48 dp rows, 48 dp cells).
+- **Import screen:** the first run's layout (padding 24 × 20, a block at 40% of the height, full-width buttons at the bottom), with a 24 dp spinner ring, `check` or `triangle-alert` as its mark.
+- **Outdoor row:** a 16 dp `bike` and the word "Outdoor" before the subtitle, the counterpart of the watch's `heart-pulse` and "Watch" (§7.5, companion.md §4.6).

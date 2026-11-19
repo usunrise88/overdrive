@@ -59,6 +59,36 @@
             </intent-filter>
         </activity>
 
+        <!-- The share target of the outdoor ride (spec section 11.8 path A, ADR 0028, design/companion.md section 4.11): the FIT file that
+             OnelapFit exports, shared from its share sheet (SEND) or opened from a file manager (VIEW). The FIT types are accepted whatever
+             the name; the generic types (octet-stream and any) only when the display name ends in .fit, which the activity checks before it
+             reads a byte. Only content:// is read (never file://), at most 16 MiB, into the app's own private storage. It holds no state
+             and no secret; the file goes to the owner's own service and nowhere else. -->
+        <activity
+            android:name=".ImportActivity"
+            android:exported="true"
+            android:label="Add outdoor ride"
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/vnd.ant.fit" />
+                <data android:mimeType="application/x-fit" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:mimeType="application/vnd.ant.fit" />
+                <data android:mimeType="application/x-fit" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
+
         <!-- Health Connect asks every app that reads health data for a screen that says how the data is used (Android 13 and
              earlier ask for the first action, Android 14 and later for the alias): without it the permission dialog does not open. -->
         <activity

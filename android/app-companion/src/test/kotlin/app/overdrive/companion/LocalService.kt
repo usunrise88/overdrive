@@ -11,6 +11,9 @@ import app.overdrive.core.metrics.RideItem
 import app.overdrive.core.plan.PlanApiJson
 import app.overdrive.core.profile.Profile
 import app.overdrive.core.profile.ProfileApiJson
+import app.overdrive.core.repeats.RepeatDetailResponse
+import app.overdrive.core.repeats.RepeatsApiJson
+import app.overdrive.core.repeats.RepeatsResponse
 import app.overdrive.core.wellness.RecordCounts
 import app.overdrive.core.wellness.RecoveryResponse
 import app.overdrive.core.wellness.RecoveryState
@@ -39,6 +42,7 @@ class LocalService(
         val query: String?,
         val authorization: String?,
         val body: String,
+        val contentType: String? = null,
     )
 
     val received = CopyOnWriteArrayList<Received>()
@@ -72,6 +76,25 @@ class LocalService(
     @Volatile
     var insights: InsightsResponse = WatchSamples.insights()
 
+    /** What `GET /v1/repeats` answers (null is a 404, as a service that has not got the route yet), and `GET /v1/repeats/{hash}` by hash. */
+    @Volatile
+    var repeats: RepeatsResponse? = null
+
+    val repeatDetails = java.util.concurrent.ConcurrentHashMap<String, RepeatDetailResponse>()
+
+    /** The FIT files `POST /v1/activities/fit` holds, by the id it gave them: idempotent by the file's bytes, as the real one is. */
+    val fitFiles = java.util.concurrent.ConcurrentHashMap<String, ByteArray>()
+
+    /** Every body `POST /v1/activities/fit` received, in order (a file that was refused is in it too). */
+    val fitBodies = CopyOnWriteArrayList<ByteArray>()
+
+    /** Answers for the next files instead of storing them: a status and a body, used once each. */
+    val fitScript = java.util.concurrent.ConcurrentLinkedQueue<Pair<Int, String>>()
+
+    /** Stores the next files but cuts the connection before the answer: the answer is lost, the file is not. */
+    @Volatile
+    var fitLoseAnswers = 0
+
     /** Every record the service holds from `POST /v1/wellness`, by id: idempotent, as the real one is. */
     val wellnessRecords = java.util.concurrent.ConcurrentHashMap<String, WellnessRecord>()
 
@@ -103,10 +126,12 @@ class LocalService(
 
     private fun handle(exchange: HttpExchange) {
         exchange.use {
-            val body = exchange.requestBody.readBytes().decodeToString()
+            val raw = exchange.requestBody.readBytes()
+            val body = raw.decodeToString()
             val auth = exchange.requestHeaders.getFirst("Authorization")
             val path = exchange.requestURI.path
-            received += Received(exchange.requestMethod, path, exchange.requestURI.rawQuery, auth, body)
+            val type = exchange.requestHeaders.getFirst("Content-Type")
+            received += Received(exchange.requestMethod, path, exchange.requestURI.rawQuery, auth, body, type)
             val (status, text) =
                 answer(
                     exchange.requestMethod,
@@ -114,6 +139,8 @@ class LocalService(
                     exchange.requestURI.rawQuery.orEmpty(),
                     auth,
                     body,
+                    raw,
+                    type,
                 )
             val bytes = text.encodeToByteArray()
             exchange.responseHeaders.add("Content-Type", "application/json")
@@ -131,6 +158,8 @@ class LocalService(
         rawQuery: String,
         auth: String?,
         body: String,
+        raw: ByteArray,
+        contentType: String?,
     ): Pair<Int, String> {
         if (down) return 503 to error("internal_error", "Down for the test")
         if (rejectToken ||
@@ -172,6 +201,19 @@ class LocalService(
                 val from = q.getValue("from")
                 val to = q.getValue("to")
                 200 to WellnessApiJson.encodeWellnessResponse(WatchSamples.wellnessResponse(from, to))
+            }
+
+            method == "GET" && path == "/v1/repeats" -> {
+                repeats?.let { 200 to RepeatsApiJson.encodeRepeats(it) } ?: (404 to error("not_found", "No such route"))
+            }
+
+            method == "GET" && path.startsWith("/v1/repeats/") -> {
+                repeatDetails[path.removePrefix("/v1/repeats/")]?.let { 200 to RepeatsApiJson.encodeDetail(it) }
+                    ?: (404 to error("not_found", "No such session"))
+            }
+
+            method == "POST" && path == "/v1/activities/fit" -> {
+                importFit(raw, contentType)
             }
 
             method == "GET" && path == "/v1/recovery" -> {
@@ -272,6 +314,37 @@ class LocalService(
                 "2026-11-18T07:40:00Z",
             )
         return 200 to WellnessApiJson.encodeUploadResponse(response)
+    }
+
+    private fun importFit(
+        raw: ByteArray,
+        contentType: String?,
+    ): Pair<Int, String> {
+        fitBodies += raw
+        fitScript.poll()?.let { return it }
+        if (contentType != "application/vnd.ant.fit") return 415 to error("unsupported_media_type", "Not a FIT body")
+        val isFit = raw.size >= 14 && raw[0].toInt() == 12 && String(raw, 8, 4, Charsets.US_ASCII) == ".FIT"
+        if (!isFit) return 422 to error("invalid_fit", "Not a FIT file")
+        val digest =
+            java.security.MessageDigest
+                .getInstance(
+                    "SHA-256",
+                ).digest(raw)
+                .joinToString("") { "%02x".format(it) }
+        val id = "fit-${digest.take(16)}"
+        val known = fitFiles.putIfAbsent(id, raw) != null
+        if (!known) {
+            rides = (rides + RepeatSamples.outdoorItem(id)).sortedByDescending { it.start }
+        }
+        if (fitLoseAnswers > 0) {
+            fitLoseAnswers--
+            throw java.io.IOException("The answer is lost")
+        }
+        return if (known) {
+            200 to RepeatSamples.duplicateJson()
+        } else {
+            201 to RepeatSamples.importedJson(id)
+        }
     }
 
     private fun dismiss(body: String): Pair<Int, String> {

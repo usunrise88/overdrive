@@ -3,8 +3,13 @@ package app.overdrive.companion
 import android.content.Context
 import app.overdrive.companion.model.TestClock
 import app.overdrive.companion.settings.OnboardingStep
+import app.overdrive.companion.share.ContentResolverReader
+import app.overdrive.companion.share.SharedFileReader
+import app.overdrive.companion.work.BackgroundScheduler
+import app.overdrive.companion.work.NoBackgroundWork
 import app.overdrive.core.health.HealthSource
 import app.overdrive.core.health.RetryPolicy
+import app.overdrive.core.sync.HttpPostBytesTransport
 import app.overdrive.data.settings.SecretText
 import app.overdrive.data.sync.UrlConnectionTransport
 import kotlinx.coroutines.runBlocking
@@ -37,18 +42,24 @@ class ContainerWorld(
         health: HealthSource = FakeHealth(),
         moving: Boolean = false,
         retry: RetryPolicy = RetryPolicy(40, 200),
+        bytesTransport: HttpPostBytesTransport = UrlConnectionTransport(),
+        sharedFiles: SharedFileReader = ContentResolverReader(context),
+        scheduler: BackgroundScheduler = NoBackgroundWork,
     ): CompanionContainer =
         CompanionContainer(
             context,
             settingsName = name,
             cacheDirectory = cache,
             patchTransport = UrlConnectionTransport(setPatchMethod = JdkPatch::allow),
+            bytesTransport = bytesTransport,
             clock = if (moving) TestClock.moving else TestClock.clock,
             settleMillis = settleMillis,
             healthSource = health,
             permissionRequest = { emptySet() },
             retryPolicy = retry,
             openGapMillis = 0,
+            sharedFiles = sharedFiles,
+            scheduler = scheduler,
         ).also { containers += it }
 
     fun CompanionContainer.configure(

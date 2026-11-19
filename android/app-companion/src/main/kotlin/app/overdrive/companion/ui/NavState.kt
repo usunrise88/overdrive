@@ -40,6 +40,11 @@ sealed interface Route {
     data class ActivityDetail(
         val id: String,
     ) : Route
+
+    /** One repeated session, from the Rides tab's second view (design/companion.md §4.12). */
+    data class RepeatDetail(
+        val hash: String,
+    ) : Route
 }
 
 /**

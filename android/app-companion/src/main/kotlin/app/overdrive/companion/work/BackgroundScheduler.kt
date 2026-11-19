@@ -15,7 +15,13 @@ interface BackgroundScheduler {
      */
     fun startFirstRead(): Boolean
 
-    /** Cancels both: the rider took the watch data away. */
+    /**
+     * Makes sure the FIT files that wait for the service are sent as soon as there is a network, even with the app closed (ADR 0028):
+     * one job with a network constraint and its own backoff. Safe to call whenever a file is kept.
+     */
+    fun scheduleFitFlush()
+
+    /** Cancels the watch data's jobs: the rider took the watch data away. */
     fun cancelAll()
 }
 
@@ -24,6 +30,8 @@ object NoBackgroundWork : BackgroundScheduler {
     override fun scheduleDaily() = Unit
 
     override fun startFirstRead(): Boolean = false
+
+    override fun scheduleFitFlush() = Unit
 
     override fun cancelAll() = Unit
 }

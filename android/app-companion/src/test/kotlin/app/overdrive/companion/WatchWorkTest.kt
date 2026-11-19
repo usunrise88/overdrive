@@ -8,6 +8,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
+import app.overdrive.companion.work.FitFlushWorker
 import app.overdrive.companion.work.NoBackgroundWork
 import app.overdrive.companion.work.WatchWorker
 import app.overdrive.companion.work.WorkManagerScheduler
@@ -97,6 +98,27 @@ class WatchWorkTest {
     @Test
     fun `the worker runs the container's read and ends the day's attempt when nothing is allowed`() {
         val worker = TestListenableWorkerBuilder<WatchWorker>(context).build()
+        val result = runBlocking { worker.doWork() }
+        assertEquals(ListenableWorker.Result.success(), result)
+    }
+
+    // region the FIT files that wait (ADR 0028)
+
+    @Test
+    fun `a kept FIT file is sent by one job that waits for the network, and asking again appends and does not fail`() {
+        val scheduler = WorkManagerScheduler(context)
+        scheduler.scheduleFitFlush()
+        scheduler.scheduleFitFlush()
+        val jobs = infos(WorkManagerScheduler.FIT_FLUSH)
+        assertTrue(jobs.isNotEmpty())
+        assertTrue(jobs.all { it.constraints.requiredNetworkType == NetworkType.CONNECTED })
+        assertTrue(jobs.none { it.state == WorkInfo.State.FAILED || it.state == WorkInfo.State.CANCELLED })
+        NoBackgroundWork.scheduleFitFlush()
+    }
+
+    @Test
+    fun `the FIT worker sends what waits through the container and ends when nothing is wrong`() {
+        val worker = TestListenableWorkerBuilder<FitFlushWorker>(context).build()
         val result = runBlocking { worker.doWork() }
         assertEquals(ListenableWorker.Result.success(), result)
     }
