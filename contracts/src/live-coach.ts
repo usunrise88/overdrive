@@ -337,6 +337,84 @@ export function mustSayOf(step: Step): readonly MustSay[] {
 }
 
 /**
+ * The mistakes in the live coach's fields of a workout, said plainly with the path (a nested `oneOf` makes the schema's own messages
+ * point at the step and no further): a brief of the wrong length, a flag that is not true or false, more than 3 lines in a step, a line
+ * with no moment or no words, or too many. Takes anything, never throws, and never quotes a line or the brief.
+ */
+export function liveCoachShapeErrors(input: unknown): string[] {
+  const errors: string[] = [];
+  if (typeof input !== "object" || input === null) return errors;
+  const workout = input as Record<string, unknown>;
+  if (workout.live_coach !== undefined && typeof workout.live_coach !== "boolean") {
+    errors.push("/live_coach must be true or false");
+  }
+  const brief = workout.coach_brief;
+  if (brief !== undefined) {
+    if (typeof brief !== "string") errors.push("/coach_brief must be a string");
+    else if (brief.trim() === "") errors.push("/coach_brief must not be blank");
+    else if (liveTextLength(brief) > LIVE_COACH_BRIEF_MAX_CHARS) {
+      errors.push(
+        `/coach_brief is ${liveTextLength(brief)} characters, at most ${LIVE_COACH_BRIEF_MAX_CHARS}`,
+      );
+    }
+  }
+  const checkStep = (step: unknown, at: string): void => {
+    if (typeof step !== "object" || step === null) return;
+    const record = step as Record<string, unknown>;
+    if (record.type === "repeat") {
+      if (record.must_say !== undefined)
+        errors.push(`${at}/must_say: a repeat has no lines of its own, put them on its steps`);
+      if (Array.isArray(record.steps)) {
+        for (const [i, inner] of record.steps.entries()) checkStep(inner, `${at}/steps/${i}`);
+      }
+      return;
+    }
+    const lines = record.must_say;
+    if (lines === undefined) return;
+    if (!Array.isArray(lines)) {
+      errors.push(`${at}/must_say must be a list of lines`);
+      return;
+    }
+    if (lines.length === 0) errors.push(`${at}/must_say must have a line or be left out`);
+    if (lines.length > LIVE_MUST_SAY_PER_STEP) {
+      errors.push(
+        `${at}/must_say has ${lines.length} lines, at most ${LIVE_MUST_SAY_PER_STEP} per step`,
+      );
+    }
+    for (const [i, line] of lines.entries()) {
+      const here = `${at}/must_say/${i}`;
+      if (typeof line !== "object" || line === null) {
+        errors.push(`${here} must be { at, text }`);
+        continue;
+      }
+      const item = line as Record<string, unknown>;
+      const moment = item.at;
+      if (
+        moment !== "start" &&
+        !(typeof moment === "number" && Number.isInteger(moment) && moment >= 1)
+      ) {
+        errors.push(`${here}/at must be "start" or a whole second of the step, 1 or more`);
+      }
+      const text = item.text;
+      if (typeof text !== "string") errors.push(`${here}/text must be a string`);
+      else if (text.trim() === "") errors.push(`${here}/text must not be blank`);
+      else if (liveTextLength(text) > LIVE_CUE_MAX_CHARS) {
+        errors.push(
+          `${here}/text is ${liveTextLength(text)} characters, at most ${LIVE_CUE_MAX_CHARS}`,
+        );
+      }
+      for (const key of Object.keys(item)) {
+        if (key !== "at" && key !== "text") errors.push(`${here} has no property ${key}`);
+      }
+    }
+  };
+  if (Array.isArray(workout.steps)) {
+    for (const [i, step] of workout.steps.entries()) checkStep(step, `/steps/${i}`);
+  }
+  return errors;
+}
+
+/**
  * What the schema cannot say about the `must_say` lines of a workout: a line's second is below the step's duration, and two
  * lines of a step are not at the same moment. Paths are those of the workout; no message quotes a line's text.
  */

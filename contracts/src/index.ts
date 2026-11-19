@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { Ajv2020 } from "ajv/dist/2020.js";
-import { type MustSay, mustSayConsistencyErrors } from "./live-coach.ts";
+import { liveCoachShapeErrors, type MustSay, mustSayConsistencyErrors } from "./live-coach.ts";
 
 // The sync API's request and response shapes (spec §8.3) live in their own files.
 export * from "./insights.ts";
@@ -142,9 +142,13 @@ export function validateWorkout(input: unknown): Validation<Workout> {
     const errors = workoutConsistencyErrors(input);
     return errors.length === 0 ? { ok: true, value: input } : { ok: false, errors };
   }
-  const errors = (checkWorkout.errors ?? []).map(
-    (e) => `${e.instancePath || "/"} ${e.message ?? "is invalid"}`,
-  );
+  // The live coach's fields are said plainly first: a mistake in a nested step is only "must match exactly one schema" to the schema.
+  const errors = [
+    ...liveCoachShapeErrors(input),
+    ...(checkWorkout.errors ?? []).map(
+      (e) => `${e.instancePath || "/"} ${e.message ?? "is invalid"}`,
+    ),
+  ];
   return { ok: false, errors };
 }
 

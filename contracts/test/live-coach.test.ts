@@ -10,6 +10,7 @@ import {
   LIVE_STREAM_END_REASONS,
   type LiveCue,
   type LiveSnapshot,
+  liveCoachShapeErrors,
   liveTextLength,
   mustSayOf,
   validateLiveCue,
@@ -149,6 +150,34 @@ describe("the workout's live-coach fields", () => {
     ]) {
       expect(errors(name)).not.toMatch(/Go\.|Again\./);
     }
+  });
+
+  it("says what is wrong with the fields plainly, first, with the path and never the words", () => {
+    const first = (name: string): string => {
+      const found = load("workout", "invalid").find(([file]) => file === `${name}.json`);
+      const result = validateWorkout(found?.[1]);
+      return result.ok ? "" : (result.errors[0] ?? "");
+    };
+    expect(first("must-say-text-81-characters")).toBe(
+      "/steps/0/must_say/0/text is 81 characters, at most 80",
+    );
+    expect(first("must-say-four-lines")).toBe("/steps/0/must_say has 4 lines, at most 3 per step");
+    expect(first("must-say-in-a-repeat-beyond-its-step")).toMatch(/must_say\/0\/at is 650/);
+    expect(first("must-say-on-a-repeat")).toMatch(
+      /\/steps\/0\/must_say: a repeat has no lines of its own/,
+    );
+    expect(first("must-say-at-another-word")).toBe(
+      '/steps/0/must_say/0/at must be "start" or a whole second of the step, 1 or more',
+    );
+    expect(first("must-say-text-blank")).toBe("/steps/0/must_say/0/text must not be blank");
+    expect(first("must-say-extra-key")).toBe("/steps/0/must_say/0 has no property voice");
+    expect(first("coach-brief-too-long")).toBe("/coach_brief is 1001 characters, at most 1000");
+    expect(first("coach-brief-blank")).toBe("/coach_brief must not be blank");
+    expect(first("live-coach-not-a-boolean")).toBe("/live_coach must be true or false");
+    // Nothing the agent wrote is repeated.
+    expect(first("must-say-text-81-characters")).not.toContain("yyyy");
+    expect(liveCoachShapeErrors("not a workout")).toEqual([]);
+    expect(liveCoachShapeErrors({ steps: "nope" })).toEqual([]);
   });
 
   it("is not part of a workout's structure: the hash ignores the brief, the flag and every line", () => {
