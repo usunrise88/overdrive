@@ -307,6 +307,37 @@ private fun RiderGroup(
                 label = "step per gear",
             )
         }
+        RouteDifficultyRow(settings, actions)
+    }
+}
+
+/** How much of a route's grade is felt (spec §11.4): a row of its own in the ride group, so it stays apart from the engine settings. */
+@Composable
+private fun RouteDifficultyRow(
+    settings: AppSettings,
+    actions: SettingsActions,
+) {
+    SettingRow("Route difficulty", description = "Share of the road's grade you feel; 0% is flat") {
+        Stepper(
+            "${settings.routeDifficultyPercent}%",
+            onDecrement = {
+                actions.onChange {
+                    it.copy(
+                        routeDifficultyPercent = SettingsRules.routeDifficulty.stepped(it.routeDifficultyPercent, -1),
+                    )
+                }
+            },
+            onIncrement = {
+                actions.onChange {
+                    it.copy(
+                        routeDifficultyPercent = SettingsRules.routeDifficulty.stepped(it.routeDifficultyPercent, +1),
+                    )
+                }
+            },
+            canDecrement = SettingsRules.routeDifficulty.canStep(settings.routeDifficultyPercent, -1),
+            canIncrement = SettingsRules.routeDifficulty.canStep(settings.routeDifficultyPercent, +1),
+            label = "route difficulty",
+        )
     }
 }
 
