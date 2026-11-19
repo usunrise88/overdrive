@@ -211,6 +211,21 @@ class ImportActivityTest {
         assertTrue(service.fitBodies.isEmpty())
     }
 
+    @Test
+    fun `a provider that fails in its own way is a file that cannot be read, and the app goes on`() {
+        connect()
+        val broken = IllegalStateException("the provider's own bug, with SENTINEL-177 in it")
+        launch(
+            send(
+                TestFitProvider.put("m", "ride.fit", SyntheticFit.bytes(12), failure = broken),
+                "application/octet-stream",
+            ),
+        )
+        waitForText("Could not read the file")
+        assertTrue("what failed is not said", !showsText("SENTINEL-177"))
+        assertTrue(service.fitBodies.isEmpty())
+    }
+
     // region the service cannot be reached
 
     @Test

@@ -77,6 +77,7 @@ import app.overdrive.data.settings.AddressCheck
 import app.overdrive.data.settings.SecretText
 import app.overdrive.data.settings.ServiceRules
 import app.overdrive.data.sync.UrlConnectionTransport
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -746,10 +747,17 @@ class CompanionContainer(
         shown.value = FitShown.Importing
         scope.launch {
             val result =
-                when (val read = sharedFiles.read(file)) {
-                    is SharedRead.Bytes -> FitShown.Done(fits.import(read.bytes))
-                    is SharedRead.Refused -> FitShown.Done(FitOutcome.Refused(read.refusal))
-                    SharedRead.Unreadable -> FitShown.Unreadable
+                try {
+                    when (val read = sharedFiles.read(file)) {
+                        is SharedRead.Bytes -> FitShown.Done(fits.import(read.bytes))
+                        is SharedRead.Refused -> FitShown.Done(FitOutcome.Refused(read.refusal))
+                        SharedRead.Unreadable -> FitShown.Unreadable
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // Nothing another app does with the file may take the container down; what failed is not said (it could name the file).
+                    FitShown.Unreadable
                 }
             // A second share replaced this one while it ran: the screen shows the newer.
             if (mine == shares) shown.value = result

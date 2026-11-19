@@ -9,11 +9,11 @@ import androidx.core.content.IntentCompat
 import app.overdrive.core.outdoor.ACTIVITY_FIT_MAX_BYTES
 import app.overdrive.core.outdoor.FitFileCheck
 import app.overdrive.core.outdoor.FitRefusal
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
-import java.io.IOException
 
 /*
  * The FIT file another app hands to the companion (spec §11.8 path A, ADR 0028): an `ACTION_SEND` from the share sheet of OnelapFit or an
@@ -92,13 +92,11 @@ class ContentResolverReader(
                     }
                     SharedRead.Bytes(out.toByteArray())
                 }
-            } catch (e: IOException) {
-                SharedRead.Unreadable
-            } catch (e: SecurityException) {
-                SharedRead.Unreadable
-            } catch (e: IllegalArgumentException) {
-                SharedRead.Unreadable
-            } catch (e: UnsupportedOperationException) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Another app's provider decides what it throws (a link that is gone, a grant that ended, a bug of its own): whatever it
+                // is, the file cannot be read, and nothing of it is kept or said.
                 SharedRead.Unreadable
             }
         }
@@ -115,9 +113,9 @@ class ContentResolverReader(
                 val size = if (sizeAt >= 0 && !cursor.isNull(sizeAt)) cursor.getLong(sizeAt) else null
                 name to size
             } ?: (null to null)
-        } catch (e: SecurityException) {
-            null to null
-        } catch (e: IllegalArgumentException) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
             null to null
         }
     }
@@ -125,7 +123,9 @@ class ContentResolverReader(
     private fun typeOf(uri: Uri): String? =
         try {
             resolver.getType(uri)
-        } catch (e: SecurityException) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
             null
         }
 

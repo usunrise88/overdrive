@@ -21,6 +21,8 @@ class TestFitProvider : ContentProvider() {
         /** What the provider says its size is: the real one by default, another number, or null for "does not know". */
         val reportedSize: Long?,
         val type: String = "application/octet-stream",
+        /** What opening the file throws, for a provider with a bug of its own. */
+        val failure: RuntimeException? = null,
     )
 
     override fun onCreate(): Boolean = true
@@ -45,6 +47,7 @@ class TestFitProvider : ContentProvider() {
         mode: String,
     ): ParcelFileDescriptor? {
         val held = files[uri.lastPathSegment] ?: return null
+        held.failure?.let { throw it }
         val file = File.createTempFile("shared", ".fit").also { it.deleteOnExit() }
         file.writeBytes(held.bytes)
         return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
@@ -81,8 +84,9 @@ class TestFitProvider : ContentProvider() {
             bytes: ByteArray,
             reportedSize: Long? = bytes.size.toLong(),
             type: String = "application/octet-stream",
+            failure: RuntimeException? = null,
         ): Uri {
-            files[id] = Held(name, bytes, reportedSize, type)
+            files[id] = Held(name, bytes, reportedSize, type, failure)
             return Uri.parse("content://$AUTHORITY/$id")
         }
     }
