@@ -5,13 +5,22 @@ import kotlin.math.cbrt
 /**
  * Turns rider power into virtual speed (spec §4.3).
  *
- * The real implementation is `app.overdrive.core.physics.FlatPhysicsSpeedModel` (rolling resistance plus
- * aerodynamic drag with system mass, CdA and Crr as settings), which `RideEngine` uses. [PlaceholderSpeedModel]
- * stays as the default of `SimulatedRideSession`, whose users already depend on its numbers.
+ * The real implementation is `app.overdrive.core.physics.FlatPhysicsSpeedModel` (rolling resistance, gravity and aerodynamic drag
+ * with system mass, CdA and Crr as settings), which `RideEngine` uses. [PlaceholderSpeedModel] stays as the default of
+ * `SimulatedRideSession`, whose users already depend on its numbers.
  */
 public fun interface SpeedModel {
     /** Steady-state speed in km/h on the flat for a rider holding [powerWatts]. */
     public fun speedKmh(powerWatts: Double): Double
+
+    /**
+     * Steady-state speed in km/h on a road of [gradePercent] (positive climbs, spec §11.4) for a rider holding [powerWatts]. A model
+     * with no gravity term ignores the grade, which is what the default does: it is the flat model.
+     */
+    public fun speedKmh(
+        powerWatts: Double,
+        gradePercent: Double,
+    ): Double = speedKmh(powerWatts)
 }
 
 /**
