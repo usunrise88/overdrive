@@ -220,8 +220,11 @@ class CompanionContainerTest {
         // Everything the start asked for is in flight at once: wait until each has its answer before counting what the service saw.
         await("every resource of the start has been refused", diagnostics = diagnostics(c)) {
             val refused = ProblemKind.TOKEN_REJECTED
-            c.workouts.state.value.problem?.kind == refused && c.recovery.state.value.problem?.kind == refused &&
-                c.insights.newest.state.value.problem?.kind == refused &&
+            c.workouts.state.value.problem
+                ?.kind == refused && c.recovery.state.value.problem
+                ?.kind == refused &&
+                c.insights.newest.state.value.problem
+                    ?.kind == refused &&
                 c.profile.state.value.problem == ProfileProblem.TokenRejected
         }
         val asked = service.received.size
