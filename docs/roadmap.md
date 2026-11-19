@@ -7,7 +7,7 @@ rest is solid.
 
 **Where we are: M1 to M4 are done, and Phase 2 is complete.** `v0.1.0` is the MVP: everything automatic is green and
 nothing has touched real hardware. Phase 2 (P2-1 to P2-5) is built and merged, and `v0.2.0` is ready to be cut by the
-owner once CI is green. Phase 3 and then multiple users (ADR 0015) are next. The bench (below) is still open.
+owner once CI is green. Phase 3 is built (see below). Multiple users (ADR 0015) comes last. The bench (below) is still open.
 
 | Stage | Release | Goal | What the owner tests | State |
 |---|---|---|---|---|
@@ -77,6 +77,8 @@ Pre-releases are `v0.1.0-alpha.N`; the MVP is `v0.1.0`. Later phases continue fr
 
 ## Phase 3 stages (spec §6)
 
+**Where we are: Phase 3 is built; `v0.3.0-rc.1` is for the owner to test; the long checks run in parallel; then `v0.3.0`.**
+
 Order of work, 2026-11-18. Stages merge into the development branch without a release; the phase ends with a release candidate
 `v0.3.0-rc.1`, which the owner tests while the orchestrator runs the long checks, then the final `v0.3.0` (`CLAUDE.md`, Process).
 Tasks live in Lific, project OVD.
@@ -84,13 +86,18 @@ Tasks live in Lific, project OVD.
 | Stage | Goal | Task | State |
 |---|---|---|---|
 | Interfaces | The phone companion's design: navigation, screens, charts, copy, mock-ups (`design/companion.md`) | | done |
-| P3-1 Metrics engine | Load, fitness/fatigue/form, power curve, eFTP suggestion, aerobic drift, W′ balance; `GET /v1/metrics`, ride detail, MCP `get_fitness` (§6.3) | OVD-12 | in progress |
-| P3-2 Wellness | `POST /v1/wellness`, `WellnessSource`, intervals.icu wellness, baselines, ready/caution/rest, other activities from the watch (§6.2, §6.4, §6.7) | OVD-13 | server side done (ADR 0023); the upload comes with the companion, P3-4 |
-| P3-3 Insights and alerts | Written notes from computed facts (configurable LLM endpoint), morning/deviation/drift alerts in Telegram, MCP tools, coach topics (§6.5, §6.6, §12.3) | OVD-14 | server side done (ADR 0025); the companion shows the notes in P3-4 |
-| P3-4 Companion app | Phone app: five screens, Health Connect reader, background sync (§6.1) | OVD-15 | not started |
+| P3-1 Metrics engine | Load, fitness/fatigue/form, power curve, eFTP suggestion, aerobic drift, W′ balance; `GET /v1/metrics`, ride detail, MCP `get_fitness` (§6.3) | OVD-12 | done (merged, ADR 0022) |
+| P3-2 Wellness | `POST /v1/wellness`, `WellnessSource`, intervals.icu wellness, baselines, ready/caution/rest, other activities from the watch (§6.2, §6.4, §6.7) | OVD-13 | done (merged, ADR 0023) |
+| P3-3 Insights and alerts | Written notes from computed facts (configurable LLM endpoint), morning/deviation/drift alerts in Telegram, MCP tools, coach topics (§6.5, §6.6, §12.3) | OVD-14 | done (merged, ADR 0025) |
+| P3-4a Companion app | Phone app: five screens, service connection, charts, the FTP answers (§6.1) | OVD-15 | done (merged, ADR 0024) |
+| P3-4b Health Connect reader | Health Connect records from the phone, the outbox, background reading, the Wellness screens (§6.1, §6.2, §12.5) | OVD-15 | done (merged, ADR 0027) |
+| P3-4c Repeats and FIT share on the phone | Repeat page, FIT share target with its outbox (§11.7, §11.8) | OVD-15 | done (merged, ADR 0028) |
 | P3-5 FTP confirmation | The eFTP suggestion is confirmed or dismissed by the owner (companion, Telegram, MCP); only then do zones move (§6.3) | OVD-16 | not started |
-| P3-7 Repeats and outdoor rides | The same-session comparison (hash of the workout structure, heart rate at the same power, trends, `GET /v1/repeats`, `previous` for the overlay, MCP); outdoor rides from a FIT file (own decoder, `POST /v1/activities/fit`, heart-rate load as `other`, duplicate guard, forwarded to intervals.icu, Telegram document) (§11.7, §11.8) | | server side done (ADR 0026, 2026-11-18); the repeat page and the share target come with the companion, P3-4; the overlay line is `v0.4.0` |
-| P3-6 Release candidate | `v0.3.0-rc.1`, then the long checks while the owner tests, then `v0.3.0` | OVD-17 | not started |
+| P3-7 Repeats and outdoor rides | The same-session comparison (hash of the workout structure, heart rate at the same power, trends, `GET /v1/repeats`, `previous` for the overlay, MCP); outdoor rides from a FIT file (own decoder, `POST /v1/activities/fit`, heart-rate load as `other`, duplicate guard, forwarded to intervals.icu, Telegram document) (§11.7, §11.8) | | done (merged): server ADR 0026, companion ADR 0028; the overlay line is `v0.4.0` |
+| P3-6 Release candidate | `v0.3.0-rc.1`, then the long checks while the owner tests, then `v0.3.0` | OVD-17 | `v0.3.0-rc.1` cut when this is merged; the final `v0.3.0` follows the owner's test |
+
+P3-5 is not marked done here: the companion has the Keep and Use answers to a suggested FTP (ADR 0024, section 3), but the stage
+was not re-checked against its task (OVD-16) when this table was written.
 
 Owner's open design questions, answered with the designer's defaults until the owner says otherwise: 14 nights before a recovery
 verdict; charts open on 6 months (fitness, power) and 4 weeks (wellness); form words Fresh/Neutral/Training hard/Very fatigued at
