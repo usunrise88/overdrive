@@ -8,6 +8,7 @@ import {
   rangeDays,
   validateWorkoutsResponse,
   type WorkoutsResponse,
+  workoutHash,
   workoutsResponseConsistencyErrors,
 } from "../src/index.ts";
 
@@ -74,6 +75,42 @@ describe("workouts response schema", () => {
     });
     expect(workoutsResponseConsistencyErrors(answer("2027-01-01"))).toEqual([]);
     expect(workoutsResponseConsistencyErrors(answer("2027-01-02"))).not.toEqual([]);
+  });
+});
+
+describe("the structure hash of a planned workout (ADR 0034)", () => {
+  const withHash = load("valid").find(([name]) => name === "week-with-structure-hashes.json")?.[1];
+
+  it("is the repeats' own hash of the workout it sits beside, in the fixture", () => {
+    const response = withHash as WorkoutsResponse;
+    expect(response.workouts.length).toBeGreaterThanOrEqual(2);
+    for (const entry of response.workouts) {
+      expect(entry.structureHash).toBe(workoutHash(entry.workout));
+    }
+  });
+
+  it("is optional: every older fixture, with none, is still valid", () => {
+    const without = load("valid").filter(
+      ([, body]) =>
+        (body as WorkoutsResponse).workouts.length > 0 &&
+        (body as WorkoutsResponse).workouts.every((w) => w.structureHash === undefined),
+    );
+    expect(without.length).toBeGreaterThanOrEqual(2);
+    for (const [, body] of without)
+      expect(validateWorkoutsResponse(body)).toMatchObject({ ok: true });
+  });
+
+  it("is refused when it is not 16 lower-case hex characters", () => {
+    const byName = new Map(load("invalid"));
+    for (const name of [
+      "structure-hash-too-short.json",
+      "structure-hash-upper-case.json",
+      "structure-hash-not-hex.json",
+      "structure-hash-null.json",
+      "structure-hash-a-number.json",
+    ]) {
+      expect(validateWorkoutsResponse(byName.get(name)).ok, name).toBe(false);
+    }
   });
 });
 

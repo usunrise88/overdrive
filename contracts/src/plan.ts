@@ -19,6 +19,11 @@ export interface PlannedWorkout {
   name: string;
   source: PlanSource;
   workout: Workout;
+  /**
+   * The workout's structure hash (spec §11.7, ADR 0026, `workoutHash`), worked out by the service from the workout as it serves it, so the
+   * tablet can ask for the previous attempt (`GET /v1/repeats/{hash}/previous`) without computing it (ADR 0034). Absent from an older service.
+   */
+  structureHash?: string;
 }
 
 /** The answer to `GET /v1/workouts?from&to`. */

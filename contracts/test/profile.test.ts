@@ -94,6 +94,26 @@ describe("profile schema", () => {
     expect(WEEKDAYS).toEqual(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
   });
 
+  it("has no bike weight and no rider weight by default: absent keys, so the old defaults fixture is unchanged", () => {
+    const profile = defaultProfile();
+    expect(profile.bikeWeightKg).toBeUndefined();
+    expect(profile.riderWeight).toBeUndefined();
+  });
+
+  it("reads the weights of the fixtures as they are written", () => {
+    const profile = load("profile/valid").find(([name]) => name === "weights.json")?.[1] as Profile;
+    expect(profile.bikeWeightKg).toBe(9);
+    expect(profile.riderWeight).toEqual({ kg: 78.4, date: "2026-11-18", days: 5 });
+  });
+
+  it("names the rule a well-shaped rider weight breaks", () => {
+    const byName = new Map(load("profile/invalid"));
+    const result = validateProfile(byName.get("rider-weight-date-impossible.json"));
+    expect(result.ok).toBe(false);
+    if (!result.ok)
+      expect(result.errors.join("; ")).toMatch(/riderWeight\/date is not a real calendar date/);
+  });
+
   it("has no W′ by default, and the service's default for it is 20 kJ", () => {
     expect(defaultProfile().wPrimeKj).toBeNull();
     expect(DEFAULT_W_PRIME_KJ).toBe(20);
@@ -148,6 +168,21 @@ describe("profile patch", () => {
     // These have the right shape and fail only once applied.
     expect(shape("zones-not-increasing.json")).toBe(true);
     expect(shape("goals-blank.json")).toBe(true);
+  });
+
+  it("sets and clears the bike weight, and cannot be given the rider's weight", () => {
+    const set = applyProfilePatch(defaultProfile(), { bikeWeightKg: 9.5 });
+    expect(set).toMatchObject({ ok: true, value: { bikeWeightKg: 9.5 } });
+    const cleared = applyProfilePatch(
+      { ...defaultProfile(), bikeWeightKg: 9 },
+      { bikeWeightKg: null },
+    );
+    expect(cleared).toMatchObject({ ok: true, value: { bikeWeightKg: null } });
+    expect(validateProfilePatch({ bikeWeightKg: 0 }).ok).toBe(false);
+    expect(validateProfilePatch({ bikeWeightKg: 100 }).ok).toBe(true);
+    expect(validateProfilePatch({ riderWeight: { kg: 70, date: "2026-11-18", days: 7 } }).ok).toBe(
+      false,
+    );
   });
 
   it("does not change the profile it is given", () => {

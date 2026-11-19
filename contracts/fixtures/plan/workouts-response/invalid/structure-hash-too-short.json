@@ -1,0 +1,94 @@
+{
+  "from": "2026-11-20",
+  "to": "2026-11-26",
+  "generatedAt": "2026-11-19T07:30:12Z",
+  "stale": false,
+  "configured": true,
+  "workouts": [
+    {
+      "id": "icu-1001",
+      "date": "2026-11-20",
+      "name": "Sweet spot 3x10",
+      "source": "intervals.icu",
+      "workout": {
+        "schema": 1,
+        "id": "icu-1001",
+        "name": "Sweet spot 3x10",
+        "description": "Three 10-minute efforts with 5-minute recoveries.",
+        "steps": [
+          {
+            "type": "ramp",
+            "duration": 600,
+            "from": 0.45,
+            "to": 0.7,
+            "label": "Warm-up"
+          },
+          {
+            "type": "repeat",
+            "count": 3,
+            "steps": [
+              {
+                "type": "steady",
+                "duration": 600,
+                "target": 0.88,
+                "label": "Sweet spot"
+              },
+              {
+                "type": "steady",
+                "duration": 300,
+                "target": 0.5,
+                "label": "Recover"
+              }
+            ]
+          },
+          {
+            "type": "ramp",
+            "duration": 300,
+            "from": 0.55,
+            "to": 0.4,
+            "label": "Cool-down"
+          }
+        ]
+      },
+      "structureHash": "3f9a1c07"
+    },
+    {
+      "id": "icu-1002",
+      "date": "2026-11-22",
+      "name": "Easy spin",
+      "source": "intervals.icu",
+      "workout": {
+        "schema": 1,
+        "id": "icu-1002",
+        "name": "Easy spin",
+        "steps": [
+          {
+            "type": "steady",
+            "duration": 2700,
+            "target": 0.55,
+            "cadence": 90
+          }
+        ]
+      },
+      "structureHash": "d77f53a07bc87f92"
+    },
+    {
+      "id": "icu-1003",
+      "date": "2026-11-22",
+      "name": "Free ride",
+      "source": "intervals.icu",
+      "workout": {
+        "schema": 1,
+        "id": "icu-1003",
+        "name": "Free ride",
+        "steps": [
+          {
+            "type": "free",
+            "duration": 3600
+          }
+        ]
+      },
+      "structureHash": "da2b6fdd397b6f36"
+    }
+  ]
+}
