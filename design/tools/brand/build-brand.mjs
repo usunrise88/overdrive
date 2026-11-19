@@ -181,7 +181,18 @@ if (want("kotlin")) {
   // 360 points are plenty on a screen (a segment of a 400 px ring is 8 px and deviates 0.04 px from the circle).
   const d = glyph(360).d;
   const parts = d.match(/.{1,100}/g).map((p) => `    "${p}"`);
-  const file = join(root, "android", "ui-kit", "src", "main", "kotlin", "app", "overdrive", "uikit", "OverdriveMarkPath.kt");
+  const file = join(
+    root,
+    "android",
+    "ui-kit",
+    "src",
+    "main",
+    "kotlin",
+    "app",
+    "overdrive",
+    "uikit",
+    "OverdriveMarkPath.kt",
+  );
   writeFileSync(
     file,
     `package app.overdrive.uikit
