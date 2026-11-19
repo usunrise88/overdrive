@@ -1,0 +1,67 @@
+{
+  "scope": "coach",
+  "generatedAt": "2026-11-19T07:30:00Z",
+  "limits": {
+    "maxChars": 12000,
+    "logMaxChars": 3000
+  },
+  "totalChars": 67,
+  "sections": [
+    {
+      "key": "profile",
+      "title": "Rider profile and constraints",
+      "text": "Rides before work: 06:30, tired legs on Mondays. Prefers °C and km.",
+      "version": 1,
+      "updatedAt": "2026-11-19T06:30:00.250Z",
+      "reason": null
+    },
+    {
+      "key": "what_works",
+      "title": "What works",
+      "text": "",
+      "version": 0,
+      "updatedAt": null,
+      "reason": null
+    },
+    {
+      "key": "what_does_not",
+      "title": "What does not work",
+      "text": "",
+      "version": 0,
+      "updatedAt": null,
+      "reason": null
+    },
+    {
+      "key": "injuries",
+      "title": "Injuries and niggles",
+      "text": "",
+      "version": 0,
+      "updatedAt": null,
+      "reason": null
+    },
+    {
+      "key": "methodology",
+      "title": "Methodology",
+      "text": "",
+      "version": 0,
+      "updatedAt": null,
+      "reason": null
+    },
+    {
+      "key": "open_questions",
+      "title": "Open questions",
+      "text": "",
+      "version": 0,
+      "updatedAt": null,
+      "reason": null
+    },
+    {
+      "key": "log",
+      "title": "Decisions log",
+      "text": "",
+      "version": 0,
+      "updatedAt": null,
+      "reason": null
+    }
+  ]
+}

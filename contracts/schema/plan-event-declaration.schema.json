@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive plan event declaration",
+  "description": "The body of POST /v1/plan-events (spec §12.2, ADR 0035): the rider declares illness or travel, so that the coach agent rebuilds the days ahead. kind is illness or travel (the other kinds of plan event are detected by the service and cannot be declared). until is the last day it lasts, a date, or absent or null when the rider gave no end. The service answers with the plan event (plan-event.schema.json): 201 for a new one, 200 when the same declaration was already made (the same kind, the same local day and the same until, so a repeated tap or a repeated command is one event). The day of the event is today in the rider's time zone. A body that is not this, or an until before today, is 400 invalid_json.",
+  "type": "object",
+  "required": ["kind"],
+  "additionalProperties": false,
+  "properties": {
+    "kind": { "enum": ["illness", "travel"] },
+    "until": {
+      "oneOf": [{ "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }, { "type": "null" }]
+    }
+  }
+}

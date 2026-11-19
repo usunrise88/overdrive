@@ -1,0 +1,14 @@
+{
+  "id": 7,
+  "kind": "illness",
+  "day": "2026-11-18",
+  "workoutId": null,
+  "detail": {
+    "until": null
+  },
+  "status": "open",
+  "createdAt": "2026-11-18T02:00:00Z",
+  "resolvedAt": null,
+  "resolutionNote": null,
+  "dropped": null
+}

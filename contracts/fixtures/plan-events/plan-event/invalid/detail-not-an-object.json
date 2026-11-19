@@ -1,0 +1,12 @@
+{
+  "id": 1,
+  "kind": "missed",
+  "day": "2026-11-17",
+  "workoutId": "icu-5001",
+  "detail": "sweet spot",
+  "status": "open",
+  "createdAt": "2026-11-18T02:00:00Z",
+  "resolvedAt": null,
+  "resolutionNote": null,
+  "dropped": null
+}
