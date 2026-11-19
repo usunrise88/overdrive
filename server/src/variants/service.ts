@@ -1,6 +1,5 @@
 import { addDaysToIsoDate, type RideHeader, workoutHash } from "@overdrive/contracts";
 import type { Db } from "../db.ts";
-import type { EventBus } from "../events.ts";
 import { type IntervalsClient, IntervalsError } from "../intervals/client.ts";
 import { eventIdOf } from "../intervals/ids.ts";
 import { retryDelayMs } from "../intervals/uploads.ts";
@@ -58,7 +57,6 @@ export interface VariantsOptions {
   intervals: Pick<IntervalsClient, "getEvent" | "updateEvent"> | null;
   planEvents: Pick<PlanEventsService, "emit">;
   rideWorkouts: RideWorkoutResolver;
-  bus: EventBus;
   timezone: string;
   now: () => Date;
   log: Logger;

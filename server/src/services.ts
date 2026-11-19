@@ -249,7 +249,6 @@ export function createServices(options: ServicesOptions): Services {
     intervals,
     planEvents,
     rideWorkouts,
-    bus,
     timezone,
     now: now ?? (() => new Date()),
     log,
