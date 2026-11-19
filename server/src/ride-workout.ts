@@ -1,8 +1,14 @@
-import type { RideHeader, Workout } from "@overdrive/contracts";
+import {
+  type PlannedVariant,
+  type RideHeader,
+  variantWorkout,
+  type Workout,
+} from "@overdrive/contracts";
 import { type IntervalsClient, IntervalsError } from "./intervals/client.ts";
 import { eventIdOf } from "./intervals/ids.ts";
 import type { Logger } from "./log.ts";
 import { readPlanEvent } from "./plan/entries.ts";
+import type { ExtrasStore } from "./plan/extras.ts";
 import type { PlanStore } from "./plan/store.ts";
 import type { RideStore } from "./ride-store.ts";
 
@@ -16,9 +22,10 @@ export interface RideWorkoutResolver {
   /**
    * The workout behind `ride.workoutId`. The copy taken earlier if there is one; otherwise the plan
    * cache, then intervals.icu, and whatever is found is kept, so the ride keeps its workout when the
-   * plan moves on or the event is deleted. Never throws.
+   * plan moves on or the event is deleted. A ride that says it played the easier variant (`variantRidden`, spec §11.5) gets the
+   * planned workout with the variant's steps, while the service still has them, and the primary otherwise. Never throws.
    */
-  resolve(ride: Pick<RideHeader, "id" | "workoutId">): Promise<RideWorkout>;
+  resolve(ride: Pick<RideHeader, "id" | "workoutId" | "variantRidden">): Promise<RideWorkout>;
 }
 
 export interface RideWorkoutDeps {
@@ -26,6 +33,8 @@ export interface RideWorkoutDeps {
   plan: Pick<PlanStore, "get">;
   /** null when no plan source is configured. */
   intervals: Pick<IntervalsClient, "getEvent"> | null;
+  /** Where the easier variants are kept; without it a variant ride is resolved to the primary. */
+  extras?: Pick<ExtrasStore, "get">;
   now: () => Date;
   log: Logger;
 }
@@ -33,6 +42,38 @@ export interface RideWorkoutDeps {
 export function createRideWorkoutResolver(deps: RideWorkoutDeps): RideWorkoutResolver {
   const { rides, plan, intervals, now, log } = deps;
   const none = (reason: string): RideWorkout => ({ workout: null, reason });
+
+  /** The primary workout from the plan cache, else from intervals.icu, or the reason there is none. */
+  async function primaryOf(
+    workoutId: string,
+  ): Promise<{ workout: Workout; variant?: PlannedVariant } | { workout: null; reason: string }> {
+    const cached = await plan.get(workoutId);
+    if (cached !== null) {
+      return {
+        workout: cached.workout,
+        ...(cached.variant === undefined ? {} : { variant: cached.variant }),
+      };
+    }
+    const eventId = eventIdOf(workoutId);
+    if (intervals === null || eventId === null) {
+      return none(`the workout ${workoutId} is no longer in the plan and cannot be looked up`);
+    }
+    const event = await intervals.getEvent(eventId);
+    if (event === null) {
+      return none(`the workout ${workoutId} is no longer in the plan (it was deleted)`);
+    }
+    const reading = readPlanEvent(event);
+    if (reading.kind !== "entry" || reading.entry.workout === null) {
+      return none(
+        `the workout ${workoutId} is in the calendar but cannot be read as a workout${
+          reading.kind === "entry" && reading.entry.unsupportedReason !== null
+            ? `: ${reading.entry.unsupportedReason}`
+            : ""
+        }`,
+      );
+    }
+    return { workout: reading.entry.workout };
+  }
 
   return {
     async resolve(ride) {
@@ -44,32 +85,23 @@ export function createRideWorkoutResolver(deps: RideWorkoutDeps): RideWorkoutRes
         const kept = await rides.workoutSnapshot(ride.id);
         if (kept !== null) return { workout: kept };
 
-        const cached = await plan.get(workoutId);
-        if (cached !== null) {
-          await rides.saveWorkoutSnapshot(ride.id, cached.workout, now());
-          return { workout: cached.workout };
+        const found = await primaryOf(workoutId);
+        if (found.workout === null) return found;
+        let workout = found.workout;
+        if (ride.variantRidden === true) {
+          // The cache has the variant laid over its entry; a day that has left the cache still has it in the extras, for a few days.
+          const variant = found.variant ?? (await deps.extras?.get(workoutId))?.variant ?? null;
+          if (variant !== null) {
+            workout = variantWorkout(workout, variant);
+          } else {
+            log.warn(
+              { rideId: ride.id },
+              "the ride says it played the easier variant, which the service no longer has: the primary workout is kept as its copy",
+            );
+          }
         }
-
-        const eventId = eventIdOf(workoutId);
-        if (intervals === null || eventId === null) {
-          return none(`the workout ${workoutId} is no longer in the plan and cannot be looked up`);
-        }
-        const event = await intervals.getEvent(eventId);
-        if (event === null) {
-          return none(`the workout ${workoutId} is no longer in the plan (it was deleted)`);
-        }
-        const reading = readPlanEvent(event);
-        if (reading.kind !== "entry" || reading.entry.workout === null) {
-          return none(
-            `the workout ${workoutId} is in the calendar but cannot be read as a workout${
-              reading.kind === "entry" && reading.entry.unsupportedReason !== null
-                ? `: ${reading.entry.unsupportedReason}`
-                : ""
-            }`,
-          );
-        }
-        await rides.saveWorkoutSnapshot(ride.id, reading.entry.workout, now());
-        return { workout: reading.entry.workout };
+        await rides.saveWorkoutSnapshot(ride.id, workout, now());
+        return { workout };
       } catch (error) {
         const reason =
           error instanceof IntervalsError

@@ -3,6 +3,7 @@ import { DEFAULT_INTERVALS_BASE_URL } from "./config.ts";
 import type { CoachSettings } from "./config-coach.ts";
 import type { InsightsSettings } from "./config-insights.ts";
 import type { IntegrationsSettings } from "./config-integrations.ts";
+import type { RoutesSettings } from "./config-routes.ts";
 import { type StravaConfig, stravaSettings } from "./config-strava.ts";
 import type { Db } from "./db.ts";
 import { createEventBus, type EventBus } from "./events.ts";
@@ -19,6 +20,7 @@ import { createMetricsService, type MetricsService } from "./metrics/service.ts"
 import { createNotebookService, type NotebookService } from "./notebook/service.ts";
 import { createNotebookStore } from "./notebook/store.ts";
 import { createOutdoor, type OutdoorService } from "./outdoor/service.ts";
+import { createExtrasStore, type ExtrasStore } from "./plan/extras.ts";
 import { createPlanRefresher, type PlanRefresher } from "./plan/refresher.ts";
 import { createPlanStore, type PlanStore } from "./plan/store.ts";
 import { createPlanEvents, type PlanEventsService } from "./plan-events/service.ts";
@@ -27,11 +29,13 @@ import { createProfileStore, type ProfileStore } from "./profile/store.ts";
 import { createRepeats, type RepeatsService } from "./repeats/service.ts";
 import { createRideStore, type RideStore } from "./ride-store.ts";
 import { createRideWorkoutResolver, type RideWorkoutResolver } from "./ride-workout.ts";
+import { createRoutes, type RoutesService } from "./routes/service.ts";
 import { createStrava, STRAVA_DESTINATION, type StravaUploads } from "./strava/index.ts";
 import { createPlanHistory } from "./telegram/history.ts";
 import { createTelegram, type TelegramBot } from "./telegram/index.ts";
 import { createRideQueries } from "./telegram/rides.ts";
 import type { Timers } from "./timers.ts";
+import { createVariants, type VariantsService } from "./variants/service.ts";
 import { createRideHeartRateIndex } from "./wellness/heart-rate-index.ts";
 import { createWellness, type WellnessService } from "./wellness/service.ts";
 
@@ -53,6 +57,7 @@ export type ServicesConfig = Partial<
   IntegrationsSettings &
   InsightsSettings &
   CoachSettings &
+  RoutesSettings &
   StravaConfig;
 
 /**
@@ -108,6 +113,12 @@ export interface Services {
   notebook: NotebookService;
   /** Plan events: what tells the coach agent the plan needs rebuilding (spec §12.2, ADR 0035). */
   planEvents: PlanEventsService;
+  /** Routes with elevation, created by the agent and ridden on the tablet (spec §11.4, ADR 0036). */
+  routes: RoutesService;
+  /** What the service keeps about a planned workout that intervals.icu cannot hold: its easier variant and its route ids (ADR 0036). */
+  extras: ExtrasStore;
+  /** The easier variant's life: the plan event and the intervals.icu update when it is ridden, its removal when the session moves (spec §11.5). */
+  variants: VariantsService;
   /** Starts the refresher, the upload worker, the calendar mirror, the bot, the wellness pull and its forwarding, the insights. */
   start(): void;
   /** Stops them and waits for what is in flight. */
@@ -136,6 +147,7 @@ export function createServices(options: ServicesOptions): Services {
     );
   const timezone = config.TIMEZONE ?? "UTC";
   const plan = createPlanStore(db, bus);
+  const extras = createExtrasStore(db);
   const now = options.now;
   const rides = createRideStore(db);
   // The plan history (what was planned, kept after the cache drops a day) is shared by the bot, the insights and the plan events.
@@ -202,8 +214,9 @@ export function createServices(options: ServicesOptions): Services {
     refresher = createPlanRefresher({
       client: intervals,
       store: plan,
-      // What the rider moved or deleted in the calendar becomes a plan event for the coach agent (ADR 0035).
-      onCalendarChanges: (change) => planEvents.notePlanChanges(change),
+      // What the rider moved or deleted in the calendar becomes a plan event for the coach agent (ADR 0035), and its easier variant goes.
+      onCalendarChanges: (change) =>
+        Promise.all([planEvents.notePlanChanges(change), variants.onCalendarChanges(change)]),
       ...shared,
     });
     uploads = createUploadWorker({ db, client: intervals, bus, ...shared });
@@ -218,8 +231,29 @@ export function createServices(options: ServicesOptions): Services {
     rides,
     plan,
     intervals,
+    extras,
     now: now ?? (() => new Date()),
     log,
+  });
+  const routes = createRoutes({
+    db,
+    settings: config,
+    now: now ?? (() => new Date()),
+    log,
+    ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+  });
+  const variants = createVariants({
+    db,
+    extras,
+    plan,
+    intervals,
+    planEvents,
+    rideWorkouts,
+    bus,
+    timezone,
+    now: now ?? (() => new Date()),
+    log,
+    timers: options.timers,
   });
   const metrics = createMetricsService({
     db,
@@ -231,10 +265,14 @@ export function createServices(options: ServicesOptions): Services {
     now: now ?? (() => new Date()),
     log,
   });
-  // A ride keeps the workout it was played from, whatever the plan does later.
+  // A ride keeps the workout it was played from (the variant, when that was ridden), whatever the plan does later, and the route it
+  // followed with the route's key; a ride that played the variant queues the update of its intervals.icu event.
   bus.on("ride-stored", async ({ rideId }) => {
     const header = await rides.getHeader(rideId);
-    if (header?.workoutId != null) await rideWorkouts.resolve(header);
+    if (header === null) return;
+    if (header.workoutId != null) await rideWorkouts.resolve(header);
+    await variants.onRideStored(header);
+    await routes.noteRide(header);
   });
 
   const repeats = createRepeats({
@@ -369,6 +407,9 @@ export function createServices(options: ServicesOptions): Services {
     insights,
     notebook,
     planEvents,
+    routes,
+    extras,
+    variants,
     start() {
       void uploads?.start();
       void strava?.start();
@@ -380,6 +421,7 @@ export function createServices(options: ServicesOptions): Services {
       repeats.start();
       insights.start();
       planEvents.start();
+      variants.start();
     },
     async stop() {
       await Promise.all([
@@ -393,6 +435,7 @@ export function createServices(options: ServicesOptions): Services {
         repeats.whenIdle(),
         insights.stop(),
         planEvents.stop(),
+        variants.stop(),
       ]);
     },
   };

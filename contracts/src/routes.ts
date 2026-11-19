@@ -17,6 +17,10 @@ export type RouteSource = (typeof ROUTE_SOURCES)[number];
 /** A route id as a free step's `route_id` and a ride's `routeId` carry it: 1 to 64 characters, starting with a letter or digit. */
 export const ROUTE_ID_PATTERN: RegExp = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
+export function isValidRouteId(id: string): boolean {
+  return ROUTE_ID_PATTERN.test(id);
+}
+
 /** The service resamples a route to one point every this many metres, unless a setting says otherwise. */
 export const ROUTE_DEFAULT_STEP_METERS = 20;
 /** The elevation is smoothed with a moving average over about this many metres. */
@@ -106,6 +110,21 @@ export function routePointsHash(points: readonly RoutePoint[]): string {
  */
 export function routeKey(routeId: string, points: readonly RoutePoint[]): string {
   return `${routeId}:${routePointsHash(points)}`;
+}
+
+/** The version of the definition of {@link routeSessionHash}. */
+export const ROUTE_SESSION_HASH_VERSION = 1;
+
+/**
+ * The 16 hex characters that identify the session two rides on the same route share (`GET /v1/repeats` calls it `hash`): the first 16
+ * hex characters of the SHA-256 of the line `overdrive.route-session.v1`, a line feed and the {@link routeKey}. It cannot collide with
+ * a workout's hash, which is taken over another text.
+ */
+export function routeSessionHash(key: string): string {
+  return createHash("sha256")
+    .update(`overdrive.route-session.v${ROUTE_SESSION_HASH_VERSION}\n${key}`)
+    .digest("hex")
+    .slice(0, 16);
 }
 
 // ---- Validation ----------------------------------------------------------------------------------------------------

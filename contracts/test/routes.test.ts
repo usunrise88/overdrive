@@ -8,6 +8,7 @@ import {
   routeAscentMeters,
   routeKey,
   routePointsHash,
+  routeSessionHash,
   validateRideRecord,
   validateRoute,
   validateRoutesResponse,
@@ -123,6 +124,7 @@ describe("the route key", () => {
       canonicalText: string;
       pointsHash: string;
       routeKey: string;
+      sessionHash: string;
     }[];
   }
   const golden = JSON.parse(readFileSync(join(fixtures, "route-key.json"), "utf8")) as Golden;
@@ -130,6 +132,7 @@ describe("the route key", () => {
   it.each(golden.cases)("$name has the golden hash and key", (c) => {
     expect(routePointsHash(c.points)).toBe(c.pointsHash);
     expect(routeKey(c.routeId, c.points)).toBe(c.routeKey);
+    expect(routeSessionHash(c.routeKey)).toBe(c.sessionHash);
     expect(c.routeKey.length).toBeLessThanOrEqual(64);
     expect(c.canonicalText.startsWith("overdrive.route-points.v1\n")).toBe(true);
   });

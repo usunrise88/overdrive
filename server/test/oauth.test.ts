@@ -990,7 +990,9 @@ describe("a real MCP client, the SDK's, from nothing to a tool call", () => {
     const tools = await client.listTools();
     expect(tools.tools.map((t) => t.name).sort()).toEqual([
       "append_notebook_log",
+      "create_route",
       "create_workout",
+      "delete_route",
       "delete_workout",
       "get_activity",
       "get_facts",
@@ -1009,6 +1011,7 @@ describe("a real MCP client, the SDK's, from nothing to a tool call", () => {
       "list_planned_workouts",
       "list_repeats",
       "list_rides",
+      "list_routes",
       "mark_discussion_topic",
       "resolve_plan_event",
       "rollback_notebook_section",
