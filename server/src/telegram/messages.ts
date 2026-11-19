@@ -19,6 +19,8 @@ export interface PlannedView {
   workout: Workout | null;
   /** The planned length; null when there is no native workout. */
   plannedSeconds: number | null;
+  /** The agent wrote an easier version of the session, which the tablet offers at the start (spec §11.5). */
+  hasEasierVersion?: boolean;
 }
 
 const round = (value: number): number => Math.round(value);
@@ -34,9 +36,11 @@ function lengthOf(view: Pick<PlannedView, "plannedSeconds">): string {
 }
 
 function stepsLine(view: PlannedView): string {
-  return view.workout === null
-    ? "The tablet cannot play this workout."
-    : `${describeSteps(view.workout, 400)}.`;
+  if (view.workout === null) return "The tablet cannot play this workout.";
+  // One short line, only when there is one: the rider chooses on the tablet.
+  const easier =
+    view.hasEasierVersion === true ? "\nAn easier version is ready on the tablet." : "";
+  return `${describeSteps(view.workout, 400)}.${easier}`;
 }
 
 // ---- Reminders ---------------------------------------------------------------------------------

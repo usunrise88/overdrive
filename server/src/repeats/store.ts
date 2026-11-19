@@ -9,10 +9,17 @@ import { REPEAT_STATS_VERSION } from "./figures.ts";
  * workout snapshot has no hash and never matches another.
  */
 
-/** A ride that was played from a workout whose structure has a hash. */
+/**
+ * A ride that is an attempt at a session: it was played from a workout whose structure has a hash (`workout`), or it followed a route
+ * and was played from no workout (`route`, spec §11.4, §11.7: two rides on the same route are one session; the hash is then the
+ * route session hash of the contracts, taken over the route key).
+ */
 export interface AttemptRow {
   rideId: string;
   hash: string;
+  kind: "workout" | "route";
+  /** The route id and the hash of its points, when the ride followed a route. */
+  routeKey: string | null;
   startMs: number;
   /** The workout's name as it was when the ride was stored. */
   name: string;
@@ -45,6 +52,8 @@ export interface RepeatStore {
 interface AttemptSql {
   ride_id: string;
   hash: string;
+  kind: "workout" | "route";
+  route_key: string | null;
   start: string;
   name: string | null;
   duration: string | null;
@@ -84,19 +93,35 @@ export function createRepeatStore(db: Db): RepeatStore {
 
     async attempts(hash) {
       const result = await db.query<AttemptSql>(
-        `SELECT w.ride_id, w.workout_hash AS hash, r.start_epoch_millis::text AS start, w.workout->>'name' AS name,
-                r.record->'summary'->>'durationSeconds' AS duration,
-                r.record->'summary'->>'averagePower' AS avg_power,
-                r.record->'summary'->>'averageHeartRate' AS avg_hr
-           FROM ride_workouts w JOIN rides r ON r.id = w.ride_id
-          WHERE w.workout_hash IS NOT NULL AND w.workout_hash_version = $1
-            AND ($2::text IS NULL OR w.workout_hash = $2)
-          ORDER BY r.start_epoch_millis, w.ride_id`,
+        `SELECT a.ride_id, a.hash, a.kind, a.route_key, a.start, a.name, a.duration, a.avg_power, a.avg_hr FROM (
+           SELECT w.ride_id, w.workout_hash AS hash, 'workout' AS kind, rr.route_key,
+                  r.start_epoch_millis::text AS start, w.workout->>'name' AS name,
+                  r.record->'summary'->>'durationSeconds' AS duration,
+                  r.record->'summary'->>'averagePower' AS avg_power,
+                  r.record->'summary'->>'averageHeartRate' AS avg_hr
+             FROM ride_workouts w JOIN rides r ON r.id = w.ride_id
+             LEFT JOIN ride_routes rr ON rr.ride_id = w.ride_id
+            WHERE w.workout_hash IS NOT NULL AND w.workout_hash_version = $1
+           UNION ALL
+           SELECT rr.ride_id, rr.session_hash AS hash, 'route' AS kind, rr.route_key,
+                  r.start_epoch_millis::text AS start, rr.route_name AS name,
+                  r.record->'summary'->>'durationSeconds' AS duration,
+                  r.record->'summary'->>'averagePower' AS avg_power,
+                  r.record->'summary'->>'averageHeartRate' AS avg_hr
+             FROM ride_routes rr JOIN rides r ON r.id = rr.ride_id
+            WHERE NOT EXISTS (
+              SELECT 1 FROM ride_workouts w WHERE w.ride_id = rr.ride_id AND w.workout_hash IS NOT NULL
+            )
+         ) a
+          WHERE ($2::text IS NULL OR a.hash = $2)
+          ORDER BY a.start::bigint, a.ride_id`,
         [WORKOUT_HASH_VERSION, hash ?? null],
       );
       return result.rows.map((row) => ({
         rideId: row.ride_id,
         hash: row.hash,
+        kind: row.kind,
+        routeKey: row.route_key,
         startMs: Number(row.start),
         name: row.name ?? "Planned workout",
         durationSeconds: number(row.duration) ?? 0,
@@ -108,10 +133,16 @@ export function createRepeatStore(db: Db): RepeatStore {
     async hashOf(rideId) {
       const result = await db.query<{ hash: string | null }>(
         `SELECT workout_hash AS hash FROM ride_workouts
-          WHERE ride_id = $1 AND workout_hash_version = $2`,
+          WHERE ride_id = $1 AND workout_hash_version = $2 AND workout_hash IS NOT NULL`,
         [rideId, WORKOUT_HASH_VERSION],
       );
-      return result.rows[0]?.hash ?? null;
+      if (result.rows[0]?.hash != null) return result.rows[0].hash;
+      // No workout: a ride on a route is a session of the route's.
+      const route = await db.query<{ hash: string }>(
+        "SELECT session_hash AS hash FROM ride_routes WHERE ride_id = $1",
+        [rideId],
+      );
+      return route.rows[0]?.hash ?? null;
     },
 
     async stats(rideIds) {

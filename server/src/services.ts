@@ -279,6 +279,7 @@ export function createServices(options: ServicesOptions): Services {
     db,
     rides,
     metrics,
+    routes,
     timezone,
     now: now ?? (() => new Date()),
     log,
