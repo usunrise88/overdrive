@@ -1,10 +1,14 @@
 package app.overdrive.core.remote
 
+import app.overdrive.core.sync.ApiErrorCode
 import app.overdrive.core.sync.HttpAnswer
 import app.overdrive.core.sync.HttpGetRequest
 import app.overdrive.core.sync.HttpGetTransport
+import app.overdrive.core.sync.HttpPostBytesRequest
+import app.overdrive.core.sync.HttpPostBytesTransport
 import app.overdrive.core.sync.HttpPostRequest
 import app.overdrive.core.sync.HttpPostTransport
+import app.overdrive.core.sync.SyncApiJson
 import app.overdrive.core.sync.SyncConfig
 import app.overdrive.core.sync.TransportException
 import kotlinx.coroutines.CancellationException
@@ -21,9 +25,13 @@ public sealed interface Outcome<out T> {
     /** Nothing is set up (no address or token): nothing was asked and nothing is said. */
     public data object NotSetUp : Outcome<Nothing>
 
-    /** It did not work, for [problem]. */
+    /**
+     * It did not work, for [problem]. [code] is the service's own error code when it answered with one and the caller asked for it
+     * ([ServiceClient.postBytes]: a refused file says why), else null.
+     */
     public data class Failed(
         val problem: ServiceProblem,
+        val code: ApiErrorCode? = null,
     ) : Outcome<Nothing>
 }
 
@@ -42,6 +50,7 @@ public class ServiceClient(
     private val config: () -> SyncConfig,
     private val reader: HttpGetTransport,
     private val poster: HttpPostTransport? = null,
+    private val bytesPoster: HttpPostBytesTransport? = null,
 ) {
     private val rejected = MutableStateFlow<SyncConfig?>(null)
 
@@ -107,6 +116,48 @@ public class ServiceClient(
         if (answer.status in HTTP_SUCCESS) return Outcome.Ok(answer, answer.body)
         return Outcome.Failed(problemOf(answer, settings))
     }
+
+    /**
+     * `POST` [body] (bytes, as [contentType]) to [path]: a file for the service. Like [post] it returns the answer when the service
+     * gave one **and it was 2xx**; any other status or no answer is a failure, and a failure the service explained carries its
+     * [error code][Outcome.Failed.code] so the caller can say which rule the file broke. Neither the token nor the body is in an outcome.
+     */
+    public suspend fun postBytes(
+        path: String,
+        contentType: String,
+        body: ByteArray,
+        maxBytes: Int,
+    ): Outcome<HttpAnswer> {
+        val settings = config()
+        if (!settings.isConfigured) return Outcome.NotSetUp
+        val transport = bytesPoster ?: return Outcome.Failed(ServiceProblem.NotTheService)
+        refusalFor(settings)?.let { return Outcome.Failed(it) }
+        val answer =
+            try {
+                transport.postBytes(
+                    HttpPostBytesRequest(
+                        settings.baseUrl.trimEnd('/') + path,
+                        settings.token,
+                        body,
+                        contentType,
+                        maxBytes,
+                    ),
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: TransportException) {
+                return Outcome.Failed(ServiceProblem.of(e))
+            }
+        if (answer.status in HTTP_SUCCESS) return Outcome.Ok(answer, answer.body)
+        return Outcome.Failed(problemOf(answer, settings), errorCodeOf(answer.body))
+    }
+
+    private fun errorCodeOf(body: String): ApiErrorCode? =
+        try {
+            SyncApiJson.decodeApiError(body).code
+        } catch (e: IllegalArgumentException) {
+            null
+        }
 
     private fun refusalFor(settings: SyncConfig): ServiceProblem? =
         if (rejected.value == settings || !settings.token.all { it in '!'..'~' }) ServiceProblem.TokenRejected else null

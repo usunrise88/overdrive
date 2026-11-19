@@ -6,6 +6,8 @@ import app.overdrive.core.sync.HttpGetRequest
 import app.overdrive.core.sync.HttpGetTransport
 import app.overdrive.core.sync.HttpPatchRequest
 import app.overdrive.core.sync.HttpPatchTransport
+import app.overdrive.core.sync.HttpPostBytesRequest
+import app.overdrive.core.sync.HttpPostBytesTransport
 import app.overdrive.core.sync.HttpPostRequest
 import app.overdrive.core.sync.HttpPostTransport
 import app.overdrive.core.sync.HttpRequest
@@ -38,7 +40,10 @@ import java.net.URL
  * And it is the [HttpPatchTransport] of the rider's profile (ADR 0021): one `PATCH` with a small JSON body
  * (`application/json`), the same stack and rules. Android's `HttpURLConnection` (OkHttp inside) knows the verb PATCH; the JDK's
  * does not, which only matters to a test on a plain JVM (see [setPatchMethod]). And it is the [HttpPostTransport] of the
- * companion's FTP answer (ADR 0024): one `POST` with a small JSON body, the same stack and rules again.
+ * companion's FTP answer (ADR 0024): one `POST` with a small JSON body, the same stack and rules again. And it is the
+ * [HttpPostBytesTransport] of the outdoor ride's FIT file (ADR 0028): one `POST` of up to 16 MiB of bytes with a fixed length, sent in
+ * pieces so a cancelled request stops, with `Content-Type` as the request says (`application/vnd.ant.fit`); the body is the rider's ride,
+ * so it is kept out of every failure and every printed request, like the token.
  *
  * **It logs nothing and keeps neither the token nor the body anywhere but the request being sent.** What went wrong without an
  * answer is a [TransportException] whose message names only the kind of failure; its hint for the owner is a fixed vocabulary
@@ -57,7 +62,8 @@ class UrlConnectionTransport(
 ) : HttpTransport,
     HttpGetTransport,
     HttpPatchTransport,
-    HttpPostTransport {
+    HttpPostTransport,
+    HttpPostBytesTransport {
     override suspend fun get(request: HttpGetRequest): HttpAnswer =
         withContext(dispatcher) {
             val connection =
@@ -136,6 +142,11 @@ class UrlConnectionTransport(
     override suspend fun post(request: HttpPostRequest): HttpAnswer =
         sendJson(request.url, request.bearerToken, request.body, request.maxBytes) { it.requestMethod = "POST" }
 
+    override suspend fun postBytes(request: HttpPostBytesRequest): HttpAnswer =
+        sendBody(request.url, request.bearerToken, request.body, request.contentType, request.maxBytes) {
+            it.requestMethod = "POST"
+        }
+
     /** One request with a small JSON body of known length ([PATCH][patch] and [POST][post]), the answer read up to [maxBytes]. */
     private suspend fun sendJson(
         url: String,
@@ -143,8 +154,22 @@ class UrlConnectionTransport(
         text: String,
         maxBytes: Int,
         setMethod: (HttpURLConnection) -> Unit,
+    ): HttpAnswer = sendBody(url, bearerToken, text.encodeToByteArray(), "application/json", maxBytes, setMethod)
+
+    /**
+     * One request with a body of known length, in pieces (a cancelled request stops between two of them), the answer read up to
+     * [maxBytes]. The body is only ever written to the connection: it is in no exception and no message.
+     */
+    private suspend fun sendBody(
+        url: String,
+        bearerToken: String,
+        body: ByteArray,
+        contentType: String,
+        maxBytes: Int,
+        setMethod: (HttpURLConnection) -> Unit,
     ): HttpAnswer =
         withContext(dispatcher) {
+            val job = currentCoroutineContext().job
             val connection =
                 try {
                     URL(url).openConnection() as HttpURLConnection
@@ -154,7 +179,6 @@ class UrlConnectionTransport(
                     throw TransportException(TransportFailure.Other, e)
                 }
             try {
-                val body = text.encodeToByteArray()
                 setMethod(connection)
                 connection.connectTimeout = connectTimeoutMillis
                 connection.readTimeout = readTimeoutMillis
@@ -163,10 +187,18 @@ class UrlConnectionTransport(
                 connection.doInput = true
                 connection.doOutput = true
                 connection.setRequestProperty("Authorization", "Bearer $bearerToken")
-                connection.setRequestProperty("Content-Type", "application/json")
+                connection.setRequestProperty("Content-Type", contentType)
                 connection.setRequestProperty("Accept", "application/json")
                 connection.setFixedLengthStreamingMode(body.size)
-                connection.outputStream.use { it.write(body) }
+                connection.outputStream.use { out ->
+                    var at = 0
+                    while (at < body.size) {
+                        job.ensureActive()
+                        val count = minOf(WRITE_CHUNK_BYTES, body.size - at)
+                        out.write(body, at, count)
+                        at += count
+                    }
+                }
                 val status = connection.responseCode
                 val stream = if (status >= HTTP_BAD_REQUEST) connection.errorStream else connection.inputStream
                 HttpAnswer(status, stream?.use { readAtMost(it, maxBytes) }.orEmpty())
@@ -214,6 +246,7 @@ class UrlConnectionTransport(
         const val READ_TIMEOUT_MILLIS = 30_000
         private const val MAX_ANSWER_BYTES = 4_096
         private const val READ_CHUNK_BYTES = 8_192
+        private const val WRITE_CHUNK_BYTES = 64 * 1024
         private const val HTTP_BAD_REQUEST = 400
     }
 }
