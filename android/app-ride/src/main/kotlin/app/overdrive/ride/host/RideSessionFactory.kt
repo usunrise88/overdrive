@@ -14,6 +14,7 @@ import app.overdrive.core.ride.RideSettings
 import app.overdrive.core.ride.SignalDropout
 import app.overdrive.core.ride.SimulatedSignal
 import app.overdrive.core.ride.SimulationScenario
+import app.overdrive.core.route.RideRoutes
 import app.overdrive.core.workout.Workout
 import app.overdrive.ride.settings.AppSettings
 import app.overdrive.ride.settings.DeviceSource
@@ -33,6 +34,10 @@ class RideRequest(
     val recorder: RideRecorder,
     /** 1, 2, 3, … per ride in this process; seeds the simulation. */
     val rideNumber: Int,
+    /** The routes the ride may follow, only those the tablet has downloaded (spec §11.4); none is the flat road. */
+    val routes: RideRoutes = RideRoutes.None,
+    /** The workout is the planned workout's easier version (spec §11.5): the record's header says so. */
+    val variantRidden: Boolean = false,
 )
 
 /** The things the Devices screen can ask a device layer to do. Every call is fire and forget and returns at once. */
@@ -144,6 +149,8 @@ class SimulatedRideSessionFactory : RideSessionFactory {
                 settings = rideSettings,
                 recorder = request.recorder,
                 tickInterval = tick,
+                routes = request.routes,
+                variantRidden = request.variantRidden,
             )
         // The bike starts before the ride so its readings of second k reach the engine just before its tick k.
         bike.start()

@@ -174,6 +174,8 @@ Garmin's SDK, and **the SDK is not a dependency of the app, the build or CI**.
 | (ours) | what a record's timestamp is | `recordStamp` | `SECOND_START` |
 | (ours) | the UTC offset of the local time | `utcOffsetSeconds` | 0, the app must set it |
 | (ours) | load fields in the session | `loadFields` | `true` |
+| 8.10 | positions of a ride on a route (stage A2b-2, ADR 0037) | `positions` | `true`: `position_lat` and `position_long` for a route with coordinates; none for a ride with no route |
+| 8.10 | altitude of a ride on a route (stage A2b-2, ADR 0037) | `altitude` | `true`: `altitude` and `enhanced_altitude`, a profile's included |
 
 - **Verification in CI** (`make check`), none of it using Garmin's SDK: an **independent test-only FIT reader**
   (`FitReader`, commonTest) that parses the file generically from its own definition messages and is strict (header

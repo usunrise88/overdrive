@@ -78,17 +78,25 @@ public data class RampStep(
     }
 }
 
-/** Free ride: simulation mode with gears, no power target. */
+/**
+ * Free ride: simulation mode with gears, no power target.
+ *
+ * [routeId] (`route_id`, spec §8.1, §11.4, ADR 0036) names a route with elevation that backs the step: its grade feeds the
+ * trainer's simulation. A step without it is the flat free ride, exactly as before. The id is the service's: the tablet looks
+ * it up in the routes it has downloaded, and a route it does not have is a flat step.
+ */
 @Serializable
 @SerialName("free")
 public data class FreeStep(
     override val duration: Int,
     override val cadence: Double? = null,
     override val label: String? = null,
+    @SerialName("route_id") val routeId: String? = null,
 ) : LeafStep {
     init {
         requireValidDuration(duration)
         requireValidCadence(cadence)
+        require(routeId == null || isValidRouteId(routeId)) { "Not a route id: '$routeId'" }
     }
 }
 
@@ -161,6 +169,14 @@ public data class RepeatStep(
 }
 
 private const val MAX_FTP_FRACTION = 3.0
+
+private val routeIdPattern = Regex("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+/**
+ * Whether [id] is a route id as a free step's `route_id` and a ride's `routeId` carry it: 1 to 64 characters from
+ * `A-Z a-z 0-9 . _ -`, starting with a letter or digit (`contracts/schema/route.schema.json`).
+ */
+public fun isValidRouteId(id: String): Boolean = routeIdPattern.matches(id)
 
 private fun requireValidDuration(duration: Int) =
     require(duration >= 1) { "Duration must be at least 1 second, got $duration" }

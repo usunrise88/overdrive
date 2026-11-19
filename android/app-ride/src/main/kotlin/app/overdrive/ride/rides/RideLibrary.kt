@@ -1,6 +1,7 @@
 package app.overdrive.ride.rides
 
 import androidx.compose.runtime.Immutable
+import app.overdrive.core.fit.FitRoutes
 import app.overdrive.core.record.AsyncRideRecorder
 import app.overdrive.core.record.NoRideRecorder
 import app.overdrive.core.record.RideRecord
@@ -95,9 +96,13 @@ interface RideDiskLog {
     /**
      * After the ride ended: waits for the log to be written out, then stores the finished [record] (JSON and FIT) and
      * removes the log. Can be called again after a failure. The work is not cancelled with the caller: a rider who
-     * leaves the summary while it runs still gets the ride stored.
+     * leaves the summary while it runs still gets the ride stored. [routes] says which route each stretch of the ride followed, for
+     * the FIT file's positions and altitude (spec §11.4); the default is the flat road and the file every ride had.
      */
-    suspend fun finish(record: RideRecord): SaveState
+    suspend fun finish(
+        record: RideRecord,
+        routes: FitRoutes = FitRoutes.None,
+    ): SaveState
 }
 
 /** Where rides go: the library on the tablet, or [None] where nothing is stored (previews and plain host tests). */
@@ -113,8 +118,10 @@ fun interface RidePersistence {
                     override val recorder: RideRecorder = NoRideRecorder
                     override val failed: StateFlow<Boolean> = MutableStateFlow(false)
 
-                    override suspend fun finish(record: RideRecord): SaveState =
-                        SaveState.Failed("Rides are not stored in this build.", retryable = false)
+                    override suspend fun finish(
+                        record: RideRecord,
+                        routes: FitRoutes,
+                    ): SaveState = SaveState.Failed("Rides are not stored in this build.", retryable = false)
                 }
             }
     }
@@ -148,6 +155,11 @@ class RideLibrary(
     private val minimumRecoverableSeconds: Int = MINIMUM_RECOVERABLE_SECONDS,
     private val report: (String, Throwable) -> Unit = { _, _ -> },
     private val onSaved: (StoredRide) -> Unit = {},
+    /**
+     * The routes of a ride that is completed from its log or its stored record, for the FIT file's positions: the record names its
+     * route and the points are the tablet's. The default is none, the file every ride had.
+     */
+    private val routesOf: (RideRecord) -> FitRoutes = { FitRoutes.None },
 ) : RidePersistence {
     private val mutableLastSaved = MutableStateFlow<StoredRide?>(null)
     private val mutableRecovery = MutableStateFlow<RecoveryState>(RecoveryState.None)
@@ -191,7 +203,7 @@ class RideLibrary(
         scope.launch {
             val ride = pending.firstOrNull()?.takeIf { it.id == id } ?: return@launch
             mutableRecovery.value = RecoveryState.Saving(ride, pending.size - 1)
-            when (val result = store.finalizeStored(ride.id, utcOffsetSeconds)) {
+            when (val result = store.finalizeStored(ride.id, utcOffsetSeconds, routesOf)) {
                 is StoreResult.Ok -> {
                     pending = pending.filterNot { it.id == ride.id }
                     mutableLastSaved.value = result.value
@@ -235,7 +247,7 @@ class RideLibrary(
         val saved = rides.filter { it.status == StoredRideStatus.Saved }.toMutableList()
         // A ride that ended but was never exported: nothing to ask, finish it.
         for (ride in rides.filter { it.status == StoredRideStatus.Unsaved }) {
-            when (val result = store.finalizeStored(ride.id, utcOffsetSeconds)) {
+            when (val result = store.finalizeStored(ride.id, utcOffsetSeconds, routesOf)) {
                 is StoreResult.Ok -> saved += result.value
                 is StoreResult.Failed -> report("Finishing a stored ride failed", result.cause)
             }
@@ -282,12 +294,23 @@ class RideLibrary(
         override val recorder: RideRecorder get() = queue
         override val failed: StateFlow<Boolean> get() = writer.failed
 
-        override suspend fun finish(record: RideRecord): SaveState =
+        override suspend fun finish(
+            record: RideRecord,
+            routes: FitRoutes,
+        ): SaveState =
             scope
                 .async {
                     // Everything the engine handed over is written, the `finished` line synced and the file closed.
                     queue.close()
-                    when (val result = store.finalize(record, title, utcOffsetSeconds(record.ride.startEpochMillis))) {
+                    when (
+                        val result =
+                            store.finalize(
+                                record,
+                                title,
+                                utcOffsetSeconds(record.ride.startEpochMillis),
+                                routes,
+                            )
+                    ) {
                         is StoreResult.Ok -> {
                             mutableLastSaved.value = result.value
                             announce(result.value)

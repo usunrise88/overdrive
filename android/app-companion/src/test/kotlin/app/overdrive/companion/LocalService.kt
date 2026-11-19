@@ -63,6 +63,10 @@ class LocalService(
     @Volatile
     var planConfigured = true
 
+    /** What `GET /v1/workouts` answers instead of the sample plan when it is set (a plan with a route or an easier version, ADR 0037). */
+    @Volatile
+    var workoutsBody: String? = null
+
     @Volatile
     var profile: Profile? = Samples.profile()
 
@@ -182,7 +186,11 @@ class LocalService(
             }
 
             method == "GET" && path == "/v1/workouts" -> {
-                200 to PlanApiJson.encodeWorkoutsResponse(Samples.workouts(q.getValue("from"), planConfigured))
+                200 to
+                    (
+                        workoutsBody
+                            ?: PlanApiJson.encodeWorkoutsResponse(Samples.workouts(q.getValue("from"), planConfigured))
+                    )
             }
 
             path == "/v1/profile" -> {

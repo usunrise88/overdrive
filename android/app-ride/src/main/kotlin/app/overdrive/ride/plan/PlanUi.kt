@@ -11,7 +11,13 @@ import app.overdrive.core.plan.intensityFactor
 import app.overdrive.core.plan.playability
 import app.overdrive.core.ride.flatSteps
 import app.overdrive.core.ride.totalDurationSeconds
+import app.overdrive.core.route.RouteLibrary
+import app.overdrive.core.route.RouteStatus
+import app.overdrive.core.workout.Step
+import app.overdrive.core.workout.Workout
 import app.overdrive.ride.rides.RiddenWorkout
+import app.overdrive.ride.routes.RouteChoiceUi
+import app.overdrive.ride.routes.RoutesView
 import app.overdrive.ride.workouts.WorkoutDescriber
 import app.overdrive.uikit.UiFormat
 import java.time.Instant
@@ -35,9 +41,42 @@ data class PlanRow(
     val duration: String?,
     /** "IF 0.76", or null when the workout prescribes too little power to say. */
     val intensity: String?,
+    /** The easier version the agent wrote, offered right under this row: one tap chooses it (spec §11.5). Null when there is none. */
+    val variant: VariantRow? = null,
+    /** "Recovery: caution", beside the choice, on a row of today that has an easier version; else null (spec §11.5). */
+    val recovery: String? = null,
 ) {
     /** The player can run it: the row is a button. */
     val enabled: Boolean get() = mark != PlanMark.Blocked
+}
+
+/**
+ * The easier version of a planned workout as a row under it (spec §11.5): the planned workout with the variant's steps, so the ride keeps
+ * the planned workout's id; its name is "Easier version" and the **note** the agent wrote with it is the line under the name, else what kinds of
+ * step it has.
+ */
+@Immutable
+data class VariantRow(
+    /** What the ride plays: the planned workout's id and name, the variant's steps. */
+    val workout: Workout,
+    val title: String,
+    val subtitle: String,
+    val mark: PlanMark,
+    val duration: String?,
+    val intensity: String?,
+    /** The agent's note, kept for the detail beside the Start button. */
+    val note: String?,
+    /**
+     * The service's hash of the structure of the primary with the variant's steps: a variant ride is a session of its own (ADR 0036), so
+     * this, and not the planned workout's, is what the previous attempt of the ride is asked for (spec §11.7, docs/adr/0034).
+     */
+    val structureHash: String? = null,
+) {
+    val enabled: Boolean get() = mark != PlanMark.Blocked
+
+    companion object {
+        const val TITLE = "Easier version"
+    }
 }
 
 /** The planned rows of one day after today. */
@@ -87,12 +126,15 @@ data class PlanUi(
             nowMillis: Long,
             zone: ZoneId = ZoneId.systemDefault(),
             locale: Locale = Locale.getDefault(),
+            routes: RoutesView = RoutesView.None,
+            recovery: String? = null,
         ): PlanUi {
             if (!state.visible) return Hidden
             val agenda = PlanAgenda.of(state.workouts, today)
             val last = ridden.groupBy { it.workoutId }.mapValues { (_, rides) -> rides.maxOf { it.startEpochMillis } }
 
-            fun row(workout: PlannedWorkout) = rowOf(workout, last[workout.id], zone, locale)
+            fun row(workout: PlannedWorkout) =
+                rowOf(workout, last[workout.id], zone, locale, routes, recovery.takeIf { workout.date == today })
             val tomorrow = PlanCalendar.addDays(today, 1)
             val (status, alert, detail) = statusOf(state, nowMillis, zone, locale)
             return PlanUi(
@@ -114,12 +156,27 @@ data class PlanUi(
             lastRideMillis: Long?,
             zone: ZoneId,
             locale: Locale,
+            routes: RoutesView,
+            recovery: String?,
         ): PlanRow {
             val workout = planned.workout
             val description = describe(planned)
+            val variant = variantOf(planned, routes)
             return when (val playability = workout.playability()) {
                 is Playability.Unrunnable -> {
-                    PlanRow(planned, planned.name, playability.reason, PlanMark.Blocked, null, null)
+                    PlanRow(
+                        planned,
+                        planned.name,
+                        playability.reason,
+                        PlanMark.Blocked,
+                        null,
+                        null,
+                        variant,
+                        recovery.takeIf {
+                            variant !=
+                                null
+                        },
+                    )
                 }
 
                 Playability.Runnable -> {
@@ -127,13 +184,75 @@ data class PlanUi(
                     PlanRow(
                         workout = planned,
                         title = planned.name,
-                        subtitle = if (done == null) description else "$done · $description",
+                        subtitle =
+                            listOfNotNull(
+                                done,
+                                description,
+                                routeText(workout.steps, routes),
+                            ).joinToString(" · "),
                         mark = if (done == null) PlanMark.None else PlanMark.Done,
                         duration = UiFormat.minutes(workout.flatSteps().totalDurationSeconds()),
                         intensity = workout.intensityFactor()?.let { "IF " + UiFormat.decimal(it, 2) },
+                        variant = variant,
+                        recovery = recovery.takeIf { variant != null },
                     )
                 }
             }
+        }
+
+        /** The easier version as a row, or null when the planned workout has none. */
+        private fun variantOf(
+            planned: PlannedWorkout,
+            routes: RoutesView,
+        ): VariantRow? {
+            val variant = planned.variant ?: return null
+            val workout = planned.variantWorkout() ?: return null
+            val note = variant.note
+            val kinds = WorkoutDescriber.kinds(workout).replaceFirstChar { it.uppercase() }
+            val subtitle = listOfNotNull(note ?: kinds, routeText(variant.steps, routes)).joinToString(" · ")
+            return when (val playability = workout.playability()) {
+                is Playability.Unrunnable -> {
+                    VariantRow(
+                        workout,
+                        VariantRow.TITLE,
+                        playability.reason,
+                        PlanMark.Blocked,
+                        null,
+                        null,
+                        note,
+                        variant.structureHash,
+                    )
+                }
+
+                Playability.Runnable -> {
+                    VariantRow(
+                        workout = workout,
+                        title = VariantRow.TITLE,
+                        subtitle = subtitle,
+                        mark = PlanMark.None,
+                        duration = UiFormat.minutes(workout.flatSteps().totalDurationSeconds()),
+                        intensity = workout.intensityFactor()?.let { "IF " + UiFormat.decimal(it, 2) },
+                        note = note,
+                        structureHash = variant.structureHash,
+                    )
+                }
+            }
+        }
+
+        /**
+         * The route a workout's free steps name, in plain words (spec §11.4): "Route: North road" when the points are on the tablet (a ride
+         * on them needs no network), **"Route not downloaded yet"** when one is not (the ride would be flat there), nothing for a workout
+         * that names none. A workout that names two or more says "Routes: A, B".
+         */
+        fun routeText(
+            steps: List<Step>,
+            routes: RoutesView,
+        ): String? {
+            val ids = RouteLibrary.routeIdsOf(steps)
+            if (ids.isEmpty()) return null
+            if (ids.any { routes.statusOf(it) != RouteStatus.READY }) return RouteChoiceUi.NOT_DOWNLOADED
+            val names = ids.mapNotNull(routes::nameOf)
+            return (if (names.size == 1) "Route: " else "Routes: ") + names.joinToString(", ")
         }
 
         /** The workout's own description (its first line), else the kinds of step it has: one plain line. */

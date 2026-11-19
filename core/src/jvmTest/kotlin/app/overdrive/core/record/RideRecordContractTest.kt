@@ -19,10 +19,14 @@ import kotlin.test.assertTrue
  * `cd core && OVERDRIVE_WRITE_FIXTURES=1 ./gradlew jvmTest --tests '*RideRecordContractTest*' --rerun`.
  */
 class RideRecordContractTest {
-    private val fixtures = File(System.getProperty("overdrive.contracts.dir"), "fixtures/rides")
+    private val contracts = File(System.getProperty("overdrive.contracts.dir"))
+    private val fixtures = File(contracts, "fixtures/rides")
 
+    /** The record fixtures, and those of stage A2b-1 under `fixtures/routes/ride-record` (`routeId`, `routeName`, `variantRidden`). */
     private fun fixtures(kind: String): List<File> =
-        File(fixtures, kind).listFiles { f -> f.extension == "json" }.orEmpty().sortedBy { it.name }
+        listOf(File(fixtures, kind), File(contracts, "fixtures/routes/ride-record/$kind"))
+            .flatMap { dir -> dir.listFiles { f -> f.extension == "json" }.orEmpty().toList() }
+            .sortedBy { it.name }
 
     /** The valid fixtures that are generated, by file name. */
     private fun generated(): Map<String, RideRecord> {
@@ -122,6 +126,36 @@ class RideRecordContractTest {
         val withNulls = RideRecordJson.decode(File(fixtures, "valid/explicit-nulls.json").readText())
         assertEquals(minimal, withNulls)
         assertNull(withNulls.samples.first().heartRate)
+    }
+
+    private fun routeFixture(name: String) = File(contracts, "fixtures/routes/ride-record/valid/$name").readText()
+
+    @Test
+    fun `the route and the variant of a ride are in its header, and a ride without them is written as it was`() {
+        val onRoute = RideRecordJson.decode(routeFixture("route-ride.json")).ride
+        assertEquals("route-gpx-0001", onRoute.routeId)
+        assertEquals("North road", onRoute.routeName)
+        assertEquals(false, onRoute.wasVariantRidden)
+
+        val variant = RideRecordJson.decode(routeFixture("variant-ride.json")).ride
+        assertEquals("icu-5001", variant.workoutId)
+        assertEquals(true, variant.variantRidden)
+        assertTrue(variant.wasVariantRidden)
+        assertNull(variant.routeId)
+
+        // False, and a producer's explicit nulls, are a workout ridden as planned.
+        assertEquals(false, RideRecordJson.decode(routeFixture("variant-not-ridden.json")).ride.wasVariantRidden)
+        assertEquals(false, RideRecordJson.decode(routeFixture("explicit-nulls.json")).ride.wasVariantRidden)
+
+        val both = RideRecordJson.decode(routeFixture("workout-with-route-and-variant.json")).ride
+        assertTrue(both.wasVariantRidden && both.routeId != null && both.workoutId != null)
+
+        // The new keys are written only when there is something to say: a plain ride is byte for byte what it always was.
+        val plain = RideRecordJson.decode(File(fixtures, "valid/minimal-free-ride.json").readText())
+        val written = RideRecordJson.encode(plain)
+        assertTrue("routeId" !in written && "routeName" !in written && "variantRidden" !in written, written)
+        val ridden = RideRecordJson.encode(RideRecordJson.decode(routeFixture("workout-with-route-and-variant.json")))
+        assertTrue("\"variantRidden\":true" in ridden && "\"routeId\":" in ridden && "\"routeName\":" in ridden, ridden)
     }
 
     @Test

@@ -76,6 +76,7 @@ class SettingsRepository(
         val clickVolumeRepeat = intPreferencesKey("dev_click_volume_repeat_ms")
         val syncUrl = stringPreferencesKey("sync_url")
         val syncToken = stringPreferencesKey("sync_token")
+        val routeDifficulty = intPreferencesKey("route_difficulty_percent")
     }
 
     private fun Preferences.toSettings(): AppSettings {
@@ -105,6 +106,7 @@ class SettingsRepository(
             tuning = tuning(),
             syncUrl = this[Keys.syncUrl].orEmpty(),
             syncToken = SecretText(this[Keys.syncToken].orEmpty()),
+            routeDifficultyPercent = this[Keys.routeDifficulty] ?: defaults.routeDifficultyPercent,
         ).sanitized()
     }
 
@@ -185,6 +187,7 @@ class SettingsRepository(
         this[Keys.clickVolumeRepeat] = click.volumeRepeatMillis
         if (settings.syncUrl.isEmpty()) remove(Keys.syncUrl) else this[Keys.syncUrl] = settings.syncUrl
         if (settings.syncToken.isEmpty) remove(Keys.syncToken) else this[Keys.syncToken] = settings.syncToken.value
+        this[Keys.routeDifficulty] = settings.routeDifficultyPercent
     }
 
     private companion object {

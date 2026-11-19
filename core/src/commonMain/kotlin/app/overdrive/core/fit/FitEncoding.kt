@@ -64,11 +64,16 @@ internal enum class FitBaseType(
     val invalid: Long,
     /** The largest value that is real data, below [invalid] for the types whose invalid value is the maximum. */
     val maxValid: Long,
+    /** The smallest value that is real data: 0 for the unsigned types. */
+    val minValid: Long = 0,
 ) {
     ENUM(0x00, 1, 0xFF, 0xFE),
     UINT8(0x02, 1, 0xFF, 0xFE),
     UINT16(0x84, 2, 0xFFFF, 0xFFFE),
     UINT32(0x86, 4, 0xFFFFFFFFL, 0xFFFFFFFEL),
+
+    /** Signed, such as a position in semicircles: the invalid value is the largest, so the largest real one is one less (fit.md section 2). */
+    SINT32(0x85, 4, 0x7FFFFFFFL, 0x7FFFFFFEL, minValid = -0x80000000L),
 
     /** Zero is invalid, so any other 32-bit value is data. */
     UINT32Z(0x8C, 4, 0, 0xFFFFFFFFL),
@@ -155,7 +160,16 @@ internal fun FitBuffer.data(
     require(values.size == type.fields.size) { "Message ${type.global} has ${type.fields.size} fields" }
     for ((index, field) in type.fields.withIndex()) {
         val value = values[index]
-        uint(if (value == null) field.type.invalid else value.coerceIn(0, field.type.maxValid), field.type.size)
+        uint(
+            if (value ==
+                null
+            ) {
+                field.type.invalid
+            } else {
+                value.coerceIn(field.type.minValid, field.type.maxValid)
+            },
+            field.type.size,
+        )
     }
 }
 
@@ -168,7 +182,16 @@ internal fun FitBuffer.dataArray(
     val field = type.fields.single()
     require(values.size == field.count) { "Expected ${field.count} values, got ${values.size}" }
     for (value in values) {
-        uint(if (value == null) field.type.invalid else value.coerceIn(0, field.type.maxValid), field.type.size)
+        uint(
+            if (value ==
+                null
+            ) {
+                field.type.invalid
+            } else {
+                value.coerceIn(field.type.minValid, field.type.maxValid)
+            },
+            field.type.size,
+        )
     }
 }
 

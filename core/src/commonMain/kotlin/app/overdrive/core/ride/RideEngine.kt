@@ -14,6 +14,9 @@ import app.overdrive.core.record.RideHeader
 import app.overdrive.core.record.RideRecorder
 import app.overdrive.core.record.RideSample
 import app.overdrive.core.record.RrInterval
+import app.overdrive.core.route.RideRoutes
+import app.overdrive.core.route.RouteCourse
+import app.overdrive.core.route.RouteGrade
 import app.overdrive.core.workout.PlayerTarget
 import app.overdrive.core.workout.Workout
 import app.overdrive.core.workout.WorkoutPlayer
@@ -91,6 +94,8 @@ import kotlin.time.Duration.Companion.seconds
  * @param tickInterval the length of one ride second; shorten it only to fast-forward in demos.
  * @param rideId the id of the ride record, by default derived from its start time.
  * @param clock wall-clock milliseconds since the Unix epoch, for the ride record's start and end times.
+ * @param routes the routes the ride may follow (spec §11.4), only those the tablet has downloaded; none by default, the flat road.
+ * @param variantRidden the workout is the planned workout's easier variant (spec §11.5): the record's header says so.
  */
 public class RideEngine(
     scope: CoroutineScope,
@@ -103,6 +108,8 @@ public class RideEngine(
     private val tickInterval: Duration = 1.seconds,
     private val rideId: String? = null,
     private val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    private val routes: RideRoutes = RideRoutes.None,
+    private val variantRidden: Boolean = false,
 ) : RideSession {
     private sealed interface Input {
         data object Start : Input
@@ -189,6 +196,12 @@ public class RideEngine(
     private var movingSeconds = 0
     private var speedKmh = 0.0
     private var distanceMeters = 0.0
+
+    // The route (spec §11.4): the grades by route id, the step whose distance along its route is counted, and that distance. It
+    // starts again at 0 whenever the workout's step changes (a ride with no workout is one step), and counts only while riding.
+    private val grades = HashMap<String, RouteGrade>()
+    private var routeStepIndex = NO_ROUTE_STEP
+    private var routeDistance = 0.0
 
     private val trainerReading = HeldReading<TrainerReading>(settings.trainerTimeoutSeconds)
     private val heartRateReading = HeldReading<HeartRateReading>(settings.heartRateTimeoutSeconds)
@@ -327,7 +340,42 @@ public class RideEngine(
             is Input.HeartRateData -> onHeartRateData(input.reading)
         }
         syncHeartRateStep()
+        syncRoute()
         if (!finished) updateOrder()
+    }
+
+    /** The grade of the route behind the current step, or null on the flat road: an ERG step, a free step with no route or one the tablet does not have. */
+    private fun activeGrade(): RouteGrade? {
+        if (currentMode() != TrainerMode.SIMULATION) return null
+        val route = routes.routeOf(steps, player?.stepIndex) ?: return null
+        return grades.getOrPut(route.id) { RouteGrade(RouteCourse(route), routes.difficultyPercent, gears) }
+    }
+
+    /** The route's distance starts again at 0 whenever the step changes, so each step on a route begins at the start of it. */
+    private fun syncRoute() {
+        val index = player?.stepIndex ?: 0
+        if (index != routeStepIndex) {
+            routeStepIndex = index
+            routeDistance = 0.0
+        }
+    }
+
+    /** The route's own grade the trainer is told now: flat before the start and on the flat road, 0 once the route is over. */
+    private fun routeGradePercent(): Double = if (!started) 0.0 else activeGrade()?.routePercentAt(routeDistance) ?: 0.0
+
+    private fun routeProgress(): RouteProgress? {
+        if (finished) return null
+        val grade = activeGrade() ?: return null
+        val length = grade.lengthMeters
+        val done = grade.isFinished(routeDistance)
+        return RouteProgress(
+            routeId = grade.course.route.id,
+            name = grade.course.route.name,
+            distanceMeters = routeDistance.coerceIn(0.0, length),
+            lengthMeters = length,
+            gradePercent = if (done) 0.0 else grade.routePercentAt(routeDistance),
+            finished = done,
+        )
     }
 
     /**
@@ -384,6 +432,7 @@ public class RideEngine(
         cadence = latest?.cadence
         heartRateBpm = heartRateReading.peek()?.bpm?.takeIf { it > 0 }
         pendingRrIntervals.clear()
+        val route = routes.firstRoute(steps)
         recorder.onRideStarted(
             RideHeader(
                 id = rideId ?: "ride-$startMillis",
@@ -391,6 +440,9 @@ public class RideEngine(
                 workoutId = workout?.id,
                 ftp = settings.ftp,
                 devices = listOfNotNull(trainer.name, heartRate?.name),
+                routeId = route?.id,
+                routeName = route?.name,
+                variantRidden = true.takeIf { variantRidden && workout != null },
             ),
         )
         refreshState()
@@ -504,8 +556,15 @@ public class RideEngine(
         val cadenceNow = trainerNow?.cadence
         val bpmNow = strapNow?.bpm?.takeIf { it > 0 }
 
-        speedKmh = if (wasRiding && powerNow != null) speedModel.speedKmh(powerNow.toDouble()) else 0.0
-        if (wasRiding) distanceMeters += speedKmh / KMH_PER_METER_PER_SECOND
+        // The speed is the one the route's grade at the start of the second allows (spec §11.4); the flat road is grade 0.
+        val grade = activeGrade()
+        val gradePercent = grade?.routePercentAt(routeDistance) ?: 0.0
+        speedKmh = if (wasRiding && powerNow != null) speedModel.speedKmh(powerNow.toDouble(), gradePercent) else 0.0
+        if (wasRiding) {
+            val travelled = speedKmh / KMH_PER_METER_PER_SECOND
+            distanceMeters += travelled
+            if (grade != null) routeDistance += travelled
+        }
 
         // The sample describes the second that just ended: readings now, plan as it was during the second.
         val target = player?.target
@@ -616,7 +675,7 @@ public class RideEngine(
             }
 
             else -> {
-                simulationAt(gear)
+                simulationAt(gear, routeGradePercent())
             }
         }
     }
@@ -632,7 +691,10 @@ public class RideEngine(
             settings.pausedTargetWatts
         }
 
-    private fun simulationAt(gear: Int) = TrainerCommand.Simulation(gears.simulationParameters(gear, settings.physics))
+    private fun simulationAt(
+        gear: Int,
+        routeGradePercent: Double = 0.0,
+    ) = TrainerCommand.Simulation(gears.simulationParameters(gear, settings.physics, routeGradePercent))
 
     private fun updateOrder() {
         val next = TrainerOrder(desiredCommand())
@@ -725,6 +787,7 @@ public class RideEngine(
                     null
                 },
             heartRateHold = if (finished) null else heartRateHold?.state(),
+            route = routeProgress(),
         )
     }
 
@@ -770,6 +833,7 @@ public class RideEngine(
 
     private companion object {
         const val KMH_PER_METER_PER_SECOND = 3.6
+        const val NO_ROUTE_STEP = -1
         val COMMAND_RETRY_DELAY = 1.seconds
         const val MAX_FINAL_ATTEMPTS = 3
     }

@@ -14,7 +14,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import app.overdrive.core.plan.PlannedWorkout
 import app.overdrive.ride.host.RideChoice
 import app.overdrive.ride.plan.PlanMark
 import app.overdrive.ride.plan.PlanRow
@@ -47,13 +46,13 @@ import app.overdrive.uikit.tokens.OverdriveColors
 fun PlannedSection(
     plan: PlanUi,
     choice: RideChoice,
-    onSelect: (PlannedWorkout) -> Unit,
+    onSelect: (RideChoice) -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (!plan.visible) return
     var weekOpen by rememberSaveable { mutableStateOf(false) }
-    val chosen = (choice as? RideChoice.Planned)?.workout?.id
+    val chosen = choice as? RideChoice.Planned
     Column(modifier.fillMaxWidth().padding(bottom = 16.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             SectionLabel("Planned", Modifier.weight(1f).padding(start = 16.dp))
@@ -122,16 +121,16 @@ private fun PlanStatus(plan: PlanUi) {
 @Composable
 private fun PlanRowItem(
     row: PlanRow,
-    chosen: String?,
-    onSelect: (PlannedWorkout) -> Unit,
+    chosen: RideChoice.Planned?,
+    onSelect: (RideChoice) -> Unit,
 ) {
     ValueRow(
         title = row.title,
         subtitle = row.subtitle,
-        onClick = { onSelect(row.workout) },
+        onClick = { onSelect(RideChoice.Planned(row.workout.workout, row.workout.structureHash)) },
         value = row.duration,
         caption = row.intensity,
-        selected = chosen == row.workout.id,
+        selected = chosen != null && chosen.workout.id == row.workout.id && !chosen.variant,
         enabled = row.enabled,
         subtitleIcon =
             when (row.mark) {
@@ -140,4 +139,29 @@ private fun PlanRowItem(
                 PlanMark.Blocked -> OverdriveIcons.TriangleAlert
             },
     )
+    // The easier version (spec §11.5): a row of its own right under the workout, one tap each, and today's recovery state under both.
+    val variant = row.variant ?: return
+    ValueRow(
+        title = variant.title,
+        subtitle = variant.subtitle,
+        onClick = {
+            onSelect(
+                RideChoice.Planned(variant.workout, variant.structureHash, variant = true, variantNote = variant.note),
+            )
+        },
+        modifier = Modifier.padding(start = 16.dp),
+        value = variant.duration,
+        caption = variant.intensity,
+        selected = chosen != null && chosen.workout.id == row.workout.id && chosen.variant,
+        enabled = variant.enabled,
+        subtitleIcon = if (variant.mark == PlanMark.Blocked) OverdriveIcons.TriangleAlert else null,
+    )
+    row.recovery?.let {
+        OdText(
+            it,
+            Modifier.padding(start = 32.dp, top = 2.dp, bottom = 4.dp),
+            style = OdType.label,
+            color = OverdriveColors.textSecondary,
+        )
+    }
 }

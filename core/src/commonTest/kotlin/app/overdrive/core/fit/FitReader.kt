@@ -42,7 +42,7 @@ internal class FitMessage(
     /** The value of a scalar field with its profile scale applied, or null if absent or invalid. */
     fun scaled(fieldName: String): Double? {
         val number = FitFacts.fieldsOf(globalNumber).entries.single { it.value.name == fieldName }
-        return raw(fieldName)?.let { it.toDouble() / number.value.scale }
+        return raw(fieldName)?.let { it.toDouble() / number.value.scale - number.value.offset }
     }
 
     /** Whether the message has the field at all (even as invalid). */
@@ -240,11 +240,14 @@ internal class FitFieldFact(
     val name: String,
     val baseTypeNumber: Int,
     val scale: Int = 1,
+    /** The profile's offset: the value is `raw / scale - offset` (altitude: a fifth of a metre above a datum 500 m down). */
+    val offset: Int = 0,
 )
 
 /** A second transcription of the profile facts of fit.md section 4, for naming and type-checking what the writer wrote. */
 internal object FitFacts {
     private const val ENUM = 0
+    private const val SINT32 = 5
     private const val UINT8 = 2
     private const val UINT16 = 4
     private const val UINT32 = 6
@@ -282,12 +285,16 @@ internal object FitFacts {
                 ),
             20 to
                 mapOf(
+                    0 to FitFieldFact("position_lat", SINT32), // semicircles
+                    1 to FitFieldFact("position_long", SINT32),
+                    2 to FitFieldFact("altitude", UINT16, scale = 5, offset = 500),
                     3 to FitFieldFact("heart_rate", UINT8),
                     4 to FitFieldFact("cadence", UINT8),
                     5 to FitFieldFact("distance", UINT32, 100),
                     6 to FitFieldFact("speed", UINT16, 1000),
                     7 to FitFieldFact("power", UINT16),
                     73 to FitFieldFact("enhanced_speed", UINT32, 1000),
+                    78 to FitFieldFact("enhanced_altitude", UINT32, scale = 5, offset = 500),
                 ),
             19 to
                 mapOf(

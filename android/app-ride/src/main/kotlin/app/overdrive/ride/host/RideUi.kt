@@ -26,11 +26,16 @@ sealed interface RideChoice {
 
     /**
      * A workout, played step by step. [structureHash] is the service's hash of its structure (docs/adr/0034) for a workout that came
-     * from the plan, null for one opened from a file: only the former can be compared with an earlier attempt.
+     * from the plan, null for one opened from a file: only the former can be compared with an earlier attempt. [variant] says it is the
+     * easier version of a planned workout (spec §11.5): [workout] is then the planned workout with the variant's steps, so its id is the
+     * planned workout's, [structureHash] is the **variant's** (a variant ride is a session of its own, ADR 0036), and [variantNote] is
+     * what the agent wrote with it.
      */
     data class Planned(
         val workout: Workout,
         val structureHash: String? = null,
+        val variant: Boolean = false,
+        val variantNote: String? = null,
     ) : RideChoice {
         override val title: String get() = workout.name
     }

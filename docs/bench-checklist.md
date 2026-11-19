@@ -929,6 +929,40 @@ settle (`docs/adr/0028-companion-repeats-and-fit-share.md`, "What only a phone s
 - [ ] **12.10 What to send back.** What the share sheet offered and what the file was (12.1, 12.2), the ride's facts as Overdrive showed them against OnelapFit's (12.1, 12.3), whether it went
   by itself offline (12.5), the trend sentences after 3 and 4 attempts (12.7), and screenshots of anything that looks wrong. They show your own rides: send them privately, never in a commit.
 
+## Session 13: routes and the easier version on the bike (stage A2b-2)
+
+Needs: the tablet with the release under test, the D500, the strap, the Click, the service with **two routes** the coach agent (or you, through `create_route`) made: one from a **GPX file** or
+waypoints (it has a map) and one **synthetic profile** (it has none), each at least 5 km with some real climbs (6% or more for a few hundred metres, and a descent); a **planned workout with an
+easier version** (`create_workout` with `variant`) on today's date and one whose `free` step names the GPX route; a Strava account to upload to (spec §11.4, §11.5, ADR 0037). **The stage was written
+without a bike, a real route or a Strava upload**: everything below is what the tests cannot settle. The routes are your own roads: never post a GPX file or a ride's map anywhere public.
+**Install this release of the tablet and the phone before the coach agent writes a route or a variant**: an older app refuses the whole plan answer.
+
+- [ ] **13.1 The route row.** Free ride: under the title there is one row, **Route**, saying **Flat road**; it is not there while the service has no routes. Open it: the flat road, then the two routes
+  with their distance, ascent and "has a map" / "profile only". Choose the GPX route: the row says its name and its facts; with the network on, "Downloading…" goes by in a second. Close the app, switch the
+  network **off**, open it: the row says Flat road again (the choice is not kept across a restart), and choosing the same route again needs no network, because its points are on the disk. Settles: spec §11.4.
+- [ ] **13.2 A route not downloaded.** Airplane mode before ever choosing the second route, choose it: **Route not downloaded yet** with the alert, and a ride starts **flat** (the overlay and the ride screen show 0%).
+  Switch the network on and press the planned list's refresh: the route comes and the ready ride follows it without a tap.
+- [ ] **13.3 Riding a route.** Choose the GPX route, difficulty 50, start. Is the resistance a hill you feel? **Does the D500 follow the grade changes** (it should change a little every second or two on a climb;
+  note any lag or jerks)? Note the speed on a 6% climb at about 150 W (the model says about 11 km/h at 80 kg) and on a descent at 0 W (it freewheels to about 45 km/h on 5% and stops at 80): does it feel right?
+  Shift the gears up and down on the climb: the pedals change, the **speed at the same power does not** (spec §4.3). Settles: ADR 0037 section 3.
+- [ ] **13.4 Difficulty.** Settings, Ride, **Route difficulty**: 0% is flat (the route is only a map), 100% is the real grade up to the trainer's 15% (a steeper hill is held at 15). Is 50 the right default
+  for one cog (could you hold the climb at 50% for the whole route)? Does a steeper hill than 15% at 100% feel like a wall at the top? Write down the difficulty you would keep.
+- [ ] **13.5 The end of the route.** Ride a short route to its end (or a long one at demo speed in the developer settings): the grade goes to 0 and the ride goes on flat; **it does not start again**. The record
+  keeps the route's name (Settings, Share FIT file, or the companion's ride).
+- [ ] **13.6 A route in a workout.** Choose the planned workout whose `free` step names the GPX route: the plan row says **Route: <name>** (or "Route not downloaded yet" with no network at all the first time);
+  the ERG steps around the free step are as always, and the free step starts at the start of the route. Skip to the next step and back (the Click): the route starts again from its start.
+- [ ] **13.7 The easier version.** On the planned workout that has one: its row, and under it **Easier version** with the agent's note, and **Recovery: ...** under both if the service has a rating for today
+  (check it against the companion's Today). One tap each: the right side shows the chosen one (the title, then "Easier version · note"). Ride the easier one for a few minutes and finish: the ride is stored
+  with the **planned workout's id**; after the upload intervals.icu's event reads "Easier version ridden" (ADR 0036) and the agent sees it. Ride the planned version of another day's workout and
+  check nothing says easier. A workout with no easier version looks as it always did. With no network, "Recovery: ..." from the last rating of **today** is still there, and nothing at all if yesterday's.
+- [ ] **13.8 The FIT file and Strava.** Share the FIT file of the GPX route ride and upload it to **Strava**: does it draw a **map** (the activity type matters: note whether it is a Virtual Ride or a Ride, and
+  whether the route is where it should be), the **elevation profile** and the climb? Upload the profile route's ride too: no map, but the elevation? Import the files into intervals.icu: the altitude? If Strava
+  shows no map, try `FitOptions.subSport` 6 (indoor cycling) or a plain ride, and write down which worked (`docs/protocols/fit.md` 8.10). Settles: FIT 10.
+- [ ] **13.9 A workout's route in the file.** Upload the ride of 13.6: the map covers only the free step (the rest of the file has no position), and Strava accepts it?
+- [ ] **13.10 TalkBack and the large font.** TalkBack reads the route row as a button, "Route, Flat road" (the disclosure row also says "Collapsed" for the closed list: is that confusing for a row that opens a sheet?), and the sheet's rows as the route with its facts; at 1.3x the rows wrap and nothing is cut.
+- [ ] **13.11 What to send back.** The difficulty you would keep, how the trainer followed the grade (13.3), what Strava showed (13.8, 13.9), the sentence on the Ready screen for each case above, and screenshots of anything
+  that looks wrong (send them privately: they show your roads).
+
 ---
 
 ## Coverage: what settles what

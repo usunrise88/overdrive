@@ -263,6 +263,18 @@ chip, then right-aligned: device status icons (16 dp, see §7.7), overlay button
   and the intensity factor ("IF 0.76", caption, text 3) on the right; the chosen one is surface 2 with a check, like the Free ride
   and local workout rows. A ridden workout says "✓ Done 18:04 · description" (a 16 dp `check` before the subtitle); one the player
   cannot run is dimmed, takes no press or focus and says why ("Longer than 12 hours", with a `triangle-alert`).
+- **Routes and the easier version (stage A2b-2, spec §11.4, §11.5, ADR 0037).** No new component and no new colour: the rows of §7.5 and the sheet of §9.
+  - *The route row* (right column, in the **Free ride** detail, between the description and the stat row): one **disclosure row** (§7.5), "Route" at the left and what is chosen at the
+    right, **"Flat road"** or the route's name, with the `chevron-right`; under it, in label text 2, the facts of the chosen route ("12.4 km · 340 m up · has a map", or "… · profile only"),
+    or, with a 16 dp `triangle-alert` and text 1, **"Route not downloaded yet"** (the ride will be flat), or "Downloading…". **Hidden when the tablet has no routes**, and nothing is said. It opens a
+    **bottom sheet** (§9): "Route" (heading) over the flat road ("Flat road", "No hills") and one **selection row** (§7.5) for each cached route: the name over "12.4 km · 340 m up · has a map"
+    (a profile says "profile only", which is the word for "no map"), the chosen one surface 2 with a check; one tap chooses and closes, a tap outside closes without choosing.
+    The description under the title says "Simulation on the route's grade with virtual gears…" while a route is chosen.
+  - *A route a planned workout names* is used automatically and named at the end of the plan row's subtitle in one line: "Route: North road" (two: "Routes: A, B"), or **"Route not downloaded yet"**.
+  - *The easier version*: a planned row that has one is followed, **indented 16 dp**, by a second **value row**: "Easier version" over the agent's note (else the kinds of step), the length and IF on the right;
+    chosen like the row above it, one tap each, the chosen one surface 2 with a check. **"Recovery: ready / caution / rest"** is one label (label, text 2) under the two rows, indented 32 dp, on a
+    workout of today only, and **absent** while the service is learning the rider's range, has no reading, or says nothing. The detail beside **Start** names the version under the title
+    ("Easier version · the note", body-strong). A planned row with no easier version, no route and no recovery line is drawn exactly as it was.
 
 ### 6.2 Riding (`ride--riding.png`)
 
@@ -372,7 +384,7 @@ Two columns of grouped cards; group label (label, text 3) above each card; setti
   (segmented Compact / Detailed), Opacity (slider 85–100%, value at the right), Blur the video
   behind (switch, "Uses more battery"), Position (Reset, ghost).
 - **Rider and gears:** FTP (stepper, ±5 W, long-press repeats), Gears (stepper, 10–30), Step per
-  gear (stepper, ±0.1%, 0.5–2.0%; caption says the total stays within 15%).
+  gear (stepper, ±0.1%, 0.5–2.0%; caption says the total stays within 15%), **Route difficulty** (stage A2b-2: stepper, ±10%, 0–100%, default 50%; "Share of the road's grade you feel; 0% is flat").
 - **Physics for speed and distance:** mass (kg, ±1), CdA (m², ±0.01), Crr (±0.0005).
 - **The rider's profile on these four** (FTP, mass, CdA, Crr; Phase 2 fix, ADR 0021): a row shows the value in force, and when it
   is not the tablet's own a **source marker** sits left of the stepper: **From service** (the profile on the service) or **Not sent

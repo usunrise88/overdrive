@@ -80,6 +80,12 @@ public data class RideSnapshot(
      * current power and [intensityPercent] does not apply.
      */
     val heartRateHold: HeartRateHoldState? = null,
+    /**
+     * Where the ride is on its route (spec §11.4): set while the current step is a free-ride step with a route the tablet has (or a
+     * ride with no workout and a route chosen), null on the flat road, in an ERG step and after the ride. The overlay will show it;
+     * nothing draws it yet.
+     */
+    val route: RouteProgress? = null,
 ) {
     init {
         require(ftp > 0) { "FTP must be positive, got $ftp" }
@@ -110,6 +116,31 @@ public data class RideSnapshot(
 
         /** The neutral gear when none is configured: the middle one, with the extra gear on the hard side. */
         public const val DEFAULT_NEUTRAL_GEAR: Int = (DEFAULT_GEAR_COUNT + 1) / 2
+    }
+}
+
+/**
+ * Where the ride is on its route (spec §11.4): the distance along it, its length and the grade the trainer's route part is at. The
+ * grade is the route's own, smoothed and scaled by the difficulty and clamped to the trainer's limit, **without** the gear's offset: what
+ * the virtual speed uses. When the end is reached [finished] is true, the grade is 0 and the ride goes on flat; the route does not loop.
+ */
+public data class RouteProgress(
+    val routeId: String,
+    val name: String,
+    /** Metres ridden along the route, at most [lengthMeters]. */
+    val distanceMeters: Double,
+    val lengthMeters: Double,
+    /** Percent; 0 once [finished]. */
+    val gradePercent: Double,
+    val finished: Boolean,
+) {
+    init {
+        require(lengthMeters > 0.0 && distanceMeters in 0.0..lengthMeters) {
+            "Distance $distanceMeters is outside the route of $lengthMeters m"
+        }
+        require(!finished || (distanceMeters == lengthMeters && gradePercent == 0.0)) {
+            "A route that is finished is at its end and flat"
+        }
     }
 }
 

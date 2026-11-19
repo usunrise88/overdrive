@@ -158,5 +158,5 @@ should be filtered like the engine's; whether two days is long enough for a late
 - A workout can offer an easier version without a second calendar entry, and the service keeps the calendar honest when it is ridden.
 - `PlanStore` reads join `planned_workout_extras`; `PlanEntry` and `PlannedWorkout` have an optional `variant`; `RideWorkoutResolver` knows the
   variant; `createRepeats` takes `routes`; `Services` has `routes`, `extras` and `variants`.
-- **What the tablet stage must fill and read:** read `GET /v1/routes/{id}` (and the list) and `variant` and `route_id` of `GET /v1/workouts`; write
+- **What the tablet stage must fill and read (built in stage A2b-2, ADR 0037):** read `GET /v1/routes/{id}` (and the list) and `variant` and `route_id` of `GET /v1/workouts`; write
   `ride.routeId`, `ride.routeName` and `ride.variantRidden` (with `workoutId` the planned workout's id); write positions into the FIT.

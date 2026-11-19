@@ -185,13 +185,25 @@ Used for timer start and stop. Timestamp field `253` is required in practice.
 | 6 | speed | uint16 | 1000 | m/s | `0xFFFF` |
 | 7 | power | uint16 | 1 | W | `0xFFFF` |
 | 73 | enhanced_speed | uint32 | 1000 | m/s | `0xFFFFFFFF` |
+| 0 | position_lat | sint32 | 1 | semicircles | `0x7FFFFFFF` |
+| 1 | position_long | sint32 | 1 | semicircles | `0x7FFFFFFF` |
+| 2 | altitude | uint16 | 5, offset 500 | m | `0xFFFF` |
+| 78 | enhanced_altitude | uint32 | 5, offset 500 | m | `0xFFFFFFFF` |
 
 - Profile: `speed` (6) has a component field, `enhanced_speed` (73). `enhanced_speed` has a 32-bit range (no
   65.5 m/s limit). Our recommendation is to write both fields with the same value. Reason: `speed` is the field
   older readers take. This is a recommendation, not a profile requirement. intervals.icu and Strava behaviour is
   open (8.2).
-- Position fields (`position_lat` 0 and `position_long` 1, sint32 semicircles, invalid `0x7FFFFFFF`) are only
-  needed if we want a map. Indoor virtual rides do not need them. Not written.
+- **Position and altitude (stage A2b-2, spec §11.4, ADR 0037).** A ride on a **route** writes `position_lat` (0) and `position_long` (1), sint32
+  **semicircles** (`degrees · 2³¹ / 180`, rounded; 45° is 536870912, −90° is −1073741824; 180° is 2³¹, one more than a sint32 holds, so it is held at the largest real value
+  2147483646 and never at the invalid `0x7FFFFFFF`), and `altitude` (2, uint16) and `enhanced_altitude` (78, uint32), **the same value in both**, a fifth of a metre above a datum 500 m
+  below sea level (`(m + 500) · 5`: 100 m is 3000). Facts from the profile's `record` message (21.222: positionLat, positionLong sint32 semicircles; altitude uint16 scale 5 offset 500 with the
+  component `enhancedAltitude`, uint32 scale 5 offset 500, the same read as the speed pair). They come **after** the fields every file has, in the definition's order position, altitude; the
+  definition has them **only when some second of the ride followed a route** (a position only when that route has coordinates, so a profile writes the altitude and no position, and Strava has no
+  map to draw), **so a ride with no route is laid out and written exactly as before** (the golden of section 6 is unchanged). Seconds of a workout that were not on a route have them as invalid values.
+  The place of a second is the route's point interpolated at the **distance ridden along the route**, the sample's `distance` minus the distance at the start of its lap (a run of seconds in one step);
+  the route does not extend, so after its end the last point is the place. `session` and `lap` have no start position and no total ascent (not needed for a map; section 8.10).
+  `FitOptions.positions` and `FitOptions.altitude` turn each off.
 - `distance` is the cumulative distance in metres.
 - Gaps: a missing heart rate or power is written as its invalid value, so every record has the same field set
   (one definition per record layout).
@@ -542,6 +554,11 @@ encoder is within §1; (2) whether the `com.garmin:fit` jar may be used as a tes
    and the FIT Protocol PDF were not read. Check the field numbers against the PDF before the writer is merged.
 9. **Compressed headers and developer fields.** Not used. Not verified how importers handle them if a later version
    of the writer uses them.
+10. **Positions and altitude in a virtual ride (stage A2b-2).** Whether Strava draws a map from `position_lat` and `position_long` in an activity with sport cycling, sub-sport 58
+   (virtual activity), or wants another sub-sport (6, indoor cycling, or a plain road ride); whether it draws the altitude profile and the climb from `altitude` or wants `total_ascent` in
+   the session; whether `start_position_lat` and `start_position_long` in the `session` and the `lap`s are needed; whether intervals.icu reads the altitude and draws a map; whether
+   a file whose records have positions only for part of the ride (a workout with one step on a route) is accepted; whether writing both `altitude` and `enhanced_altitude` duplicates
+   anything. `FitOptions.positions`, `altitude` and `subSport` are the switches. Bench: `docs/bench-checklist.md` session 13.
 
 ## 9. Reading outdoor rides (stage P3-7, ADR 0026)
 

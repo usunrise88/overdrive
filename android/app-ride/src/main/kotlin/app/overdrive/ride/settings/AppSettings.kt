@@ -98,6 +98,11 @@ data class AppSettings(
     /** The web service's token (spec §4.9): stored and **not used** in Phase 1. A secret: it prints as bullets. */
     val syncToken: SecretText = SecretText(),
     /**
+     * How much of a route's grade the rider feels, in percent (spec §11.4): 50 means a 10% road is felt as 5%, 0 is the flat. The
+     * grade of the road scaled by it is what the trainer simulates and what the virtual speed uses.
+     */
+    val routeDifficultyPercent: Int = SettingsRules.DEFAULT_ROUTE_DIFFICULTY_PERCENT,
+    /**
      * The engine's tuning numbers: resuming after a pause, the cadence guard and the heart-rate hold (docs/adr/0034). Always inside
      * their rules (see [RideTuning.sanitized]); they reach the engine through [app.overdrive.ride.host.toRideSettings].
      */
@@ -126,6 +131,7 @@ data class AppSettings(
             massKg = SettingsRules.mass.normalize(massKg),
             cdA = SettingsRules.cdA.normalize(cdA),
             crr = SettingsRules.crr.normalize(crr),
+            routeDifficultyPercent = SettingsRules.routeDifficulty.normalize(routeDifficultyPercent),
             overlayOpacityPercent = SettingsRules.opacity.normalize(overlayOpacityPercent),
             overlayX = overlayX?.takeIf { it.isFinite() }?.coerceIn(0f, 1f),
             overlayY = overlayY?.takeIf { it.isFinite() }?.coerceIn(0f, 1f),
@@ -145,6 +151,7 @@ data class AppSettings(
             demoSpeed,
             scriptedDropouts,
             deviceSource,
+            routeDifficultyPercent,
             tuning,
         )
 
@@ -218,6 +225,9 @@ object SettingsRules {
     const val DEFAULT_GRADE_PER_GEAR: Double = 1.0
     const val DEFAULT_OPACITY_PERCENT: Int = 95
 
+    /** Spec §11.4: steep roads stay rideable on one cog. Equals `RouteGrade.DEFAULT_DIFFICULTY_PERCENT`. */
+    const val DEFAULT_ROUTE_DIFFICULTY_PERCENT: Int = 50
+
     /** FTP in watts, steps of 5 (spec §4.5). */
     val ftp = IntRule(min = 50, max = 600, step = 5)
 
@@ -238,6 +248,9 @@ object SettingsRules {
 
     /** Overlay opacity in percent: 85 to 100 in steps of 5. */
     val opacity = IntRule(min = 85, max = 100, step = 5)
+
+    /** Route difficulty in percent of the road's grade, 0 to 100 in steps of 10 (spec §11.4). */
+    val routeDifficulty = IntRule(min = 0, max = 100, step = 10)
 
     /** The bike's weight in kg, 3 to 30 in steps of 0.5 (the profile itself takes anything above 0 up to 100). */
     val bikeWeight = DecimalRule(min = 3.0, max = 30.0, step = 0.5)

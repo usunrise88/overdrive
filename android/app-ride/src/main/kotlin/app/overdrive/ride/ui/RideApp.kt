@@ -41,6 +41,8 @@ import app.overdrive.ride.overlay.OverlayPolicy
 import app.overdrive.ride.plan.PlanUi
 import app.overdrive.ride.profile.ProfileUi
 import app.overdrive.ride.rides.SaveState
+import app.overdrive.ride.routes.RecoveryLine
+import app.overdrive.ride.routes.RouteChoiceUi
 import app.overdrive.ride.settings.OverlayStartMode
 import app.overdrive.ride.settings.SimulatedClick
 import app.overdrive.ride.workouts.WorkoutFileError
@@ -131,6 +133,10 @@ private fun RideRoot(
     val pairing by container.pairing.state.collectAsStateWithLifecycle()
     val learn by container.learning.ui.collectAsStateWithLifecycle()
     val planState by container.plan.state.collectAsStateWithLifecycle()
+    // The routes (spec §11.4) and today's recovery state (spec §11.5), which the Ready screen words next to the choices they belong to.
+    val routesView by container.routes.collectAsStateWithLifecycle()
+    val freeRoute by host.freeRoute.collectAsStateWithLifecycle()
+    val recoveryState by container.recovery.state.collectAsStateWithLifecycle()
     val ridden by container.rides.ridden.collectAsStateWithLifecycle()
     val syncStatus by container.sync.status.collectAsStateWithLifecycle()
     val syncReport by container.sync.report.collectAsStateWithLifecycle()
@@ -254,9 +260,18 @@ private fun RideRoot(
                     // list is made again from the clock whenever the plan or the rides change, never more often.
                     LaunchedEffect(Unit) { container.planScreenOpened() }
                     val planUi =
-                        remember(planState, ridden) {
-                            PlanUi.of(planState, ridden, LocalDate.now().toString(), System.currentTimeMillis())
+                        remember(planState, ridden, routesView, recoveryState) {
+                            val today = LocalDate.now().toString()
+                            PlanUi.of(
+                                planState,
+                                ridden,
+                                today,
+                                System.currentTimeMillis(),
+                                routes = routesView,
+                                recovery = RecoveryLine.of(recoveryState, today),
+                            )
                         }
+                    val routeChoice = remember(routesView, freeRoute) { RouteChoiceUi.of(routesView, freeRoute) }
                     ReadyScreen(
                         choice = choice,
                         workouts = workouts,
@@ -279,8 +294,10 @@ private fun RideRoot(
                                 onRecoveryDiscard = { container.rides.discardRecovered(it.id) },
                                 onOpenDevices = { screen = Screen.Devices },
                                 onRefreshPlan = container::refreshPlan,
+                                onChooseRoute = container::chooseRoute,
                             ),
                         plan = planUi,
+                        routeChoice = routeChoice,
                         overlayAccess = access,
                         recovery = recovery,
                         lastRide = lastRide,

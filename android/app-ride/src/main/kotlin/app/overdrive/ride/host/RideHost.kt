@@ -15,6 +15,8 @@ import app.overdrive.core.ride.RideSession
 import app.overdrive.core.ride.RideSnapshot
 import app.overdrive.core.ride.RideState
 import app.overdrive.core.ride.flatSteps
+import app.overdrive.core.route.RideRoutes
+import app.overdrive.core.route.Route
 import app.overdrive.ride.rides.RideDiskLog
 import app.overdrive.ride.rides.RidePersistence
 import app.overdrive.ride.rides.SaveState
@@ -77,6 +79,11 @@ class RideHost(
      */
     private val rideTriggers: Flow<Any> = flowOf(Unit),
     /**
+     * The routes on the tablet whose points a ride can follow, by id, read at the moment a session is prepared (spec §11.4): the ride never
+     * waits for the network, so a route that is not here is the flat road. When this changes, [rideTriggers] is what rebuilds a ready ride.
+     */
+    private val downloadedRoutes: () -> Map<String, Route> = { emptyMap() },
+    /**
      * Where the previous attempt of a planned workout's session comes from (spec §11.7, docs/adr/0034): asked **once, when the ride
      * starts**, on the ride's own coroutine, so the ride never waits for it; anything but a clean answer is no line.
      */
@@ -89,6 +96,7 @@ class RideHost(
     )
 
     private class Run(
+        val routes: RideRoutes,
         val inputs: Inputs,
         val number: Int,
         val choice: RideChoice,
@@ -134,6 +142,7 @@ class RideHost(
 
     private val currentSettings: AppSettings get() = received.value ?: AppSettings()
     private val mutableChoice = MutableStateFlow(initialChoice)
+    private val mutableFreeRoute = MutableStateFlow<String?>(null)
     private val mutableSnapshots = MutableStateFlow(RideSnapshot(RideState.IDLE, ftp = AppSettings().ftp))
     private val mutableUi =
         MutableStateFlow(
@@ -143,6 +152,9 @@ class RideHost(
 
     /** What the rider chose to ride. Change it with [select]. */
     val choice: StateFlow<RideChoice> = mutableChoice.asStateFlow()
+
+    /** The id of the route chosen for a free ride, or null for the flat road (spec §11.4). Change it with [selectFreeRoute]. */
+    val freeRoute: StateFlow<String?> = mutableFreeRoute.asStateFlow()
 
     /** The current ride's snapshots: the one flow the ride screens and the overlay read. `IDLE` until the first ride is prepared. */
     val snapshots: StateFlow<RideSnapshot> = mutableSnapshots.asStateFlow()
@@ -215,6 +227,19 @@ class RideHost(
         }
     }
 
+    /**
+     * Chooses the route a free ride follows, or the flat road for null (spec §11.4). It is kept when another workout is chosen and
+     * back, and ignored while a ride is under way. A route whose points are not on the tablet yet is followed as soon as they are: the
+     * ready ride is built again then.
+     */
+    fun selectFreeRoute(id: String?) {
+        scope.launch {
+            if (active?.isLive() == true) return@launch
+            mutableFreeRoute.value = id
+            if (received.value != null && mutableChoice.value is RideChoice.Free) prepare(mutableChoice.value)
+        }
+    }
+
     /** Throws a finished ride away and prepares the next one with the same choice (the **Done** button). */
     fun reset() {
         scope.launch {
@@ -261,11 +286,30 @@ class RideHost(
         val live = InMemoryRideRecorder()
         val disk = persistence.begin(choice.title)
         val workout = choice.workoutOrNull
+        val downloaded = downloadedRoutes()
+        val routes =
+            RideRoutes(
+                difficultyPercent = settings.routeDifficultyPercent,
+                freeRide = if (choice is RideChoice.Free) mutableFreeRoute.value?.let(downloaded::get) else null,
+                byId = downloaded,
+            )
+        val variant = (choice as? RideChoice.Planned)?.variant == true
         val handle =
-            factory.create(RideRequest(runScope, workout, settings, CompositeRideRecorder(disk.recorder, live), number))
+            factory.create(
+                RideRequest(
+                    runScope,
+                    workout,
+                    settings,
+                    CompositeRideRecorder(disk.recorder, live),
+                    number,
+                    routes,
+                    variant,
+                ),
+            )
         val steps = workout?.flatSteps().orEmpty()
         val run =
             Run(
+                routes = routes,
                 inputs = Inputs(settings.rideInputs(), trigger.value),
                 number = number,
                 choice = choice,
@@ -390,7 +434,9 @@ class RideHost(
      */
     private fun store(run: Run) {
         val record = run.record ?: return
-        run.scope.launch { setSave(run, run.disk.finish(record)) }
+        // The FIT file puts the ride on the routes it followed: positions for a route with coordinates, the altitude for any.
+        val fitRoutes = run.routes.forFit(run.stepsOfWorkout)
+        run.scope.launch { setSave(run, run.disk.finish(record, fitRoutes)) }
     }
 
     private fun setSave(
