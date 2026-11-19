@@ -143,7 +143,7 @@ the table; stages merge without a release, the phase ends with `v0.4.0-rc.1` and
 | **A1c The overlay and the settings** (§11.3, §11.7, §12.5) | Expands around step changes, shows the guard and the heart-rate step, the previous-attempt line, system mass with the body weight | OVD-19 | done (merged): ADR 0034; nothing seen on a tablet yet |
 | **A2a Notebook and replanning** (§11.6, §12.2, §12.4) | The coach notebook (versions, rollback, Methodology), plan events and their tools, the Telegram note, the companion's read-only view | OVD-20 | server side done (merged): ADR 0035, migration 0010; the companion's view is not built |
 | **A2b-1 Routes and the variant: the service** (§11.4, §11.5) | BRouter beside the service (container and tiles done: deploy guide section 20), `create_route` in three modes, the variant of a workout and its lifecycle, route sessions in repeats | OVD-20 | done (merged): ADR 0036, migration 0011 |
-| **A2b-2 Routes and the variant: the tablet** (§11.4, §11.5) | The Kotlin models, route choice, grade in the trainer's simulation, positions in the FIT, the variant choice at the start, the companion's notebook view | OVD-20 | |
+| **A2b-2 Routes and the variant: the tablet** (§11.4, §11.5) | The Kotlin models, route choice, grade in the trainer's simulation, positions in the FIT, the variant choice at the start, the companion's notebook view | OVD-20 | done (merged): ADR 0037; the companion's notebook page is merged; nothing seen on a device |
 | **A3 Live coach** (§12.1) | Snapshots from the tablet, trigger rules, the LLM line, the owner's TTS, audio and text on the tablet, the cue log | OVD-21 | |
 | **Release candidate `v0.4.0-rc.1`**, then **`v0.4.0`** | Long checks while the owner rides it | | |
 
