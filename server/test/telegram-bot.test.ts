@@ -176,7 +176,9 @@ describe("polling", () => {
   it("keeps its place across a restart: a command is answered once", async () => {
     const first = await boot();
     await ask("/help");
-    expect(telegram.offsets.at(-1)).toBeGreaterThanOrEqual(1);
+    // The next poll asks for what comes after the answered update; on a real database that
+    // follows the saved offset by a moment, so wait for it rather than look once.
+    await until(() => expect(telegram.offsets.at(-1)).toBeGreaterThanOrEqual(1));
     await first.app.close();
     started.pop();
 
