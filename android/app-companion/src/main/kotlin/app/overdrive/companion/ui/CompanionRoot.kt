@@ -105,6 +105,7 @@ private fun Tabs(container: CompanionContainer) {
                     is Route.Settings -> SettingsScreen(container)
                     is Route.Licences -> LicencesScreen(container)
                     is Route.Notes -> NotesScreen(container)
+                    is Route.Notebook -> NotebookScreen(container)
                     is Route.RideDetail -> RideDetailScreen(container, target.id)
                     is Route.ActivityDetail -> ActivityScreen(container, target.id)
                     is Route.RepeatDetail -> RepeatDetailScreen(container, target.hash)
