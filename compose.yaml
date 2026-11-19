@@ -64,8 +64,20 @@ services:
       STRAVA_REFRESH_TOKEN: ${STRAVA_REFRESH_TOKEN:-}
       STRAVA_BACKFILL: ${STRAVA_BACKFILL:-}
       STRAVA_BASE_URL: ${STRAVA_BASE_URL:-}
+      # BRouter road routing (spec §11.4): empty means routing is off. Set to http://brouter:17777. docs/deploy.md, section 19.
+      BROUTER_URL: ${BROUTER_URL:-}
     ports:
       - "127.0.0.1:${SERVER_PORT:-8080}:8080"
+
+  # BRouter routing server (spec §11.4), built from deploy/brouter. The tiles are not in the repository:
+  # fetch them into ./data/brouter/segments4 first (docs/deploy.md, section 19). Nothing is published on the host;
+  # the server reaches it at http://brouter:17777 on the compose network.
+  brouter:
+    build: deploy/brouter
+    restart: unless-stopped
+    mem_limit: 640m
+    volumes:
+      - ./data/brouter/segments4:/segments4:ro
 
   # PostgreSQL is the store (spec §7.2, ADR 0014): the server migrates it on start.
   db:

@@ -35,6 +35,9 @@ captures/
 .claude/settings.local.json
 .claude/worktrees/
 
+# Large runtime data, e.g. the BRouter tiles in data/brouter (docs/deploy.md, section 19)
+/data/
+
 # Generated ride artifacts used during manual testing
 *.fit
 !contracts/fixtures/**/*.fit
