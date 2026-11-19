@@ -55,5 +55,20 @@ light behind the name carries the app's colour.
 | Companion (phone) | `android/app-companion/src/main/res/raw/overdrive_intro.webm`, 720 × 1600, lime, "Companion" under the name | about 1.5 MB |
 
 `design/tools/intro/build-intro.mjs` renders both from `intro.html` (see the header of the script for what it needs: three r160,
-the bike's GLB, Chromium and the ffmpeg that Playwright installs). The 44 MB GLB is not in the repository. The apps play the video
-with Android's own player: no library and no Play Services.
+the bike's GLB, Chromium and the ffmpeg that Playwright installs). The 44 MB GLB is not in the repository.
+
+**How the apps play it** (ADR 0031; `IntroVideo` and `IntroHost` in `android/ui-kit`). Android's own `VideoView`: no library and no
+Play Services. The film plays once, muted and without taking audio focus, filling the screen with its aspect ratio kept on the
+film's own background (`#05070A`), so a screen of another shape shows no bars. It plays on a **cold start** only (the activity has
+no saved state, so a rotation does not replay it) and **not** when the system's animations are off (animator duration scale 0). The
+app's own start-up is not delayed: the app is composed from the first frame under the film, and the film's layer is opaque and takes
+every touch, so nothing under it can be used by mistake.
+
+- **Ride app (tablet):** when the film ends, or when the rider taps the screen during it, a primary **Continue** button (64 dp, the
+  ride height of design/system.md §7.1) appears at the bottom end of the screen inside the system bars, with initial focus so that
+  Enter on a keyboard presses it. The film's last frame stays behind it. Pressing it fades the layer out in 300 ms.
+- **Companion (phone):** no button. The end of the film, or a tap, fades the layer out in 400 ms.
+- **The fade** is drawn by Compose in two halves, because the video's own surface cannot be faded the same way on every device:
+  the last frame dips into `#05070A`, then that colour fades away to show the app.
+- A film that cannot be played (an error, or no frame within 1.5 s) removes the layer at once; the app is simply there.
+- A film that is in the background when the activity stops pauses and carries on when it comes back.
