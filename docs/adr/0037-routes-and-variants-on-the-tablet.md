@@ -82,8 +82,8 @@ for a map. With no list and nothing chosen the row is not drawn. A planned worko
 
 A planned workout **with a variant** shows its own row as before and, **right under it, an "Easier version" row** (the agent's note as its line, the length and
 IF on the right): **one tap each**, then **Start** as always; **"Recovery: caution"** is one plain label under the two for a workout of today, from `GET /v1/recovery`
-(the tablet did not read it before). It is asked **only when a workout of today has a variant** (start, the Ready screen opening, a change of settings; at most once
-a minute), kept on disk, and **nothing is shown** for `learning`, `noData`, another day's answer or no answer. A planned workout without a variant looks exactly as before.
+(the tablet did not read it before). It is asked **only when a workout of today has a variant** (at start and whenever the plan changes, when the Ready screen opens (at most once
+a minute), and after a change of settings), kept on disk, and **nothing is shown** for `learning`, `noData`, another day's answer or no answer. A planned workout without a variant looks exactly as before.
 What the ride plays: the planned workout with the variant's steps (so `workoutId` is the planned id and the previous attempt is asked for by the **variant's** hash,
 a session of its own, ADR 0036); the record's header says `variantRidden: true`.
 

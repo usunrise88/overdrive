@@ -959,7 +959,7 @@ without a bike, a real route or a Strava upload**: everything below is what the 
   whether the route is where it should be), the **elevation profile** and the climb? Upload the profile route's ride too: no map, but the elevation? Import the files into intervals.icu: the altitude? If Strava
   shows no map, try `FitOptions.subSport` 6 (indoor cycling) or a plain ride, and write down which worked (`docs/protocols/fit.md` 8.10). Settles: FIT 10.
 - [ ] **13.9 A workout's route in the file.** Upload the ride of 13.6: the map covers only the free step (the rest of the file has no position), and Strava accepts it?
-- [ ] **13.10 TalkBack and the large font.** TalkBack reads the route row as "Route, Flat road" (a button) and the sheet's rows as the route with its facts; at 1.3x the rows wrap and nothing is cut.
+- [ ] **13.10 TalkBack and the large font.** TalkBack reads the route row as a button, "Route, Flat road" (the disclosure row also says "Collapsed" for the closed list: is that confusing for a row that opens a sheet?), and the sheet's rows as the route with its facts; at 1.3x the rows wrap and nothing is cut.
 - [ ] **13.11 What to send back.** The difficulty you would keep, how the trainer followed the grade (13.3), what Strava showed (13.8, 13.9), the sentence on the Ready screen for each case above, and screenshots of anything
   that looks wrong (send them privately: they show your roads).
 
