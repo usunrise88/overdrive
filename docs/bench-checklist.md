@@ -239,6 +239,13 @@ Turn the HCI snoop log on for this whole session.
   (spec §4.2). The overlay says why (auto). Pedal again: the ride resumes. Watch the log for the cadence the
   trainer reports when you stop: does it send 0, or hold the last value? Expect: 0. If it holds the last value,
   auto-pause never fires. Settles: ADR4 ("reports cadence 0 when the rider stops").
+- [ ] **3.9b Resume after an auto-pause (ADR 0032, OVD-24).** In an ERG step above 100 W, stop until the overlay says the ride
+  is paused (auto), wait 5 seconds, pedal again. Expect: the resistance comes up with the first strokes (a second or two) and the
+  overlay says riding at once; the paused target is **25 W** (`05 19 00` in the log), not 0 W, and the first target after the
+  first stroke comes in the same second. Note which of cadence, power (10 W) and flywheel speed (rising by 0.5 km/h) in the
+  Indoor Bike Data of those seconds ended the pause. Then stop again and let the flywheel coast: the ride must stay paused
+  (no flapping). The full list of what to look at and the settings to tune are in ADR 0032, "What the owner should check on
+  the bike". Settles: the hypotheses of ADR 0032.
 - [ ] **3.10 Zero watts in a paused ERG step.** Start a workout ERG step, then pause it (on screen). Expect:
   the trainer's target drops to 0 W and the trainer accepts it. If it rejects 0 W, the response code appears in
   the `0x80` indication (`80 05 <result>`). Record the code. On resume, the target ramps in over about 3 seconds
