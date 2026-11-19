@@ -117,6 +117,11 @@ export function createNotifier(options: NotifierOptions): Notifier {
 
   let current: Promise<void> | null = null;
   let again = false;
+  // When Telegram last refused the bot token. A refused token fails the same way for everything, and only the owner can mend it:
+  // until the next poll, an event (a plan change, a stored note) does not ask again. The poll does, in case it was mended.
+  let refusedAt: number | null = null;
+  const refusedLately = (): boolean =>
+    refusedAt !== null && ctx.now().getTime() - refusedAt < pollMs;
   let stopTicking: (() => void) | null = null;
   const unsubscribe: (() => void)[] = [];
   // The history of the plan must be brought up to date before anything is worked out from it.
@@ -385,9 +390,14 @@ export function createNotifier(options: NotifierOptions): Notifier {
       await deliver(message.text, message.buttons, message.entities);
     } catch (error) {
       summary[await failed(candidate, attempts, error)]++;
-      // A refused token fails the same way for everything else: leave them for the next tick.
-      return error instanceof TelegramError && error.configuration ? "stop" : undefined;
+      // A refused token fails the same way for everything else: leave them for the next poll.
+      if (error instanceof TelegramError && error.configuration) {
+        refusedAt = ctx.now().getTime();
+        return "stop";
+      }
+      return undefined;
     }
+    refusedAt = null;
     await finish(candidate, "sent");
     if (candidate.kind === "ride-summary") announced.delete(candidate.key);
     summary.sent++;
@@ -429,7 +439,8 @@ export function createNotifier(options: NotifierOptions): Notifier {
     return summary;
   }
 
-  function kick(): void {
+  function run(polled: boolean): void {
+    if (!polled && refusedLately()) return;
     if (current !== null) {
       again = true;
       return;
@@ -442,11 +453,13 @@ export function createNotifier(options: NotifierOptions): Notifier {
         } catch (error) {
           log.error({ err: error }, "the Telegram notifier failed");
         }
-      } while (again);
+      } while (again && !refusedLately());
     })().finally(() => {
       current = null;
     });
   }
+
+  const kick = (): void => run(false);
 
   return {
     tick,
@@ -467,7 +480,7 @@ export function createNotifier(options: NotifierOptions): Notifier {
         // A written note or alert was stored: send it now rather than at the next poll.
         bus.on("insight-stored", () => kick()),
       );
-      stopTicking = timers.every(pollMs, kick);
+      stopTicking = timers.every(pollMs, () => run(true));
       // A few rows a day: a quarter of a year is more history than anything reads.
       void db
         .query("DELETE FROM bot_notifications WHERE created_at < now() - interval '120 days'")

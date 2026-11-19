@@ -139,6 +139,10 @@ time and wait on conditions, not sleeps.
   cache on every `plan-changed` and at start. A workout that vanishes from the cache while its day has not passed was deleted and
   is forgotten; one that vanishes because its day passed stays; one skipped from the bot stays as `skipped`. The first week after
   the bot is switched on counts only what it saw.
+- **A refused bot token is asked about once per poll** (found by the Phase 3 long checks, 2026-11-19). When Telegram answers 401 the
+  notifier stops its tick, and it also stops asking when an event (a plan change, a stored note or ride) kicks it: only the next
+  30-second poll asks again, in case the owner has mended the token. Before this, a second event right after a refusal made a second
+  tick, which sent the next message and was refused too (a flaky `telegram-notifications` test on CI, made deterministic since).
 
 ### 7. Telegram: commands
 

@@ -299,6 +299,13 @@ describe("reminders", () => {
     });
     const h = await boot({ now: "2026-11-18T19:00:00Z" });
     expect(telegram.callsTo("sendMessage")).toHaveLength(1);
+    // An event (a plan change, a stored note) does not ask again, however often it comes: only the next poll does.
+    h.services.bus.emit("plan-changed", { added: [], updated: ["icu-1"], removed: [] });
+    h.services.bus.emit("plan-changed", { added: [], updated: ["icu-2"], removed: [] });
+    await h.services.telegram?.idle();
+    expect(telegram.callsTo("sendMessage")).toHaveLength(1);
+    await tick(h);
+    expect(telegram.callsTo("sendMessage")).toHaveLength(2);
     const log = h.logging.text();
     expect(log).toContain("TELEGRAM_BOT_TOKEN");
     expect(log).not.toContain(FAKE_BOT_TOKEN);
