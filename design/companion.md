@@ -44,6 +44,7 @@ Bottom navigation (system.md §7.9): **Today** (`house`), **Fitness** (`activity
 | Rides, a row | Ride detail or Activity detail |
 | Rides, Repeats view, a session | Repeat detail (§4.12) |
 | Repeat detail, an attempt | Ride detail of that ride |
+| Settings, **Coach notebook** row (group **Coach**) | Coach notebook, read-only (§4.13) |
 | Share sheet of OnelapFit, or **Open with** a `.fit` file | Import screen (§4.11), its own activity: **Done** returns to the app that shared |
 | Telegram/notification deep link (later) | Today |
 
@@ -263,6 +264,8 @@ at the right, 64 dp min) and field rows.
   .fit file from OnelapFit to Overdrive to add an outdoor ride."), why files wait and that they go by themselves ("There is no network
   connection. They go to your service when it can be reached."), and what the service refused ("1 file was not imported: not a cycling
   ride."). **Sync now** also sends the waiting files.
+- **Coach:** one row, **Coach notebook** (bodyStrong) with the note "What the coach keeps about you. Read-only." and a chevron-right at the
+  right; it opens the notebook (§4.13). Nothing else in the group.
 - **About:** Version (numXS), Licences (Geist SIL OFL 1.1, Lucide ISC; opens a plain text screen).
 
 ### 4.10 First run (`settings--onb-*.png`)
@@ -354,6 +357,31 @@ States as §5: loading "Loading your repeated sessions…" / "Loading the sessio
 error with nothing cached: "Could not reach your service" and the cause; a card whose measure no attempt has: its heading and one sentence in the
 card, no frame ("No attempt has an aerobic drift figure yet. Drift is measured on steady stretches of 40 minutes or more with heart rate."); a
 single attempt with a figure draws its dot; an attempt with no figure is a gap in the line and a dash in the readout, never a zero.
+
+### 4.13 Coach notebook (pushed, read-only, spec §11.6, ADR 0035)
+
+Reached from Settings (group **Coach**). Back bar "Coach notebook". The subtitle is "Updated 07:40" (or "Updating…" with a spinner while a
+request runs), then the status line when the last refresh failed, then the content:
+
+- **The read-only line** (body, text 2), first in the content: "Read-only. To change something, tell the coach or send a note in Telegram."
+  The page has no control that changes the notebook and sends nothing.
+- **The seven sections in the service's fixed order**, each a card (surface 1, padding 16, gap 8): the title (heading), "changed 3 days ago,
+  version 4" (label, text 2), then the text (body, text 1), selectable and wrapped as written. The words for the change: "changed today",
+  "changed yesterday", "changed N days ago" up to six days, then "changed on Mon 9 Nov"; a section never written says "Not written yet"
+  and has no text.
+- **Methodology** is marked, not moved: the label "Current plan" (label, text 2) sits above its title, and the reason given for its
+  current text follows the text as "Why: …" (label, text 2). A change to the plan is announced to the rider (spec §12.4).
+- **Decisions log** (the last section): one line per entry, oldest first as written. Collapsed it shows the latest five with **Show all**
+  (secondary, 40 dp); expanded, the same button reads **Show latest**. Five entries or fewer have no button. The collapsed state survives a
+  rotation and is not kept across a restart.
+- **Empty** (no section ever written): the heading "No notebook yet" and one sentence: "The coach writes its notebook as it plans your
+  sessions, and it appears here."
+- **Offline or old:** the cached text stays and the status line says why, as on the other pages ("Offline · updated 06:10", the cause in
+  words). Nothing cached and the request failed: the error block with **Try again**.
+- **No sizes.** The service's caps and totals are not shown: this page has no place for them.
+
+The data is `GET /v1/notebook`, a cached resource (`cache/notebook`) asked when the page opens (at most once a minute), on a pull down and on
+**Sync now**. It is not part of Settings' "Last sync". The words are `NotebookUi`, pure and tested in `NotebookModelsTest`.
 
 ## 5. States
 
