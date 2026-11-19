@@ -38,7 +38,8 @@ Dark theme only. Use roles, never raw hex.
 | On primary | `text.onPrimary` #090C11 | Text on the primary button and on zone fills |
 | Overlay backing | `overlay.backing` #06080B at 95% | The overlay window fill |
 
-**No other hues.** There is no brand colour and no success/warning/error colour. Good/bad and
+**No other hues.** There is no brand colour in the apps and no success/warning/error colour (the brand accents of `brand.md`
+live in icons, logos and the cover only, never in a screen). Good/bad and
 attention are carried by: weight (600 vs 400), tone (text 1 vs 3), an icon (`triangle-alert`,
 `check`, `info`, `pause`), the inverted chip (`chip.on`: text 1 fill, dark text) and the word.
 

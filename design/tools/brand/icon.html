@@ -1,0 +1,67 @@
+<!doctype html><meta charset="utf-8">
+<style>html,body{margin:0;background:transparent}svg{display:block}</style>
+<!-- glyph.js is written next to this file by build-brand.mjs: const GLYPH = { d, bbox } from mark.mjs -->
+<script src="glyph.js"></script>
+<body><script>
+const q = new URLSearchParams(location.search);
+const accent = "#" + (q.get("accent") || "ff2d6f");
+const accent2 = "#" + (q.get("accent2") || q.get("accent") || "ff6b3d");
+const mode = q.get("mode") || "full";           // full | bg | fg | mono | mark
+const size = +(q.get("size") || 1024);
+const scale = +(q.get("scale") || 0.70);        // the glyph's longest side as a share of the canvas
+const dx = +(q.get("dx") || 0), dy = +(q.get("dy") || 0); // optical shift, in canvas units of 1000
+const gain = +(q.get("gain") || 1), G = (v) => Math.min(1, v * gain).toFixed(3);
+const g = GLYPH, [bx0, by0, bx1, by1] = g.bbox;
+// glyph centre of mass sits left of the box centre (the tail pulls the box right): centre the ring, not the tail
+const t = `translate(${500 + dx} ${500 + dy}) scale(${scale}) translate(-500 -500)`;
+const bg = `
+  <defs>
+    <linearGradient id="base" x1="0.2" y1="0" x2="0.8" y2="1"><stop offset="0" stop-color="#0d1117"/><stop offset="1" stop-color="#05070a"/></linearGradient>
+    <radialGradient id="halo" cx="0.47" cy="0.52" r="0.55"><stop offset="0" stop-color="${accent}" stop-opacity="${G(0.30)}"/><stop offset="0.5" stop-color="${accent}" stop-opacity="${G(0.08)}"/><stop offset="1" stop-color="${accent}" stop-opacity="0"/></radialGradient>
+    <radialGradient id="corner" cx="1" cy="0" r="0.75"><stop offset="0" stop-color="${accent}" stop-opacity="${G(0.65)}"/><stop offset="1" stop-color="${accent}" stop-opacity="0"/></radialGradient>
+    <radialGradient id="corner2" cx="0" cy="1" r="0.7"><stop offset="0" stop-color="${accent2}" stop-opacity="${G(0.55)}"/><stop offset="1" stop-color="${accent2}" stop-opacity="0"/></radialGradient>
+    <radialGradient id="vig" cx="0.5" cy="0.5" r="0.78"><stop offset="0.45" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.72"/></radialGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="22"/></filter>
+    <filter id="grainy" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.30" numOctaves="2" seed="11" result="t"/>
+      <feColorMatrix in="t" type="matrix" values="2.6 0 0 0 -0.75  2.6 0 0 0 -0.75  2.6 0 0 0 -0.75  2.6 0 0 0 -0.75" result="n"/>
+      <feComposite in="SourceGraphic" in2="n" operator="arithmetic" k1="2.1" k2="0.2" k3="0" k4="0"/>
+    </filter>
+    <filter id="grainyBlur" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.30" numOctaves="2" seed="5" result="t"/>
+      <feColorMatrix in="t" type="matrix" values="2.6 0 0 0 -0.75  2.6 0 0 0 -0.75  2.6 0 0 0 -0.75  2.6 0 0 0 -0.75" result="n"/>
+      <feComposite in="SourceGraphic" in2="n" operator="arithmetic" k1="2.1" k2="0.2" k3="0" k4="0"/>
+    </filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.35" numOctaves="2" seed="7" result="n"/><feColorMatrix type="saturate" values="0"/></filter>
+  </defs>
+  <rect width="1000" height="1000" fill="url(#base)"/>
+  <g filter="url(#grainy)"><rect width="1000" height="1000" fill="url(#corner)"/><rect width="1000" height="1000" fill="url(#corner2)"/>
+  <rect width="1000" height="1000" fill="url(#halo)"/></g>
+  <g filter="url(#grainy)"><g filter="url(#soft)" transform="rotate(-38 500 500)">
+    <rect x="-300" y="150" width="1600" height="46" fill="#fff" opacity="0.09"/>
+    <rect x="-300" y="260" width="1600" height="120" fill="${accent2}" opacity="0.22"/>
+    <rect x="-300" y="560" width="1600" height="70" fill="#fff" opacity="0.06"/>
+    <rect x="-300" y="720" width="1600" height="150" fill="${accent2}" opacity="${G(0.08)}"/>
+  </g></g>
+  <rect width="1000" height="1000" fill="url(#vig)"/>
+  <rect width="1000" height="1000" filter="url(#grain)" opacity="0.18" style="mix-blend-mode:overlay"/>`;
+const glow = `
+  <g transform="${t}">
+    <g filter="url(#grainyBlur)"><path d="${g.d}" fill="${accent}" opacity="1" filter="url(#b1)"/></g>
+    <path d="${g.d}" fill="${accent2}" opacity="0.5" filter="url(#b3)"/>
+    <path d="${g.d}" fill="#fff" opacity="0.5" filter="url(#b2)"/>
+  </g>`;
+const core = `<g transform="${t}"><path d="${g.d}" fill="#fff"/></g>`;
+const ink = "#" + (q.get("ink") || "ffffff");
+const mono = `<g transform="${t}"><path d="${g.d}" fill="${ink}"/></g>`;
+const glyphDefs = `<defs>
+  <filter id="b1" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="${26 / scale}"/></filter>
+  <filter id="b2" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="${7 / scale}"/></filter>
+  <filter id="b3" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="${14 / scale}"/></filter></defs>`;
+let body = "";
+if (mode === "full") body = bg + glyphDefs + glow + core;
+else if (mode === "bg") body = bg;
+else if (mode === "fg") body = glyphDefs + glow + core;
+else if (mode === "mono" || mode === "mark") body = mono;
+document.body.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 1000 1000">${body}</svg>`;
+</script>

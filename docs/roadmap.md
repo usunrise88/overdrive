@@ -77,7 +77,9 @@ Pre-releases are `v0.1.0-alpha.N`; the MVP is `v0.1.0`. Later phases continue fr
 
 ## Phase 3 stages (spec §6)
 
-**Where we are: Phase 3 is built; `v0.3.0-rc.1` is for the owner to test; the long checks run in parallel; then `v0.3.0`.**
+**Where we are: Phase 3 is released as `v0.3.1` (2026-11-19); the long checks run after the release; fixes go to `v0.3.2`.**
+There was no `v0.3.0`: `v0.3.0-rc.1` was the candidate, and the owner asked for the final release to carry the graphics (ADR 0030) and
+to run the long checks after it, so the final version is `0.3.1`.
 
 Order of work, 2026-11-18. Stages merge into the development branch without a release; the phase ends with a release candidate
 `v0.3.0-rc.1`, which the owner tests while the orchestrator runs the long checks, then the final `v0.3.0` (`CLAUDE.md`, Process).
@@ -94,7 +96,7 @@ Tasks live in Lific, project OVD.
 | P3-4c Repeats and FIT share on the phone | Repeat page, FIT share target with its outbox (§11.7, §11.8) | OVD-15 | done (merged, ADR 0028) |
 | P3-5 FTP confirmation | The eFTP suggestion is confirmed or dismissed by the owner (companion, Telegram, MCP); only then do zones move (§6.3) | OVD-16 | not started |
 | P3-7 Repeats and outdoor rides | The same-session comparison (hash of the workout structure, heart rate at the same power, trends, `GET /v1/repeats`, `previous` for the overlay, MCP); outdoor rides from a FIT file (own decoder, `POST /v1/activities/fit`, heart-rate load as `other`, duplicate guard, forwarded to intervals.icu, Telegram document) (§11.7, §11.8) | | done (merged): server ADR 0026, companion ADR 0028; the overlay line is `v0.4.0` |
-| P3-6 Release candidate | `v0.3.0-rc.1`, then the long checks while the owner tests, then `v0.3.0` | OVD-17 | `v0.3.0-rc.1` cut when this is merged; the final `v0.3.0` follows the owner's test |
+| P3-6 Release candidate | `v0.3.0-rc.1`, then the long checks while the owner tests, then `v0.3.0` | OVD-17 | `v0.3.0-rc.1` cut; the final release is `v0.3.1`, with the long checks after it (owner's decision, 2026-11-19) |
 
 P3-5 is not marked done here: the companion has the Keep and Use answers to a suggested FTP (ADR 0024, section 3), but the stage
 was not re-checked against its task (OVD-16) when this table was written.

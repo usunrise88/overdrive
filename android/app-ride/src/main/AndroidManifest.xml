@@ -41,6 +41,8 @@
         android:allowBackup="false"
         android:usesCleartextTraffic="true"
         android:label="Overdrive"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/Theme.Overdrive">
         <activity
             android:name=".MainActivity"

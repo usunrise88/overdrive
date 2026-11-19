@@ -27,6 +27,7 @@ import app.overdrive.uikit.OdIconButton
 import app.overdrive.uikit.OdText
 import app.overdrive.uikit.OdTopBar
 import app.overdrive.uikit.OdType
+import app.overdrive.uikit.OverdriveMark
 import app.overdrive.uikit.icons.OverdriveIcons
 import app.overdrive.uikit.tokens.OverdriveColors
 
@@ -57,7 +58,8 @@ class TopBarActions(
 
 /**
  * The top bar of the ride screens (design/system.md §6): the title and a state chip, then right-aligned the device
- * status icons, the overlay button and the settings button.
+ * status icons, the overlay button and the settings button. [mark] puts the Overdrive mark before the title (the Ready screen,
+ * where the title is the app's name).
  */
 @Composable
 fun RideTopBar(
@@ -66,6 +68,7 @@ fun RideTopBar(
     devices: DevicesUi,
     actions: TopBarActions,
     modifier: Modifier = Modifier,
+    mark: Boolean = false,
 ) {
     OdTopBar(modifier) {
         Row(
@@ -73,6 +76,7 @@ fun RideTopBar(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (mark) OverdriveMark(size = 26.dp)
             OdText(title, Modifier.weight(1f, fill = false), style = OdType.heading, maxLines = 1)
             when (chip) {
                 is TopBarChip.Calm -> OdChip(chip.text, dot = true)

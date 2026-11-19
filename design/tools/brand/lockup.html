@@ -1,0 +1,31 @@
+<!doctype html><meta charset="utf-8">
+<!-- Logo lockup and the cover. Query: layout=lockup|cover, accent, accent2, gain, ink (text and mark colour), bg=transparent|full, fonts=<dir of Geist> -->
+<style>html,body{margin:0;background:transparent}</style>
+<script src="glyph.js"></script>
+<body><script>
+const q = new URLSearchParams(location.search);
+const layout = q.get("layout") || "lockup";
+const ink = "#" + (q.get("ink") || "ffffff");
+const fonts = q.get("fonts") || "";
+const W = +(q.get("w") || 1280), H = +(q.get("h") || 640);
+const face = `@font-face{font-family:Geist;font-weight:600;src:url("file://${fonts}/Geist-SemiBold.ttf")}@font-face{font-family:Geist;font-weight:400;src:url("file://${fonts}/Geist-Regular.ttf")}`;
+const g = GLYPH;
+const mark = (size, extra = "") => `<svg width="${size}" height="${size}" viewBox="0 0 1000 1000" style="${extra}"><path d="${g.d}" fill="${ink}"/></svg>`;
+let html = "";
+if (layout === "lockup") {
+  // horizontal: the mark, then the name; sized by the height H
+  const ms = H * 0.86;
+  html = `<div style="display:flex;align-items:center;gap:${H * 0.12}px;width:${W}px;height:${H}px;box-sizing:border-box;padding:0 ${H * 0.1}px">
+    ${mark(ms)}<span style="font:600 ${H * 0.52}px/1 Geist,system-ui;color:${ink};letter-spacing:-0.035em">Overdrive</span></div>`;
+} else {
+  // the cover: the icon's own background (rendered separately and passed as an image), the mark and the name
+  html = `<div style="position:relative;width:${W}px;height:${H}px;overflow:hidden;background:#05070a url('${q.get("bgimg")}') center/cover">
+    <div style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(5,7,10,.82) 0%,rgba(5,7,10,.55) 45%,rgba(5,7,10,0) 75%)"></div>
+    <div style="position:absolute;left:${W * 0.07}px;top:50%;transform:translateY(-50%)">
+      <div style="font:600 ${H * 0.17}px/1 Geist,system-ui;color:#fff;letter-spacing:-0.04em">Overdrive</div>
+      <div style="font:400 ${H * 0.052}px/1.35 Geist,system-ui;color:rgba(255,255,255,.78);margin-top:${H * 0.045}px;max-width:${W * 0.38}px">${q.get("tag") || ""}</div></div>
+    <div style="position:absolute;right:${W * 0.04}px;top:50%;transform:translateY(-50%)">${mark(H * 0.78, "filter:drop-shadow(0 0 22px rgba(255,255,255,.45))")}</div></div>`;
+}
+document.head.insertAdjacentHTML("beforeend", `<style>${face}</style>`);
+document.body.innerHTML = html;
+</script>

@@ -121,6 +121,7 @@ fun ReadyScreen(
                 ),
                 devices,
                 topBar,
+                mark = true,
             )
             Row(Modifier.weight(1f).fillMaxWidth()) {
                 WorkoutList(choice, workouts, settings, plan, actions, Modifier.width(360.dp).fillMaxHeight())

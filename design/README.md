@@ -14,6 +14,9 @@ mock-ups for the ride app (tablet), its overlay and the companion (phone). Nothi
 | `tools/build-tokens.mjs` | Writes `mockups/tokens.css`, `android/ui-kit` `OverdriveTokens.kt` and the Geist font resources from `tokens.json`; `--check` fails when any is stale |
 | `tools/check-contrast.mjs` | Checks the contrast rules (zones ≥ 7:1 on the overlay over white video, text tiers on every surface) and prints the colour-vision distances; exits 1 on failure |
 | `tools/render-mockups.mjs` | Serves `design/` locally and screenshots every frame of every mock-up with Playwright (`mockups/companion/` pages go to `mockups/companion/png/`) |
+| `brand.md` | The mark, the accents (gold, lime) and every built asset: app icons, adaptive layers, logos, the cover |
+| `tools/brand/` | `build-brand.mjs` builds the icons, logos, cover and the Android launcher layers from the mark's geometry (`mark.mjs`); needs Chromium |
+| `logo/` | Built logos, icons, the bot avatar and the cover (see `brand.md`) |
 | `fonts/` | Geist 400, 500, 600 (TTF, ~380 KB) and its licence, SIL OFL 1.1. From npm `geist` 1.9.2 |
 | `icons/` | The Lucide icons we use (SVG, stroke 1.5) and the ISC licence. From npm `lucide-static` 1.74.0 |
 | `mockups/*.html` | Static mock-ups: `overlay`, `ride`, `devices` (with the component sheet), `settings` |

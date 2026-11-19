@@ -32,6 +32,7 @@ import app.overdrive.uikit.OdIcon
 import app.overdrive.uikit.OdText
 import app.overdrive.uikit.OdTextField
 import app.overdrive.uikit.OdType
+import app.overdrive.uikit.OverdriveMark
 import app.overdrive.uikit.Spinner
 import app.overdrive.uikit.icons.OverdriveIcons
 import app.overdrive.uikit.tokens.OverdriveColors
@@ -104,6 +105,7 @@ fun ConnectView(
             Modifier.weight(1f).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            OverdriveMark(size = 56.dp)
             if (ONBOARDING_STEPS > 1) {
                 OdText("Step 1 of $ONBOARDING_STEPS", style = OdType.label, color = OverdriveColors.textTertiary)
             }

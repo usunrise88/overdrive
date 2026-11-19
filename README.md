@@ -1,5 +1,7 @@
 # Overdrive
 
+![Overdrive](design/logo/cover.png)
+
 Single-user indoor cycling system: an Android tablet app that controls a Van Rysel D500 and shows
 ride data in an overlay on top of other apps, a thin self-hosted web service with an MCP server so
 an AI agent can plan workouts, and a phone companion for statistics and wellness data.
