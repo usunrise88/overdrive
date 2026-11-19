@@ -29,7 +29,7 @@ public interface MediaKeys {
  *
  * | Action | Does |
  * |---|---|
- * | [ClickAction.GEAR_UP], [ClickAction.GEAR_DOWN] | in an **ERG** step (`RideSnapshot.mode`), intensity up or down 5 points; otherwise one gear |
+ * | [ClickAction.GEAR_UP], [ClickAction.GEAR_DOWN] | in an **ERG** step (`RideSnapshot.mode`), intensity up or down 5 points (the target heart rate by 2 bpm in a heart-rate step, spec §11.2: the session decides); otherwise one gear |
  * | [ClickAction.NEXT_INTERVAL], [ClickAction.PREVIOUS_INTERVAL] | the session's own skip |
  * | [ClickAction.TOGGLE_RIDE_PAUSE] | pause while `RIDING`, resume while `PAUSED`, nothing in any other state |
  * | [ClickAction.PLAY_PAUSE_MEDIA] | [MediaKeys.playPause] |

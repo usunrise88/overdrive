@@ -58,6 +58,16 @@ public data class RideSettings(
      * affected.
      */
     val autoPauseTargetWatts: Int = DEFAULT_AUTO_PAUSE_TARGET_WATTS,
+    /**
+     * The ERG stall guard (spec §11.1, docs/adr/0033): cadence below a floor for 3 s in an ERG step lowers the target to 70% and
+     * holds it there until the rider is pedalling again. On by default; `StallGuardSettings.enabled = false` turns it off.
+     */
+    val stallGuard: StallGuardSettings = StallGuardSettings(),
+    /**
+     * The controller of the heart-rate step (spec §11.2, docs/adr/0033): gains, step limits, the start ramp, the strap-loss
+     * timing and the size of a gear-button press. First guesses, for the owner to tune on the bike.
+     */
+    val heartRateHold: HeartRateHoldSettings = HeartRateHoldSettings(),
 ) {
     init {
         require(ftp > 0) { "FTP must be positive, got $ftp" }
