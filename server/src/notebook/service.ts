@@ -1,6 +1,7 @@
 import { isIsoDate, type NotebookResponse, type NotebookSection } from "@overdrive/contracts";
 import { DEFAULT_NOTEBOOK_LOG_MAX_CHARS, DEFAULT_NOTEBOOK_MAX_CHARS } from "../config-coach.ts";
 import type { EventBus } from "../events.ts";
+import type { Logger } from "../log.ts";
 import type { NotificationSource } from "../notifications.ts";
 import { localDate } from "../time.ts";
 import {
@@ -154,6 +155,8 @@ export interface NotebookServiceOptions {
   limits?: Partial<NotebookLimits>;
   /** Whether a message to the rider can be sent at all (the Telegram bot and the owner's chat are set up). */
   canAnnounce: boolean;
+  /** Told that a notebook changed: its scope, section, version and kind, never a text or a reason. */
+  log?: Logger;
 }
 
 /** A change to the methodology is worth telling the rider of for a day after it was made. */
@@ -211,6 +214,15 @@ const iso = (date: Date): string => date.toISOString();
 
 export function createNotebookService(options: NotebookServiceOptions): NotebookService {
   const { store, bus, timezone, now, canAnnounce } = options;
+
+  /** The change is announced on the bus and logged by what it was, never by what it said. */
+  function changed(scope: NotebookScope, written: VersionRow): void {
+    options.log?.info(
+      { scope, section: written.section, version: written.version, kind: written.kind },
+      "notebook changed",
+    );
+    bus.emit("notebook-changed", { scope, section: written.section, version: written.version });
+  }
   const limits: NotebookLimits = {
     maxChars: options.limits?.maxChars ?? DEFAULT_NOTEBOOK_MAX_CHARS,
     logMaxChars: options.limits?.logMaxChars ?? DEFAULT_NOTEBOOK_LOG_MAX_CHARS,
@@ -311,7 +323,7 @@ export function createNotebookService(options: NotebookServiceOptions): Notebook
     });
     if ("refused" in outcome) return outcome.refused;
     const written = outcome.written;
-    bus.emit("notebook-changed", { scope, section: written.section, version: written.version });
+    changed(scope, written);
     const current = await store.current(scope);
     const saved: Extract<EditOutcome, { saved: true }> = {
       saved: true,
@@ -439,7 +451,7 @@ export function createNotebookService(options: NotebookServiceOptions): Notebook
       });
       if ("refused" in outcome) return outcome.refused;
       const written = outcome.written;
-      bus.emit("notebook-changed", { scope, section: written.section, version: written.version });
+      changed(scope, written);
       const total = totalOf(await store.current(scope));
       const over = written.text.length > limits.logMaxChars;
       return {

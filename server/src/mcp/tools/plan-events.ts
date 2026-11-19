@@ -32,7 +32,7 @@ export function registerPlanEventTools(server: McpServer, ctx: ToolContext): voi
         "session was ridden), illness or travel (the rider declared it: detail.until is the last day or null for no end given). Each has " +
         "day (the rider's local day it is about), workoutId (the planned workout, null for illness and travel), detail, status, a summary " +
         "in plain words written by code, and, once resolved, resolvedAt, resolutionNote and dropped. Open events come oldest first (the order " +
-        "to deal with them in); resolved ones newest first; status all lists both. Rebuild the days that are left with the normal planning " +
+        "to deal with them in); resolved ones newest first; status all lists both, newest first. Rebuild the days that are left with the normal planning " +
         "tools (list_planned_workouts, update_workout, create_workout, delete_workout), checking the change against the methodology section " +
         "of the notebook and the load and recovery picture (get_fitness, get_recovery), then call resolve_plan_event. The service moves " +
         "nothing by itself.",

@@ -41,6 +41,10 @@ services:
       ALERT_MISSED_SESSIONS: ${ALERT_MISSED_SESSIONS:-}
       ALERT_LOAD_ABOVE_PERCENT: ${ALERT_LOAD_ABOVE_PERCENT:-}
       ALERT_LOAD_BELOW_PERCENT: ${ALERT_LOAD_BELOW_PERCENT:-}
+      # The coach notebook's caps and the plan events' day end (ADR 0035): empty values mean the defaults. docs/deploy.md, section 19.
+      NOTEBOOK_MAX_CHARS: ${NOTEBOOK_MAX_CHARS:-}
+      NOTEBOOK_LOG_MAX_CHARS: ${NOTEBOOK_LOG_MAX_CHARS:-}
+      PLAN_EVENT_DAY_END_GRACE_MINUTES: ${PLAN_EVENT_DAY_END_GRACE_MINUTES:-}
       # The MCP server and its OAuth server (ADR 0018): on only when both of the first two are set.
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
       OWNER_PASSPHRASE_HASH: ${OWNER_PASSPHRASE_HASH:-}

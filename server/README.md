@@ -7,7 +7,8 @@ integration (ADR 0016: rides are forwarded, the planned workouts are read, conve
 served to the tablet), the rider's profile (`GET`/`PATCH /v1/profile`), the MCP server with its
 OAuth server for AI clients (ADR 0018), the Google Calendar mirror and the Telegram bot (ADR 0019), the Strava upload (ADR 0020), the
 training metrics (ADR 0022), wellness, recovery and the watch's other activities (ADR 0023), the written insights, alerts and discussion
-topics (ADR 0025), the repeat-session comparison and the outdoor rides imported from FIT files (ADR 0026) and `GET /healthz`.
+topics (ADR 0025), the repeat-session comparison and the outdoor rides imported from FIT files (ADR 0026), the coach notebook and the plan events
+(ADR 0035) and `GET /healthz`.
 
 ```bash
 pnpm --filter @overdrive/server dev      # node --watch src/main.ts, http://127.0.0.1:8080 (needs DATABASE_URL)
@@ -51,6 +52,8 @@ and names the variable, never its value):
 | `ALERT_STREAK_DAYS` | `3` | 2 to 14: mornings in a row a metric is outside its usual range (adverse side) before an alert |
 | `ALERT_MISSED_SESSIONS` | `2` | 1 to 7: planned sessions missed in the last 7 days before a plan-drift alert |
 | `ALERT_LOAD_ABOVE_PERCENT`, `ALERT_LOAD_BELOW_PERCENT` | `30`, `40` | The ride load of the last 7 days this far above (5 to 300) or below (5 to 95) the planned load: plan drift |
+| `NOTEBOOK_MAX_CHARS`, `NOTEBOOK_LOG_MAX_CHARS` | `12000`, `3000` | 2000 to 100000 and 500 to 50000: the most the whole coach notebook, and its dated log, may hold, in characters. ADR 0035 |
+| `PLAN_EVENT_DAY_END_GRACE_MINUTES` | `180` | 0 to 720: how long after local midnight a day waits before it is checked for a planned session no ride completed |
 | `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_REFRESH_TOKEN` | unset | The Strava upload (ADR 0020). **The feature is off unless all three are set**; with only some set it is off and the log names the missing ones. The client id is the number of the application on strava.com/settings/api; the refresh token (which only seeds the first run, Strava rotates it) comes from `strava-auth` (below). Letters, digits and `. _ ~ + / = : -` only |
 | `STRAVA_BACKFILL` | `false` | `true` also sends the rides stored before Strava was turned on, at start. Off, turning Strava on does not post the history |
 | `STRAVA_BASE_URL` | `https://www.strava.com` | Another http(s) address; the tests point it at a fake |
@@ -115,6 +118,8 @@ general 1 to 128 characters from `A-Z a-z 0-9 . _ -`, starting with a letter or 
 | `GET /v1/repeats/{hash}/previous[?before=<rideId>]` | none | `200` the attempt before a ride with its step boundaries and per-step heart rate, for the tablet's overlay (`repeat-previous-response.schema.json`); `previous` is null when there is none · `404 ride_not_found` an unknown `before` that does not carry its start · `400 invalid_ride_id` |
 
 | `GET /v1/insights?from=YYYY-MM-DD&to=YYYY-MM-DD` | none | `200` the written notes created on those local days, at most 366, newest first, not cached (`insights-response.schema.json`, ADR 0025): `{ id, kind, createdAt, text, rideId, topic }` with `kind` `morning`, `ride`, `week`, `deviation` or `drift`, and, on a ride note, its discussion topic (`discussion-topic.schema.json`) · `400 invalid_range` |
+| `GET /v1/notebook` | none | `200` the coach notebook, read-only, not cached (`notebook-response.schema.json`, ADR 0035): the seven fixed sections with their text, version, time and reason, the caps and the total. **Only the coach scope; the game master's notebook is never served** |
+| `POST /v1/plan-events` | `{ "kind": "illness" or "travel", "until": "YYYY-MM-DD"? }` (`plan-event-declaration.schema.json`) | `201` the plan event (`plan-event.schema.json`) / `200` when the same declaration was made before · `400 invalid_json` a body that is not a declaration, or an `until` before today |
 
 Also `401 unauthorized` everywhere, `404 not_found` for any other path or method, and `500
 internal_error` (the tablet retries those). "The same" means the same content: a record is compared
@@ -150,6 +155,11 @@ Migration 0007 (ADR 0023) adds `wellness_records` (the raw Health Connect record
 of intervals.icu's wellness went), `activities` (the watch's workouts with their heart-rate samples and how dense they are),
 `activity_destinations` (the queue that forwards them to intervals.icu) and `ride_heart_rate` (what each ride says about the rider's
 heart rates, for the profile's estimates). **Health data: nothing in them is ever logged.**
+
+Migration 0010 (ADR 0035) adds `notebook_versions` (every edit of a section of a notebook is a new row, never updated or deleted: the
+coach notebook and the game master's, told apart by `scope`), `plan_events` (the queue of facts that tell the coach agent the plan may need
+rebuilding, idempotent by `natural_key`) and `plan_event_cursor` (how far the end-of-day check for missed sessions has got). **Private: the
+notebook is what the agent knows about the rider; nothing in these tables is ever logged.**
 
 Tests run on PGlite and need nothing installed. To run them on a real PostgreSQL as well (CI does),
 set `TEST_DATABASE_URL`: **the `public` schema of that database is dropped**, so point it at a scratch one.
@@ -261,6 +271,29 @@ a topic ends with the opening question in a monospace block to copy). The tests 
 check, the retry and the fallback, the triggers across a restart, the thresholds as tables, the topic limits and that no log line holds a
 value, a sentence, the key or the address. What only a real endpoint settles is in ADR 0025.
 
+## Coach notebook and plan events (ADR 0035)
+
+The coach agent's memory and the queue that tells it the plan needs rebuilding. The agent works through MCP; the rider reads the notebook
+in the companion and can declare illness or travel; the service itself only keeps, detects and queues.
+
+| Piece | Where |
+|---|---|
+| The notebooks' sections (coach, game master) | `src/notebook/sections.ts` (the coach's are `NOTEBOOK_SECTIONS` of the contracts) |
+| Versioned storage, one writer at a time per notebook | `src/notebook/store.ts` (`notebook_versions`; `mutate` decides under an advisory lock) |
+| The rules: caps, the condense answer, the methodology's reason, rollback, the announcement | `src/notebook/service.ts` |
+| `GET /v1/notebook` (coach scope only) | `src/notebook/routes.ts` |
+| Plan events: emit, declare, resolve, the end-of-day check | `src/plan-events/service.ts`, `store.ts` (`plan_events`, `plan_event_cursor`), `routes.ts` (`POST /v1/plan-events`) |
+| What moved or was deleted behind the service's back | `PlanStore.mirror` reports it (`moved`, `deleted`); the refresher hands it to `planEvents.notePlanChanges` |
+| The rider's notes (methodology changed, event resolved), written by code | `src/notebook/service.ts` (`methodologyChangedText`), `src/plan-events/messages.ts`; both are `NotificationSource`s the bot sends |
+| `/ill` and `/travel` | `src/telegram/commands.ts` |
+| MCP tools | `src/mcp/tools/notebook.ts`: `get_notebook`, `update_notebook_section`, `append_notebook_log`, `list_notebook_versions`, `rollback_notebook_section`; `src/mcp/tools/plan-events.ts`: `list_plan_events`, `resolve_plan_event` |
+| The game master's scope | `GAME_MASTER_SCOPE` in `src/oauth/routes.ts`; the MCP route builds the tools for the token's scopes (`createMcpServer(ctx, caller)`) |
+
+The tools are built **per request, for the caller's token**: a session without the `game-master` scope has no `scope` argument on the
+notebook tools and nothing in their descriptions or the server instructions mentions it. The tests (`test/notebook-service.test.ts`,
+`notebook-mcp.test.ts`, `plan-events.test.ts`, `plan-events-mcp.test.ts`, `config-coach.test.ts`) run on PGlite with the fake intervals.icu
+and Telegram and a clock the test moves.
+
 ## Strava (ADR 0020)
 
 With `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET` and `STRAVA_REFRESH_TOKEN` set, each ride whose FIT arrives is posted to Strava as a
@@ -343,7 +376,9 @@ intervals.icu, through the same client the plan refresher uses, then the plan ca
 `get_profile`, `update_profile` (also the maximum and threshold heart rate and the read-only estimates from the rides), and, from
 stage P3-2 (ADR 0023): `get_wellness` (the daily figures, with the owner's own usual ranges and body weight and its trend),
 `get_recovery` (today's state, the rule that decided, the facts), `list_activities` and `get_activity` (the tablet's rides and the
-watch's workouts, each with a `type` and a `source`). `list_rides` and `get_ride` remain as deprecated aliases for one release.
+watch's workouts, each with a `type` and a `source`). `list_rides` and `get_ride` remain as deprecated aliases for one release. From stage A2a
+(ADR 0035): the coach notebook (`get_notebook`, `update_notebook_section`, `append_notebook_log`, `list_notebook_versions`,
+`rollback_notebook_section`) and the plan events (`list_plan_events`, `resolve_plan_event`).
 Results are compact JSON, failures are tool errors in plain words (`plan source not configured: …`, `workout does not validate: /steps/0/duration must
 be integer`); without `INTERVALS_API_KEY` the plan tools say so and the rest work.
 
@@ -377,7 +412,7 @@ Both start with `app.services.start()` and are off (null, one log line) without 
 - **Bot** (`src/telegram/`). Long polling (`getUpdates`), the next offset kept in `bot_state`; answers **only**
   `TELEGRAM_OWNER_CHAT_ID`, logs any other chat's id and never its content. Commands `/today`, `/week`, `/skip` and `/move` (buttons,
   confirmation before a skip; they write through `PlanStore` and the intervals.icu client, and say so plainly when there is no plan
-  source), `/help`. By itself: reminders (the evening before, and `REMINDER_LEAD_MINUTES` before the start), a summary after each
+  source), `/ill` and `/travel` (tell the coach you are ill or away, ADR 0035), `/help`. By itself: reminders (the evening before, and `REMINDER_LEAD_MINUTES` before the start), a summary after each
   stored ride, a weekly summary. Each is claimed in `bot_notifications` before it is sent and marked after, so a restart neither
   repeats nor loses one. Numbers are computed by code; no model is involved. `plan_history` keeps the planned workouts after the
   plan cache has dropped their day, for the weekly "planned against done". Steps: `docs/deploy.md`, section 13.
@@ -413,6 +448,8 @@ Other modules (the MCP tools, Telegram, Google Calendar, Strava) plug in without
 | Outdoor rides | `services.outdoor` (`src/outdoor/`, ADR 0026) | `importFit(bytes, device)` → `{ response, created }`, or throws `ImportError` (`invalid_fit`, `unsupported_sport`, `empty_activity`); stores an activity (`source = 'fit'`) and emits `activity-stored` |
 | Wellness | `services.wellness` (`src/wellness/`, ADR 0023) | `upload.ingest(batch, device)`, `wellness(from, to)`, `recovery()`, `activity(id)`, `listActivities(query)`, `otherLoadByDay(from, to)` (the watch's load per local day), `refresh()` (pulls intervals.icu, `null` without a key); the `activity-stored` event queues a forwarding |
 | Insights | `services.insights` (`src/insights/`, ADR 0025) | `list(from, to)` (the wire shape), `facts(request)`, `topics(statuses, limit)`, `markTopicDiscussed(id)`, `tick()`; `notifications` is a `NotificationSource` (`src/notifications.ts`) the bot sends; a stored note emits `insight-stored`, new wellness figures `wellness-updated`. The plan history (`createPlanHistory`, shared with the bot) keeps each planned workout with its length and planned load after the cache drops its day |
+| Notebook | `services.notebook` (`src/notebook/`, ADR 0035) | `get(scope)`, `coachResponse()` (the wire shape, coach only), `update`, `append`, `rollback`, `versions`; a write emits `notebook-changed`; `notifications` announces a methodology change |
+| Plan events | `services.planEvents` (`src/plan-events/`, ADR 0035) | `emit({ kind, day, workoutId, detail, naturalKey? })` (the easier variant of stage A2b calls it with kind `variant`), `declare(kind, until)`, `list`, `resolve`, `detectMissed()`, `notePlanChanges(diff)`; a new or resolved event emits `plan-event-changed`; `notifications` tells the rider of a resolution |
 | Plan entries | `src/plan/entries.ts` (`readPlanEvent`), `src/plan/summary.ts` | one reading of a calendar event as a plan entry; duration, estimated load and a one-line outline of a native workout |
 
 ## Deployment

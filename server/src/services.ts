@@ -173,6 +173,7 @@ export function createServices(options: ServicesOptions): Services {
         : { logMaxChars: config.NOTEBOOK_LOG_MAX_CHARS }),
     },
     canAnnounce: riderReachable,
+    log,
   });
   // The profile carries heart-rate estimates from the stored rides (ADR 0023).
   const heartRates = createRideHeartRateIndex(db, rides, log);

@@ -202,6 +202,9 @@ Values in `.env` are never in the repository.
 | `ALERT_STREAK_DAYS` | `3` | 2 to 14: mornings in a row a metric is outside its usual range before an alert |
 | `ALERT_MISSED_SESSIONS` | `2` | 1 to 7: planned sessions missed in the last 7 days before a plan-drift alert |
 | `ALERT_LOAD_ABOVE_PERCENT`, `ALERT_LOAD_BELOW_PERCENT` | `30`, `40` | Plan drift: the load of the last 7 days this many percent above (5 to 300) or below (5 to 95) the load planned for them |
+| `NOTEBOOK_MAX_CHARS` | `12000` | 2000 to 100000: the most the whole coach notebook (every section) may hold, in characters. An edit that would pass it is not saved and the agent is told how to make room. ADR 0035 |
+| `NOTEBOOK_LOG_MAX_CHARS` | `3000` | 500 to 50000: the most the notebook's dated log may hold. The entry that passes it is saved and the agent is asked to condense the old entries into the sections; until it has, no more entries are accepted |
+| `PLAN_EVENT_DAY_END_GRACE_MINUTES` | `180` | 0 to 720: how long after local midnight a day waits before it is checked for a planned session no ride completed (a late upload is not a missed session) |
 | `PUBLIC_BASE_URL` | unset | `https://overdrive.llmto.day`: the service's public address (https, no path). **With `OWNER_PASSPHRASE_HASH`, turns the MCP server on.** ADR 0018 |
 | `OWNER_PASSPHRASE_HASH` | unset | The hash of the owner's passphrase, `scrypt:…` (section 12). **With `PUBLIC_BASE_URL`, turns the MCP server on.** The plain passphrase is never configured |
 | `MCP_STATIC_TOKENS` | empty | `name:token,name:token`: fixed bearer tokens for an MCP client that cannot do OAuth; at least 32 characters each; open `/mcp` only |
@@ -308,10 +311,20 @@ put it in `.env` (grants already issued stay; delete them as above if you want t
 The plan tools (`create_workout` and the others) need `INTERVALS_API_KEY`; without it they answer `plan source not configured` and
 the profile and ride tools still work.
 
+The coach notebook and the plan events (section 19) need nothing more: their tools are there for every client you approve, and the
+server's instructions tell the agent to read the notebook and check the open plan events at the start of each session. **The game
+master's notebook** is a second notebook that only a client approved with the extra scope `game-master` can read or write (it is not
+offered in the discovery documents, so a client has to ask for `scope=mcp game-master` explicitly; the approval page then says so).
+The apps, the REST API and the other clients never see it. You type your passphrase to approve it, so the secrecy is between the
+agents and the rider's apps, not from you.
+
 ## 13. The Telegram bot
 
 The bot (spec §5.4, ADR 0019) sends reminders, a summary after each ride and a weekly summary, and answers `/today`, `/week`,
-`/skip`, `/move` and `/help`. From stage P3-3 it also sends the **written notes and alerts** (section 17): the morning note, a note
+`/skip`, `/move`, `/ill`, `/travel` and `/help`. `/ill` and `/travel` (optionally `/ill 3` for three days, today included, or
+`/ill 2026-11-25` for until that day) tell the coach agent you are ill or away, so that it rebuilds the days ahead (section 19). The bot
+also tells you, in one short message, when the coach changes the **methodology** of your plan (with the reason and the version) and
+when the coach has dealt with a missed or moved session (what changed and why, and plainly when a session was dropped). From stage P3-3 it also sends the **written notes and alerts** (section 17): the morning note, a note
 after each ride (with the opening question of a discussion topic in a block you can tap to copy), the weekly review, and the alerts for a
 metric outside your usual range and for a plan that is drifting. It answers **only your chat** and ignores everyone else without a word. The token and the chat id
 stay in `.env`: you type them into the file on the host and never into a chat.
@@ -547,6 +560,34 @@ unreachable: the log says which); `skipped` has its reason in `last_error` (the 
 
 **Repeated sessions** (spec §11.7) need nothing either: when you ride the same planned workout again (the same steps, whatever it is called) the
 service notices and the companion shows the attempts side by side; the agent reads them with `list_repeats`, `get_repeat` and `get_ride`.
+
+## 19. The coach notebook and replanning after a missed session
+
+Two things for the coach agent (spec §11.6, §12.2, §12.4, ADR 0035), both on from the start and with no key to set.
+
+**The coach notebook** is the agent's persistent memory about you, kept on the server: seven fixed sections (rider profile and
+constraints, what works, what does not, injuries and niggles, **methodology**, open questions, a dated decisions log). The agent reads it
+at the start of every session and records the reason for every plan change in the log. Every edit is a new numbered version and can be
+rolled back (a rollback is a new version; history is never rewritten). Changing the methodology needs a written reason and is told to you
+in Telegram, with the reason and the version; day-to-day adjustments inside it are not. The notebook has a size cap (`NOTEBOOK_MAX_CHARS`,
+default 12000 characters) and so does the log (`NOTEBOOK_LOG_MAX_CHARS`, 3000): past it the agent is asked to condense. You read it in the
+companion (read-only; `GET /v1/notebook`); to correct it, tell the agent or write in Telegram. To look at the versions yourself:
+
+```bash
+docker compose exec db psql -U overdrive -d overdrive -c "SELECT scope, section, version, kind, left(reason, 60) AS reason, author, created_at FROM notebook_versions ORDER BY created_at DESC LIMIT 20"
+```
+
+**Plan events** tell the agent the plan may need rebuilding: a planned day that ended with no ride (checked after local midnight plus
+`PLAN_EVENT_DAY_END_GRACE_MINUTES`), a session you moved or deleted in intervals.icu, the easier variant being ridden (a later stage),
+and illness or travel you declare (`/ill`, `/travel`, or `POST /v1/plan-events`). The server **only detects and queues**: the agent reads
+the open events (`list_plan_events`), rebuilds the days left with its normal planning tools and resolves each (`resolve_plan_event`); you
+get one short Telegram note of what changed and why, and it says plainly when a missed session was dropped. Nothing moves a workout by
+itself. A session ridden outdoors or recorded by the watch is not matched to the plan (as in the plan-drift alert): the tool's description
+tells the agent to check `list_activities` for that day before it takes a missed session for one that was not ridden. To see the queue:
+
+```bash
+docker compose exec db psql -U overdrive -d overdrive -c "SELECT id, kind, day, workout_id, status, dropped FROM plan_events ORDER BY id DESC LIMIT 20"
+```
 
 ## Troubleshooting
 

@@ -10,7 +10,7 @@ import {
 } from "../src/notebook/service.ts";
 import { createNotebookStore } from "../src/notebook/store.ts";
 import { openMigratedTestDb } from "./helpers/db.ts";
-import { type TestClock, testClock } from "./helpers/support.ts";
+import { collectingLogger, type TestClock, testClock } from "./helpers/support.ts";
 
 /**
  * The coach notebook's rules (spec §11.6, §12.4, ADR 0035) at the service, on a real database: versions that are only ever added,
@@ -21,6 +21,7 @@ import { type TestClock, testClock } from "./helpers/support.ts";
 let db: Db;
 let clock: TestClock;
 let events: NotebookChangedEvent[];
+let logging: ReturnType<typeof collectingLogger>;
 
 beforeAll(async () => {
   db = await openMigratedTestDb();
@@ -32,6 +33,7 @@ beforeEach(async () => {
   await db.exec("TRUNCATE notebook_versions");
   clock = testClock("2026-11-18T08:00:00Z");
   events = [];
+  logging = collectingLogger();
 });
 
 function make(
@@ -51,6 +53,7 @@ function make(
       ...(options.logMaxChars === undefined ? {} : { logMaxChars: options.logMaxChars }),
     },
     canAnnounce: options.canAnnounce ?? true,
+    log: logging.log,
   });
 }
 
@@ -553,6 +556,34 @@ describe("the methodology", () => {
     expect(
       methodologyChangedText({ version: 4, reason: null, kind: "edit", rolledBackTo: null }),
     ).toBe("Coach notebook: Methodology changed (version 4).\nWhy: no reason was recorded");
+  });
+});
+
+describe("what is logged", () => {
+  it("is what changed, by scope, section, version and kind, and never what it said or why", async () => {
+    const notebook = make();
+    await notebook.update("coach", {
+      section: "methodology",
+      text: "SECRET-TEXT",
+      reason: "SECRET-REASON",
+      author: AGENT,
+    });
+    await notebook.append("coach", { entry: "SECRET-ENTRY", author: AGENT });
+    await notebook.update("game-master", { section: "notes", text: "SECRET-GM", author: AGENT });
+    expect(logging.lines.map((l) => [l.level, l.message, l.fields])).toEqual([
+      [
+        "info",
+        "notebook changed",
+        { scope: "coach", section: "methodology", version: 1, kind: "edit" },
+      ],
+      ["info", "notebook changed", { scope: "coach", section: "log", version: 1, kind: "append" }],
+      [
+        "info",
+        "notebook changed",
+        { scope: "game-master", section: "notes", version: 1, kind: "edit" },
+      ],
+    ]);
+    expect(logging.text()).not.toMatch(/SECRET/);
   });
 });
 
