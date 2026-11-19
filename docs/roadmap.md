@@ -77,7 +77,7 @@ Pre-releases are `v0.1.0-alpha.N`; the MVP is `v0.1.0`. Later phases continue fr
 
 ## Phase 3 stages (spec §6)
 
-**Where we are: Phase 3 is released as `v0.3.1` (2026-11-19); the long checks run after the release; fixes go to `v0.3.2`.**
+**Where we are: Phase 3 is released as `v0.3.1` (2026-11-19); `v0.3.2` adds the launch animation; the long checks run after the releases; their fixes go to `v0.3.3`.**
 There was no `v0.3.0`: `v0.3.0-rc.1` was the candidate, and the owner asked for the final release to carry the graphics (ADR 0030) and
 to run the long checks after it, so the final version is `0.3.1`.
 
