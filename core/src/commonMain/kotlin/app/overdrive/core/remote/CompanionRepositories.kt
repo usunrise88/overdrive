@@ -157,11 +157,15 @@ public class RidesRepository(
 
     public fun settingsChanged(): Unit = newest.settingsChanged()
 
-    /** Refreshes the newest page; older pages already fetched are dropped when a new one arrives. */
+    /**
+     * Refreshes the newest page; older pages already fetched are dropped when a new one arrives. **Only the pages that hang from the
+     * page that was replaced:** the screen asks for the next page the moment it shows the new one, which can be before this call has
+     * returned, and that page, fetched after the new newest page, is not the replaced page's.
+     */
     public suspend fun refresh(why: Refresh) {
         val before = newest.state.value.fetchedAtMillis
         newest.refresh(why)
-        if (newest.state.value.fetchedAtMillis != before) more.value = More()
+        if (newest.state.value.fetchedAtMillis != before) more.update { if (it.after == before) More() else it }
     }
 
     /** The page [loadMore] has taken to fetch: the pages shown so far, and where the next one starts. */

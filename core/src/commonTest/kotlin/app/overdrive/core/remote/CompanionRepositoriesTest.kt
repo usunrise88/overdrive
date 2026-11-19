@@ -163,6 +163,43 @@ class CompanionRepositoriesTest {
         }
 
     @Test
+    fun `the next page asked for the moment the newest one is shown is kept by that refresh`() =
+        runTest {
+            val first = ridesPage("2026-11-18", count = 3, hasMore = true, limit = 3)
+            val second = ridesPage("2026-11-15", count = 3, hasMore = true, before = first.nextBefore, limit = 3)
+            val transport = ScriptedTransport(ok(json(first)), ok(json(second)))
+            val repository =
+                RidesRepository(
+                    scope(),
+                    ServiceClient({ config }, transport),
+                    { config },
+                    null,
+                    { wall },
+                    { elapsed },
+                    pageSize = 3,
+                )
+            // The screen asks for the next page as soon as it shows the newest one (it is near the end of a short list): in
+            // place, inside the very change that shows it, before the refresh that made it has returned.
+            var asked = false
+            scope().launch {
+                repository.view.collect { view ->
+                    if (view.list.hasMore && !asked) {
+                        asked = true
+                        launch { repository.loadMore() }
+                    }
+                }
+            }
+            repository.refresh(Refresh.START)
+            assertEquals(2, transport.gets.size)
+            assertEquals(6, repository.view.value.list.items.size, "the older page asked for meanwhile is there")
+            // And a refresh that brings a newer newest page still drops the older ones.
+            wall += 1000
+            transport.then(ok(json(first)))
+            repository.refresh(Refresh.REQUESTED)
+            assertEquals(3, repository.view.value.list.items.size)
+        }
+
+    @Test
     fun `a page fetch that is cancelled leaves the list as it was and the next ask goes out`() =
         runTest {
             val first = ridesPage("2026-11-18", count = 3, hasMore = true, limit = 3)
