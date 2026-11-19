@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive live coach: a snapshot of the ride",
+  "description": "The body of POST /v1/live/sessions/{id}/snapshots (spec §12.1, ADR 0038), sent by the ride app every 5 seconds while the session is on: a compact picture of the ride now. seq counts the snapshots of the session from 0 (a repeat or an older one is ignored). clock is the app's clock in milliseconds since the Unix epoch. elapsedSeconds is the ride's time so far in the ride record's sense (pauses included: the offset of the latest sample). paused: the ride is paused (nothing is judged while it is). muted: the rider has muted the coach for the rest of the ride (the service then says nothing). step is the step being ridden, flattened as in the ride record (repeats expanded, index from 0): its type, label, length and time left in seconds (pauses do not count) and the target it asks for now, targetWatts in watts (steady and ramp steps; the target without the stall guard's cut) or targetBpm in beats per minute (heart-rate steps); neither in a free step. stepCount is the number of steps of the flattened workout. power, heartRate and cadence are the means over the last 5 seconds in whole watts, beats per minute and rpm; a reading that was not measured is absent (or null). compliancePercent is the share of the judged seconds of this step so far (not paused, with a reading) that were within 5% of the target power, or inside the heart-rate band in a heart-rate step, 0 to 100; absent in a free step or before the first judged second. stallGuardActive: the ERG stall guard (spec §11.1) is holding the target down now. events are what happened in the last 10 minutes that the coach may care about, newest first, at most 8, each with how many seconds ago. Every number is a measurement of the rider's body or ride: the service never logs one and sends them only to the owner's language model endpoint.",
+  "type": "object",
+  "required": ["seq", "clock", "elapsedSeconds", "paused", "muted", "step", "stepCount"],
+  "additionalProperties": false,
+  "properties": {
+    "seq": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+    "clock": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "elapsedSeconds": { "type": "integer", "minimum": 0, "maximum": 259200 },
+    "paused": { "type": "boolean" },
+    "muted": { "type": "boolean" },
+    "step": {
+      "type": "object",
+      "required": ["index", "type", "durationSeconds", "timeLeftSeconds"],
+      "additionalProperties": false,
+      "properties": {
+        "index": { "type": "integer", "minimum": 0, "maximum": 9999 },
+        "type": { "enum": ["steady", "ramp", "free", "hr"] },
+        "label": { "type": "string", "maxLength": 100 },
+        "durationSeconds": { "type": "integer", "minimum": 1, "maximum": 259200 },
+        "timeLeftSeconds": { "type": "integer", "minimum": 0, "maximum": 259200 },
+        "targetWatts": { "type": ["integer", "null"], "minimum": 0, "maximum": 3000 },
+        "targetBpm": { "type": ["integer", "null"], "minimum": 20, "maximum": 260 }
+      }
+    },
+    "stepCount": { "type": "integer", "minimum": 1, "maximum": 10000 },
+    "power": { "type": ["integer", "null"], "minimum": 0, "maximum": 3000 },
+    "heartRate": { "type": ["integer", "null"], "minimum": 20, "maximum": 260 },
+    "cadence": { "type": ["integer", "null"], "minimum": 0, "maximum": 250 },
+    "compliancePercent": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
+    "stallGuardActive": { "type": "boolean" },
+    "events": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["type", "secondsAgo"],
+        "additionalProperties": false,
+        "properties": {
+          "type": { "enum": ["stall-guard", "strap-lost", "paused", "resumed"] },
+          "secondsAgo": { "type": "integer", "minimum": 0, "maximum": 600 }
+        }
+      }
+    }
+  }
+}

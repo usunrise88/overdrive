@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Overdrive workout, schema 1",
-  "description": "Native workout format (spec §8.1). Targets are fractions of FTP, durations are seconds. A heart-rate step (type hr, spec §11.2) is the exception: its target is a heart rate and its power limits are absolute watts. ZWO files and intervals.icu workouts are converted to this format on import.",
+  "description": "Native workout format (spec §8.1). Targets are fractions of FTP, durations are seconds. A heart-rate step (type hr, spec §11.2) is the exception: its target is a heart rate and its power limits are absolute watts. ZWO files and intervals.icu workouts are converted to this format on import. live_coach, coach_brief and the steps' must_say (spec §12.1, ADR 0038) are for the live coach on the service: the agent writes them, the service keeps them (intervals.icu and Google Calendar never see them) and serves them on GET /v1/workouts, and the tablet reads live_coach to decide whether to start a live session. They are optional and additive: a reader that knows nothing of the live coach must not meet them until the agent first writes one.",
   "type": "object",
   "required": ["schema", "id", "name", "steps"],
   "additionalProperties": false,
@@ -10,6 +10,17 @@
     "id": { "type": "string", "minLength": 1 },
     "name": { "type": "string", "minLength": 1 },
     "description": { "type": "string" },
+    "live_coach": {
+      "type": "boolean",
+      "description": "true: the live coach (spec §12.1) may speak short cues during this session. Absent or false: it is silent. The agent sets it for key or strict sessions."
+    },
+    "coach_brief": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000,
+      "pattern": "\\S",
+      "description": "What the session is for, what to watch in this rider and what tone to take: the agent's brief to the live coach's model. At most 1000 characters. Never shown to the rider on the tablet."
+    },
     "steps": {
       "type": "array",
       "minItems": 1,
@@ -52,6 +63,23 @@
       "exclusiveMinimum": 0,
       "description": "Target cadence in rpm. Shown only; never controls the trainer."
     },
+    "mustSay": {
+      "description": "A line the live coach speaks exactly as written, with no model involved (spec §12.1). at is \"start\" (as the step begins) or the second of the step to speak it at (at least 1, below the step's duration, checked beyond the schema). text is at most 80 characters, the length of any cue. Use sparingly.",
+      "type": "object",
+      "required": ["at", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "at": { "oneOf": [{ "const": "start" }, { "type": "integer", "minimum": 1 }] },
+        "text": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "\\S" }
+      }
+    },
+    "mustSayList": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/mustSay" },
+      "description": "At most 3 lines per step. Inside a repeat a step's lines are spoken at every pass."
+    },
     "steady": {
       "type": "object",
       "required": ["type", "duration", "target"],
@@ -61,6 +89,7 @@
         "duration": { "$ref": "#/$defs/duration" },
         "target": { "$ref": "#/$defs/ftpFraction" },
         "cadence": { "$ref": "#/$defs/cadence" },
+        "must_say": { "$ref": "#/$defs/mustSayList" },
         "label": { "$ref": "#/$defs/label" }
       }
     },
@@ -74,6 +103,7 @@
         "from": { "$ref": "#/$defs/ftpFraction" },
         "to": { "$ref": "#/$defs/ftpFraction" },
         "cadence": { "$ref": "#/$defs/cadence" },
+        "must_say": { "$ref": "#/$defs/mustSayList" },
         "label": { "$ref": "#/$defs/label" }
       }
     },
@@ -86,6 +116,7 @@
         "duration": { "$ref": "#/$defs/duration" },
         "cadence": { "$ref": "#/$defs/cadence" },
         "route_id": { "$ref": "#/$defs/routeId" },
+        "must_say": { "$ref": "#/$defs/mustSayList" },
         "label": { "$ref": "#/$defs/label" }
       }
     },
@@ -130,6 +161,7 @@
           "description": "The most power in watts the controller may command. Greater than power_min."
         },
         "cadence": { "$ref": "#/$defs/cadence" },
+        "must_say": { "$ref": "#/$defs/mustSayList" },
         "label": { "$ref": "#/$defs/label" }
       }
     },

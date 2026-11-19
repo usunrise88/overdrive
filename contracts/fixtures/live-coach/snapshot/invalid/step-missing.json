@@ -1,0 +1,14 @@
+{
+  "seq": 41,
+  "clock": 1795000205000,
+  "elapsedSeconds": 205,
+  "paused": false,
+  "muted": false,
+  "stepCount": 7,
+  "power": 251,
+  "heartRate": 158,
+  "cadence": 88,
+  "compliancePercent": 92,
+  "stallGuardActive": false,
+  "events": []
+}

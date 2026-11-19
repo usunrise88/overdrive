@@ -1,0 +1,22 @@
+{
+  "seq": 41,
+  "clock": 1795000205000,
+  "elapsedSeconds": 205,
+  "paused": false,
+  "muted": false,
+  "step": {
+    "index": 1,
+    "type": "steady",
+    "label": "Threshold",
+    "durationSeconds": 600,
+    "timeLeftSeconds": 395,
+    "targetWatts": 247
+  },
+  "stepCount": 7,
+  "power": 251,
+  "heartRate": 158,
+  "cadence": 88,
+  "compliancePercent": 92,
+  "stallGuardActive": "no",
+  "events": []
+}

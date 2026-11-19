@@ -1,0 +1,10 @@
+{
+  "sessionId": "ls-3f9a2c41d0b84e6a",
+  "coach": {
+    "on": true,
+    "reason": null
+  },
+  "serverTime": 1795000000456,
+  "snapshotEverySeconds": 5,
+  "message": "hello"
+}

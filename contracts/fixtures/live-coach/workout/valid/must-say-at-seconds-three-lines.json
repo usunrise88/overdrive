@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "icu-6004",
+  "name": "Over-unders",
+  "live_coach": true,
+  "coach_brief": "Over-unders: stay smooth through the change of pace.",
+  "steps": [
+    {
+      "type": "steady",
+      "duration": 900,
+      "target": 0.9,
+      "label": "Over",
+      "cadence": 90,
+      "must_say": [
+        {
+          "at": "start",
+          "text": "Settle in."
+        },
+        {
+          "at": 300,
+          "text": "Halfway to the change. Stay relaxed."
+        },
+        {
+          "at": 600,
+          "text": "Shoulders down."
+        }
+      ]
+    }
+  ]
+}

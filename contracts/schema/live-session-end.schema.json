@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive live coach: the end of a session",
+  "description": "The optional body of POST /v1/live/sessions/{id}/end (spec §12.1, ADR 0038): the app says the ride is over. reason is finished (the workout ran to its end), stopped (the rider ended the ride) or error (the app gave up); clock is the app's clock in milliseconds since the Unix epoch. Both are optional and the body may be left out altogether (no body, or {}). The service answers live-session-end-response.schema.json: 200 also when the session had already ended.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "reason": { "enum": ["finished", "stopped", "error"] },
+    "clock": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+  }
+}

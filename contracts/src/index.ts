@@ -1,8 +1,10 @@
 import { readFileSync } from "node:fs";
 import { Ajv2020 } from "ajv/dist/2020.js";
+import { type MustSay, mustSayConsistencyErrors } from "./live-coach.ts";
 
 // The sync API's request and response shapes (spec §8.3) live in their own files.
 export * from "./insights.ts";
+export * from "./live-coach.ts";
 export * from "./metrics.ts";
 export * from "./notebook.ts";
 export * from "./outdoor.ts";
@@ -22,6 +24,11 @@ interface StepBase {
   /** Target cadence in rpm. Display only. */
   cadence?: number;
   label?: string;
+  /**
+   * What the live coach says exactly as written (spec §12.1, ADR 0038), at most 3 lines. Kept only by the service and served to the
+   * tablet; never in the calendar. Not part of the workout's structure (it changes no hash).
+   */
+  must_say?: MustSay[];
 }
 
 export interface SteadyStep extends StepBase {
@@ -84,6 +91,10 @@ export interface Workout {
   id: string;
   name: string;
   description?: string;
+  /** true: the live coach may speak during this session (spec §12.1, ADR 0038). Absent: it is silent. Kept only by the service. */
+  live_coach?: boolean;
+  /** The agent's brief to the live coach: what the session is for, what to watch in this rider, what tone. At most 1000 characters. */
+  coach_brief?: string;
   steps: Step[];
 }
 
@@ -102,9 +113,12 @@ export const workoutJsonSchema: Readonly<Record<string, unknown>> = workoutSchem
 const ajv = new Ajv2020({ allErrors: true });
 const checkWorkout = ajv.compile<Workout>(workoutSchema);
 
-/** What the schema cannot say about a workout: a heart-rate step's `power_min` is below its `power_max`. */
+/**
+ * What the schema cannot say about a workout: a heart-rate step's `power_min` is below its `power_max`, and the `must_say` lines
+ * of the live coach are spoken inside their step, once each.
+ */
 export function workoutConsistencyErrors(workout: Workout): string[] {
-  const errors: string[] = [];
+  const errors: string[] = mustSayConsistencyErrors(workout);
   const check = (step: LeafStep, at: string): void => {
     if (step.type === "hr" && step.power_min >= step.power_max) {
       errors.push(`${at} power_min must be below power_max`);

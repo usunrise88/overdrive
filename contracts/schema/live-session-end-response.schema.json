@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive live coach: the answer to an end",
+  "description": "The answer to POST /v1/live/sessions/{id}/end (200, spec §12.1, ADR 0038): status is ended (this request ended it) or already-ended (it had ended before: the app's own end, a newer session, or the service's timeout, which is a session with no snapshot for 10 minutes); cues is how many cues the session made, which the service stored on the ride. A session the service has never heard of, or has long forgotten, is 404 not_found.",
+  "type": "object",
+  "required": ["sessionId", "status", "cues"],
+  "additionalProperties": false,
+  "properties": {
+    "sessionId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+    "status": { "enum": ["ended", "already-ended"] },
+    "cues": { "type": "integer", "minimum": 0, "maximum": 1000000 }
+  }
+}

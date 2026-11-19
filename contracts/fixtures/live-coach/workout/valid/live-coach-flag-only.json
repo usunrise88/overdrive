@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "id": "icu-6002",
+  "name": "Tempo",
+  "live_coach": true,
+  "steps": [
+    {
+      "type": "steady",
+      "duration": 1800,
+      "target": 0.8
+    }
+  ]
+}

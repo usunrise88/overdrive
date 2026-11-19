@@ -1,0 +1,17 @@
+retry: 3000
+
+: open
+
+id: 3
+event: cue
+data: {"id":3,"text":"Ten minutes at 247 watts. Smooth first two minutes.","trigger":"step-start","audio":{"format":"mp3","base64":"SUQzBAAAAAAAAA=="},"createdAt":"2026-11-19T07:42:10.250Z","expiresAt":"2026-11-19T07:42:18.250Z","ttlMs":8000}
+
+: hb
+
+id: 4
+event: cue
+data: {"id":4,"text":"Two minutes left. Hold it steady.","trigger":"two-minutes","audio":{"format":"mp3","base64":"SUQzBAAAAAAAAA=="},"createdAt":"2026-11-19T07:42:10.250Z","expiresAt":"2026-11-19T07:42:18.250Z","ttlMs":8000}
+
+event: end
+data: {"reason":"ended"}
+

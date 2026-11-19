@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "id": "icu-6100",
+  "name": "Bad",
+  "steps": [
+    {
+      "type": "steady",
+      "duration": 600,
+      "target": 0.9,
+      "live_coach": true
+    }
+  ]
+}

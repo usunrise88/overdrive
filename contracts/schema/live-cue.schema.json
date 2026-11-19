@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive live coach: a cue",
+  "description": "The data of a `cue` event on GET /v1/live/sessions/{id}/cues (Server-Sent Events, spec §12.1, ADR 0038): one spoken line, ready to play. id is the cue's number in the session from 1; it is also the event's SSE id, so the app resumes with Last-Event-ID, and it names the cue in POST /v1/live/sessions/{id}/cues/{cueId}/played. text is what is said, 1 to 80 characters, shown on the plate under the overlay. trigger says why it was made: step-start, two-minutes, power-drift, cadence-sag, heart-rate-climb, strong-finish (a model wrote the line) or must-say (the agent's own words); a reader must treat a name it does not know as a plain string. audio is the speech itself, inline: format (mp3 unless the owner chose another) and the bytes in base64 (a cue of 80 characters is about 60 KB, 80 KB as base64; at most 400000 bytes). It is inline, not a link, because it makes one request instead of two on a flaky connection, needs no second authentication, no cache and no clean-up on the service, and the audio is never kept. createdAt is when the cue was ready (UTC); expiresAt is when it stops being worth playing (UTC): a cue that arrives after it (a stream that came back) is not played. ttlMs is expiresAt minus createdAt in milliseconds, for an app that does not trust its clock: it plays a cue only within ttlMs of receiving it.",
+  "type": "object",
+  "required": ["id", "text", "trigger", "audio", "createdAt", "expiresAt", "ttlMs"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+    "text": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "\\S" },
+    "trigger": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+    "audio": {
+      "type": "object",
+      "required": ["format", "base64"],
+      "additionalProperties": false,
+      "properties": {
+        "format": { "enum": ["mp3", "opus", "aac", "flac", "wav"] },
+        "base64": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 533336,
+          "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+        }
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "expiresAt": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "ttlMs": { "type": "integer", "minimum": 1, "maximum": 600000 }
+  }
+}
