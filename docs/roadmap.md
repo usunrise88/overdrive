@@ -128,5 +128,21 @@ to Phase 3 join the Phase 3 stages above and ship in `v0.3.0`; those that belong
 | Agent replans after a missed session (§12.2) | 2 | `v0.4.0`, stage A2 (plan events, MCP tools, Telegram note) |
 | Live coach: spoken cues in real time (§12.1) | 2 | `v0.4.0`, stage A3 (streaming from the tablet, trigger rules, LLM, TTS) |
 
-Open questions before `v0.4.0` (the owner's, not yet asked): which road-routing engine (BRouter or GraphHopper, spec §11.4), which TTS
-service for the live coach, and whether the live coach is wanted before the macOS application.
+## Phase 4 (`v0.4.0`) stages
+
+Started 2026-11-19 on the owner's word. Decisions (owner, 2026-11-19): the road-routing engine is **BRouter**; the TTS service is the
+owner's own (`TTS_BASE_URL`, `TTS_MODEL`, `TTS_VOICE`, `TTS_API_KEY` are in the server's `.env`; an OpenAI-compatible
+`/v1/audio/speech` answering `audio/mpeg`, about 0.5 s to the first byte). Still the owner's: the region whose BRouter tiles are downloaded,
+and whether the live coach comes before the macOS application (in this plan it is the last stage). The order inside a stage is the order in
+the table; stages merge without a release, the phase ends with `v0.4.0-rc.1` and then `v0.4.0`.
+
+| Stage | Goal | Task | State |
+|---|---|---|---|
+| **A1a Resume after a pause** (spec §4.2, §4.5) | After a pause the resistance and the cadence come back at once (the owner's report, 2026-11-19: 10 to 15 s of pedalling against nothing) | OVD-24 | |
+| **A1b Stall guard and heart-rate hold** (§11.1, §11.2) | The core: the guard, the `hr` step in the contract, the player and the controller, MCP and the repeats hash | OVD-19 | |
+| **A1c The overlay and the settings** (§11.3, §11.7, §12.5) | Expands around step changes, shows the guard and the heart-rate step, the previous-attempt line, system mass with the body weight | OVD-19 | |
+| **A2a Notebook and replanning** (§11.6, §12.2, §12.4) | The coach notebook (versions, rollback, Methodology), plan events and their tools, the Telegram note, the companion's read-only view | OVD-20 | |
+| **A2b Routes and the easier variant** (§11.4, §11.5) | BRouter beside the service, `create_route`, grade in the trainer's simulation, positions in the FIT; the variant of a workout and its choice at the start | OVD-20 | |
+| **A3 Live coach** (§12.1) | Snapshots from the tablet, trigger rules, the LLM line, the owner's TTS, audio and text on the tablet, the cue log | OVD-21 | |
+| **Release candidate `v0.4.0-rc.1`**, then **`v0.4.0`** | Long checks while the owner rides it | | |
+
