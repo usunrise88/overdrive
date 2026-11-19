@@ -1,6 +1,7 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import {
   type RecoveryResponse,
+  validateProfile,
   validateRecoveryResponse,
   validateWellnessResponse,
   type WellnessResponse,
@@ -356,11 +357,78 @@ describe("body weight (spec §12.5)", () => {
     expect(day?.weightKg).toBe(79.2);
   });
 
-  it("changes nothing else: the profile, with its physics, is as it was", async () => {
-    const before = await profileOf();
+  it("changes nothing stored: the profile's physics is as it was, and only the derived rider weight appears", async () => {
+    const before = (await profileOf()) as Record<string, unknown>;
     await post(h.app, batch(weight("w", "2026-11-17T06:40:00Z", 91.5)));
-    expect(await profileOf()).toEqual(before);
+    const after = (await profileOf()) as Record<string, unknown>;
+    const { riderWeight, ...rest } = after;
+    expect(rest).toEqual(before);
     expect((before as { physics: { systemMassKg: number } }).physics.systemMassKg).toBe(80);
+    expect(riderWeight).toEqual({ kg: 91.5, date: "2026-11-17", days: 1 });
+  });
+
+  it("puts the 7-day average on the profile, with the day of the newest weighing and the days that had one (docs/adr/0034)", async () => {
+    await post(
+      h.app,
+      batch(
+        weight("w-12", "2026-11-12T06:40:00Z", 78),
+        weight("w-14a", "2026-11-14T06:40:00Z", 78.4),
+        weight("w-14b", "2026-11-14T19:40:00Z", 78.8),
+        weight("w-17", "2026-11-17T06:40:00Z", 77),
+      ),
+    );
+    const shown = (await profileOf()) as { riderWeight: unknown };
+    // The same average as get_wellness gives for the 18th: three days of the seven have a weighing.
+    expect(shown.riderWeight).toEqual({ kg: 77.9, date: "2026-11-17", days: 3 });
+    expect(validateProfile(shown)).toMatchObject({ ok: true });
+  });
+
+  it("has no rider weight, not even a null key, while no weighing is within the last seven days", async () => {
+    await post(h.app, batch(weight("old", "2026-11-10T06:40:00Z", 78)));
+    expect(await profileOf()).not.toHaveProperty("riderWeight");
+    await post(h.app, batch(weight("edge", "2026-11-12T06:40:00Z", 78)));
+    expect(await profileOf()).toMatchObject({ riderWeight: { date: "2026-11-12", days: 1 } });
+  });
+
+  it("keeps the bike weight with the profile, clears it with null, and refuses the rider's weight as input", async () => {
+    await db.exec("TRUNCATE profile");
+    const patch = (body: unknown) =>
+      h.app.inject({
+        method: "PATCH",
+        url: "/v1/profile",
+        headers: { "content-type": "application/json", ...bearer() },
+        payload: JSON.stringify(body),
+      });
+    expect(await profileOf()).not.toHaveProperty("bikeWeightKg");
+    const set = await patch({ bikeWeightKg: 9.5 });
+    expect(set.statusCode, set.body).toBe(200);
+    expect(set.json()).toMatchObject({ bikeWeightKg: 9.5 });
+    expect(await profileOf()).toMatchObject({ bikeWeightKg: 9.5 });
+    expect((await patch({ bikeWeightKg: 0 })).statusCode).toBe(422);
+    expect((await patch({ bikeWeightKg: 101 })).statusCode).toBe(422);
+    expect((await patch({ riderWeight: { kg: 70, date: "2026-11-18", days: 7 } })).statusCode).toBe(
+      422,
+    );
+    expect(await profileOf()).toMatchObject({ bikeWeightKg: 9.5 });
+    const cleared = await patch({ bikeWeightKg: null });
+    expect(cleared.json()).toMatchObject({ bikeWeightKg: null });
+    await db.exec("TRUNCATE profile");
+  });
+
+  it("is told to the agent: get_profile shows both weights when they exist and update_profile sets the bike's", async () => {
+    await db.exec("TRUNCATE profile");
+    expect((await mcp("get_profile")).json).not.toHaveProperty("riderWeight");
+    await post(h.app, batch(weight("w", "2026-11-17T06:40:00Z", 78.4)));
+    const set = await mcp("update_profile", { bikeWeightKg: 9 });
+    expect(set.isError).toBe(false);
+    expect(set.json).toMatchObject({
+      changed: ["bikeWeightKg"],
+      bikeWeightKg: 9,
+      riderWeight: { kg: 78.4, date: "2026-11-17", days: 1 },
+    });
+    const bad = await mcp("update_profile", { bikeWeightKg: 150 });
+    expect(bad.isError).toBe(true);
+    await db.exec("TRUNCATE profile");
   });
 
   it("is told to the agent: get_wellness has the weight and its trend", async () => {

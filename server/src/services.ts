@@ -23,7 +23,7 @@ import { createPlanRefresher, type PlanRefresher } from "./plan/refresher.ts";
 import { createPlanStore, type PlanStore } from "./plan/store.ts";
 import { createPlanEvents, type PlanEventsService } from "./plan-events/service.ts";
 import { createPlanEventStore } from "./plan-events/store.ts";
-import { createProfileStore, type ProfileStore } from "./profile/store.ts";
+import { createProfileStore, type ProfileStore, type RiderWeightSource } from "./profile/store.ts";
 import { createRepeats, type RepeatsService } from "./repeats/service.ts";
 import { createRideStore, type RideStore } from "./ride-store.ts";
 import { createRideWorkoutResolver, type RideWorkoutResolver } from "./ride-workout.ts";
@@ -177,8 +177,15 @@ export function createServices(options: ServicesOptions): Services {
   });
   // The profile carries heart-rate estimates from the stored rides (ADR 0023).
   const heartRates = createRideHeartRateIndex(db, rides, log);
-  const profile = createProfileStore(db, bus, now ?? (() => new Date()), () =>
-    heartRates.estimates(),
+  // …and the rider's 7-day average weight from Health Connect (spec §12.5), which the wellness module below answers: it is created
+  // after the profile (it reads the profile), so the profile reaches it through this late-bound function.
+  let riderWeightOf: RiderWeightSource = async () => null;
+  const profile = createProfileStore(
+    db,
+    bus,
+    now ?? (() => new Date()),
+    () => heartRates.estimates(),
+    () => riderWeightOf(),
   );
 
   let intervals: IntervalsClient | null = null;
@@ -271,6 +278,7 @@ export function createServices(options: ServicesOptions): Services {
         : { nightsNeeded: config.WELLNESS_NIGHTS_NEEDED }),
     },
   });
+  riderWeightOf = () => wellness.riderWeight();
   const outdoor = createOutdoor({ db, bus, wellness, timezone, log });
   const insights = createInsights({
     config,
