@@ -15,8 +15,8 @@ public sealed interface PlayerTarget {
     /**
      * ERG: hold [watts].
      *
-     * @property watts what to command: the step's target at this second, times the intensity setting, times the
-     * ramp-in factor after a pause.
+     * @property watts what to command: the step's target at this second, times the intensity setting, and after a pause
+     * the ramp-in from where the hold target was (see [WorkoutPlayer.beginRampIn]).
      * @property nominalWatts the same without the ramp-in: where the target is heading, and what the ride record and
      * the overlay show as "target".
      */
@@ -46,9 +46,11 @@ public sealed interface PlayerTarget {
  *   [previousInterval] restarts the current step when more than
  *   [RideSession.PREVIOUS_INTERVAL_RESTART_AFTER_SECONDS] seconds into it, otherwise goes to the start of
  *   the previous step (in the first step it restarts that step).
- * - **Ramp-in.** After a pause the ERG target climbs linearly from 0 to its full value over
- *   [rampInSeconds] seconds of workout time (spec §4.5). Call [beginRampIn] when the ride resumes. It is
- *   not applied when the workout starts, and not in free-ride steps.
+ * - **Ramp-in.** After a pause the ERG target climbs linearly from the hold target of the pause (0 W unless the caller
+ *   says otherwise) to its full value over [rampInSeconds] seconds of workout time, in whole-second steps (spec §4.5,
+ *   docs/adr/0032). Call [beginRampIn] when the ride resumes; it is not applied when the workout starts, and not in
+ *   free-ride steps. A caller that knows the rider is pedalling already can bring the first step forward with
+ *   [stepRampIn] instead of waiting for the next second.
  * - **End.** Once the last second has been advanced, [isComplete] is true and the player stays on the last step.
  */
 public class WorkoutPlayer(
@@ -77,7 +79,9 @@ public class WorkoutPlayer(
     public var intensityPercent: Int = RideSnapshot.DEFAULT_INTENSITY_PERCENT
         private set
 
-    private var rampElapsedSeconds = rampInSeconds
+    // Steps of the ramp-in taken so far; rampInSeconds means there is no ramp in progress.
+    private var rampSteps = rampInSeconds
+    private var rampFromWatts = 0
 
     /** The current step. */
     public val step: FlatStep get() = steps[stepIndex]
@@ -99,10 +103,7 @@ public class WorkoutPlayer(
         get() {
             val fraction = step.targetFractionAt(stepElapsedSeconds) ?: return PlayerTarget.Free
             val nominal = fraction * ftp * intensityPercent / PERCENT
-            return PlayerTarget.Erg(
-                watts = roundWatts(nominal * rampInFactor()),
-                nominalWatts = roundWatts(nominal),
-            )
+            return PlayerTarget.Erg(watts = rampedWatts(nominal), nominalWatts = roundWatts(nominal))
         }
 
     /** Moves the workout on by [seconds] seconds of ride time. Does nothing once [isComplete]. */
@@ -111,7 +112,7 @@ public class WorkoutPlayer(
         repeat(seconds) {
             if (isComplete) return
             positionSeconds++
-            if (rampElapsedSeconds < rampInSeconds) rampElapsedSeconds++
+            stepRampIn()
             while (stepIndex < steps.lastIndex && positionSeconds >= steps[stepIndex].endSeconds) stepIndex++
         }
     }
@@ -135,9 +136,24 @@ public class WorkoutPlayer(
     /** Intensity down by 5 points, in an ERG step. Returns whether it changed. */
     public fun intensityDown(): Boolean = changeIntensity(-RideSnapshot.INTENSITY_STEP_PERCENT)
 
-    /** Starts the ramp-in of the ERG target: call when the ride resumes after a pause. */
-    public fun beginRampIn() {
-        rampElapsedSeconds = 0
+    /**
+     * Starts the ramp-in of the ERG target: call when the ride resumes after a pause. The ramp starts at [fromWatts], the
+     * target the trainer was holding during the pause (never above the target it is heading for), so the target right
+     * after this call is [fromWatts]; it then moves one of [rampInSeconds] equal steps with each second that [advance]
+     * counts and is full after [rampInSeconds] of them. With a ramp-in of 0 seconds the target is full at once.
+     */
+    public fun beginRampIn(fromWatts: Int = 0) {
+        require(fromWatts >= 0) { "The ramp-in cannot start below 0 W, got $fromWatts" }
+        rampFromWatts = fromWatts
+        rampSteps = 0
+    }
+
+    /**
+     * Takes the next step of a ramp-in that is in progress right now instead of with the next second, so that the ramp
+     * is a second shorter and its first step is not a wait. Does nothing when no ramp-in is in progress.
+     */
+    public fun stepRampIn() {
+        if (rampSteps < rampInSeconds) rampSteps++
     }
 
     /** The progress as the overlay shows it. */
@@ -173,7 +189,12 @@ public class WorkoutPlayer(
      */
     private fun roundWatts(watts: Double): Int = (watts + ROUNDING_ALLOWANCE_WATTS).roundToInt()
 
-    private fun rampInFactor(): Double = if (rampInSeconds == 0) 1.0 else rampElapsedSeconds.toDouble() / rampInSeconds
+    /** The commanded watts: [nominal] itself, or the step of the ramp-in it is in. */
+    private fun rampedWatts(nominal: Double): Int {
+        if (rampInSeconds == 0 || rampSteps >= rampInSeconds) return roundWatts(nominal)
+        val from = minOf(rampFromWatts.toDouble(), nominal)
+        return roundWatts(from + (nominal - from) * rampSteps / rampInSeconds)
+    }
 
     public companion object {
         /** Spec §4.5: after a pause the target ramps back in over 3 s. */

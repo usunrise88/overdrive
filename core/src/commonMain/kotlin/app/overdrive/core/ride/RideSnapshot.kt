@@ -55,10 +55,21 @@ public data class RideSnapshot(
      * [RideState.PAUSED]; a session that is paused for no reason it can name leaves it null too.
      */
     val pauseReason: PauseReason? = null,
+    /**
+     * Whole ride seconds (ticks of the 1 Hz clock) since the ride last resumed from a pause of any kind, for a guard that
+     * must not judge the rider for a few seconds after a restart (docs/adr/0032): `secondsSinceResume < 5` means "just
+     * resumed". 0 from the moment of the resume until the next tick. Null while paused, before the start, after the end,
+     * and until the first resume: the start of a ride is not a resume. A resume part-way through a second makes the first
+     * tick come early, so a guard of *n* seconds covers between *n* - 1 and *n* real seconds.
+     */
+    val secondsSinceResume: Int? = null,
 ) {
     init {
         require(ftp > 0) { "FTP must be positive, got $ftp" }
         require(elapsedSeconds >= 0) { "Elapsed time must not be negative, got $elapsedSeconds" }
+        require(secondsSinceResume == null || secondsSinceResume >= 0) {
+            "Seconds since the resume must not be negative, got $secondsSinceResume"
+        }
         require(gearCount >= 1) { "Gear count must be at least 1, got $gearCount" }
         require(neutralGear in 1..gearCount) { "Neutral gear $neutralGear is outside 1..$gearCount" }
         require(gear == null || gear in 1..gearCount) { "Gear $gear is outside 1..$gearCount" }

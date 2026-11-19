@@ -160,6 +160,22 @@ Phase 1 delivers a complete offline ride: connect the devices, ride free or play
 - A 1 Hz loop reads the latest sensor values, advances the ride state and writes one record.
 - States: idle, ready, riding, paused, finished.
 - **Auto-pause.** The ride pauses after 3 s of zero cadence and resumes when pedalling starts. Manual pause overrides it.
+  *Settled in stage A1a of v0.4.0 (ADR 0032, OVD-24).* **The owner reported 10 to 15 s of pedalling against almost no
+  resistance after a pause, with the cadence "not picked up". The cause is a hypothesis until a Bluetooth log of a pause
+  and a resume from the bike (Settings, Developer, Share Bluetooth logs) confirms it:** a trainer with no crank sensor may
+  show cadence 0 while the rider pedals against the 0 W of a pause, and the engine, which lifted the pause only when a
+  once-a-second tick saw cadence above 0 while it held the trainer at 0 W, then waited for the rider to spin the flywheel
+  hard enough. What was built to be right under every reading of it:
+  the pause **ends on the trainer notification that shows pedalling**, not at the next tick (the 1 Hz clock, the records
+  and the pause itself are still counted at the tick; a second is paused or riding by the state at its tick, so the second
+  in which pedalling is first seen is a riding second); **"pedalling" is a cadence above 0, or power of at least 10 W, or
+  the trainer's own flywheel speed rising by 0.5 km/h between two readings**, where power does not count while the
+  flywheel is plainly winding down (an ERG trainer keeps reporting its target while a flywheel turns on without the rider)
+  and the speed, which the ride otherwise ignores (§4.3), is read for this one purpose; zero cadence still counts toward
+  the auto-pause as before, and a missing cadence is not zero. A manual pause is lifted only by Resume. The snapshot
+  carries `secondsSinceResume` (null while paused, before the first resume) for later checks that must not judge the rider
+  right after a restart. The three numbers are `RideSettings` (`autoResumePowerWatts`, `autoResumeFlywheelStepKmh`, each
+  0 = off); they are engine defaults, not in Settings, like the other engine settings.
 - **Trainer link.** A trainer that disconnects pauses the ride at once and its reconnect resumes it, with nothing lost:
   the seconds in between are still recorded, as paused samples with no power or cadence. The snapshot says why a ride
   is paused (trainer, manual or auto). A heart-rate dropout never pauses or stops anything; it is a gap.
@@ -177,7 +193,7 @@ Phase 1 delivers a complete offline ride: connect the devices, ride free or play
 
 - The trainer runs in simulation mode at 0% grade.
 - Virtual speed and distance come from a physics model: power equals rolling resistance plus aerodynamic drag at the given speed. System mass, CdA and Crr are settings.
-- The trainer's own speed value is ignored. It reflects flywheel speed, which a single cog ties to cadence.
+- The trainer's own speed value is ignored for the ride's speed and distance. It reflects flywheel speed, which a single cog ties to cadence. (One use: after an auto-pause a flywheel that speeds up, and one that only winds down, are told apart by it, §4.2.)
 
 ### 4.4 Virtual gears
 
@@ -195,8 +211,14 @@ Phase 1 delivers a complete offline ride: connect the devices, ride free or play
   source of truth for FTP and the physics when there is one, and the tablet's own setting applies when there is not (§8.3, ADR 0021).*
 - Structured steps run in ERG mode. Free-ride steps run in simulation mode with gears.
 - Controls: pause, next interval, previous interval, intensity up and down in 5% steps between 50% and 150%.
-- After a pause, target power ramps back in over 3 s. While paused the trainer holds 0 W in ERG steps, so the ramp
-  starts from there.
+- After a pause, target power ramps back in over 3 s, in whole-second steps, **from the target the trainer was holding
+  during the pause**. Changed in stage A1a (ADR 0032): a **manual** pause (and the state before the start) holds 0 W in
+  ERG steps, as before, so a rider who is not pedalling can spin up freely; an **auto**-pause holds a **small target**,
+  `autoPauseTargetWatts` (default 25 W, never more than the step asks for, 0 = the old behaviour), because a trainer with
+  no crank sensor that is held at 0 W may not register the first strokes, the cadence then reads 0, and the pause does not
+  end (§4.2). After a resume by pedalling the first step of the ramp is taken at once, so the trainer is told a higher
+  target in the same instant as the notification that showed the rider; after Resume or a trainer reconnect the first
+  rising step comes one second later, as before. Free-ride steps have no target and are not affected.
 
 ### 4.6 Overlay
 

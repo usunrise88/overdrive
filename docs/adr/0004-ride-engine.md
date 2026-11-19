@@ -1,6 +1,8 @@
 # ADR 0004: The ride engine and its device layer
 
-Status: accepted (stage M2a, 2026-11-18)
+Status: accepted (stage M2a, 2026-11-18). **Amended by ADR 0032 (resume after a pause, 2026-11-19):** the auto-pause now ends on the
+trainer notification that shows pedalling, not at the next tick, and "pedalling" is more than the cadence field; an auto-pause holds a
+small target (`autoPauseTargetWatts`, 25 W) instead of 0 W, and the ramp-in starts from the hold. The sections below say where.
 
 ## Context
 
@@ -32,13 +34,15 @@ persistence, crash recovery and the FIT writer on top of the `RideRecorder` seam
   instant send only the second. A failing command is retried after a second, starting over with
   `requestControl()`. Nothing is sent to a trainer that is not connected.
 - **Settings.** `RideSettings` bundles FTP, `PhysicsSettings`, `GearSettings`, auto-pause, ramp-in length, the paused
-  target, the 1500 W cap and the two reading timeouts.
+  target, the 1500 W cap and the two reading timeouts. *(ADR 0032 added the auto-pause target and the two resume
+  settings.)*
 
 ### Devices (spec §4.1)
 
 - `TrainerDevice` and `HeartRateDevice` have a `name`, a `connection` state flow and a hot `data` flow of already
   decoded notifications (`TrainerReading`: power, cadence, the trainer's own speed which is carried but never
-  used; `HeartRateReading`: bpm and RR intervals in ms). The trainer's commands are the three FTMS control point
+  used for the ride's speed *(ADR 0032 uses it for one thing: to tell a rider who pedals again from a flywheel that only
+  coasts)*; `HeartRateReading`: bpm and RR intervals in ms). The trainer's commands are the three FTMS control point
   operations the spec lists, as suspend functions. `SimulationParameters` is the FTMS payload without wind speed
   (always 0) and is validated against FTMS's encodable ranges, so a value that passes the model is a value the
   adapter can write.
@@ -65,7 +69,11 @@ persistence, crash recovery and the FIT writer on top of the `RideRecorder` seam
   `RideSnapshot.pauseReason` (new, additive) reports the first that does, in the order trainer, manual, auto, so the
   rider is told what to fix.
   - *Auto-pause*: three consecutive seconds of cadence exactly 0 (a missing cadence is not zero), while riding. The
-    three seconds still count as riding time. Pedalling (cadence above 0) lifts it. `autoPause = false` turns it off.
+    three seconds still count as riding time. `autoPause = false` turns it off. ~~Pedalling (cadence above 0) lifts it,
+    seen at the next tick.~~ **Amended (ADR 0032):** pedalling lifts it **on the trainer notification that shows it**
+    (not at the next tick), and pedalling is a cadence above 0, *or* power of at least `autoResumePowerWatts` while the
+    flywheel is not winding down, *or* the flywheel's own speed rising by `autoResumeFlywheelStepKmh` between two
+    readings. The three seconds are still counted at the tick.
   - *Manual pause* overrides it: pedalling does not lift a manual pause and stopping does not turn it into an auto
     pause; only `resume()` lifts it. `resume()` lifts a manual or auto pause and cannot bring the ride back while the
     trainer is gone. `pause()` only acts while `RIDING` (ADR 0003's table); on an auto-paused ride it does nothing and
@@ -75,7 +83,8 @@ persistence, crash recovery and the FIT writer on top of the `RideRecorder` seam
     and cadence, and the workout position stands still.
 - **Clocks.** The ride has one `RideSample` for every second from its start, paused or not, so `samples.size` is
   the duration. `RideSnapshot.elapsedSeconds` and the workout position count only the seconds that were not paused.
-  A second is paused or riding according to the state at the moment of its tick.
+  A second is paused or riding according to the state at the moment of its tick. *(With ADR 0032 the state can change
+  between ticks, so the second in which pedalling is first seen is a riding second; before, it was the last paused one.)*
 - **A sample describes the second that just ended**: offsets run 1, 2, 3, …; the readings are those at the end of
   the second; the target, gear and step are the plan in force *during* it. So a workout step of *n* seconds has exactly
   *n* samples and the laps tile the ride exactly. The sample at the instant a step changes still belongs to the old step.
@@ -87,7 +96,11 @@ persistence, crash recovery and the FIT writer on top of the `RideRecorder` seam
   on resume the target ramps in linearly over 3 s from there, in whole-second steps (a third, two thirds, full). The ramp
   is not applied at the start of the ride, which the spec does not ask for, nor in free steps. After the ride the trainer
   is put into simulation on the flat, so it is not left holding an ERG target. `pausedTargetWatts` is a setting; whether
-  0 W is accepted by the D500 is a bench question.
+  0 W is accepted by the D500 is a bench question. **Amended (ADR 0032):** 0 W is now the hold of a *manual* pause, of
+  `READY` and of a pause by the trainer's link only. An *auto*-pause holds `autoPauseTargetWatts` (25 W, never more
+  than the step asks for), because 0 W is suspected of hiding the first pedal strokes from a trainer with no crank
+  sensor. The ramp-in starts from whichever hold was in force, and after a resume by pedalling its first step is
+  taken at once.
 - **Speed and distance** come from the physics model at the second's power: no power, no movement; paused, no
   movement. A ride finishing by itself needs a workout; a free ride ends with `finish()`.
 
@@ -159,7 +172,8 @@ persistence, crash recovery and the FIT writer on top of the `RideRecorder` seam
 - `RideSnapshot` has a new field, `pauseReason`, at the end with a default: existing code and previews compile unchanged.
 - Auto-pause relies on the trainer reporting cadence 0 when the rider stops; the D500's behaviour (and whether it reports
   0 or holds the last value) is for the bench. So are the 0 W paused target, the reading timeouts and the 3 s ramp's
-  feel (it has whole-second steps).
+  feel (it has whole-second steps). *Riding the bike showed the other side of it (owner's report, 2026-11-19, OVD-24):
+  after a pause the cadence was not picked up for 10 to 15 s. ADR 0032 is the answer, and still a hypothesis.*
 - The engine's speed has no inertia; a coasting rider stops instantly. A kinetic-energy model would be a change inside
   `SpeedModel`'s implementation.
 - Two commands sent in the same instant (a hold of the gear button repeating faster than the loop) send only the last

@@ -45,9 +45,12 @@ import kotlin.time.Duration.Companion.seconds
  * **States** (spec §4.2, details in [RideSession]).
  * - `IDLE` until the trainer connects, then `READY`; `start` begins the ride. A strap is optional.
  * - `PAUSED` has three independent reasons ([PauseReason]); the ride runs only when none holds.
- *   **Auto-pause:** after [RideSettings.autoPauseAfterSeconds] consecutive seconds of zero cadence; pedalling
- *   again lifts it. **Manual pause** overrides it: pedalling does not resume a manually paused ride, only `resume`
- *   does. **Trainer disconnect** pauses the ride at once and its reconnect resumes it, with nothing lost
+ *   **Auto-pause:** after [RideSettings.autoPauseAfterSeconds] consecutive seconds of zero cadence (counted at the 1 Hz
+ *   tick). **Pedalling lifts it at once, on the trainer notification that shows it, not at the next tick**
+ *   (docs/adr/0032): cadence above 0, or power of at least [RideSettings.autoResumePowerWatts] unless the trainer's
+ *   flywheel is winding down, or the flywheel speeding up by [RideSettings.autoResumeFlywheelStepKmh]. The cadence field
+ *   alone is not trusted, because a trainer without a crank sensor may show 0 while the rider is already pedalling.
+ *   **Manual pause** overrides it: pedalling does not resume a manually paused ride, only `resume` does. **Trainer disconnect** pauses the ride at once and its reconnect resumes it, with nothing lost
  *   (acceptance criterion 4): the seconds in between are recorded as paused samples with no power or cadence.
  * - A **heart-rate dropout** never pauses or stops anything: the strap's link drop, a 0 bpm reading or silence for
  *   [RideSettings.heartRateTimeoutSeconds] seconds make the heart rate null for that second (a gap, spec §4.1).
@@ -59,8 +62,12 @@ import kotlin.time.Duration.Companion.seconds
  *
  * **What the trainer is told.**
  * - ERG step: the step's target at the current second times the intensity, rounded, limited to
- *   [RideSettings.maxTargetWatts]. After a pause it ramps in over [RideSettings.rampInSeconds] seconds (spec §4.5).
- * - While paused or before the start: [RideSettings.pausedTargetWatts] in ERG steps, so the rider can spin up.
+ *   [RideSettings.maxTargetWatts]. After a pause it ramps in from the hold target of the pause in
+ *   [RideSettings.rampInSeconds] seconds, and when the rider resumes by pedalling, the first step of the ramp is not
+ *   delayed to the next tick (spec §4.5, docs/adr/0032).
+ * - While paused or before the start: [RideSettings.pausedTargetWatts] in ERG steps, so the rider can spin up; during an
+ *   auto-pause [RideSettings.autoPauseTargetWatts] instead (not above the step's target), so that the trainer has a little
+ *   resistance with which to register the first stroke.
  * - Free-ride step, or a ride without a workout: simulation parameters from the gear (spec §4.4) and the physics
  *   settings (spec §4.3), at 0% route grade.
  * - After the ride: simulation at the neutral gear, i.e. flat, so the trainer is not left holding an ERG target.
@@ -150,6 +157,11 @@ public class RideEngine(
     private var manualPause = false
     private var autoPaused = false
     private var zeroCadenceSeconds = 0
+    private val flywheel = FlywheelWatch(settings.autoResumeFlywheelStepKmh)
+
+    // The ERG target the trainer was last told while the ride was not running: where a ramp-in after a pause starts.
+    private var pauseHoldWatts = settings.pausedTargetWatts
+    private var secondsSinceResume: Int? = null
 
     private var gear = gears.neutralGear
     private var rideSeconds = 0
@@ -290,7 +302,7 @@ public class RideEngine(
             Input.Tick -> if (isLive()) tick()
             is Input.TrainerLink -> onTrainerLink(input.state == ConnectionState.CONNECTED)
             is Input.HeartRateLink -> onHeartRateLink(input.state == ConnectionState.CONNECTED)
-            is Input.TrainerData -> if (trainerConnected) trainerReading.offer(input.reading)
+            is Input.TrainerData -> if (trainerConnected) onTrainerData(input.reading)
             is Input.HeartRateData -> onHeartRateData(input.reading)
         }
         if (!finished) updateOrder()
@@ -339,6 +351,7 @@ public class RideEngine(
         if (connected == trainerConnected) return
         trainerConnected = connected
         trainerReading.clear()
+        flywheel.reset()
         zeroCadenceSeconds = 0
         if (!connected && isLive()) {
             power = null
@@ -346,6 +359,39 @@ public class RideEngine(
             speedKmh = 0.0
         }
         refreshState()
+    }
+
+    /**
+     * A trainer notification: it is the latest reading for the next tick, and, while the ride is auto-paused, it ends the
+     * pause if it shows the rider pedalling. That is decided here, on arrival, not at the next tick: the ramp-in begins
+     * and the trainer is told its new target within this one input (docs/adr/0032).
+     */
+    private fun onTrainerData(reading: TrainerReading) {
+        trainerReading.offer(reading)
+        flywheel.offer(reading.speedKmh)
+        if (autoPaused && showsPedalling(reading)) {
+            autoPaused = false
+            refreshState()
+            // The rider is turning the pedals right now: the first step of the ramp-in does not wait for the next second.
+            if (state == RideState.RIDING) player?.stepRampIn()
+        }
+    }
+
+    /**
+     * Whether a reading shows the rider pedalling: a cadence above 0, a flywheel that speeds up, or power in a flywheel
+     * that does not merely wind down. A missing field shows nothing.
+     */
+    private fun showsPedalling(reading: TrainerReading): Boolean {
+        val cadenceNow = reading.cadence
+        val powerNow = reading.power
+        return (cadenceNow != null && cadenceNow > 0) ||
+            flywheel.accelerated ||
+            (
+                settings.autoResumePowerWatts > 0 &&
+                    powerNow != null &&
+                    powerNow >= settings.autoResumePowerWatts &&
+                    !flywheel.coasting
+            )
     }
 
     private fun onHeartRateLink(connected: Boolean) {
@@ -371,7 +417,12 @@ public class RideEngine(
                 else -> RideState.RIDING
             }
         if (state != RideState.RIDING) zeroCadenceSeconds = 0
-        if (before == RideState.PAUSED && state == RideState.RIDING) player?.beginRampIn()
+        if (before == RideState.PAUSED && state == RideState.RIDING) {
+            player?.beginRampIn(pauseHoldWatts)
+            secondsSinceResume = 0
+        } else if (state != RideState.RIDING) {
+            secondsSinceResume = null
+        }
     }
 
     /** One second of the ride has passed (spec §4.2). */
@@ -415,6 +466,7 @@ public class RideEngine(
 
         if (wasRiding) {
             movingSeconds++
+            secondsSinceResume = secondsSinceResume?.plus(1)
             player?.let {
                 it.advance()
                 if (it.isComplete) {
@@ -427,7 +479,10 @@ public class RideEngine(
         refreshState()
     }
 
-    /** Spec §4.2: pause after 3 s of zero cadence, resume when pedalling starts. */
+    /**
+     * Spec §4.2: pause after 3 s of zero cadence. The pause ends in [onTrainerData], on the notification that shows
+     * pedalling, not here.
+     */
     private fun updateAutoPause(
         cadenceNow: Int?,
         wasRiding: Boolean,
@@ -439,7 +494,6 @@ public class RideEngine(
         } else {
             zeroCadenceSeconds = 0
         }
-        if (autoPaused && cadenceNow != null && cadenceNow > 0) autoPaused = false
     }
 
     private fun endRide() {
@@ -464,7 +518,7 @@ public class RideEngine(
             }
 
             target is PlayerTarget.Erg -> {
-                val watts = if (state == RideState.RIDING) target.watts else settings.pausedTargetWatts
+                val watts = if (state == RideState.RIDING) target.watts else holdWatts(target)
                 TrainerCommand.TargetPower(watts.coerceIn(0, settings.maxTargetWatts))
             }
 
@@ -474,10 +528,22 @@ public class RideEngine(
         }
     }
 
+    /**
+     * The ERG target while the ride is not running: the auto-pause hold during an auto-pause (never above what the step
+     * asks for), the paused target otherwise: a pause by the rider, before the start, or with the trainer gone.
+     */
+    private fun holdWatts(target: PlayerTarget.Erg): Int =
+        if (autoPaused && !manualPause && settings.autoPauseTargetWatts > 0) {
+            minOf(settings.autoPauseTargetWatts, target.nominalWatts)
+        } else {
+            settings.pausedTargetWatts
+        }
+
     private fun simulationAt(gear: Int) = TrainerCommand.Simulation(gears.simulationParameters(gear, settings.physics))
 
     private fun updateOrder() {
         val next = TrainerOrder(desiredCommand())
+        if (state != RideState.RIDING) pauseHoldWatts = (next.command as? TrainerCommand.TargetPower)?.watts ?: 0
         if (next != order.value) {
             order.value = next
             wakeSender.trySend(Unit)
@@ -553,6 +619,7 @@ public class RideEngine(
             zone = power?.let { PowerZone.of(it, settings.ftp) },
             workout = workout?.let { player?.progress(it.name) },
             pauseReason = pauseReason(),
+            secondsSinceResume = secondsSinceResume,
         )
     }
 

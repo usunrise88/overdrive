@@ -194,6 +194,45 @@ class WorkoutPlayerTest {
     }
 
     @Test
+    fun `the ramp-in starts from the hold target and never from above the target it heads for`() {
+        val player = player()
+        player.advance(10) // steady 160 W
+        player.beginRampIn(fromWatts = 25)
+        assertEquals(PlayerTarget.Erg(watts = 25, nominalWatts = 160), player.target)
+        player.advance()
+        assertEquals(70, player.erg().watts) // 25 + 135 / 3
+        player.advance()
+        assertEquals(115, player.erg().watts)
+        player.advance()
+        assertEquals(PlayerTarget.Erg(watts = 160, nominalWatts = 160), player.target)
+
+        player.beginRampIn(fromWatts = 500)
+        assertEquals(160, player.erg().watts, "a hold above the target is no reason to go up first")
+        assertFailsWith<IllegalArgumentException> { player.beginRampIn(fromWatts = -1) }
+    }
+
+    @Test
+    fun `the first step of the ramp-in can be brought forward, and then the ramp is a second shorter`() {
+        val player = player()
+        player.advance(10)
+        player.beginRampIn(fromWatts = 25)
+        player.stepRampIn()
+        assertEquals(70, player.erg().watts)
+        player.advance()
+        assertEquals(115, player.erg().watts)
+        player.advance()
+        assertEquals(160, player.erg().watts)
+        player.stepRampIn()
+        player.advance()
+        assertEquals(160, player.erg().watts, "with no ramp in progress it does nothing")
+
+        val noRamp = player(rampInSeconds = 0)
+        noRamp.beginRampIn(fromWatts = 25)
+        noRamp.stepRampIn()
+        assertEquals(100, noRamp.erg().watts)
+    }
+
+    @Test
     fun `there is no ramp-in at the start, nor in a free-ride step`() {
         val player = player()
         assertEquals(100, player.erg().watts)
