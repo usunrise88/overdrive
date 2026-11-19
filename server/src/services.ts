@@ -271,8 +271,9 @@ export function createServices(options: ServicesOptions): Services {
     const header = await rides.getHeader(rideId);
     if (header === null) return;
     if (header.workoutId != null) await rideWorkouts.resolve(header);
-    await variants.onRideStored(header);
-    await routes.noteRide(header);
+    // Independent of each other: one failing does not keep the other from running.
+    const done = await Promise.allSettled([variants.onRideStored(header), routes.noteRide(header)]);
+    for (const result of done) if (result.status === "rejected") throw result.reason;
   });
 
   const repeats = createRepeats({

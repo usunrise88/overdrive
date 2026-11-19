@@ -8,7 +8,7 @@ served to the tablet), the rider's profile (`GET`/`PATCH /v1/profile`), the MCP 
 OAuth server for AI clients (ADR 0018), the Google Calendar mirror and the Telegram bot (ADR 0019), the Strava upload (ADR 0020), the
 training metrics (ADR 0022), wellness, recovery and the watch's other activities (ADR 0023), the written insights, alerts and discussion
 topics (ADR 0025), the repeat-session comparison and the outdoor rides imported from FIT files (ADR 0026), the coach notebook and the plan events
-(ADR 0035) and `GET /healthz`.
+(ADR 0035), the routes with elevation and the easier variant (ADR 0036) and `GET /healthz`.
 
 ```bash
 pnpm --filter @overdrive/server dev      # node --watch src/main.ts, http://127.0.0.1:8080 (needs DATABASE_URL)
@@ -54,6 +54,9 @@ and names the variable, never its value):
 | `ALERT_LOAD_ABOVE_PERCENT`, `ALERT_LOAD_BELOW_PERCENT` | `30`, `40` | The ride load of the last 7 days this far above (5 to 300) or below (5 to 95) the planned load: plan drift |
 | `NOTEBOOK_MAX_CHARS`, `NOTEBOOK_LOG_MAX_CHARS` | `12000`, `3000` | 2000 to 100000 and 500 to 50000: the most the whole coach notebook, and its dated log, may hold, in characters. ADR 0035 |
 | `PLAN_EVENT_DAY_END_GRACE_MINUTES` | `180` | 0 to 720: how long after local midnight a day waits before it is checked for a planned session no ride completed |
+| `BROUTER_URL` | unset | The BRouter routing server, such as `http://brouter:17777` (`docs/deploy.md`, section 20). **Empty: road routing is off** and `create_route` mode `waypoints` says so; GPX files and synthetic profiles need no engine. ADR 0036 |
+| `BROUTER_TIMEOUT_SECONDS` | `30` | 1 to 300: how long a routing request may take before the service says routing is unavailable. `compose.yaml` does not pass it yet: add `BROUTER_TIMEOUT_SECONDS: ${BROUTER_TIMEOUT_SECONDS:-}` to its `environment:` to set it from `.env` |
+| `ROUTE_STEP_METERS` | `20` | 5 to 200: a route is resampled to one point every this many metres (coarser for a route that would pass 5000 points). Same note as above for `compose.yaml` |
 | `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_REFRESH_TOKEN` | unset | The Strava upload (ADR 0020). **The feature is off unless all three are set**; with only some set it is off and the log names the missing ones. The client id is the number of the application on strava.com/settings/api; the refresh token (which only seeds the first run, Strava rotates it) comes from `strava-auth` (below). Letters, digits and `. _ ~ + / = : -` only |
 | `STRAVA_BACKFILL` | `false` | `true` also sends the rides stored before Strava was turned on, at start. Off, turning Strava on does not post the history |
 | `STRAVA_BASE_URL` | `https://www.strava.com` | Another http(s) address; the tests point it at a fake |
@@ -118,6 +121,8 @@ general 1 to 128 characters from `A-Z a-z 0-9 . _ -`, starting with a letter or 
 | `GET /v1/repeats/{hash}/previous[?before=<rideId>]` | none | `200` the attempt before a ride with its step boundaries and per-step heart rate, for the tablet's overlay (`repeat-previous-response.schema.json`); `previous` is null when there is none · `404 ride_not_found` an unknown `before` that does not carry its start · `400 invalid_ride_id` |
 
 | `GET /v1/insights?from=YYYY-MM-DD&to=YYYY-MM-DD` | none | `200` the written notes created on those local days, at most 366, newest first, not cached (`insights-response.schema.json`, ADR 0025): `{ id, kind, createdAt, text, rideId, topic }` with `kind` `morning`, `ride`, `week`, `deviation` or `drift`, and, on a ride note, its discussion topic (`discussion-topic.schema.json`) · `400 invalid_range` |
+| `GET /v1/routes` | none | `200` the routes the agent created, newest first, without points, not cached (`routes-response.schema.json`, ADR 0036): `{ id, name, source, distanceMeters, ascentMeters, hasCoordinates, createdAt }` |
+| `GET /v1/routes/{id}` | none | `200` one route with its points `[{ d, e, lat?, lon? }]` (`route.schema.json`), `Cache-Control: private, max-age=300`; **no grade**: the tablet computes it · `404 not_found` an id that is not a route |
 | `GET /v1/notebook` | none | `200` the coach notebook, read-only, not cached (`notebook-response.schema.json`, ADR 0035): the seven fixed sections with their text, version, time and reason, the caps and the total. **Only the coach scope; the game master's notebook is never served** |
 | `POST /v1/plan-events` | `{ "kind": "illness" or "travel", "until": "YYYY-MM-DD"? }` (`plan-event-declaration.schema.json`) | `201` the plan event (`plan-event.schema.json`) / `200` when the same declaration was made before · `400 invalid_json` a body that is not a declaration, or an `until` before today |
 
@@ -160,6 +165,10 @@ Migration 0010 (ADR 0035) adds `notebook_versions` (every edit of a section of a
 coach notebook and the game master's, told apart by `scope`), `plan_events` (the queue of facts that tell the coach agent the plan may need
 rebuilding, idempotent by `natural_key`) and `plan_event_cursor` (how far the end-of-day check for missed sessions has got). **Private: the
 notebook is what the agent knows about the rider; nothing in these tables is ever logged.**
+
+Migration 0011 (ADR 0036) adds `routes` (a route's points as compact JSON), `ride_routes` (the route a stored ride followed, with its route key),
+`planned_workout_extras` (what the service keeps about a planned workout that intervals.icu cannot hold: the easier variant and which route
+backs which free step) and `variant_rides` (the queue that changes an intervals.icu event to the variant that was ridden).
 
 Tests run on PGlite and need nothing installed. To run them on a real PostgreSQL as well (CI does),
 set `TEST_DATABASE_URL`: **the `public` schema of that database is dropped**, so point it at a scratch one.
@@ -293,6 +302,28 @@ The tools are built **per request, for the caller's token**: a session without t
 notebook tools and nothing in their descriptions or the server instructions mentions it. The tests (`test/notebook-service.test.ts`,
 `notebook-mcp.test.ts`, `plan-events.test.ts`, `plan-events-mcp.test.ts`, `config-coach.test.ts`) run on PGlite with the fake intervals.icu
 and Telegram and a clock the test moves.
+
+## Routes with elevation and the easier variant (ADR 0036)
+
+The agent makes routes and writes easier versions of sessions through MCP; the tablet reads both. The service keeps them, resamples and
+smooths the routes and works out their numbers, and keeps the calendar honest when a variant is ridden.
+
+| Piece | Where |
+|---|---|
+| Resampling, smoothing, distance and ascent; profiles; the limits | `src/routes/geometry.ts` |
+| The GPX reader (own scanner, no XML dependency) | `src/routes/gpx.ts` |
+| The BRouter client and the mapping of its errors | `src/routes/brouter.ts` |
+| Storage, the service (`create`, `list`, `get`, `delete`, the ride's route key), the REST routes | `src/routes/store.ts`, `service.ts`, `rest.ts` (`routes`, `ride_routes`) |
+| The variant and the route ids kept beside the calendar's primary; laid over the workout when the plan is read | `src/plan/extras.ts` (`planned_workout_extras`), `src/plan/store.ts` |
+| What happens when a variant is ridden: the event update queue, the plan event, the sweep | `src/variants/service.ts` (`variant_rides`) |
+| A ride's workout copy is the variant when it was ridden | `src/ride-workout.ts` |
+| MCP tools | `src/mcp/tools/routes.ts`: `create_route`, `list_routes`, `delete_route`; `src/mcp/tools/plan.ts`: `route_id`, `variant`, `variantNote`, `removeVariant` |
+| Route sessions in the repeat comparison | `src/repeats/` (`routeKey`, `ride_routes`) |
+| The fact for the ride note, and Telegram's line | `src/insights/facts.ts` (`easierVersionRidden`), `src/telegram/messages.ts` |
+
+The tests (`test/routes-geometry.test.ts` with its hand-computed goldens, `routes-gpx.test.ts`, `routes-brouter.test.ts` against
+`test/helpers/fake-brouter.ts`, `routes-api.test.ts`, `workout-routes-variants.test.ts`, `variant-ridden.test.ts`, `repeats-routes.test.ts`,
+`config-routes.test.ts`) run on PGlite with the fake intervals.icu and the fake BRouter, a clock the test moves and no network.
 
 ## Strava (ADR 0020)
 

@@ -205,6 +205,9 @@ Values in `.env` are never in the repository.
 | `NOTEBOOK_MAX_CHARS` | `12000` | 2000 to 100000: the most the whole coach notebook (every section) may hold, in characters. An edit that would pass it is not saved and the agent is told how to make room. ADR 0035 |
 | `NOTEBOOK_LOG_MAX_CHARS` | `3000` | 500 to 50000: the most the notebook's dated log may hold. The entry that passes it is saved and the agent is asked to condense the old entries into the sections; until it has, no more entries are accepted |
 | `PLAN_EVENT_DAY_END_GRACE_MINUTES` | `180` | 0 to 720: how long after local midnight a day waits before it is checked for a planned session no ride completed (a late upload is not a missed session) |
+| `BROUTER_URL` | unset | `http://brouter:17777`: the routing server of section 20. **Empty: road routing is off**; the agent's routes from a GPX file or a synthetic profile still work. ADR 0036 |
+| `BROUTER_TIMEOUT_SECONDS` | `30` | 1 to 300: how long a routing request may take. **`compose.yaml` does not pass it yet**: to set it, add `BROUTER_TIMEOUT_SECONDS: ${BROUTER_TIMEOUT_SECONDS:-}` under `environment:` of the `server` service |
+| `ROUTE_STEP_METERS` | `20` | 5 to 200: a route is resampled to one point every this many metres (coarser for a very long route). Same note: `compose.yaml` does not pass it yet |
 | `PUBLIC_BASE_URL` | unset | `https://overdrive.llmto.day`: the service's public address (https, no path). **With `OWNER_PASSPHRASE_HASH`, turns the MCP server on.** ADR 0018 |
 | `OWNER_PASSPHRASE_HASH` | unset | The hash of the owner's passphrase, `scrypt:…` (section 12). **With `PUBLIC_BASE_URL`, turns the MCP server on.** The plain passphrase is never configured |
 | `MCP_STATIC_TOKENS` | empty | `name:token,name:token`: fixed bearer tokens for an MCP client that cannot do OAuth; at least 32 characters each; open `/mcp` only |
@@ -317,6 +320,12 @@ master's notebook** is a second notebook that only a client approved with the ex
 offered in the discovery documents, so a client has to ask for `scope=mcp game-master` explicitly; the approval page then says so).
 The apps, the REST API and the other clients never see it. You type your passphrase to approve it, so the secrecy is between the
 agents and the rider's apps, not from you.
+
+**Routes and easier versions** (spec §11.4, §11.5, ADR 0036) need no key either. The agent's `create_route` makes a route with elevation from
+a GPX file or a synthetic profile with nothing set up, and from waypoints over roads when BRouter is running (section 20, `BROUTER_URL`); it
+says plainly when routing is off or the area has no map data. A free step of a workout can name a route (`route_id`), and a workout can carry an
+easier version, which is kept only on this server (never in intervals.icu or Google Calendar) until it is ridden; then the server changes the
+calendar entry to what was ridden. The tablet's side of both is a later stage.
 
 ## 13. The Telegram bot
 
@@ -578,7 +587,7 @@ docker compose exec db psql -U overdrive -d overdrive -c "SELECT scope, section,
 ```
 
 **Plan events** tell the agent the plan may need rebuilding: a planned day that ended with no ride (checked after local midnight plus
-`PLAN_EVENT_DAY_END_GRACE_MINUTES`), a session you moved or deleted in intervals.icu, the easier variant being ridden (a later stage),
+`PLAN_EVENT_DAY_END_GRACE_MINUTES`), a session you moved or deleted in intervals.icu, the easier variant being ridden (the ride says `variantRidden`),
 and illness or travel you declare (`/ill`, `/travel`, or `POST /v1/plan-events`). The server **only detects and queues**: the agent reads
 the open events (`list_plan_events`), rebuilds the days left with its normal planning tools and resolves each (`resolve_plan_event`); you
 get one short Telegram note of what changed and why, and it says plainly when a missed session was dropped. Nothing moves a workout by
