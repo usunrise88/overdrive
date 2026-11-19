@@ -16,6 +16,7 @@ import type { NotificationSource } from "../notifications.ts";
 import type { OutdoorService } from "../outdoor/service.ts";
 import type { PlanRefresher } from "../plan/refresher.ts";
 import type { PlanStore } from "../plan/store.ts";
+import type { PlanEventsService } from "../plan-events/service.ts";
 import type { Timers } from "../timers.ts";
 import { type Clock, parseClock } from "../zoned.ts";
 import { createTelegramBot, type TelegramBot } from "./bot.ts";
@@ -53,6 +54,8 @@ export interface TelegramDeps {
   sources?: readonly NotificationSource[] | undefined;
   /** Where a FIT file sent to the bot goes (spec §11.8, ADR 0026); without it the bot says it cannot import. */
   outdoor?: OutdoorService | undefined;
+  /** Where `/ill` and `/travel` declare illness or travel (spec §12.2, ADR 0035); without it the bot says it cannot. */
+  planEvents?: PlanEventsService | undefined;
 }
 
 const COMMANDS = [
@@ -60,6 +63,8 @@ const COMMANDS = [
   { command: "week", description: "The next 7 days" },
   { command: "skip", description: "Skip the next workout" },
   { command: "move", description: "Move the next workout to another day" },
+  { command: "ill", description: "Tell the coach you are ill" },
+  { command: "travel", description: "Tell the coach you are travelling" },
   { command: "help", description: "What I can do" },
 ];
 
@@ -114,6 +119,7 @@ export function createTelegram(deps: TelegramDeps): TelegramBot | null {
       intervals: deps.intervals,
       refresher: deps.refresher,
       outdoor: deps.outdoor ?? null,
+      planEvents: deps.planEvents ?? null,
       timezone: deps.timezone,
       workoutStart: clockOf(config.GCAL_WORKOUT_START, DEFAULT_WORKOUT_START),
       now,

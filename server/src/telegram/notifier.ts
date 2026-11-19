@@ -479,6 +479,9 @@ export function createNotifier(options: NotifierOptions): Notifier {
         }),
         // A written note or alert was stored: send it now rather than at the next poll.
         bus.on("insight-stored", () => kick()),
+        // A methodology change to announce, or a plan event the coach has resolved (ADR 0035).
+        bus.on("notebook-changed", () => kick()),
+        bus.on("plan-event-changed", () => kick()),
       );
       stopTicking = timers.every(pollMs, () => run(true));
       // A few rows a day: a quarter of a year is more history than anything reads.

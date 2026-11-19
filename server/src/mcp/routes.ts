@@ -101,7 +101,12 @@ export function mcpRoutes(app: FastifyInstance, options: McpRoutesOptions): void
     } catch {
       return reply.code(400).send(jsonRpcError(-32700, "Parse error: the body is not JSON"));
     }
-    const server = createMcpServer(tools);
+    // The tools are built for this token's scopes (the game master's notebook exists only for one that carries its scope).
+    const auth = (request.raw as IncomingMessage & { auth?: AuthInfo }).auth;
+    const server = createMcpServer(
+      tools,
+      auth === undefined ? undefined : { clientId: auth.clientId, scopes: auth.scopes },
+    );
     // No session id generator means no session: every request stands alone.
     const transport = new StreamableHTTPServerTransport({ enableJsonResponse: true });
     reply.raw.on("close", () => {

@@ -989,11 +989,13 @@ describe("a real MCP client, the SDK's, from nothing to a tool call", () => {
     await client.connect(new StreamableHTTPClientTransport(h.mcpUrl, { authProvider: provider }));
     const tools = await client.listTools();
     expect(tools.tools.map((t) => t.name).sort()).toEqual([
+      "append_notebook_log",
       "create_workout",
       "delete_workout",
       "get_activity",
       "get_facts",
       "get_fitness",
+      "get_notebook",
       "get_profile",
       "get_recovery",
       "get_repeat",
@@ -1002,10 +1004,15 @@ describe("a real MCP client, the SDK's, from nothing to a tool call", () => {
       "list_activities",
       "list_discussion_topics",
       "list_insights",
+      "list_notebook_versions",
+      "list_plan_events",
       "list_planned_workouts",
       "list_repeats",
       "list_rides",
       "mark_discussion_topic",
+      "resolve_plan_event",
+      "rollback_notebook_section",
+      "update_notebook_section",
       "update_profile",
       "update_workout",
     ]);

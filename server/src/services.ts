@@ -1,5 +1,6 @@
 import type { Config } from "./config.ts";
 import { DEFAULT_INTERVALS_BASE_URL } from "./config.ts";
+import type { CoachSettings } from "./config-coach.ts";
 import type { InsightsSettings } from "./config-insights.ts";
 import type { IntegrationsSettings } from "./config-integrations.ts";
 import { type StravaConfig, stravaSettings } from "./config-strava.ts";
@@ -15,9 +16,13 @@ import {
 } from "./intervals/uploads.ts";
 import type { Logger } from "./log.ts";
 import { createMetricsService, type MetricsService } from "./metrics/service.ts";
+import { createNotebookService, type NotebookService } from "./notebook/service.ts";
+import { createNotebookStore } from "./notebook/store.ts";
 import { createOutdoor, type OutdoorService } from "./outdoor/service.ts";
 import { createPlanRefresher, type PlanRefresher } from "./plan/refresher.ts";
 import { createPlanStore, type PlanStore } from "./plan/store.ts";
+import { createPlanEvents, type PlanEventsService } from "./plan-events/service.ts";
+import { createPlanEventStore } from "./plan-events/store.ts";
 import { createProfileStore, type ProfileStore } from "./profile/store.ts";
 import { createRepeats, type RepeatsService } from "./repeats/service.ts";
 import { createRideStore, type RideStore } from "./ride-store.ts";
@@ -25,6 +30,7 @@ import { createRideWorkoutResolver, type RideWorkoutResolver } from "./ride-work
 import { createStrava, STRAVA_DESTINATION, type StravaUploads } from "./strava/index.ts";
 import { createPlanHistory } from "./telegram/history.ts";
 import { createTelegram, type TelegramBot } from "./telegram/index.ts";
+import { createRideQueries } from "./telegram/rides.ts";
 import type { Timers } from "./timers.ts";
 import { createRideHeartRateIndex } from "./wellness/heart-rate-index.ts";
 import { createWellness, type WellnessService } from "./wellness/service.ts";
@@ -46,6 +52,7 @@ export type ServicesConfig = Partial<
 > &
   IntegrationsSettings &
   InsightsSettings &
+  CoachSettings &
   StravaConfig;
 
 /**
@@ -94,6 +101,13 @@ export interface Services {
    * written from templates. The Telegram bot sends what it stores.
    */
   insights: InsightsService;
+  /**
+   * The coach notebook and the game master's (spec §11.6, §12.4, ADR 0035): versioned sections, the caps, the announcement of a
+   * methodology change. The REST route serves only the coach one.
+   */
+  notebook: NotebookService;
+  /** Plan events: what tells the coach agent the plan needs rebuilding (spec §12.2, ADR 0035). */
+  planEvents: PlanEventsService;
   /** Starts the refresher, the upload worker, the calendar mirror, the bot, the wellness pull and its forwarding, the insights. */
   start(): void;
   /** Stops them and waits for what is in flight. */
@@ -124,6 +138,42 @@ export function createServices(options: ServicesOptions): Services {
   const plan = createPlanStore(db, bus);
   const now = options.now;
   const rides = createRideStore(db);
+  // The plan history (what was planned, kept after the cache drops a day) is shared by the bot, the insights and the plan events.
+  const planHistory = createPlanHistory({
+    db,
+    plan,
+    timezone,
+    now: now ?? (() => new Date()),
+  });
+  // The rider is told of a methodology change and of a resolved plan event through the bot, which needs its token and the owner's chat.
+  const riderReachable =
+    config.TELEGRAM_BOT_TOKEN !== undefined && config.TELEGRAM_OWNER_CHAT_ID !== undefined;
+  const planEvents = createPlanEvents({
+    store: createPlanEventStore(db),
+    history: planHistory,
+    rides: createRideQueries(db),
+    bus,
+    timezone,
+    now: now ?? (() => new Date()),
+    log,
+    dayEndGraceMinutes: config.PLAN_EVENT_DAY_END_GRACE_MINUTES,
+    timers: options.timers,
+    canTellRider: riderReachable,
+    watchesPlan: config.INTERVALS_API_KEY !== undefined,
+  });
+  const notebook = createNotebookService({
+    store: createNotebookStore(db),
+    bus,
+    timezone,
+    now: now ?? (() => new Date()),
+    limits: {
+      ...(config.NOTEBOOK_MAX_CHARS === undefined ? {} : { maxChars: config.NOTEBOOK_MAX_CHARS }),
+      ...(config.NOTEBOOK_LOG_MAX_CHARS === undefined
+        ? {}
+        : { logMaxChars: config.NOTEBOOK_LOG_MAX_CHARS }),
+    },
+    canAnnounce: riderReachable,
+  });
   // The profile carries heart-rate estimates from the stored rides (ADR 0023).
   const heartRates = createRideHeartRateIndex(db, rides, log);
   const profile = createProfileStore(db, bus, now ?? (() => new Date()), () =>
@@ -148,7 +198,13 @@ export function createServices(options: ServicesOptions): Services {
       ...(now === undefined ? {} : { now }),
       ...(options.timers === undefined ? {} : { timers: options.timers }),
     };
-    refresher = createPlanRefresher({ client: intervals, store: plan, ...shared });
+    refresher = createPlanRefresher({
+      client: intervals,
+      store: plan,
+      // What the rider moved or deleted in the calendar becomes a plan event for the coach agent (ADR 0035).
+      onCalendarChanges: (change) => planEvents.notePlanChanges(change),
+      ...shared,
+    });
     uploads = createUploadWorker({ db, client: intervals, bus, ...shared });
   } else {
     log.info(
@@ -215,12 +271,6 @@ export function createServices(options: ServicesOptions): Services {
     },
   });
   const outdoor = createOutdoor({ db, bus, wellness, timezone, log });
-  const planHistory = createPlanHistory({
-    db,
-    plan,
-    timezone,
-    now: now ?? (() => new Date()),
-  });
   const insights = createInsights({
     config,
     db,
@@ -268,8 +318,9 @@ export function createServices(options: ServicesOptions): Services {
     sleep: options.sleep,
     timers: options.timers,
     history: planHistory,
-    sources: [insights.notifications],
+    sources: [insights.notifications, notebook.notifications, planEvents.notifications],
     outdoor,
+    planEvents,
   });
   let strava: StravaUploads | null = null;
   const stravaMode = stravaSettings(config);
@@ -315,6 +366,8 @@ export function createServices(options: ServicesOptions): Services {
     repeats,
     outdoor,
     insights,
+    notebook,
+    planEvents,
     start() {
       void uploads?.start();
       void strava?.start();
@@ -325,6 +378,7 @@ export function createServices(options: ServicesOptions): Services {
       metrics.start();
       repeats.start();
       insights.start();
+      planEvents.start();
     },
     async stop() {
       await Promise.all([
@@ -337,6 +391,7 @@ export function createServices(options: ServicesOptions): Services {
         metrics.stop(),
         repeats.whenIdle(),
         insights.stop(),
+        planEvents.stop(),
       ]);
     },
   };

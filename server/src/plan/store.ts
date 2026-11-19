@@ -33,6 +33,17 @@ export interface PlanChange {
   removed: string[];
 }
 
+/**
+ * What a mirror of the calendar found that the cache did not already say: a planned session on another day than the cache had it
+ * (`moved`), or one inside the window that is no longer in the calendar (`deleted`: also one moved out of the window). A change
+ * the service made itself through the tools is already in the cache, so it is never reported here: this is what happened in the
+ * calendar behind the service's back, which is the rider's own doing (ADR 0035). A day that merely passed is not a deletion.
+ */
+export interface MirrorChange extends PlanChange {
+  moved: { id: string; name: string; from: string; to: string }[];
+  deleted: { id: string; name: string; date: string }[];
+}
+
 export interface DateRange {
   /** `YYYY-MM-DD`. */
   from: string;
@@ -62,7 +73,7 @@ export interface PlanStore {
    * Makes the cache say exactly `entries` for `window`: upserts them, removes every other entry
    * inside the window and every entry dated before it. One transaction, one `plan-changed`.
    */
-  mirror(window: DateRange, source: PlanSource, entries: PlanEntry[]): Promise<PlanChange>;
+  mirror(window: DateRange, source: PlanSource, entries: PlanEntry[]): Promise<MirrorChange>;
   syncState(source: PlanSource): Promise<PlanSyncState>;
   recordSuccess(source: PlanSource, at: Date): Promise<void>;
   recordFailure(source: PlanSource, at: Date, reason: string): Promise<void>;
@@ -107,15 +118,19 @@ function contentHash(entry: PlanEntry): string {
   );
 }
 
-/** Writes one entry; says whether it is new, changed or the same. */
-async function write(tx: Queryable, entry: PlanEntry): Promise<"added" | "updated" | "unchanged"> {
+/** Writes one entry; says whether it is new, changed or the same, and the day the cache had it on before. */
+async function write(
+  tx: Queryable,
+  entry: PlanEntry,
+): Promise<{ outcome: "added" | "updated" | "unchanged"; previousDate: string | null }> {
   const sha = contentHash(entry);
-  const found = await tx.query<{ content_sha256: string }>(
-    "SELECT content_sha256 FROM planned_workouts WHERE id = $1",
+  const found = await tx.query<{ content_sha256: string; plan_date: string }>(
+    "SELECT content_sha256, plan_date::text AS plan_date FROM planned_workouts WHERE id = $1",
     [entry.id],
   );
   const stored = found.rows[0];
-  if (stored?.content_sha256 === sha) return "unchanged";
+  const previousDate = stored?.plan_date ?? null;
+  if (stored?.content_sha256 === sha) return { outcome: "unchanged", previousDate };
   await tx.query(
     `INSERT INTO planned_workouts
        (id, source, external_id, plan_date, name, workout, unsupported_reason, content_sha256, updated_at)
@@ -135,7 +150,7 @@ async function write(tx: Queryable, entry: PlanEntry): Promise<"added" | "update
       sha,
     ],
   );
-  return stored === undefined ? "added" : "updated";
+  return { outcome: stored === undefined ? "added" : "updated", previousDate };
 }
 
 export function createPlanStore(db: Db, bus: EventBus): PlanStore {
@@ -189,7 +204,7 @@ export function createPlanStore(db: Db, bus: EventBus): PlanStore {
     },
 
     async upsert(entry) {
-      const outcome = await write(db, entry);
+      const { outcome } = await write(db, entry);
       if (outcome === "added") announce({ added: [entry.id], updated: [], removed: [] });
       if (outcome === "updated") announce({ added: [], updated: [entry.id], removed: [] });
       return outcome;
@@ -206,24 +221,45 @@ export function createPlanStore(db: Db, bus: EventBus): PlanStore {
 
     async mirror(window, source, entries) {
       const change = await db.transaction(async (tx) => {
-        const change: PlanChange = { added: [], updated: [], removed: [] };
+        const change: MirrorChange = {
+          added: [],
+          updated: [],
+          removed: [],
+          moved: [],
+          deleted: [],
+        };
         const keep = new Set(entries.map((entry) => entry.id));
         for (const entry of entries) {
-          const outcome = await write(tx, entry);
+          const { outcome, previousDate } = await write(tx, entry);
           if (outcome === "added") change.added.push(entry.id);
-          if (outcome === "updated") change.updated.push(entry.id);
+          if (outcome === "updated") {
+            change.updated.push(entry.id);
+            if (previousDate !== null && previousDate !== entry.date) {
+              change.moved.push({
+                id: entry.id,
+                name: entry.name,
+                from: previousDate,
+                to: entry.date,
+              });
+            }
+          }
         }
-        const stale = await tx.query<{ id: string }>(
+        const stale = await tx.query<{ id: string; name: string; plan_date: string }>(
           `DELETE FROM planned_workouts
             WHERE source = $3 AND (plan_date < $1::date OR plan_date BETWEEN $1::date AND $2::date)
               AND NOT (id = ANY($4::text[]))
-            RETURNING id`,
+            RETURNING id, name, plan_date::text AS plan_date`,
           [window.from, window.to, source, [...keep]],
         );
         change.removed.push(...stale.rows.map((row) => row.id));
+        for (const row of stale.rows) {
+          if (row.plan_date >= window.from) {
+            change.deleted.push({ id: row.id, name: row.name, date: row.plan_date });
+          }
+        }
         return change;
       });
-      announce(change);
+      announce({ added: change.added, updated: change.updated, removed: change.removed });
       return change;
     },
 

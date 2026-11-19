@@ -19,10 +19,18 @@ export class ToolError extends Error {
   }
 }
 
+/** Who is calling: the OAuth client (or `static:<name>`) and the scopes its token carries. Set per request by the MCP route. */
+export interface McpCaller {
+  clientId: string;
+  scopes: readonly string[];
+}
+
 export interface ToolContext {
   services: Services;
   now: () => Date;
   log: Logger;
+  /** The session's caller. Absent only where a tool is built without a request (some tests): it then holds the default scope alone. */
+  caller?: McpCaller;
 }
 
 /** intervals.icu's failures in the words a model and its owner can act on. */
