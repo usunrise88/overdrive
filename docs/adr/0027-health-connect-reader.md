@@ -150,9 +150,11 @@ message holding a figure), the token is in no file, and no log line holds a figu
   heart-rate change reaching the service, and the secrecy of the token and of every figure in the files and the logs.
 - **Every wait is for a condition**, and where a test then closes the container or reads a file it waits for the disk as well (the outbox and the state are written before the
   status that says so is published). **Stability**: the pipeline tests (`HealthSyncTest`, `WatchRepositoriesTest`) and the container tests (`WatchContainerTest`,
-  `CompanionContainerTest`) were run ten times in a row pinned to two cores (`taskset -c 0-1`) with three busy loops on the same cores, build cache off so each run really ran.
-  Two real races came out of earlier runs and were fixed in the code, not the tests: a run that began while the state was loading was turned away as "already running", and a
-  read that began before the rider changed a permission overwrote what the screen had just learned.
+  `CompanionContainerTest`) were run ten times in a row pinned to two cores (`taskset -c 0-1`) with three busy loops on the same cores and the build cache off, so each run
+  really ran (24 + 8 pipeline tests, 16 + 15 container tests per run): ten of ten passed. Earlier runs found three races, two in the code and one in a test, all fixed
+  at the cause: a run that began while the state was loading was turned away as "already running" (`load` no longer takes the run's lock), a read that began before the rider changed
+  a permission overwrote what the screen had just learned (what is allowed is published when it is known, not when the run ends), and the rejected-token test counted the
+  service's requests while the start's other requests were still in flight (it now waits for every resource of the start, as the new notes and rating resources made the window wider).
 
 ## Deviations from the design and the brief
 
