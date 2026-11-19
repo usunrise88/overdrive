@@ -14,6 +14,7 @@ import { planEventsRoutes } from "./plan-events/routes.ts";
 import { profileRoutes } from "./profile/routes.ts";
 import { repeatsRoutes } from "./repeats/routes.ts";
 import { DEFAULT_LIMITS, type Limits, ridesRoutes } from "./rides.ts";
+import { routesRest } from "./routes/rest.ts";
 import { createServices, type Services, type ServicesConfig } from "./services.ts";
 import { wellnessRoutes } from "./wellness/routes.ts";
 
@@ -102,6 +103,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       v1.register(insightsRoutes, { insights: services.insights });
       v1.register(notebookRoutes, { service: services.notebook });
       v1.register(planEventsRoutes, { service: services.planEvents });
+      v1.register(routesRest, { service: services.routes });
     },
     { prefix: "/v1" },
   );

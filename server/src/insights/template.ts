@@ -134,6 +134,11 @@ export function rideText(facts: RideFacts): string {
         ? ""
         : `${plan.riddenMinutes} min of it ridden${plan.completionPercent === null ? "" : ` (${plan.completionPercent}%)`}`;
     lines.push(`Plan: ${[plan.workoutName, planned, ridden].filter((p) => p !== "").join(", ")}.`);
+    if (plan.easierVersionRidden === true) {
+      lines.push(
+        "You chose the easier version of this session, so it is compared with that version.",
+      );
+    }
     if (plan.stepsCompared !== null && plan.stepsCompared > 0) {
       const watts =
         plan.targetWatts !== null && plan.riddenWatts !== null

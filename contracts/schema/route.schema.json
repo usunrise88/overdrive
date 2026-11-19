@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive route",
+  "description": "A route with elevation (spec §11.4, ADR 0036): GET /v1/routes/{id}. The agent supplies it over MCP (create_route) from a GPX file, from waypoints the service routes over roads (BRouter), or as a synthetic elevation profile; the tablet rides it: it computes the grade from the points and feeds it to the trainer's simulation mode, the service sends no grade. points are resampled by the service to one every step metres (20 by default; the step grows for a route that would need more than 5000 points, so a point count never exceeds 5000), elevation lightly smoothed (a moving average over about 60 m with a window that shrinks towards the ends, which are kept), and distanceMeters and ascentMeters are computed by code from the points: distanceMeters is the last point's d rounded to a whole metre, ascentMeters the sum of the rises between consecutive points rounded to a whole metre. A point is d (metres along the route from the start, strictly increasing from 0), e (elevation in metres above sea level) and lat and lon (degrees) when the route follows real roads: all points carry coordinates or none does, and hasCoordinates says which. source gpx and waypoints always have coordinates, profile never (a synthetic profile has no map and so writes no positions into the FIT file). Rules a schema cannot state, checked by every implementation: 2 to 5000 points; the first d is 0 and d strictly increases; distanceMeters is the last d rounded; ascentMeters is within 1 m of the sum of the rises; hasCoordinates is true exactly when every point has lat and lon and false exactly when none has; source profile goes with no coordinates, gpx and waypoints with coordinates; createdAt is a real UTC instant.",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "source",
+    "distanceMeters",
+    "ascentMeters",
+    "hasCoordinates",
+    "createdAt",
+    "points"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "#/$defs/id" },
+    "name": { "$ref": "#/$defs/name" },
+    "source": { "$ref": "#/$defs/source" },
+    "distanceMeters": { "$ref": "#/$defs/distanceMeters" },
+    "ascentMeters": { "$ref": "#/$defs/ascentMeters" },
+    "hasCoordinates": { "type": "boolean" },
+    "createdAt": { "$ref": "#/$defs/instant" },
+    "points": {
+      "description": "Resampled points in order of distance, at most 5000.",
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 5000,
+      "items": { "$ref": "#/$defs/point" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "description": "The route's id, 1 to 64 characters from A-Z a-z 0-9 . _ -, starting with a letter or digit. It is what a free step's route_id and a ride's routeId carry.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "source": {
+      "description": "How the route came in: gpx (a GPX file), waypoints (routed over roads from waypoints) or profile (a synthetic elevation profile).",
+      "enum": ["gpx", "waypoints", "profile"]
+    },
+    "distanceMeters": { "type": "integer", "minimum": 100, "maximum": 1000000 },
+    "ascentMeters": { "type": "integer", "minimum": 0 },
+    "instant": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "point": {
+      "type": "object",
+      "required": ["d", "e"],
+      "additionalProperties": false,
+      "dependentRequired": { "lat": ["lon"], "lon": ["lat"] },
+      "properties": {
+        "d": {
+          "description": "Metres along the route from its start.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "e": {
+          "description": "Elevation in metres, smoothed.",
+          "type": "number",
+          "minimum": -500,
+          "maximum": 9000
+        },
+        "lat": { "type": "number", "minimum": -90, "maximum": 90 },
+        "lon": { "type": "number", "minimum": -180, "maximum": 180 }
+      }
+    },
+    "summary": {
+      "description": "A route without its points: what the list shows.",
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "source",
+        "distanceMeters",
+        "ascentMeters",
+        "hasCoordinates",
+        "createdAt"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "$ref": "#/$defs/name" },
+        "source": { "$ref": "#/$defs/source" },
+        "distanceMeters": { "$ref": "#/$defs/distanceMeters" },
+        "ascentMeters": { "$ref": "#/$defs/ascentMeters" },
+        "hasCoordinates": { "type": "boolean" },
+        "createdAt": { "$ref": "#/$defs/instant" }
+      }
+    }
+  }
+}

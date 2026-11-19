@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "icu-5001",
+  "name": "Ride out",
+  "steps": [
+    {
+      "type": "ramp",
+      "duration": 600,
+      "from": 0.45,
+      "to": 0.7,
+      "label": "Warm-up"
+    },
+    {
+      "type": "free",
+      "duration": 3600,
+      "route_id": "route-gpx-0001",
+      "label": "The road"
+    },
+    {
+      "type": "free",
+      "duration": 300,
+      "label": "Flat cool-down"
+    }
+  ]
+}

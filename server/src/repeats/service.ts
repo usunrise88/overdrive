@@ -20,6 +20,7 @@ import type { Logger } from "../log.ts";
 import type { MetricsService } from "../metrics/service.ts";
 import { type FlatStep, flattenWorkout } from "../ride-stats.ts";
 import type { RideStore } from "../ride-store.ts";
+import type { RoutesService } from "../routes/service.ts";
 import { localDate } from "../time.ts";
 import {
   type AttemptSteps,
@@ -98,6 +99,8 @@ export interface RepeatsOptions {
   db: Db;
   rides: Pick<RideStore, "getRecord" | "workoutSnapshot">;
   metrics: Pick<MetricsService, "ensureComputed" | "store">;
+  /** The routes' side of the ride rows: every ride that followed a route is recorded with its route key before a read. */
+  routes: Pick<RoutesService, "ensureRideRoutes">;
   timezone: string;
   now: () => Date;
   log: Logger;
@@ -107,6 +110,15 @@ const iso = (ms: number): string => new Date(ms).toISOString();
 const clip = (text: string, max: number): string =>
   text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 const round1 = (value: number): number => Math.round(value * 10) / 10;
+
+/** What a route session is played from, for the figures: a workout with no steps, so the session has no fixed-power step. */
+const routeWorkout = (name: string): Workout => ({ schema: 1, id: "route", name, steps: [] });
+
+/** The route key every attempt shares, or null when they do not all have the same one. */
+function commonRouteKey(attempts: readonly AttemptRow[]): string | null {
+  const first = attempts[0]?.routeKey ?? null;
+  return first !== null && attempts.every((a) => a.routeKey === first) ? first : null;
+}
 
 /** A ride id made by the engine carries its start: `ride-<start millis>`. */
 const RIDE_ID_WITH_START = /^ride-(\d{10,14})$/;
@@ -137,9 +149,22 @@ function sessionSteps(workout: Workout): {
 }
 
 export function createRepeats(options: RepeatsOptions): RepeatsService {
-  const { db, rides, metrics, timezone, now, log } = options;
+  const { db, rides, metrics, routes, timezone, now, log } = options;
   const store = createRepeatStore(db);
   let backfill: Promise<unknown> = Promise.resolve();
+
+  /** The rides' route keys, then the workout hashes: what a read needs before it groups the rides. */
+  async function ensure(): Promise<number> {
+    await routes.ensureRideRoutes();
+    return store.ensureHashes();
+  }
+
+  /** The workout an attempt was played from (a ride on a route and no workout: one with no steps), or null when it is unknown. */
+  async function workoutFor(attempt: AttemptRow): Promise<Workout | null> {
+    const snapshot = await rides.workoutSnapshot(attempt.rideId);
+    if (snapshot !== null) return snapshot;
+    return attempt.kind === "route" ? routeWorkout(attempt.name) : null;
+  }
 
   /** The figures of these rides: the stored ones, and the rest worked out from their records and kept. */
   async function loadStats(attempts: readonly AttemptRow[]): Promise<Map<string, RideRepeatStats>> {
@@ -148,7 +173,7 @@ export function createRepeats(options: RepeatsOptions): RepeatsService {
       if (known.has(attempt.rideId)) continue;
       const [record, workout, sha] = await Promise.all([
         rides.getRecord(attempt.rideId),
-        rides.workoutSnapshot(attempt.rideId),
+        workoutFor(attempt),
         store.recordSha(attempt.rideId),
       ]);
       if (record === null || workout === null || sha === null) continue;
@@ -179,7 +204,7 @@ export function createRepeats(options: RepeatsOptions): RepeatsService {
   // ---- GET /v1/repeats --------------------------------------------------------------------------------------------
 
   async function list(): Promise<RepeatsResponse> {
-    await store.ensureHashes();
+    await ensure();
     await metrics.ensureComputed();
     const byHash = new Map<string, AttemptRow[]>();
     for (const attempt of await store.attempts()) {
@@ -194,7 +219,7 @@ export function createRepeats(options: RepeatsOptions): RepeatsService {
       const latest = attempts[attempts.length - 1] as AttemptRow;
       const previous = attempts[attempts.length - 2] as AttemptRow;
       const first = attempts[0] as AttemptRow;
-      const workout = await rides.workoutSnapshot(latest.rideId);
+      const workout = await workoutFor(latest);
       if (workout === null) continue;
       const stats = await loadStats([previous, latest]);
       const latestStats = stats.get(latest.rideId);
@@ -235,7 +260,7 @@ export function createRepeats(options: RepeatsOptions): RepeatsService {
       repeats.push({
         hash,
         name: clip(latest.name, 100),
-        routeKey: null,
+        routeKey: commonRouteKey(attempts),
         attempts: attempts.length,
         firstDate: localDate(first.startMs, timezone),
         lastDate: localDate(latest.startMs, timezone),
@@ -263,14 +288,14 @@ export function createRepeats(options: RepeatsOptions): RepeatsService {
   // ---- GET /v1/repeats/{hash} -------------------------------------------------------------------------------------
 
   async function detail(hash: string): Promise<RepeatDetailResponse | null> {
-    await store.ensureHashes();
+    await ensure();
     await metrics.ensureComputed();
     const all = await store.attempts(hash);
     const stats = await loadStats(all);
     const attempts = all.filter((a) => stats.has(a.rideId));
     if (attempts.length < 2) return null;
     const latest = attempts[attempts.length - 1] as AttemptRow;
-    const workout = await rides.workoutSnapshot(latest.rideId);
+    const workout = await workoutFor(latest);
     if (workout === null) return null;
     const { steps, weights } = sessionSteps(workout);
 
@@ -338,7 +363,7 @@ export function createRepeats(options: RepeatsOptions): RepeatsService {
       generatedAt: now().toISOString(),
       hash,
       name: clip(latest.name, 100),
-      routeKey: null,
+      routeKey: commonRouteKey(attempts),
       note: REPEAT_NOTE,
       definition: {
         powerTolerancePercent: REPEAT_POWER_TOLERANCE_PERCENT as 3,
@@ -394,7 +419,7 @@ export function createRepeats(options: RepeatsOptions): RepeatsService {
     hash: string,
     before: string | null,
   ): Promise<RepeatPreviousResponse | "unknown-ride"> {
-    await store.ensureHashes();
+    await ensure();
     let cutoff: number | null = null;
     if (before !== null) {
       cutoff = await startOf(before);
@@ -413,7 +438,7 @@ export function createRepeats(options: RepeatsOptions): RepeatsService {
     });
     if (found === undefined) return answer(null);
     const stats = (await loadStats([found])).get(found.rideId);
-    const workout = await rides.workoutSnapshot(found.rideId);
+    const workout = await workoutFor(found);
     if (stats === undefined || workout === null) return answer(null);
     const { flat, weights } = sessionSteps(workout);
 
@@ -456,7 +481,7 @@ export function createRepeats(options: RepeatsOptions): RepeatsService {
   // ---- For get_ride -----------------------------------------------------------------------------------------------
 
   async function repeatOf(rideId: string): Promise<RideRepeatOf | null> {
-    await store.ensureHashes();
+    await ensure();
     const hash = await store.hashOf(rideId);
     if (hash === null) return null;
     const all = await store.attempts(hash);
@@ -476,7 +501,7 @@ export function createRepeats(options: RepeatsOptions): RepeatsService {
     const stats = await loadStats([earlier, current]);
     const thisStats = stats.get(current.rideId);
     const earlierStats = stats.get(earlier.rideId);
-    const workout = await rides.workoutSnapshot(current.rideId);
+    const workout = await workoutFor(current);
     const date = localDate(earlier.startMs, timezone);
     if (thisStats === undefined || earlierStats === undefined || workout === null) {
       result.previous = {
@@ -531,9 +556,9 @@ export function createRepeats(options: RepeatsOptions): RepeatsService {
     detail,
     previous,
     repeatOf,
-    ensureHashes: () => store.ensureHashes(),
+    ensureHashes: () => ensure(),
     start() {
-      backfill = store.ensureHashes().then(
+      backfill = ensure().then(
         (done) => {
           if (done > 0) log.info({ rides: done }, "workout hashes worked out for the stored rides");
         },

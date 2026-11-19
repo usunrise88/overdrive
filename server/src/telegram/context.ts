@@ -39,6 +39,7 @@ export function plannedView(entry: PlanEntry): PlannedView {
     name: entry.name,
     workout: entry.workout,
     plannedSeconds: entry.workout === null ? null : workoutDurationSeconds(entry.workout),
+    ...(entry.variant === undefined ? {} : { hasEasierVersion: true }),
   };
 }
 

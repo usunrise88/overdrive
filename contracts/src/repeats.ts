@@ -107,7 +107,7 @@ export interface RepeatAttemptRef {
 export interface RepeatSummary {
   hash: string;
   name: string;
-  /** The hook for routes (stage v0.4.0): always null today. */
+  /** The route id and the hash of its points when every attempt followed the same route (spec §11.4, `routeKey` of the contracts), else null. */
   routeKey: string | null;
   attempts: number;
   firstDate: string;

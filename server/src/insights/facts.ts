@@ -404,8 +404,15 @@ export interface RideInput {
   maxHeartRate: number | null;
   workKilojoules: number | null;
   ftp: number;
-  /** The workout the ride was played from and how it went, or null for a free ride. */
-  plan: { workout: Workout; compliance: Compliance | { problem: string } } | null;
+  /**
+   * The workout the ride was played from and how it went, or null for a free ride. `easierVersionRidden`: the rider chose the session's
+   * easier variant (spec §11.5), and `workout` is that version: an implicit feedback fact about the day.
+   */
+  plan: {
+    workout: Workout;
+    compliance: Compliance | { problem: string };
+    easierVersionRidden?: boolean;
+  } | null;
   /** This ride's best power at each duration. */
   curve: { durationSec: number; power: number }[];
   priorBests: PriorBest[];
@@ -494,6 +501,11 @@ export interface RideFacts extends FactsBase {
   /** null: a free ride, or the workout it was played from is no longer known. */
   plan: {
     workoutName: string;
+    /**
+     * Present, and true, only when the rider chose the easier version of the planned session at the start (spec §11.5): the plan below is
+     * that version, and the choice is itself a fact about how the rider felt that day. Absent otherwise.
+     */
+    easierVersionRidden?: true;
     plannedMinutes: number | null;
     plannedLoad: number | null;
     plannedIntensityFactor: number | null;
@@ -639,6 +651,7 @@ export function buildRideFacts(input: RideInput): RideFacts {
       }));
     plan = {
       workoutName: workout.name,
+      ...(input.plan.easierVersionRidden === true ? { easierVersionRidden: true as const } : {}),
       plannedMinutes: q.minutes(`${label}: planned length`, stats.seconds),
       plannedLoad: q.n(`${label}: planned load`, plannedLoadValue, "load"),
       plannedIntensityFactor: q.n(

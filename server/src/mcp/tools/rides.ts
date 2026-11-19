@@ -157,6 +157,8 @@ export function registerRideTools(server: McpServer, ctx: ToolContext): RideTool
         "factor (normalised power over average heart rate) fell from the first half to the second, positive when heart rate rose against power; otherwise it says why there is none. " +
         "wPrimeBalance: the W′ balance model (Skiba 2012) with critical power taken as the FTP and W′ from the profile (20 kJ when unset): the lowest balance in kJ, when, and " +
         "how much of W′ it used; below 0 means CP or W′ are set too low for this rider. " +
+        "variantRidden (present and true only when the rider chose the session's easier version at the start: the laps and compliance are then against that version) and " +
+        "route (the route's id and name, present only when the ride followed one). " +
         "repeatOf: when the ride was played from a workout that has been ridden more than once (same structure, whatever it is called), its attempt number among the " +
         "attempts, how many there are, and the attempt before it with the difference in average heart rate at the same power (this ride minus that one, bpm: " +
         "lower at the same power is fitter); null otherwise. Heart rate also moves with heat, sleep and caffeine: one comparison proves little, list_repeats and get_repeat give the trend.",
@@ -206,6 +208,11 @@ export function registerRideTools(server: McpServer, ctx: ToolContext): RideTool
         ftp: record.ride.ftp,
         devices: record.ride.devices ?? [],
         workoutId: record.ride.workoutId ?? null,
+        // The easier version of the session was ridden (spec §11.5), and the route followed (spec §11.4): facts about the day.
+        ...(record.ride.variantRidden === true ? { variantRidden: true } : {}),
+        ...(record.ride.routeId == null
+          ? {}
+          : { route: { id: record.ride.routeId, name: record.ride.routeName ?? null } }),
         durationSeconds: statistics.durationSeconds,
         movingSeconds: statistics.movingSeconds,
         pausedSeconds: statistics.pausedSeconds,

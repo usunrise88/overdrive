@@ -7,6 +7,7 @@ export const RIDE_PROMPT: PromptDefinition = {
   limit: "at most 5 sentences, about 90 words",
   instructions: `Write the note after the ride.
 - Say how the ride went against its plan: how much of the planned length was ridden, how close the steps were to their target power (plan.stepsOnTarget, plan.deltaPercent), and the load against the planned load.
+- If plan.easierVersionRidden is true the rider chose the easier version of the session at the start: say so in a few words (it is a fact about their day, not a failure) and judge the ride against that version, which is the plan in the facts.
 - Mention a new best (efforts with newBest true), the aerobic drift, or a deep dip of W' (wPrime.low true) only if the facts have it.
 - A heart-rate step (plan.heartRateSteps) has no planned power: say how long the heart rate stayed inside its band (inBandPercent, minutesInBand of judgedMinutes) and nothing about its power against a target.
 - If the stall guard took hold (stallGuard is present), say how many times and in which step, as a fact about cadence and not as blame; it cut the target to 70% until the rider was pedalling again.

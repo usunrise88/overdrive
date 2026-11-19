@@ -106,7 +106,9 @@ describe("the tools and what they say about themselves", () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       "append_notebook_log",
+      "create_route",
       "create_workout",
+      "delete_route",
       "delete_workout",
       "get_activity",
       "get_facts",
@@ -125,6 +127,7 @@ describe("the tools and what they say about themselves", () => {
       "list_planned_workouts",
       "list_repeats",
       "list_rides",
+      "list_routes",
       "mark_discussion_topic",
       "resolve_plan_event",
       "rollback_notebook_section",
@@ -690,7 +693,11 @@ describe("update_workout", () => {
   });
 
   it.each([
-    ["nothing to change", { id: "icu-5001" }, /nothing to change: give a name, a date or steps/],
+    [
+      "nothing to change",
+      { id: "icu-5001" },
+      /nothing to change: give a name, a date, steps or a variant/,
+    ],
     ["a blank name", { id: "icu-5001", name: "   " }, /name must not be blank/],
     [
       "a date that does not exist",

@@ -22,8 +22,8 @@ const digest = (secret: string): Buffer => createHash("sha256").update(secret).d
 
 const OAUTH_ACCESS_TOKEN = /^odat_[A-Za-z0-9_-]{43}$/;
 
-/** The largest request body: a workout is a few kilobytes. */
-const BODY_LIMIT = 1024 * 1024;
+/** The largest request body: a workout is a few kilobytes; `create_route` takes a GPX file of up to 2 MB as a JSON string (ADR 0036). */
+const BODY_LIMIT = 3 * 1024 * 1024;
 
 const jsonRpcError = (code: number, message: string) => ({
   jsonrpc: "2.0" as const,

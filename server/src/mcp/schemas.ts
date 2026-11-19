@@ -67,3 +67,14 @@ export const stepsField = z
   .array(z.record(z.string(), z.unknown()))
   .meta(stepsSchema)
   .describe("The complete new list of steps, replacing the old one.");
+
+/**
+ * The `variant` argument of `create_workout` and `update_workout` (spec §11.5): the easier version of the session, in the same format as
+ * `steps`. It is kept only by the Overdrive service; intervals.icu and the rider's calendars hold the primary.
+ */
+export const variantField = z
+  .array(z.record(z.string(), z.unknown()))
+  .meta(stepsSchema)
+  .describe(
+    "The easier version of this session, as a complete list of steps in the same format as the workout's steps (the rider is offered it at the start of the ride and chooses with one tap).",
+  );

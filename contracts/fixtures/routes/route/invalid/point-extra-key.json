@@ -1,0 +1,48 @@
+{
+  "id": "route-gpx-0001",
+  "name": "North road",
+  "source": "gpx",
+  "distanceMeters": 100,
+  "ascentMeters": 1,
+  "hasCoordinates": true,
+  "createdAt": "2026-11-19T09:05:00.250Z",
+  "points": [
+    {
+      "d": 0,
+      "e": 250,
+      "lat": 45,
+      "lon": 7
+    },
+    {
+      "d": 20,
+      "e": 250.5,
+      "lat": 45.00018,
+      "lon": 7,
+      "grade": 2.5
+    },
+    {
+      "d": 40,
+      "e": 251,
+      "lat": 45.00036,
+      "lon": 7
+    },
+    {
+      "d": 60,
+      "e": 250.8,
+      "lat": 45.00054,
+      "lon": 7
+    },
+    {
+      "d": 80,
+      "e": 250.2,
+      "lat": 45.000719,
+      "lon": 7
+    },
+    {
+      "d": 100,
+      "e": 250,
+      "lat": 45.000899,
+      "lon": 7
+    }
+  ]
+}

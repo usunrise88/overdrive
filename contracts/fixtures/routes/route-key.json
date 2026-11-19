@@ -1,0 +1,163 @@
+{
+  "description": "Golden numbers for routePointsHash, routeKey and routeSessionHash (contracts/src/routes.ts): the points as text (d and e to a tenth of a metre, lat and lon to six decimals, a line each, after the line overdrive.route-points.v1), the first 16 hex characters of its SHA-256, the key routeId:hash, and the session hash (the first 16 hex characters of the SHA-256 of the line overdrive.route-session.v1, a line feed and the key). Written by a script that does not share code with the TypeScript functions.",
+  "cases": [
+    {
+      "name": "profile route",
+      "routeId": "route-profile01",
+      "points": [
+        {
+          "d": 0,
+          "e": 100
+        },
+        {
+          "d": 20,
+          "e": 100.4
+        },
+        {
+          "d": 40,
+          "e": 101
+        },
+        {
+          "d": 60,
+          "e": 101.6
+        },
+        {
+          "d": 80,
+          "e": 102
+        },
+        {
+          "d": 100,
+          "e": 102
+        },
+        {
+          "d": 120,
+          "e": 101.5
+        },
+        {
+          "d": 140,
+          "e": 101
+        },
+        {
+          "d": 160,
+          "e": 100.5
+        },
+        {
+          "d": 180,
+          "e": 100.2
+        },
+        {
+          "d": 200,
+          "e": 100
+        }
+      ],
+      "canonicalText": "overdrive.route-points.v1\n0.0 100.0\n20.0 100.4\n40.0 101.0\n60.0 101.6\n80.0 102.0\n100.0 102.0\n120.0 101.5\n140.0 101.0\n160.0 100.5\n180.0 100.2\n200.0 100.0",
+      "pointsHash": "c7dd886a5d4e5645",
+      "routeKey": "route-profile01:c7dd886a5d4e5645",
+      "sessionHash": "e511c16ad4ff5524"
+    },
+    {
+      "name": "route with coordinates",
+      "routeId": "route-gpx-0001",
+      "points": [
+        {
+          "d": 0,
+          "e": 250,
+          "lat": 45,
+          "lon": 7
+        },
+        {
+          "d": 20,
+          "e": 250.5,
+          "lat": 45.00018,
+          "lon": 7
+        },
+        {
+          "d": 40,
+          "e": 251,
+          "lat": 45.00036,
+          "lon": 7
+        },
+        {
+          "d": 60,
+          "e": 250.8,
+          "lat": 45.00054,
+          "lon": 7
+        },
+        {
+          "d": 80,
+          "e": 250.2,
+          "lat": 45.000719,
+          "lon": 7
+        },
+        {
+          "d": 100,
+          "e": 250,
+          "lat": 45.000899,
+          "lon": 7
+        }
+      ],
+      "canonicalText": "overdrive.route-points.v1\n0.0 250.0 45.000000 7.000000\n20.0 250.5 45.000180 7.000000\n40.0 251.0 45.000360 7.000000\n60.0 250.8 45.000540 7.000000\n80.0 250.2 45.000719 7.000000\n100.0 250.0 45.000899 7.000000",
+      "pointsHash": "dc8a1ad9fb59a0a9",
+      "routeKey": "route-gpx-0001:dc8a1ad9fb59a0a9",
+      "sessionHash": "bc17ff5fda275d0b"
+    },
+    {
+      "name": "route with a short last gap",
+      "routeId": "route-wp-0001",
+      "points": [
+        {
+          "d": 0,
+          "e": 10,
+          "lat": 46,
+          "lon": 8
+        },
+        {
+          "d": 20,
+          "e": 11,
+          "lat": 46.00018,
+          "lon": 8.00005
+        },
+        {
+          "d": 40,
+          "e": 12,
+          "lat": 46.00036,
+          "lon": 8.0001
+        },
+        {
+          "d": 60,
+          "e": 13,
+          "lat": 46.00054,
+          "lon": 8.00015
+        },
+        {
+          "d": 80,
+          "e": 12,
+          "lat": 46.000719,
+          "lon": 8.0002
+        },
+        {
+          "d": 100,
+          "e": 12,
+          "lat": 46.000899,
+          "lon": 8.00025
+        },
+        {
+          "d": 120,
+          "e": 11,
+          "lat": 46.001079,
+          "lon": 8.0003
+        },
+        {
+          "d": 130.4,
+          "e": 10.5,
+          "lat": 46.001259,
+          "lon": 8.00035
+        }
+      ],
+      "canonicalText": "overdrive.route-points.v1\n0.0 10.0 46.000000 8.000000\n20.0 11.0 46.000180 8.000050\n40.0 12.0 46.000360 8.000100\n60.0 13.0 46.000540 8.000150\n80.0 12.0 46.000719 8.000200\n100.0 12.0 46.000899 8.000250\n120.0 11.0 46.001079 8.000300\n130.4 10.5 46.001259 8.000350",
+      "pointsHash": "ac9987b8c6579aee",
+      "routeKey": "route-wp-0001:ac9987b8c6579aee",
+      "sessionHash": "1a14d924101edc68"
+    }
+  ]
+}

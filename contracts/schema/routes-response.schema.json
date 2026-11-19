@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive routes response",
+  "description": "The service's answer to GET /v1/routes (spec §11.4, ADR 0036): the routes the agent has created, newest first, without their points (GET /v1/routes/{id} gives one route with its points, route.schema.json). generatedAt is when the service answered (UTC). Rules a schema cannot state, checked by every implementation: ids are unique, createdAt is a real UTC instant and the routes are ordered newest first, then by id.",
+  "type": "object",
+  "required": ["generatedAt", "routes"],
+  "additionalProperties": false,
+  "properties": {
+    "generatedAt": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "routes": {
+      "type": "array",
+      "items": { "$ref": "route.schema.json#/$defs/summary" }
+    }
+  }
+}

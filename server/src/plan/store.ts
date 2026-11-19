@@ -1,7 +1,8 @@
-import type { PlannedWorkout, PlanSource, Workout } from "@overdrive/contracts";
+import type { PlannedVariant, PlannedWorkout, PlanSource, Workout } from "@overdrive/contracts";
 import type { Db, Queryable } from "../db.ts";
 import type { EventBus } from "../events.ts";
 import { canonicalJson, sha256Hex } from "../hash.ts";
+import { applyExtras, type ExtrasRow, type RouteIds, type StoredVariant } from "./extras.ts";
 
 /**
  * The plan cache (spec §5.1, ADR 0016): the planned workouts of the next days, already converted
@@ -24,6 +25,11 @@ export interface PlanEntry {
   workout: Workout | null;
   /** Why `workout` is null; null when it is not. */
   unsupportedReason: string | null;
+  /**
+   * The easier version of the session (spec §11.5), laid over the entry when it is read from the store; never part of what is written
+   * (the calendar holds the primary). The route ids of the free steps are laid over `workout` the same way (spec §11.4).
+   */
+  variant?: PlannedVariant;
 }
 
 /** What a write changed, by planned workout id. */
@@ -60,11 +66,13 @@ export interface PlanSyncState {
 }
 
 export interface PlanStore {
-  /** Workouts that were converted, from `from` to `to`, ordered by date then id. */
+  /** Workouts that were converted, from `from` to `to`, ordered by date then id, with their variants and route ids laid on. */
   list(range: DateRange): Promise<PlannedWorkout[]>;
   /** Every cached event in the range, converted or not (for the MCP's view of what the tablet cannot play). */
   entries(range: DateRange): Promise<PlanEntry[]>;
   get(id: string): Promise<PlannedWorkout | null>;
+  /** Lays the variants and route ids the service keeps over entries read from elsewhere (the calendar, for a range the cache lacks). */
+  decorate(entries: PlanEntry[]): Promise<PlanEntry[]>;
   /** Adds or replaces one entry; `plan-changed` is emitted when something changed. */
   upsert(entry: PlanEntry): Promise<"added" | "updated" | "unchanged">;
   /** Removes one entry; true if it was there. */
@@ -88,22 +96,48 @@ interface Row {
   workout: Workout | null;
   unsupported_reason: string | null;
   content_sha256: string;
+  /** Laid over the workout when it is read (`planned_workout_extras`): route ids, the fingerprint they hold for, the variant. */
+  x_route_ids: RouteIds | null;
+  x_steps_hash: string | null;
+  x_variant: StoredVariant | null;
 }
 
-const COLUMNS = `id, source, external_id, plan_date::text AS plan_date, name, workout,
-                 unsupported_reason, content_sha256`;
+const COLUMNS = `p.id, p.source, p.external_id, p.plan_date::text AS plan_date, p.name, p.workout,
+                 p.unsupported_reason, p.content_sha256,
+                 x.route_ids AS x_route_ids, x.steps_hash AS x_steps_hash, x.variant AS x_variant`;
+const FROM = "planned_workouts p LEFT JOIN planned_workout_extras x ON x.workout_id = p.id";
+
+const extrasOf = (row: Row): Pick<ExtrasRow, "routeIds" | "stepsHash" | "variant"> => ({
+  routeIds: row.x_route_ids,
+  stepsHash: row.x_steps_hash,
+  variant: row.x_variant,
+});
 
 const MAX_REASON = 500;
 
 function toEntry(row: Row): PlanEntry {
+  const laid = row.workout === null ? null : applyExtras(row.workout, extrasOf(row));
   return {
     id: row.id,
     source: row.source,
     externalId: row.external_id,
     date: row.plan_date,
     name: row.name,
-    workout: row.workout,
+    workout: laid === null ? null : laid.workout,
     unsupportedReason: row.unsupported_reason,
+    ...(laid?.variant === undefined ? {} : { variant: laid.variant }),
+  };
+}
+
+function toPlanned(row: Row): PlannedWorkout {
+  const laid = applyExtras(row.workout as Workout, extrasOf(row));
+  return {
+    id: row.id,
+    date: row.plan_date,
+    name: row.name,
+    source: row.source,
+    workout: laid.workout,
+    ...(laid.variant === undefined ? {} : { variant: laid.variant }),
   };
 }
 
@@ -163,24 +197,18 @@ export function createPlanStore(db: Db, bus: EventBus): PlanStore {
   return {
     async list(range) {
       const result = await db.query<Row>(
-        `SELECT ${COLUMNS} FROM planned_workouts
-          WHERE plan_date BETWEEN $1::date AND $2::date AND workout IS NOT NULL
-          ORDER BY plan_date, id`,
+        `SELECT ${COLUMNS} FROM ${FROM}
+          WHERE p.plan_date BETWEEN $1::date AND $2::date AND p.workout IS NOT NULL
+          ORDER BY p.plan_date, p.id`,
         [range.from, range.to],
       );
-      return result.rows.map((row) => ({
-        id: row.id,
-        date: row.plan_date,
-        name: row.name,
-        source: row.source,
-        workout: row.workout as Workout,
-      }));
+      return result.rows.map(toPlanned);
     },
 
     async entries(range) {
       const result = await db.query<Row>(
-        `SELECT ${COLUMNS} FROM planned_workouts
-          WHERE plan_date BETWEEN $1::date AND $2::date ORDER BY plan_date, id`,
+        `SELECT ${COLUMNS} FROM ${FROM}
+          WHERE p.plan_date BETWEEN $1::date AND $2::date ORDER BY p.plan_date, p.id`,
         [range.from, range.to],
       );
       return result.rows.map(toEntry);
@@ -188,19 +216,41 @@ export function createPlanStore(db: Db, bus: EventBus): PlanStore {
 
     async get(id) {
       const result = await db.query<Row>(
-        `SELECT ${COLUMNS} FROM planned_workouts WHERE id = $1 AND workout IS NOT NULL`,
+        `SELECT ${COLUMNS} FROM ${FROM} WHERE p.id = $1 AND p.workout IS NOT NULL`,
         [id],
       );
       const row = result.rows[0];
-      return row === undefined
-        ? null
-        : {
-            id: row.id,
-            date: row.plan_date,
-            name: row.name,
-            source: row.source,
-            workout: row.workout as Workout,
-          };
+      return row === undefined ? null : toPlanned(row);
+    },
+
+    async decorate(entries) {
+      const withWorkout = entries.filter((entry) => entry.workout !== null);
+      if (withWorkout.length === 0) return entries;
+      const found = await db.query<{
+        workout_id: string;
+        route_ids: RouteIds | null;
+        steps_hash: string | null;
+        variant: StoredVariant | null;
+      }>(
+        `SELECT workout_id, route_ids, steps_hash, variant FROM planned_workout_extras
+          WHERE workout_id = ANY($1::text[])`,
+        [withWorkout.map((entry) => entry.id)],
+      );
+      const byId = new Map(found.rows.map((row) => [row.workout_id, row]));
+      return entries.map((entry) => {
+        const row = byId.get(entry.id);
+        if (entry.workout === null || row === undefined) return entry;
+        const laid = applyExtras(entry.workout, {
+          routeIds: row.route_ids,
+          stepsHash: row.steps_hash,
+          variant: row.variant,
+        });
+        return {
+          ...entry,
+          workout: laid.workout,
+          ...(laid.variant === undefined ? {} : { variant: laid.variant }),
+        };
+      });
     },
 
     async upsert(entry) {

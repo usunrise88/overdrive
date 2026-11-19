@@ -205,7 +205,14 @@ export function createGatherer(deps: GatherDeps): Gatherer {
         maxHeartRate: summary.maxHeartRate ?? null,
         workKilojoules: summary.workKilojoules,
         ftp: record.ride.ftp,
-        plan: workout === null ? null : { workout, compliance: rideCompliance(record, workout) },
+        plan:
+          workout === null
+            ? null
+            : {
+                workout,
+                compliance: rideCompliance(record, workout),
+                ...(record.ride.variantRidden === true ? { easierVersionRidden: true } : {}),
+              },
         curve: rideMetrics?.powerCurve ?? [],
         priorBests,
         drift: rideMetrics?.drift ?? null,

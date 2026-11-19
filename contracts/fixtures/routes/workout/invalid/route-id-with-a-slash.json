@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "id": "icu-5001",
+  "name": "Ride out",
+  "steps": [
+    {
+      "type": "free",
+      "duration": 600,
+      "route_id": "route/1"
+    }
+  ]
+}

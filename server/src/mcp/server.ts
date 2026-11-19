@@ -10,6 +10,7 @@ import { registerPlanEventTools } from "./tools/plan-events.ts";
 import { registerProfileTools } from "./tools/profile.ts";
 import { registerRepeatTools } from "./tools/repeats.ts";
 import { registerRideTools } from "./tools/rides.ts";
+import { registerRouteTools } from "./tools/routes.ts";
 import { registerWellnessTools } from "./tools/wellness.ts";
 
 /** What the server tells a client about itself; not the release tag. */
@@ -41,6 +42,13 @@ const INSTRUCTIONS =
   "do it. The rider reads this notebook in the companion, so write what you would say to their face. When you have rebuilt the plan for an event with " +
   "the planning tools, call resolve_plan_event with a short note for the rider (what changed and why; the server sends it) and dropped true or false: " +
   "dropping a missed session is a valid outcome, and the rider is told plainly. The service moves nothing by itself. " +
+  // Routes and the easier variant (spec §11.4, §11.5, ADR 0036).
+  "ROUTES: create_route makes a route with elevation (from a GPX file, from waypoints routed over roads, or as a synthetic elevation profile) " +
+  "that the rider rides with its real grade; give a free step of a workout its id as route_id. list_routes and delete_route manage them. " +
+  "EASIER VERSIONS: when you plan a demanding session you may also write an easier version of it (variant and variantNote in create_workout and " +
+  "update_workout); the rider sees their recovery state at the start of the ride and picks one version with a tap. It lives only in this server. " +
+  "When it is ridden the server updates the calendar entry to what was done and list_plan_events shows a variant event: treat it as a fact about the " +
+  "rider's day (they chose the easier version) when you plan the next sessions, and resolve it. " +
   "Results are compact by default; ask for detail only when needed.";
 
 /** What a session that holds the game master's scope is told in addition. */
@@ -65,6 +73,7 @@ export function createMcpServer(base: ToolContext, caller?: McpCaller): McpServe
   );
   registerProfileTools(server, ctx);
   registerPlanTools(server, ctx);
+  registerRouteTools(server, ctx);
   const rides = registerRideTools(server, ctx);
   registerActivityTools(server, ctx, rides);
   registerFitnessTools(server, ctx);
