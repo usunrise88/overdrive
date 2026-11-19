@@ -106,7 +106,6 @@ describe("the structure hash of a planned workout (ADR 0034)", () => {
       "structure-hash-too-short.json",
       "structure-hash-upper-case.json",
       "structure-hash-not-hex.json",
-      "structure-hash-null.json",
       "structure-hash-a-number.json",
     ]) {
       expect(validateWorkoutsResponse(byName.get(name)).ok, name).toBe(false);

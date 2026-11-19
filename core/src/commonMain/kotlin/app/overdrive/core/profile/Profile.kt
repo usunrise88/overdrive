@@ -1,6 +1,9 @@
 package app.overdrive.core.profile
 
 import app.overdrive.core.physics.PhysicsSettings
+import app.overdrive.core.plan.PlanDates
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 /**
@@ -14,6 +17,7 @@ import kotlinx.serialization.Serializable
  * The model is as strict as the schema: a value out of range, an unknown key or a missing one is an
  * [IllegalArgumentException] when it is read.
  */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 public data class Profile(
     val ftp: Int?,
@@ -36,6 +40,18 @@ public data class Profile(
     val estimatedMaxHeartRate: Int? = null,
     /** 95% of the best 20-minute average heart rate in the stored rides; read-only, null when not enough. */
     val estimatedThresholdHeartRate: Int? = null,
+    /**
+     * The bike, kit and bottles in kilograms, or null when not set (spec §12.5, docs/adr/0034). Setting it is what puts the rider's
+     * weight into the physics: see [systemMassKgFromWeights]. Written to the wire only when it has a value (an absent key is "not set").
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val bikeWeightKg: Double? = null,
+    /**
+     * The rider's weight as the service has it from Health Connect, read-only and derived (spec §12.5): the 7-day average. Null when
+     * there is none; written to the wire only when there is one.
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val riderWeight: RiderWeight? = null,
 ) {
     init {
         require(ftp == null || ftp in MIN_FTP..MAX_FTP) { "FTP must be within $MIN_FTP..$MAX_FTP W, got $ftp" }
@@ -57,6 +73,9 @@ public data class Profile(
             "Estimated threshold heart rate must be within $MIN_THRESHOLD_HR..$MAX_THRESHOLD_HR bpm, " +
                 "got $estimatedThresholdHeartRate"
         }
+        require(bikeWeightKg == null || (bikeWeightKg > 0.0 && bikeWeightKg <= MAX_BIKE_WEIGHT_KG)) {
+            "The bike weight must be within (0, $MAX_BIKE_WEIGHT_KG] kg, got $bikeWeightKg"
+        }
         require(maxHeartRate == null || thresholdHeartRate == null || thresholdHeartRate < maxHeartRate) {
             "Threshold heart rate $thresholdHeartRate must be below the maximum $maxHeartRate"
         }
@@ -68,9 +87,22 @@ public data class Profile(
         require(updatedAt == null || INSTANT.matches(updatedAt)) { "updatedAt is not a UTC instant: '$updatedAt'" }
     }
 
+    /**
+     * The system mass the weights give: the rider's 7-day average weight plus the bike's, or null unless **both** are there. A profile
+     * that has no weighing this week, or no bike weight, leaves the mass to [ProfilePhysics.systemMassKg] (docs/adr/0034).
+     */
+    public fun systemMassKgFromWeights(): Double? {
+        val rider = riderWeight ?: return null
+        val bike = bikeWeightKg ?: return null
+        val total = rider.kg + bike
+        return if (total <= ProfilePhysics.MAX_MASS_KG) total else null
+    }
+
     public companion object {
         public const val MIN_FTP: Int = 30
         public const val MAX_FTP: Int = 2000
+        public const val MAX_BIKE_WEIGHT_KG: Double = 100.0
+        public const val MAX_RIDER_WEIGHT_KG: Double = 500.0
         public const val MIN_W_PRIME_KJ: Double = 1.0
         public const val MAX_W_PRIME_KJ: Double = 100.0
         public const val MAX_GOALS: Int = 10
@@ -92,6 +124,31 @@ public data class Profile(
                 physics = ProfilePhysics.DEFAULT,
                 updatedAt = null,
             )
+    }
+}
+
+/**
+ * The rider's weight as the service has it (spec §12.5, docs/adr/0034): the mean of the daily weights of the last seven local days,
+ * [kg] to one decimal, with the local [date] of the newest weighing in it and the number of [days] of the seven that had one.
+ */
+@Serializable
+public data class RiderWeight(
+    val kg: Double,
+    /** `YYYY-MM-DD`. */
+    val date: String,
+    val days: Int,
+) {
+    init {
+        require(kg > 0.0 && kg <= Profile.MAX_RIDER_WEIGHT_KG) {
+            "The rider's weight must be within (0, ${Profile.MAX_RIDER_WEIGHT_KG}] kg, got $kg"
+        }
+        require(days in 1..WEIGHT_WINDOW_DAYS) { "The days with a weighing are 1..$WEIGHT_WINDOW_DAYS, got $days" }
+        require(PlanDates.epochDay(date) != null) { "Not a calendar date: '$date'" }
+    }
+
+    public companion object {
+        /** The window of the average, in days (spec §12.5). */
+        public const val WEIGHT_WINDOW_DAYS: Int = 7
     }
 }
 
