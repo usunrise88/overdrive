@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.Modifier
 import app.overdrive.ride.ui.RideApp
 import app.overdrive.uikit.OverdriveTheme
+import app.overdrive.uikit.shouldPlayIntro
 import app.overdrive.uikit.tokens.OverdriveColors
 
 /**
@@ -30,12 +31,16 @@ class MainActivity : ComponentActivity() {
         )
         val container = (application as OverdriveApp).container
         // The system's "remove animations" setting switches off every short animation (design/system.md §9).
-        val motion = Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
+        val animatorScale = Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+        val motion = animatorScale > 0f
+        // The launch film plays on a cold start only, and not when the animations are off (ADR 0031).
+        val playIntro = shouldPlayIntro(coldStart = savedInstanceState == null, animatorScale = animatorScale)
         setContent {
             OverdriveTheme(motionEnabled = motion) {
                 RideApp(
                     container,
                     Modifier.fillMaxSize().background(OverdriveColors.bg).windowInsetsPadding(WindowInsets.safeDrawing),
+                    playIntro = playIntro,
                 )
             }
         }

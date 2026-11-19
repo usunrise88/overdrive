@@ -16,6 +16,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import app.overdrive.companion.ui.CompanionRoot
 import app.overdrive.uikit.OverdriveTheme
+import app.overdrive.uikit.shouldPlayIntro
 
 /**
  * The one activity, portrait (design/companion.md §1). It holds no state: the screens, the answers and the back stacks live in the
@@ -30,14 +31,21 @@ class MainActivity : ComponentActivity() {
         )
         val container = (application as CompanionApp).container
         // The system's "remove animations" setting switches off every short animation (design/system.md §9).
-        val motion = Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
+        val animatorScale = Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+        val motion = animatorScale > 0f
+        // The launch film plays on a cold start only, and not when the animations are off (ADR 0031).
+        val playIntro = shouldPlayIntro(coldStart = savedInstanceState == null, animatorScale = animatorScale)
         // The app is on screen: read what is new from the watch (at most every five minutes), as the daily job does at 06:00.
         lifecycle.addObserver(
             LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_START) container.appOpened() },
         )
         setContent {
             OverdriveTheme(motionEnabled = motion) {
-                CompanionRoot(container, Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars))
+                CompanionRoot(
+                    container,
+                    Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars),
+                    playIntro = playIntro,
+                )
             }
         }
     }
