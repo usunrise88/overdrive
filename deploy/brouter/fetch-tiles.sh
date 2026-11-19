@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Download BRouter routing tiles (segments4, one .rd5 file per 5x5 degree square) from brouter.de.
-# The tiles are not in the repository. docs/deploy.md, section 19.
+# The tiles are not in the repository. docs/deploy.md, section 20.
 #
 # Run from the repository root, so the default target is ./data/brouter/segments4 (git-ignored):
 #   deploy/brouter/fetch-tiles.sh --list --region serbia

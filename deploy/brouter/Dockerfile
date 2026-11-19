@@ -1,6 +1,6 @@
 # BRouter routing server (spec §11.4). Built here from the upstream release zip, not from ghcr.io:
 # the ghcr.io "latest" image is too old to read the current brouter.de tiles (lookups.dat version
-# mismatch). Upgrading: change BROUTER_VERSION and BROUTER_SHA256 together. docs/deploy.md, section 19.
+# mismatch). Upgrading: change BROUTER_VERSION and BROUTER_SHA256 together. docs/deploy.md, section 20.
 #   docker compose build brouter
 ARG JAVA_IMAGE=eclipse-temurin:17-jre-jammy
 
