@@ -1,0 +1,17 @@
+{
+  "seq": 90,
+  "clock": 1795000450000,
+  "elapsedSeconds": 450,
+  "paused": false,
+  "muted": false,
+  "step": {
+    "index": 3,
+    "type": "free",
+    "durationSeconds": 900,
+    "timeLeftSeconds": 700
+  },
+  "stepCount": 7,
+  "power": 140,
+  "heartRate": 121,
+  "cadence": 85
+}

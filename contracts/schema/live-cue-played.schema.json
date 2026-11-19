@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive live coach: a cue was played, or not",
+  "description": "The body of POST /v1/live/sessions/{id}/cues/{cueId}/played (spec §12.1, ADR 0038), optional for the app: it says whether the cue was heard. played is true when it was played, false when it was not (it had expired, audio focus was refused, the rider muted the coach). clock is the app's clock in milliseconds since the Unix epoch. The service stores the answer with the cue on the ride (the log shows whether the rider was told) and answers 204; a cue it does not know is 404 not_found. Without this call the log says it does not know whether the cue was played.",
+  "type": "object",
+  "required": ["played"],
+  "additionalProperties": false,
+  "properties": {
+    "played": { "type": "boolean" },
+    "clock": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+  }
+}

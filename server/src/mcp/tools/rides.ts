@@ -159,6 +159,8 @@ export function registerRideTools(server: McpServer, ctx: ToolContext): RideTool
         "how much of W′ it used; below 0 means CP or W′ are set too low for this rider. " +
         "variantRidden (present and true only when the rider chose the session's easier version at the start: the laps and compliance are then against that version) and " +
         "route (the route's id and name, present only when the ride followed one). " +
+        "liveCoach (present only when the live coach spoke in the ride: each line it said, in order, with the minute of the ride, what triggered it, the step it was about and " +
+        "whether the tablet reported it as played; this is what the rider was told, so do not repeat it back as news). " +
         "repeatOf: when the ride was played from a workout that has been ridden more than once (same structure, whatever it is called), its attempt number among the " +
         "attempts, how many there are, and the attempt before it with the difference in average heart rate at the same power (this ride minus that one, bpm: " +
         "lower at the same power is fitter); null otherwise. Heart rate also moves with heat, sleep and caffeine: one comparison proves little, list_repeats and get_repeat give the trend.",
@@ -199,6 +201,7 @@ export function registerRideTools(server: McpServer, ctx: ToolContext): RideTool
 
       const computed = await services.metrics.rideMetrics(rideId, { wbal: true }, record);
       const repeatOf = await services.repeats.repeatOf(rideId);
+      const liveCues = await services.liveCoach.cuesOfRide(rideId);
 
       const startedAt = record.ride.startEpochMillis;
       return {
@@ -242,6 +245,23 @@ export function registerRideTools(server: McpServer, ctx: ToolContext): RideTool
         })),
         compliance,
         stallGuard: stallGuardSummary(record, resolved.workout),
+        // What the live coach said to the rider (spec §12.1): present only when it said something.
+        ...(liveCues.length === 0
+          ? {}
+          : {
+              liveCoach: {
+                count: liveCues.length,
+                cues: liveCues.map((cue) => ({
+                  minute: round(cue.atSeconds / 60, 1),
+                  trigger: cue.trigger,
+                  source: cue.source,
+                  step: cue.stepIndex === null ? null : cue.stepIndex + 1,
+                  text: cue.text,
+                  // What the tablet reported; null when it did not say.
+                  played: cue.played,
+                })),
+              },
+            }),
         powerCurve: computed?.powerCurve ?? [],
         aerobicDrift: computed?.drift ?? null,
         wPrimeBalance: computed?.wPrimeBalance ?? null,

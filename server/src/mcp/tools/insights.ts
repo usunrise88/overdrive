@@ -106,7 +106,7 @@ export function registerInsightTools(server: McpServer, ctx: ToolContext): void 
       description:
         "The structured facts the service computed for a note and gave to the writer, so you can reason over exactly what the rider's note was " +
         "based on. kind morning (a date: recovery state with its reason and signals, today's planned workout with its length, planned load and intensity, form, " +
-        "last ride), ride (a rideId: the ride, planned against ridden step by step, the best efforts against earlier bests, drift, W' and form), week (a Monday: " +
+        "last ride), ride (a rideId: the ride, planned against ridden step by step, the best efforts against earlier bests, drift, W' and form, and liveCoach: the lines the live coach said to the rider, when it spoke), week (a Monday: " +
         "sessions planned against done, load against the week before, fitness and form, recovery mornings, wellness trends, new bests, the next 7 days), " +
         "deviation (a date: the metrics that have been outside the rider's baseline for the alert's number of days) or drift (a date: missed sessions and " +
         "load against plan over the last 7 days). Every number is computed by the server and listed in quotable with its unit: quote them, never recalculate or " +

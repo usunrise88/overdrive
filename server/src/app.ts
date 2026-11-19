@@ -4,6 +4,7 @@ import type { Config } from "./config.ts";
 import type { Db } from "./db.ts";
 import { installErrorHandling, sendError } from "./errors.ts";
 import { insightsRoutes } from "./insights/routes.ts";
+import { liveRoutes } from "./live-coach/routes.ts";
 import { type McpConfig, type McpTestOptions, mcpModule, mcpSettings } from "./mcp/index.ts";
 import { metricsRoutes } from "./metrics/routes.ts";
 import { notebookRoutes } from "./notebook/routes.ts";
@@ -104,6 +105,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       v1.register(notebookRoutes, { service: services.notebook });
       v1.register(planEventsRoutes, { service: services.planEvents });
       v1.register(routesRest, { service: services.routes });
+      v1.register(liveRoutes, { service: services.liveCoach });
     },
     { prefix: "/v1" },
   );

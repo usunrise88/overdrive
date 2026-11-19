@@ -41,6 +41,11 @@ src/         @overdrive/contracts: the schema plus a validator for the TypeScrip
 | Plan event declaration (`POST /v1/plan-events` body) | `schema/plan-event-declaration.schema.json` | §12.2, §8.3, ADR 0035 |
 | Route with points (`GET /v1/routes/{id}`) | `schema/route.schema.json` | §11.4, §8.3, ADR 0036 |
 | Routes (`GET /v1/routes`) | `schema/routes-response.schema.json` | §11.4, §8.3, ADR 0036 |
+| Live coach: the workout's `live_coach`, `coach_brief` and the steps' `must_say` | `schema/workout.schema.json` (additive) | §12.1, §8.1, ADR 0038 |
+| Live coach: start of a session (`POST /v1/live/sessions` body) and its answer | `schema/live-session-start.schema.json`, `…-response.schema.json` | §12.1, §8.3, ADR 0038 |
+| Live coach: a snapshot of the ride (`POST /v1/live/sessions/{id}/snapshots` body, every 5 s) | `schema/live-snapshot.schema.json` | §12.1, §8.3, ADR 0038 |
+| Live coach: a cue (`cue` event of `GET /v1/live/sessions/{id}/cues`, Server-Sent Events) and the `end` event | `schema/live-cue.schema.json`, `schema/live-stream-end.schema.json` | §12.1, §8.3, ADR 0038 |
+| Live coach: end of a session (`POST …/end` body and answer), a cue played (`POST …/cues/{id}/played` body) | `schema/live-session-end.schema.json`, `…-end-response.schema.json`, `schema/live-cue-played.schema.json` | §12.1, §8.3, ADR 0038 |
 
 The remaining sync API payloads and the MCP tool inputs (spec §8.3–§8.4) get schemas here as they are fixed during
 implementation. The sync outbox of the ride app (ADR 0012) is a local journal, not a wire format, and has no schema.
@@ -141,6 +146,26 @@ and an unknown key fails them): `ride-record/` (the ride header's optional `rout
 step) and `workouts-response/` (the optional `variant` of a planned workout: `steps`, `note`, `structureHash`). The stage that teaches Kotlin these fields moves
 them next to the others. `route-key.json` holds the golden numbers of `routePointsHash` and `routeKey` (the route id and the hash of its points, which makes two
 rides on the same route one session, §11.7). Everything is synthetic, with invented coordinates. Run by `test/routes.test.ts`.
+
+`fixtures/live-coach/` holds the golden files of stage A3 (ADR 0038): the live coach (spec §12.1). The workout gains three optional fields,
+**additive and not yet read by Kotlin** (its decoders reject unknown keys), so the fixtures that carry them live here and not in `workouts/`
+or `plan/workouts-response/`, which Kotlin decodes: `live_coach` (boolean), `coach_brief` (at most 1000 characters, never shown on the
+tablet) and, on a steady, ramp, free or heart-rate step (not a repeat), `must_say`: at most 3 lines `{ at: "start" | seconds, text }`, `text`
+at most 80 characters (code points, like a cue), `at` a whole second from 1 and below the step's duration, no two at the same moment (checked
+by `validateWorkout`, which says the path and never quotes a line). They are kept only by the service (never in intervals.icu or Google
+Calendar), served on `GET /v1/workouts`, and are **not part of a workout's structure**: the hash ignores them, and the copy of the workout a
+ride keeps has none (`withoutLiveCoach`). The tablet speaks to the service over plain `HttpURLConnection`: `session-start` and
+`session-start-response` (`POST /v1/live/sessions`: ride id, workout id, structure hash, the app's clock; the answer says whether the coach
+is on and, when not, why: `feature-off`, `no-tts`, `no-llm`, `no-workout`, `no-live-coach`, `structure-changed`), `snapshot` (`POST
+…/snapshots` every 5 s: ride time, paused, muted, the step with its time left and target, means over the last 5 s of power, heart rate and
+cadence, the share of the step's judged seconds on target, the stall guard, recent events; every field bounded), `cue` and `stream-end` (the
+data of the `cue` and `end` events of the Server-Sent Events stream `GET …/cues`: the cue's id is its SSE id, `text` at most 80
+characters, the speech **inline** as base64 with its format, `createdAt`, `expiresAt` and `ttlMs`), `session-end` and
+`session-end-response` (`POST …/end`), `cue-played` (`POST …/cues/{id}/played`, optional). `stream/cues.sse.txt` is a stream as the service
+writes it (a `retry:` line, comments, `id:`, `event:`, `data:`), parsed and checked by `test/live-coach.test.ts`; the audio in it is a few
+synthetic bytes, no speech. No new API error code: a bad body is `400 invalid_json`, an unknown session or cue `404 not_found`. What a schema
+cannot say (the time left inside the step, a target that fits the step's type, `ttlMs` equal to `expiresAt` minus `createdAt`, the audio's
+size, the answer to a start being consistent) is checked by `validateLiveSnapshot` & co. here. All the fixtures are synthetic.
 
 `fixtures/fit/` holds two FIT files for the upload's tests: `fit-golden-3s.fit`, the 376 bytes `FitWriter` writes for
 `rides/valid/fit-golden-3s.json` (the worked example of `docs/protocols/fit.md`; Kotlin's `FitFixturesTest` regenerates it

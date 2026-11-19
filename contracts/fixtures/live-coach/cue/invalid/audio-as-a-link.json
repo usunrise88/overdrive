@@ -1,0 +1,9 @@
+{
+  "id": 3,
+  "text": "Ten minutes at 247 watts. Smooth first two minutes.",
+  "trigger": "step-start",
+  "createdAt": "2026-11-19T07:42:10.250Z",
+  "expiresAt": "2026-11-19T07:42:18.250Z",
+  "ttlMs": 8000,
+  "audio": "https://tts.example.com/cue-3.mp3"
+}

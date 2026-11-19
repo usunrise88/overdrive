@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive live coach: start of a session",
+  "description": "The body of POST /v1/live/sessions (spec §12.1, ADR 0038): the ride app starts a live session when a ride begins from a planned workout whose live_coach is true. rideId is the ride's id (the ride record's ride.id, 1 to 128 characters from A-Z a-z 0-9 . _ -): the cue log is stored under it. workoutId and structureHash say which workout is being ridden (the planned workout's id, icu-123, and the structureHash the service sent with it, 16 lower-case hex characters): the service looks the workout up and turns the coach off, saying why, when it does not know it or its structure has changed. variantRidden is true when the rider chose the easier version, whose structureHash is the variant's. clock is the app's clock in milliseconds since the Unix epoch, so that the service can tell how far apart the two clocks are. Only one live session exists at a time: a start ends the one before it.",
+  "type": "object",
+  "required": ["rideId", "clock"],
+  "additionalProperties": false,
+  "properties": {
+    "rideId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "workoutId": {
+      "type": ["string", "null"],
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "structureHash": { "type": ["string", "null"], "pattern": "^[0-9a-f]{16}$" },
+    "variantRidden": { "type": "boolean" },
+    "clock": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+  }
+}

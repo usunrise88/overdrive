@@ -1,0 +1,80 @@
+{
+  "from": "2026-11-20",
+  "to": "2026-11-20",
+  "generatedAt": "2026-11-19T07:30:12Z",
+  "stale": false,
+  "configured": true,
+  "workouts": [
+    {
+      "id": "icu-6001",
+      "date": "2026-11-20",
+      "name": "Threshold progression 3x10",
+      "source": "intervals.icu",
+      "workout": {
+        "schema": 1,
+        "id": "icu-6001",
+        "name": "Threshold progression 3x10",
+        "description": "Three ten-minute efforts at threshold with short recoveries.",
+        "live_coach": true,
+        "coach_brief": "Threshold progression. He tends to start intervals too hard and fade. Keep him smooth in the first two minutes. Calm, technical tone.",
+        "steps": [
+          {
+            "type": "ramp",
+            "duration": 600,
+            "from": 0.45,
+            "to": 0.7,
+            "label": "Warm-up"
+          },
+          {
+            "type": "repeat",
+            "count": 3,
+            "steps": [
+              {
+                "type": "steady",
+                "duration": 600,
+                "target": 0.95,
+                "label": "Threshold",
+                "must_say": [
+                  {
+                    "at": "start",
+                    "text": "First one. Ease into it."
+                  }
+                ]
+              },
+              {
+                "type": "steady",
+                "duration": 300,
+                "target": 0.5,
+                "label": "Recover"
+              }
+            ]
+          },
+          {
+            "type": "ramp",
+            "duration": 300,
+            "from": 0.55,
+            "to": 0.4,
+            "label": "Cool-down"
+          }
+        ]
+      },
+      "structureHash": "833a9d4d7f4ebf35",
+      "variant": {
+        "steps": [
+          {
+            "type": "steady",
+            "duration": 600,
+            "target": 0.9,
+            "must_say": [
+              {
+                "at": 700,
+                "text": "Late."
+              }
+            ]
+          }
+        ],
+        "structureHash": "bb36aad5ffcf3d9d"
+      }
+    }
+  ]
+}

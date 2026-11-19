@@ -3,6 +3,7 @@ import {
   type RideHeader,
   variantWorkout,
   type Workout,
+  withoutLiveCoach,
 } from "@overdrive/contracts";
 import { type IntervalsClient, IntervalsError } from "./intervals/client.ts";
 import { eventIdOf } from "./intervals/ids.ts";
@@ -100,6 +101,9 @@ export function createRideWorkoutResolver(deps: RideWorkoutDeps): RideWorkoutRes
             );
           }
         }
+        // What the ride keeps is what was ridden: the live coach's brief and lines (spec §12.1) are the agent's words to the coach, not part of
+        // the workout, and a reader of the ride that does not know them must not meet them (ADR 0038).
+        workout = withoutLiveCoach(workout);
         await rides.saveWorkoutSnapshot(ride.id, workout, now());
         return { workout };
       } catch (error) {

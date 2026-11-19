@@ -619,7 +619,7 @@ describe("what a bad variant is refused for", () => {
         .text,
     ).toMatch(/a variant or removeVariant, not both/);
     expect((await call("update_workout", { id: stored.id })).text).toMatch(
-      /nothing to change: give a name, a date, steps or a variant/,
+      /nothing to change: give a name, a date, steps, a variant, live_coach or coach_brief/,
     );
     expect((await call("update_workout", { id: stored.id, variantNote: "Shorter." })).text).toMatch(
       /variantNote goes with a variant/,

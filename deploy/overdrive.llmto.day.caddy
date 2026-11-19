@@ -4,6 +4,9 @@
 # The port is SERVER_PORT from .env (compose publishes the server on 127.0.0.1 only).
 overdrive.llmto.day {
 	import common
+	# The live coach's event stream (GET /v1/live/sessions/{id}/cues, ADR 0038) needs nothing here: reverse_proxy flushes a text/event-stream
+	# response as it is written and has no response timeout, and the service writes a comment every 15 s. If the shared `common` snippet
+	# compresses responses, exclude text/event-stream from it (docs/deploy.md section 21 shows how to check with curl -N).
 	reverse_proxy 127.0.0.1:27180
 
 	log {

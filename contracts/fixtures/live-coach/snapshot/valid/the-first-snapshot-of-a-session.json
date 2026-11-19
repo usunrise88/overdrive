@@ -1,0 +1,16 @@
+{
+  "seq": 0,
+  "clock": 1795000000500,
+  "elapsedSeconds": 0,
+  "paused": false,
+  "muted": false,
+  "step": {
+    "index": 0,
+    "type": "ramp",
+    "label": "Warm-up",
+    "durationSeconds": 600,
+    "timeLeftSeconds": 600,
+    "targetWatts": 117
+  },
+  "stepCount": 7
+}

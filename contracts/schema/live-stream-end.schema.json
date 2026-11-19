@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive live coach: the end of a stream",
+  "description": "The data of the `end` event, the last on GET /v1/live/sessions/{id}/cues before the service closes the stream (spec §12.1, ADR 0038). reason is ended (the app ended the session or it went quiet for too long), superseded (a new session was started: only one exists at a time) or shutdown (the service is stopping). The app does not reconnect after it: with ended or superseded the session is over (GET answers 404 from then on); after shutdown it starts a new session when the service is back.",
+  "type": "object",
+  "required": ["reason"],
+  "additionalProperties": false,
+  "properties": {
+    "reason": { "enum": ["ended", "superseded", "shutdown"] }
+  }
+}

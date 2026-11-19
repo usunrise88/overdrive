@@ -1,0 +1,12 @@
+{
+  "id": 3,
+  "text": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+  "trigger": "step-start",
+  "audio": {
+    "format": "mp3",
+    "base64": "SUQzBAAAAAAAAA=="
+  },
+  "createdAt": "2026-11-19T07:42:10.250Z",
+  "expiresAt": "2026-11-19T07:42:18.250Z",
+  "ttlMs": 8000
+}

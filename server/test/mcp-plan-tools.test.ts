@@ -696,7 +696,7 @@ describe("update_workout", () => {
     [
       "nothing to change",
       { id: "icu-5001" },
-      /nothing to change: give a name, a date, steps or a variant/,
+      /nothing to change: give a name, a date, steps, a variant, live_coach or coach_brief/,
     ],
     ["a blank name", { id: "icu-5001", name: "   " }, /name must not be blank/],
     [

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive live coach: the answer to a start",
+  "description": "The answer to POST /v1/live/sessions (201, spec §12.1, ADR 0038). coach.on says whether the live coach will speak in this ride. When it is on, sessionId names the session (1 to 64 characters from A-Z a-z 0-9 _ -) and reason is null: the app streams a snapshot every snapshotEverySeconds seconds to POST /v1/live/sessions/{id}/snapshots and listens on GET /v1/live/sessions/{id}/cues. When it is off, sessionId is null, reason says why and the ride is unaffected: feature-off (the owner turned the live coach off), no-tts (no speech service is configured), no-llm (no language model is configured), no-workout (no workoutId, or the service does not have that planned workout: a free ride, or one that has left the plan), no-live-coach (the workout does not ask for the coach) or structure-changed (the workout the app plays is not the one the service has: it was changed in between). A reader must treat a reason it does not know as 'off'. serverTime is the service's clock in milliseconds since the Unix epoch, snapshotEverySeconds is always 5. A start that cannot be answered at all (no network) is the app's own case: no cues, nothing else.",
+  "type": "object",
+  "required": ["sessionId", "coach", "serverTime", "snapshotEverySeconds"],
+  "additionalProperties": false,
+  "properties": {
+    "sessionId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+    "coach": {
+      "type": "object",
+      "required": ["on", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "on": { "type": "boolean" },
+        "reason": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "enum": [
+                "feature-off",
+                "no-tts",
+                "no-llm",
+                "no-workout",
+                "no-live-coach",
+                "structure-changed"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "serverTime": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "snapshotEverySeconds": { "const": 5 }
+  }
+}

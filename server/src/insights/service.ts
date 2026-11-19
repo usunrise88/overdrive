@@ -25,6 +25,7 @@ import {
 import type { Db } from "../db.ts";
 import type { EventBus } from "../events.ts";
 import { canonicalJson, sha256Hex } from "../hash.ts";
+import type { LiveCueStore } from "../live-coach/store.ts";
 import type { Logger } from "../log.ts";
 import type { MetricsService } from "../metrics/service.ts";
 import type {
@@ -124,6 +125,8 @@ export interface InsightsDeps {
   metrics: MetricsService;
   wellness: WellnessService;
   profile: ProfileStore;
+  /** The cues the live coach made in a ride, for the facts of its note (spec §12.1). */
+  liveCues?: Pick<LiveCueStore, "forRide"> | undefined;
   fetch?: typeof fetch | undefined;
   sleep?: ((ms: number) => Promise<void>) | undefined;
   timers?: Timers | undefined;
@@ -308,6 +311,7 @@ export function createInsights(deps: InsightsDeps): InsightsService {
     rides,
     rideWorkouts,
     profile,
+    liveCues: deps.liveCues,
   });
 
   // ---- Writing and storing a note -------------------------------------------------------------

@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "id": "icu-6005",
+  "name": "Mixed",
+  "live_coach": true,
+  "steps": [
+    {
+      "type": "ramp",
+      "duration": 300,
+      "from": 0.5,
+      "to": 0.8,
+      "must_say": [
+        {
+          "at": "start",
+          "text": "Build."
+        }
+      ]
+    },
+    {
+      "type": "free",
+      "duration": 600,
+      "must_say": [
+        {
+          "at": 120,
+          "text": "Pick your own pace."
+        }
+      ]
+    },
+    {
+      "type": "hr",
+      "duration": 1200,
+      "target_bpm": 135,
+      "power_min": 90,
+      "power_max": 210,
+      "must_say": [
+        {
+          "at": "start",
+          "text": "Let the heart rate settle."
+        }
+      ]
+    }
+  ]
+}

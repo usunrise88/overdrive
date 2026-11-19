@@ -1,0 +1,55 @@
+{
+  "seq": 41,
+  "clock": 1795000205000,
+  "elapsedSeconds": 205,
+  "paused": false,
+  "muted": false,
+  "step": {
+    "index": 1,
+    "type": "steady",
+    "label": "Threshold",
+    "durationSeconds": 600,
+    "timeLeftSeconds": 0,
+    "targetWatts": 247
+  },
+  "stepCount": 7,
+  "power": 251,
+  "heartRate": 158,
+  "cadence": 88,
+  "compliancePercent": 92,
+  "stallGuardActive": false,
+  "events": [
+    {
+      "type": "stall-guard",
+      "secondsAgo": 0
+    },
+    {
+      "type": "stall-guard",
+      "secondsAgo": 10
+    },
+    {
+      "type": "stall-guard",
+      "secondsAgo": 20
+    },
+    {
+      "type": "stall-guard",
+      "secondsAgo": 30
+    },
+    {
+      "type": "stall-guard",
+      "secondsAgo": 40
+    },
+    {
+      "type": "stall-guard",
+      "secondsAgo": 50
+    },
+    {
+      "type": "stall-guard",
+      "secondsAgo": 60
+    },
+    {
+      "type": "stall-guard",
+      "secondsAgo": 70
+    }
+  ]
+}

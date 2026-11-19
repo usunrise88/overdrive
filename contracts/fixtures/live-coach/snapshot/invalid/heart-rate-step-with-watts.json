@@ -1,0 +1,21 @@
+{
+  "seq": 41,
+  "clock": 1795000205000,
+  "elapsedSeconds": 205,
+  "paused": false,
+  "muted": false,
+  "step": {
+    "index": 2,
+    "type": "hr",
+    "durationSeconds": 2400,
+    "timeLeftSeconds": 1800,
+    "targetWatts": 150
+  },
+  "stepCount": 7,
+  "power": 251,
+  "heartRate": 158,
+  "cadence": 88,
+  "compliancePercent": 92,
+  "stallGuardActive": false,
+  "events": []
+}

@@ -1,0 +1,51 @@
+{
+  "from": "2026-11-20",
+  "to": "2026-11-20",
+  "generatedAt": "2026-11-19T07:30:12Z",
+  "stale": false,
+  "configured": true,
+  "workouts": [
+    {
+      "id": "icu-6001",
+      "date": "2026-11-20",
+      "name": "Too chatty",
+      "source": "intervals.icu",
+      "workout": {
+        "schema": 1,
+        "id": "icu-6001",
+        "name": "Too chatty",
+        "live_coach": true,
+        "steps": [
+          {
+            "type": "steady",
+            "duration": 600,
+            "target": 0.9,
+            "must_say": [
+              {
+                "at": 10,
+                "text": "Line 1."
+              },
+              {
+                "at": 20,
+                "text": "Line 2."
+              },
+              {
+                "at": 30,
+                "text": "Line 3."
+              },
+              {
+                "at": 40,
+                "text": "Line 4."
+              },
+              {
+                "at": 50,
+                "text": "Line 5."
+              }
+            ]
+          }
+        ]
+      },
+      "structureHash": "bb36aad5ffcf3d9d"
+    }
+  ]
+}

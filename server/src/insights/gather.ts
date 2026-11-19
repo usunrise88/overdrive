@@ -1,5 +1,6 @@
 import type { RecoveryResponse, WellnessDay } from "@overdrive/contracts";
 import { addDaysToIsoDate } from "@overdrive/contracts";
+import type { LiveCueStore } from "../live-coach/store.ts";
 import type { MetricsService } from "../metrics/service.ts";
 import type { PlanStore } from "../plan/store.ts";
 import type { ProfileStore } from "../profile/store.ts";
@@ -40,6 +41,8 @@ export interface GatherDeps {
   rides: RideStore;
   rideWorkouts: RideWorkoutResolver;
   profile: ProfileStore;
+  /** What the live coach said in the ride (spec §12.1): part of the facts of its note. Absent: the facts have none. */
+  liveCues?: Pick<LiveCueStore, "forRide"> | undefined;
 }
 
 export interface Gatherer {
@@ -223,6 +226,7 @@ export function createGatherer(deps: GatherDeps): Gatherer {
         },
         form: await formOn(detail.date),
         stallGuard: stallGuardSummary(record, workout),
+        liveCues: (await deps.liveCues?.forRide(rideId)) ?? [],
       };
     },
 

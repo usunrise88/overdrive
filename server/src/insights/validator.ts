@@ -1,5 +1,15 @@
 import { compileDenyList, deniedWords } from "./deny.ts";
 import type { Facts } from "./facts.ts";
+import type { Quantity } from "./quotes.ts";
+
+/**
+ * What the check needs of a document of facts: its kind, and the numbers a text may quote. The facts of every kind of written note are
+ * this, and so are the facts of a live cue (spec §12.1, ADR 0038), which is why the check takes this and not the union of the notes'.
+ */
+export interface CheckableFacts {
+  kind: string;
+  quotable: readonly Quantity[];
+}
 
 /**
  * The check that enforces, and does not merely ask for, the rule of spec §6.5: "quote only numbers that were supplied, make no
@@ -197,7 +207,7 @@ function walk(node: unknown, key: string | null, visit: (text: string) => void):
   }
 }
 
-function allowedFrom(facts: Facts): Allowed {
+function allowedFrom(facts: CheckableFacts): Allowed {
   const hit = cache.get(facts);
   if (hit !== undefined) return hit;
   const allowed: Allowed = {
@@ -229,7 +239,7 @@ function allowedFrom(facts: Facts): Allowed {
   for (const date of dateStrings) withoutDates(date, (m, d, y) => addDate(m, d, y));
   // A week's note may name any day of that week.
   if (facts.kind === "week") {
-    const from = Date.parse(`${facts.week.from}T00:00:00Z`);
+    const from = Date.parse(`${(facts as Extract<Facts, { kind: "week" }>).week.from}T00:00:00Z`);
     for (let i = 0; i < 7; i++) {
       const day = new Date(from + i * 86_400_000);
       addDate(day.getUTCMonth() + 1, day.getUTCDate(), day.getUTCFullYear());
@@ -256,7 +266,7 @@ function isSupplied(value: number, decimals: number, allowed: Allowed): boolean 
 }
 
 /** The numbers, dates and times of `text` that the facts do not supply. Exposed for the tests. */
-export function suppliedViolations(text: string, facts: Facts): Violation[] {
+export function suppliedViolations(text: string, facts: CheckableFacts): Violation[] {
   const allowed = allowedFrom(facts);
   const violations: Violation[] = [];
   let rest = withoutDates(text, (month, day, _year, whole) => {
@@ -287,7 +297,7 @@ export interface ValidatorOptions {
 }
 
 export interface TextValidator {
-  check(text: string, facts: Facts): TextCheck;
+  check(text: string, facts: CheckableFacts): TextCheck;
 }
 
 /** Makes the check with the deny list compiled once. */

@@ -1,0 +1,9 @@
+{
+  "sessionId": "ls 1",
+  "coach": {
+    "on": true,
+    "reason": null
+  },
+  "serverTime": 1795000000456,
+  "snapshotEverySeconds": 5
+}

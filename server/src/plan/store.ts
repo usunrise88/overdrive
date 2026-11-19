@@ -2,7 +2,13 @@ import type { PlannedVariant, PlannedWorkout, PlanSource, Workout } from "@overd
 import type { Db, Queryable } from "../db.ts";
 import type { EventBus } from "../events.ts";
 import { canonicalJson, sha256Hex } from "../hash.ts";
-import { applyExtras, type ExtrasRow, type RouteIds, type StoredVariant } from "./extras.ts";
+import {
+  applyExtras,
+  type ExtrasView,
+  type MustSayLines,
+  type RouteIds,
+  type StoredVariant,
+} from "./extras.ts";
 
 /**
  * The plan cache (spec §5.1, ADR 0016): the planned workouts of the next days, already converted
@@ -96,21 +102,31 @@ interface Row {
   workout: Workout | null;
   unsupported_reason: string | null;
   content_sha256: string;
-  /** Laid over the workout when it is read (`planned_workout_extras`): route ids, the fingerprint they hold for, the variant. */
+  /**
+   * Laid over the workout when it is read (`planned_workout_extras`): route ids and must-say lines, the fingerprint they hold for, the
+   * variant, and what is for the live coach.
+   */
   x_route_ids: RouteIds | null;
   x_steps_hash: string | null;
   x_variant: StoredVariant | null;
+  x_live_coach: boolean | null;
+  x_coach_brief: string | null;
+  x_must_say: MustSayLines | null;
 }
 
 const COLUMNS = `p.id, p.source, p.external_id, p.plan_date::text AS plan_date, p.name, p.workout,
                  p.unsupported_reason, p.content_sha256,
-                 x.route_ids AS x_route_ids, x.steps_hash AS x_steps_hash, x.variant AS x_variant`;
+                 x.route_ids AS x_route_ids, x.steps_hash AS x_steps_hash, x.variant AS x_variant,
+                 x.live_coach AS x_live_coach, x.coach_brief AS x_coach_brief, x.must_say AS x_must_say`;
 const FROM = "planned_workouts p LEFT JOIN planned_workout_extras x ON x.workout_id = p.id";
 
-const extrasOf = (row: Row): Pick<ExtrasRow, "routeIds" | "stepsHash" | "variant"> => ({
+const extrasOf = (row: Row): ExtrasView => ({
   routeIds: row.x_route_ids,
   stepsHash: row.x_steps_hash,
   variant: row.x_variant,
+  liveCoach: row.x_live_coach,
+  coachBrief: row.x_coach_brief,
+  mustSay: row.x_must_say,
 });
 
 const MAX_REASON = 500;
@@ -231,9 +247,12 @@ export function createPlanStore(db: Db, bus: EventBus): PlanStore {
         route_ids: RouteIds | null;
         steps_hash: string | null;
         variant: StoredVariant | null;
+        live_coach: boolean | null;
+        coach_brief: string | null;
+        must_say: MustSayLines | null;
       }>(
-        `SELECT workout_id, route_ids, steps_hash, variant FROM planned_workout_extras
-          WHERE workout_id = ANY($1::text[])`,
+        `SELECT workout_id, route_ids, steps_hash, variant, live_coach, coach_brief, must_say
+           FROM planned_workout_extras WHERE workout_id = ANY($1::text[])`,
         [withWorkout.map((entry) => entry.id)],
       );
       const byId = new Map(found.rows.map((row) => [row.workout_id, row]));
@@ -244,6 +263,9 @@ export function createPlanStore(db: Db, bus: EventBus): PlanStore {
           routeIds: row.route_ids,
           stepsHash: row.steps_hash,
           variant: row.variant,
+          liveCoach: row.live_coach,
+          coachBrief: row.coach_brief,
+          mustSay: row.must_say,
         });
         return {
           ...entry,

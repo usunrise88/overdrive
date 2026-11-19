@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "id": "icu-6003",
+  "name": "Endurance",
+  "live_coach": false,
+  "steps": [
+    {
+      "type": "steady",
+      "duration": 3600,
+      "target": 0.6
+    }
+  ]
+}
