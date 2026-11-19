@@ -20,6 +20,8 @@ public class CompositeRideRecorder(
 
     override fun onRideFinished(endEpochMillis: Long): Unit = forEach { it.onRideFinished(endEpochMillis) }
 
+    override fun onEvent(event: RideEvent): Unit = forEach { it.onEvent(event) }
+
     private inline fun forEach(call: (RideRecorder) -> Unit) {
         var first: Exception? = null
         for (recorder in recorders) {

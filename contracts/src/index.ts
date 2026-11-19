@@ -41,7 +41,29 @@ export interface FreeStep extends StepBase {
   duration: number;
 }
 
-export type LeafStep = SteadyStep | RampStep | FreeStep;
+/**
+ * Heart-rate hold (spec §11.2): ERG with a target power chosen by a slow controller so that the heart rate stays at the
+ * target. Exactly one of `target_bpm` and `target_lthr`; `power_min < power_max`, absolute watts (no FTP is needed).
+ */
+export interface HrStep extends StepBase {
+  type: "hr";
+  duration: number;
+  /** Target heart rate in bpm. */
+  target_bpm?: number;
+  /** Target heart rate as a fraction of the threshold heart rate; the service resolves it to bpm for the tablet. */
+  target_lthr?: number;
+  /** Half-width of the band in bpm around the target; default {@link DEFAULT_HR_BAND_BPM}. */
+  band?: number;
+  /** The least power the controller may command, in watts. */
+  power_min: number;
+  /** The most power the controller may command, in watts. */
+  power_max: number;
+}
+
+/** The band of a heart-rate step that does not say: the heart rate is inside it within this many bpm of the target. */
+export const DEFAULT_HR_BAND_BPM = 5;
+
+export type LeafStep = SteadyStep | RampStep | FreeStep | HrStep;
 
 export interface RepeatStep {
   type: "repeat";
@@ -75,10 +97,31 @@ export const workoutJsonSchema: Readonly<Record<string, unknown>> = workoutSchem
 const ajv = new Ajv2020({ allErrors: true });
 const checkWorkout = ajv.compile<Workout>(workoutSchema);
 
-/** Validates untrusted input against the native workout schema. */
+/** What the schema cannot say about a workout: a heart-rate step's `power_min` is below its `power_max`. */
+export function workoutConsistencyErrors(workout: Workout): string[] {
+  const errors: string[] = [];
+  const check = (step: LeafStep, at: string): void => {
+    if (step.type === "hr" && step.power_min >= step.power_max) {
+      errors.push(`${at} power_min must be below power_max`);
+    }
+  };
+  for (const [index, step] of workout.steps.entries()) {
+    if (step.type === "repeat") {
+      for (const [inner, leaf] of step.steps.entries()) {
+        check(leaf, `/steps/${index}/steps/${inner}`);
+      }
+    } else {
+      check(step, `/steps/${index}`);
+    }
+  }
+  return errors;
+}
+
+/** Validates untrusted input against the native workout schema, and then for what the schema cannot say. */
 export function validateWorkout(input: unknown): Validation<Workout> {
   if (checkWorkout(input)) {
-    return { ok: true, value: input };
+    const errors = workoutConsistencyErrors(input);
+    return errors.length === 0 ? { ok: true, value: input } : { ok: false, errors };
   }
   const errors = (checkWorkout.errors ?? []).map(
     (e) => `${e.instancePath || "/"} ${e.message ?? "is invalid"}`,
@@ -115,9 +158,23 @@ export interface RideSample {
   distanceMeters?: number;
   gear?: number | null;
   targetPower?: number | null;
+  /**
+   * In a heart-rate step: the bpm the controller aimed at during the second (the step's target moved by the rider).
+   * Absent in other steps and during the step's start ramp; a second without it is not judged for compliance.
+   */
+  targetHeartRate?: number | null;
   stepIndex?: number | null;
   /** Default false. */
   paused?: boolean;
+}
+
+/** An implicit-feedback event of the ride (spec §11.1): the ERG stall guard took hold. */
+export interface RideEvent {
+  type: "stall-guard";
+  /** The tick at which it was decided (a sample offset, 1 to the number of samples). */
+  timeOffsetSeconds: number;
+  /** The flattened workout step it happened in. */
+  stepIndex?: number | null;
 }
 
 export interface RrInterval {
@@ -154,6 +211,8 @@ export interface RideRecord {
   rrIntervals: RrInterval[];
   laps: Lap[];
   summary: RideSummary;
+  /** Absent or empty: nothing happened. Additive to schema 1. */
+  events?: RideEvent[];
 }
 
 const rideRecordSchema: object = JSON.parse(
@@ -178,6 +237,18 @@ export function rideRecordConsistencyErrors(record: RideRecord): string[] {
     return [
       `/summary/durationSeconds is ${summary.durationSeconds}, there are ${samples.length} samples`,
     ];
+  }
+  let lastEvent = 0;
+  for (const [index, event] of (record.events ?? []).entries()) {
+    if (event.timeOffsetSeconds > samples.length) {
+      return [
+        `/events/${index} is at second ${event.timeOffsetSeconds}, the ride is ${samples.length} s long`,
+      ];
+    }
+    if (event.timeOffsetSeconds < lastEvent) {
+      return [`/events/${index} is earlier than the event before it: in the order they happened`];
+    }
+    lastEvent = event.timeOffsetSeconds;
   }
   if (samples.length === 0) {
     return laps.length === 0 ? [] : ["/laps must be empty for a ride without samples"];

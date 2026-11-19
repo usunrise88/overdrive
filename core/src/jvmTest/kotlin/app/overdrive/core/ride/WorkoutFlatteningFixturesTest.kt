@@ -34,7 +34,10 @@ class WorkoutFlatteningFixturesTest {
             assertEquals(workout.expectedSeconds(), flat.totalDurationSeconds(), name)
             for (step in flat) {
                 assertTrue(step.label.isNotEmpty(), name)
-                assertEquals(step.targetFrom == null, step.mode == TrainerMode.SIMULATION, name)
+                // A heart-rate step (spec §11.2) is ERG without a fraction of FTP; one whose target is a fraction of the
+                // threshold has no heart rate to hold without it and flattens to a free step.
+                val noTarget = step.targetFrom == null && step.heartRate == null
+                assertEquals(noTarget, step.mode == TrainerMode.SIMULATION, name)
             }
         }
     }

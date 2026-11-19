@@ -26,6 +26,13 @@ public interface RideRecorder {
 
     /** The ride is over, by the rider's choice or because the workout ended, at [endEpochMillis]. */
     public fun onRideFinished(endEpochMillis: Long)
+
+    /**
+     * Something worth telling the coach happened (spec §11.1): called right after the [onSample] of the tick it was decided
+     * at, in the order the events happened. A recorder that keeps no events can ignore it, which is the default; a ride
+     * that never had any never calls it.
+     */
+    public fun onEvent(event: RideEvent) {}
 }
 
 /** Records nothing, for a ride that is not kept. */
@@ -66,6 +73,10 @@ public class InMemoryRideRecorder : RideRecorder {
 
     override fun onRrIntervals(intervals: List<RrInterval>) {
         checkNotNull(builder) { "The ride has not started" }.addRrIntervals(intervals)
+    }
+
+    override fun onEvent(event: RideEvent) {
+        checkNotNull(builder) { "The ride has not started" }.addEvent(event)
     }
 
     override fun onRideFinished(endEpochMillis: Long) {

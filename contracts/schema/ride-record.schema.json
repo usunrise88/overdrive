@@ -23,9 +23,33 @@
       "type": "array",
       "items": { "$ref": "#/$defs/lap" }
     },
-    "summary": { "$ref": "#/$defs/summary" }
+    "summary": { "$ref": "#/$defs/summary" },
+    "events": {
+      "description": "Things that happened during the ride and are worth telling the coach (spec §11.1, §12.1), in the order they happened. Absent or empty: nothing did. Additive: a record without the key is valid and means the same as an empty list.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/event" }
+    }
   },
   "$defs": {
+    "event": {
+      "description": "An implicit-feedback event. Today one kind: the ERG stall guard lowered the target power because cadence fell below the floor (spec §11.1). A later kind (the live coach's cues, spec §12.1) is added to the list of types here, contracts first.",
+      "type": "object",
+      "required": ["type", "timeOffsetSeconds"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["stall-guard"] },
+        "timeOffsetSeconds": {
+          "description": "The tick (second offset, as in the samples) at which the event was decided; at most the number of samples. For stall-guard: the guard took hold at this tick and the target is lowered from the next second.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "stepIndex": {
+          "description": "Index of the workout step in the flattened workout (repeats expanded) the event happened in.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        }
+      }
+    },
     "ride": {
       "type": "object",
       "required": ["id", "startEpochMillis", "ftp"],
@@ -99,6 +123,11 @@
           "description": "The workout's target power in watts for this second, without the ramp-in after a pause; absent in a free-ride step and without a workout.",
           "type": ["integer", "null"],
           "minimum": 0
+        },
+        "targetHeartRate": {
+          "description": "In a heart-rate step (spec §11.2): the heart rate in bpm the controller was aiming at during this second, the step's target moved by the rider's gear buttons. Absent in other steps, and during the step's start ramp, when the controller is not in charge yet: a second without it is not judged for the step's compliance.",
+          "type": ["integer", "null"],
+          "minimum": 1
         },
         "stepIndex": {
           "description": "Index of the workout step in the flattened workout (repeats expanded).",

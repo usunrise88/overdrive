@@ -1,5 +1,7 @@
 package app.overdrive.core.record
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -47,7 +49,15 @@ public object RideRecordJson {
         require(document.schema == SCHEMA_VERSION) {
             "Unsupported ride record schema ${document.schema}, expected $SCHEMA_VERSION"
         }
-        val record = RideRecord(document.ride, document.samples, document.rrIntervals, document.laps, document.summary)
+        val record =
+            RideRecord(
+                document.ride,
+                document.samples,
+                document.rrIntervals,
+                document.laps,
+                document.summary,
+                document.events,
+            )
         record.requireConsistent()
         return record
     }
@@ -62,9 +72,13 @@ internal class RideRecordDocument(
     val rrIntervals: List<RrInterval>,
     val laps: List<Lap>,
     val summary: RideSummary,
+    /** Absent in every record written before the events existed; the writer leaves it out when it is empty. */
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val events: List<RideEvent> = emptyList(),
 ) {
     constructor(schema: Int, record: RideRecord) :
-        this(schema, record.ride, record.samples, record.rrIntervals, record.laps, record.summary)
+        this(schema, record.ride, record.samples, record.rrIntervals, record.laps, record.summary, record.events)
 }
 
 /**
@@ -82,6 +96,14 @@ internal fun RideRecord.requireConsistent() {
     }
     require(summary.durationSeconds == samples.size) {
         "The summary says ${summary.durationSeconds} s but there are ${samples.size} samples"
+    }
+    events.forEachIndexed { index, event ->
+        require(event.timeOffsetSeconds <= samples.size) {
+            "Event $index is at second ${event.timeOffsetSeconds}, the ride is ${samples.size} s long"
+        }
+        require(index == 0 || event.timeOffsetSeconds >= events[index - 1].timeOffsetSeconds) {
+            "Event $index is earlier than the event before it: in the order they happened"
+        }
     }
     if (samples.isEmpty()) {
         require(laps.isEmpty()) { "A ride without samples has no laps" }

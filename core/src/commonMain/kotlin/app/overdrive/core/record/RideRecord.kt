@@ -1,5 +1,6 @@
 package app.overdrive.core.record
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -23,7 +24,37 @@ public data class RideRecord(
     /** One per stretch of the ride spent in one workout step, in order; see [Lap]. */
     val laps: List<Lap>,
     val summary: RideSummary,
+    /**
+     * Things that happened during the ride and are worth telling the coach, in the order they happened (spec §11.1): the
+     * ERG stall guard taking hold. Empty for a ride where nothing did, and for every record written before they existed.
+     */
+    val events: List<RideEvent> = emptyList(),
 )
+
+/** The kinds of [RideEvent]; the wire names are the schema's. */
+@Serializable
+public enum class RideEventType {
+    /** The ERG stall guard lowered the target power because cadence fell below the floor (spec §11.1). */
+    @SerialName("stall-guard")
+    STALL_GUARD,
+}
+
+/**
+ * An implicit-feedback event of the ride (spec §11.1, `contracts/schema/ride-record.schema.json` `events`).
+ */
+@Serializable
+public data class RideEvent(
+    val type: RideEventType,
+    /** The tick at which it was decided: a sample offset, from 1 to the number of samples. */
+    val timeOffsetSeconds: Int,
+    /** The index in the flattened workout of the step it happened in, null without a workout. */
+    val stepIndex: Int? = null,
+) {
+    init {
+        require(timeOffsetSeconds >= 1) { "An event's offset is at least 1 second, got $timeOffsetSeconds" }
+        require(stepIndex == null || stepIndex >= 0) { "A step index must not be negative, got $stepIndex" }
+    }
+}
 
 /**
  * The ride's identity (spec §8.2 "Ride"). The sync state of the finished ride lives in the outbox of the data
@@ -80,6 +111,12 @@ public data class RideSample(
     val stepIndex: Int? = null,
     /** Whether the ride was paused (manually, automatically or because the trainer was gone) during this second. */
     val paused: Boolean = false,
+    /**
+     * In a heart-rate step (spec §11.2): the heart rate in bpm the controller aimed at during this second, the step's
+     * target moved by the rider's gear buttons. Null in every other step and during the heart-rate step's start ramp,
+     * when the controller is not in charge yet: a second without it is not judged for the step's compliance.
+     */
+    val targetHeartRate: Int? = null,
 ) {
     init {
         require(timeOffsetSeconds >= 1) { "A sample's offset is at least 1 second, got $timeOffsetSeconds" }
@@ -90,6 +127,9 @@ public data class RideSample(
         require(gear == null || gear >= 1) { "Gears are numbered from 1, got $gear" }
         require(targetPower == null || targetPower >= 0) { "Target power must not be negative, got $targetPower" }
         require(stepIndex == null || stepIndex >= 0) { "A step index must not be negative, got $stepIndex" }
+        require(targetHeartRate == null || targetHeartRate >= 1) {
+            "A target heart rate is positive, got $targetHeartRate"
+        }
         require(power == null || power >= 0) { "Power must not be negative, got $power" }
         require(heartRate == null || heartRate >= 0) { "Heart rate must not be negative, got $heartRate" }
         require(cadence == null || cadence >= 0) { "Cadence must not be negative, got $cadence" }

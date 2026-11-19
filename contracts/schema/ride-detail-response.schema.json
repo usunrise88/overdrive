@@ -87,7 +87,7 @@
       "properties": {
         "stepIndex": { "type": ["integer", "null"], "minimum": 0 },
         "label": { "type": ["string", "null"], "minLength": 1 },
-        "type": { "enum": ["steady", "ramp", "free", null] },
+        "type": { "enum": ["steady", "ramp", "free", "hr", null] },
         "startSeconds": { "type": "integer", "minimum": 0 },
         "endSeconds": { "type": "integer", "minimum": 1 },
         "averagePower": { "type": ["number", "null"], "minimum": 0 },

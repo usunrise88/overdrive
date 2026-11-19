@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "ride": {"id":"free-ride-1","startEpochMillis":1794996000000,"endEpochMillis":1794996003000,"ftp":220,"devices":["Test trainer"]},
+  "samples": [
+    {"timeOffsetSeconds":1,"power":150,"cadence":85,"speedKmh":25.0,"distanceMeters":7.0,"gear":12,"paused":false},
+    {"timeOffsetSeconds":2,"power":155,"cadence":86,"speedKmh":26.0,"distanceMeters":14.0,"gear":12,"paused":false},
+    {"timeOffsetSeconds":3,"power":160,"cadence":87,"speedKmh":27.0,"distanceMeters":21.0,"gear":12,"paused":false}
+  ],
+  "rrIntervals": [],
+  "laps": [
+    {"startSeconds":0,"endSeconds":3,"averagePower":155.0}
+  ],
+  "summary": {"durationSeconds":3,"movingSeconds":3,"distanceMeters":21.0,"averagePower":155.0,"maxPower":160,"workKilojoules":0.465},
+  "events": [{"type":"stall-guard","timeOffsetSeconds":4}]
+}

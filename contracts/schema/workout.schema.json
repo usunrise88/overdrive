@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Overdrive workout, schema 1",
-  "description": "Native workout format (spec §8.1). Targets are fractions of FTP, durations are seconds. ZWO files and intervals.icu workouts are converted to this format on import.",
+  "description": "Native workout format (spec §8.1). Targets are fractions of FTP, durations are seconds. A heart-rate step (type hr, spec §11.2) is the exception: its target is a heart rate and its power limits are absolute watts. ZWO files and intervals.icu workouts are converted to this format on import.",
   "type": "object",
   "required": ["schema", "id", "name", "steps"],
   "additionalProperties": false,
@@ -22,6 +22,7 @@
         { "$ref": "#/$defs/steady" },
         { "$ref": "#/$defs/ramp" },
         { "$ref": "#/$defs/free" },
+        { "$ref": "#/$defs/hr" },
         { "$ref": "#/$defs/repeat" }
       ]
     },
@@ -29,7 +30,8 @@
       "oneOf": [
         { "$ref": "#/$defs/steady" },
         { "$ref": "#/$defs/ramp" },
-        { "$ref": "#/$defs/free" }
+        { "$ref": "#/$defs/free" },
+        { "$ref": "#/$defs/hr" }
       ]
     },
     "duration": { "type": "integer", "minimum": 1, "description": "Seconds." },
@@ -77,6 +79,50 @@
       "properties": {
         "type": { "const": "free" },
         "duration": { "$ref": "#/$defs/duration" },
+        "cadence": { "$ref": "#/$defs/cadence" },
+        "label": { "$ref": "#/$defs/label" }
+      }
+    },
+    "hr": {
+      "description": "Heart-rate hold (spec §11.2): ERG mode whose target power is chosen by a slow controller so that the heart rate stays at the target. Exactly one of target_bpm and target_lthr. power_min < power_max is checked beyond the schema (every implementation does, see the invalid fixtures). No FTP is needed.",
+      "type": "object",
+      "required": ["type", "duration", "power_min", "power_max"],
+      "additionalProperties": false,
+      "oneOf": [{ "required": ["target_bpm"] }, { "required": ["target_lthr"] }],
+      "properties": {
+        "type": { "const": "hr" },
+        "duration": { "$ref": "#/$defs/duration" },
+        "target_bpm": {
+          "type": "integer",
+          "minimum": 40,
+          "maximum": 230,
+          "description": "Target heart rate in beats per minute."
+        },
+        "target_lthr": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1.2,
+          "description": "Target heart rate as a fraction of the rider's threshold heart rate. The service resolves it to target_bpm from the profile when it serves the workout to the tablet; a workout with this form is only created while a threshold is known."
+        },
+        "band": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30,
+          "default": 5,
+          "description": "Half-width of the band around the target in bpm: the heart rate is inside the band when it is within this many bpm of the target. Compliance for the step is the time inside the band. Default 5."
+        },
+        "power_min": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2000,
+          "description": "The least power in watts the controller may command; the start ramp begins here, and it is where the power drops to when the strap signal is lost for 60 s."
+        },
+        "power_max": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 2000,
+          "description": "The most power in watts the controller may command. Greater than power_min."
+        },
         "cadence": { "$ref": "#/$defs/cadence" },
         "label": { "$ref": "#/$defs/label" }
       }

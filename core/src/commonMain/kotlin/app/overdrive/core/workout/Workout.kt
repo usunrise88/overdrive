@@ -92,6 +92,61 @@ public data class FreeStep(
     }
 }
 
+/**
+ * Heart-rate hold (spec §11.2): the trainer runs in ERG mode, and a slow controller (`HeartRateHold` in the ride package)
+ * chooses the target power so that the heart rate stays at the target. There is no FTP in it: the target is a heart rate
+ * and the power limits are absolute watts.
+ *
+ * Exactly one of [targetBpm] (beats per minute) and [targetLthr] (a fraction of the rider's threshold heart rate, which
+ * the service resolves to bpm when it serves the workout to the tablet, docs/adr/0033; a step still in this form has no
+ * heart rate the tablet can hold, and `flatSteps` turns it into a free-ride step unless it is told the threshold).
+ */
+@Serializable
+@SerialName("hr")
+public data class HeartRateStep(
+    override val duration: Int,
+    @SerialName("target_bpm") val targetBpm: Int? = null,
+    @SerialName("target_lthr") val targetLthr: Double? = null,
+    /** Half-width of the band in bpm: the heart rate is inside the band within this many bpm of the target. */
+    val band: Int = DEFAULT_BAND_BPM,
+    /** The least power in watts the controller may command; the start ramp begins here. */
+    @SerialName("power_min") val powerMin: Int,
+    /** The most power in watts the controller may command. */
+    @SerialName("power_max") val powerMax: Int,
+    override val cadence: Double? = null,
+    override val label: String? = null,
+) : LeafStep {
+    init {
+        requireValidDuration(duration)
+        requireValidCadence(cadence)
+        require((targetBpm == null) != (targetLthr == null)) {
+            "A heart-rate step needs exactly one of target_bpm and target_lthr"
+        }
+        require(targetBpm == null || targetBpm in MIN_BPM..MAX_BPM) {
+            "Target heart rate must be $MIN_BPM..$MAX_BPM bpm, got $targetBpm"
+        }
+        require(targetLthr == null || (targetLthr >= MIN_LTHR_FRACTION && targetLthr <= MAX_LTHR_FRACTION)) {
+            "Threshold fraction must be $MIN_LTHR_FRACTION..$MAX_LTHR_FRACTION, got $targetLthr"
+        }
+        require(band in 1..MAX_BAND_BPM) { "Band must be 1..$MAX_BAND_BPM bpm, got $band" }
+        require(powerMin in 1..MAX_POWER_WATTS && powerMax in 1..MAX_POWER_WATTS) {
+            "Power limits must be 1..$MAX_POWER_WATTS W, got $powerMin and $powerMax"
+        }
+        require(powerMin < powerMax) { "power_min ($powerMin) must be below power_max ($powerMax)" }
+    }
+
+    public companion object {
+        /** The band of a step that does not say (spec §11.2). */
+        public const val DEFAULT_BAND_BPM: Int = 5
+        public const val MIN_BPM: Int = 40
+        public const val MAX_BPM: Int = 230
+        public const val MIN_LTHR_FRACTION: Double = 0.5
+        public const val MAX_LTHR_FRACTION: Double = 1.2
+        public const val MAX_BAND_BPM: Int = 30
+        public const val MAX_POWER_WATTS: Int = 2000
+    }
+}
+
 @Serializable
 @SerialName("repeat")
 public data class RepeatStep(

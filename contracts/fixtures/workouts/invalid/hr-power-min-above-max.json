@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "id": "bad-hr-power-limits",
+  "name": "Power limits the wrong way round",
+  "steps": [
+    { "type": "hr", "duration": 600, "target_bpm": 135, "power_min": 220, "power_max": 80 }
+  ]
+}

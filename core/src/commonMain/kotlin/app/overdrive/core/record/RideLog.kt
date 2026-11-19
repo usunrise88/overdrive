@@ -32,6 +32,9 @@ internal object RideLogFormat {
     const val KIND_RR = "rr"
     const val KIND_FINISHED = "finished"
 
+    /** An implicit-feedback event (spec §11.1): the payload is one [RideEvent]. Added after the first release of the log. */
+    const val KIND_EVENT = "event"
+
     private const val CRC_DIGITS = 8
     private const val LINE_FEED = '\n'.code.toByte()
     private const val SPACE = ' '.code.toByte()
@@ -59,6 +62,8 @@ internal object RideLogFormat {
 
     fun finished(endEpochMillis: Long): ByteArray =
         line(KIND_FINISHED, json.encodeToString(Finished.serializer(), Finished(endEpochMillis)))
+
+    fun event(event: RideEvent): ByteArray = line(KIND_EVENT, json.encodeToString(RideEvent.serializer(), event))
 
     private fun line(
         kind: String,
@@ -116,6 +121,8 @@ internal object RideLogFormat {
         json.decodeFromString(ListSerializer(RrInterval.serializer()), payload)
 
     fun decodeFinished(payload: String): Long = json.decodeFromString(Finished.serializer(), payload).endEpochMillis
+
+    fun decodeEvent(payload: String): RideEvent = json.decodeFromString(RideEvent.serializer(), payload)
 
     fun isLineFeed(byte: Byte): Boolean = byte == LINE_FEED
 
@@ -187,6 +194,11 @@ public class RideLogRecorder(
         guarded { sink.append(RideLogFormat.rr(intervals)) }
     }
 
+    override fun onEvent(event: RideEvent) {
+        checkRunning()
+        guarded { sink.append(RideLogFormat.event(event)) }
+    }
+
     override fun onRideFinished(endEpochMillis: Long) {
         check(started) { "The ride has not started" }
         if (finished) return
@@ -245,6 +257,8 @@ public data class RecoveredRide(
     val validBytes: Int,
     /** Bytes after the intact part that were dropped: a torn last line, or damage and what followed it. */
     val discardedBytes: Int,
+    /** The events of the ride up to the intact part (spec §11.1), in the order they happened. */
+    val events: List<RideEvent> = emptyList(),
 ) {
     public val status: RideLogStatus get() =
         if (endEpochMillis !=
@@ -268,6 +282,7 @@ public data class RecoveredRide(
             samples = samples,
             rrIntervals = rrIntervals,
             endEpochMillis = endEpochMillis ?: (header.startEpochMillis + samples.size * MILLIS_PER_SECOND),
+            events = events,
         )
 
     private companion object {
@@ -295,6 +310,7 @@ public object RideLog {
         var header: RideHeader? = null
         val samples = mutableListOf<RideSample>()
         val rrIntervals = mutableListOf<RrInterval>()
+        val events = mutableListOf<RideEvent>()
         var endEpochMillis: Long? = null
         var position = 0
         var validEnd = 0
@@ -320,6 +336,17 @@ public object RideLog {
                         rrIntervals += RideLogFormat.decodeRr(entry.payload)
                     }
 
+                    entry.kind == RideLogFormat.KIND_EVENT -> {
+                        val event = RideLogFormat.decodeEvent(entry.payload)
+                        // An event belongs to a second that has a sample, and comes in order: else the log ends here.
+                        if (event.timeOffsetSeconds > samples.size ||
+                            (events.lastOrNull()?.let { event.timeOffsetSeconds < it.timeOffsetSeconds } == true)
+                        ) {
+                            break
+                        }
+                        events += event
+                    }
+
                     entry.kind == RideLogFormat.KIND_FINISHED -> {
                         endEpochMillis = RideLogFormat.decodeFinished(entry.payload)
                     }
@@ -337,6 +364,6 @@ public object RideLog {
             validEnd = position
         }
         val ride = header ?: return null
-        return RecoveredRide(ride, samples, rrIntervals, endEpochMillis, validEnd, bytes.size - validEnd)
+        return RecoveredRide(ride, samples, rrIntervals, endEpochMillis, validEnd, bytes.size - validEnd, events)
     }
 }

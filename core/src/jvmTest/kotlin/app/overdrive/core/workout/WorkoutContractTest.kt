@@ -56,6 +56,31 @@ class WorkoutContractTest {
             is SteadyStep -> "steady"
             is RampStep -> "ramp"
             is FreeStep -> "free"
+            is HeartRateStep -> "hr"
             is RepeatStep -> "repeat"
         }
+
+    @Test
+    fun `heart-rate fixtures have the expected shape`() {
+        val hold = json.decodeFromString<Workout>(File(fixtures, "valid/heart-rate-hold.json").readText())
+        assertEquals(
+            HeartRateStep(
+                duration = 2400,
+                targetBpm = 135,
+                band = 4,
+                powerMin = 80,
+                powerMax = 220,
+                label = "Zone 2 by heart rate",
+            ),
+            hold.steps[0],
+        )
+        val fraction =
+            json.decodeFromString<Workout>(File(fixtures, "valid/heart-rate-threshold-fraction.json").readText())
+        val repeat = assertIs<RepeatStep>(fraction.steps[1])
+        val step = assertIs<HeartRateStep>(repeat.steps[0])
+        assertEquals(0.88, step.targetLthr)
+        assertEquals(null, step.targetBpm)
+        assertEquals(HeartRateStep.DEFAULT_BAND_BPM, step.band, "the band is 5 when the file does not say")
+        assertEquals(90.0, step.cadence)
+    }
 }

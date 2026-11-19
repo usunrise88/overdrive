@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "id": "2026-12-01-zone-2-by-heart-rate",
+  "name": "Zone 2 by heart rate",
+  "description": "Base training: the power follows the heart rate. No FTP needed.",
+  "steps": [
+    { "type": "hr", "duration": 2400, "target_bpm": 135, "band": 4, "power_min": 80, "power_max": 220, "label": "Zone 2 by heart rate" },
+    { "type": "steady", "duration": 300, "target": 0.45, "label": "Cool-down" }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "id": "bad-hr-without-target",
+  "name": "No heart-rate target",
+  "steps": [
+    { "type": "hr", "duration": 600, "power_min": 80, "power_max": 200 }
+  ]
+}

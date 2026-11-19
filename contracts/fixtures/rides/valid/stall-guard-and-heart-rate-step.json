@@ -1,0 +1,277 @@
+{
+  "schema": 1,
+  "ride": {
+    "id": "hr-hold-1",
+    "startEpochMillis": 1794996000000,
+    "endEpochMillis": 1794996020000,
+    "workoutId": "2026-12-01-zone-2-by-heart-rate",
+    "ftp": 220,
+    "devices": [
+      "Test trainer",
+      "Test strap"
+    ]
+  },
+  "samples": [
+    {
+      "timeOffsetSeconds": 1,
+      "power": 92,
+      "heartRate": 100,
+      "cadence": 85,
+      "speedKmh": 20.0,
+      "distanceMeters": 5.6,
+      "targetPower": 95,
+      "stepIndex": 0,
+      "paused": false
+    },
+    {
+      "timeOffsetSeconds": 2,
+      "power": 94,
+      "heartRate": 101,
+      "cadence": 85,
+      "speedKmh": 20.0,
+      "distanceMeters": 11.2,
+      "targetPower": 100,
+      "stepIndex": 0,
+      "paused": false
+    },
+    {
+      "timeOffsetSeconds": 3,
+      "power": 96,
+      "heartRate": 101,
+      "cadence": 85,
+      "speedKmh": 20.0,
+      "distanceMeters": 16.8,
+      "targetPower": 105,
+      "stepIndex": 0,
+      "paused": false
+    },
+    {
+      "timeOffsetSeconds": 4,
+      "power": 98,
+      "heartRate": 102,
+      "cadence": 85,
+      "speedKmh": 20.0,
+      "distanceMeters": 22.4,
+      "targetPower": 110,
+      "stepIndex": 0,
+      "paused": false
+    },
+    {
+      "timeOffsetSeconds": 5,
+      "power": 100,
+      "heartRate": 102,
+      "cadence": 85,
+      "speedKmh": 20.0,
+      "distanceMeters": 28.0,
+      "targetPower": 115,
+      "stepIndex": 0,
+      "paused": false
+    },
+    {
+      "timeOffsetSeconds": 6,
+      "power": 102,
+      "heartRate": 103,
+      "cadence": 85,
+      "speedKmh": 20.0,
+      "distanceMeters": 33.6,
+      "targetPower": 120,
+      "stepIndex": 0,
+      "paused": false
+    },
+    {
+      "timeOffsetSeconds": 7,
+      "power": 104,
+      "heartRate": 103,
+      "cadence": 85,
+      "speedKmh": 20.0,
+      "distanceMeters": 39.2,
+      "targetPower": 120,
+      "stepIndex": 0,
+      "paused": false,
+      "targetHeartRate": 128
+    },
+    {
+      "timeOffsetSeconds": 8,
+      "power": 106,
+      "heartRate": 104,
+      "cadence": 85,
+      "speedKmh": 20.0,
+      "distanceMeters": 44.8,
+      "targetPower": 120,
+      "stepIndex": 0,
+      "paused": false,
+      "targetHeartRate": 128
+    },
+    {
+      "timeOffsetSeconds": 9,
+      "power": 108,
+      "heartRate": 104,
+      "cadence": 85,
+      "speedKmh": 20.0,
+      "distanceMeters": 50.4,
+      "targetPower": 120,
+      "stepIndex": 0,
+      "paused": false,
+      "targetHeartRate": 128
+    },
+    {
+      "timeOffsetSeconds": 10,
+      "power": 110,
+      "heartRate": 105,
+      "cadence": 85,
+      "speedKmh": 20.0,
+      "distanceMeters": 56.0,
+      "targetPower": 120,
+      "stepIndex": 0,
+      "paused": false,
+      "targetHeartRate": 128
+    },
+    {
+      "timeOffsetSeconds": 11,
+      "power": 112,
+      "heartRate": 105,
+      "cadence": 85,
+      "speedKmh": 20.0,
+      "distanceMeters": 61.6,
+      "targetPower": 120,
+      "stepIndex": 0,
+      "paused": false,
+      "targetHeartRate": 128
+    },
+    {
+      "timeOffsetSeconds": 12,
+      "power": 114,
+      "heartRate": 106,
+      "cadence": 50,
+      "speedKmh": 20.0,
+      "distanceMeters": 67.2,
+      "targetPower": 120,
+      "stepIndex": 0,
+      "paused": false,
+      "targetHeartRate": 128
+    },
+    {
+      "timeOffsetSeconds": 13,
+      "power": 116,
+      "heartRate": 106,
+      "cadence": 50,
+      "speedKmh": 20.0,
+      "distanceMeters": 72.8,
+      "targetPower": 120,
+      "stepIndex": 0,
+      "paused": false,
+      "targetHeartRate": 128
+    },
+    {
+      "timeOffsetSeconds": 14,
+      "power": 118,
+      "heartRate": 107,
+      "cadence": 50,
+      "speedKmh": 20.0,
+      "distanceMeters": 78.4,
+      "targetPower": 120,
+      "stepIndex": 0,
+      "paused": false,
+      "targetHeartRate": 128
+    },
+    {
+      "timeOffsetSeconds": 15,
+      "power": 70,
+      "heartRate": 107,
+      "cadence": 50,
+      "speedKmh": 20.0,
+      "distanceMeters": 84.0,
+      "targetPower": 120,
+      "stepIndex": 0,
+      "paused": false,
+      "targetHeartRate": 128
+    },
+    {
+      "timeOffsetSeconds": 16,
+      "power": 70,
+      "heartRate": 108,
+      "cadence": 50,
+      "speedKmh": 20.0,
+      "distanceMeters": 89.6,
+      "targetPower": 120,
+      "stepIndex": 0,
+      "paused": false,
+      "targetHeartRate": 128
+    },
+    {
+      "timeOffsetSeconds": 17,
+      "power": 70,
+      "heartRate": 108,
+      "cadence": 50,
+      "speedKmh": 20.0,
+      "distanceMeters": 95.2,
+      "targetPower": 120,
+      "stepIndex": 0,
+      "paused": false,
+      "targetHeartRate": 128
+    },
+    {
+      "timeOffsetSeconds": 18,
+      "power": 70,
+      "heartRate": 109,
+      "cadence": 50,
+      "speedKmh": 20.0,
+      "distanceMeters": 100.8,
+      "targetPower": 120,
+      "stepIndex": 0,
+      "paused": false,
+      "targetHeartRate": 128
+    },
+    {
+      "timeOffsetSeconds": 19,
+      "power": 70,
+      "heartRate": 109,
+      "cadence": 50,
+      "speedKmh": 20.0,
+      "distanceMeters": 106.4,
+      "targetPower": 120,
+      "stepIndex": 0,
+      "paused": false,
+      "targetHeartRate": 128
+    },
+    {
+      "timeOffsetSeconds": 20,
+      "power": 70,
+      "heartRate": 110,
+      "cadence": 62,
+      "speedKmh": 20.0,
+      "distanceMeters": 112.0,
+      "targetPower": 120,
+      "stepIndex": 0,
+      "paused": false,
+      "targetHeartRate": 128
+    }
+  ],
+  "rrIntervals": [],
+  "laps": [
+    {
+      "stepIndex": 0,
+      "startSeconds": 0,
+      "endSeconds": 20,
+      "averagePower": 94.5,
+      "averageHeartRate": 105.0
+    }
+  ],
+  "summary": {
+    "durationSeconds": 20,
+    "movingSeconds": 20,
+    "distanceMeters": 112.0,
+    "averagePower": 94.5,
+    "maxPower": 118,
+    "averageHeartRate": 105.0,
+    "maxHeartRate": 110,
+    "workKilojoules": 1.89
+  },
+  "events": [
+    {
+      "type": "stall-guard",
+      "timeOffsetSeconds": 14,
+      "stepIndex": 0
+    }
+  ]
+}
