@@ -127,7 +127,7 @@ private fun PlanRowItem(
     ValueRow(
         title = row.title,
         subtitle = row.subtitle,
-        onClick = { onSelect(RideChoice.Planned(row.workout.workout)) },
+        onClick = { onSelect(RideChoice.Planned(row.workout.workout, row.workout.structureHash)) },
         value = row.duration,
         caption = row.intensity,
         selected = chosen != null && chosen.workout.id == row.workout.id && !chosen.variant,
@@ -145,7 +145,9 @@ private fun PlanRowItem(
         title = variant.title,
         subtitle = variant.subtitle,
         onClick = {
-            onSelect(RideChoice.Planned(variant.workout, variant = true, variantNote = variant.note))
+            onSelect(
+                RideChoice.Planned(variant.workout, variant.structureHash, variant = true, variantNote = variant.note),
+            )
         },
         modifier = Modifier.padding(start = 16.dp),
         value = variant.duration,

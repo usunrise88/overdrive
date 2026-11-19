@@ -59,13 +59,18 @@ object OverlayPolicy {
 
     /**
      * Whether a change of displayed state must bypass the once-a-second limit: what the rider just did (gear,
-     * target, intensity, pause) is shown at once, because the overlay is the Click's feedback (design/system.md §5.2).
-     * Everything else, which the engine and the sensors change continuously, waits for its turn.
+     * target, intensity, pause, and the target heart rate of a heart-rate step that the gear buttons move by 2 bpm) is shown at once,
+     * because the overlay is the Click's feedback (design/system.md §5.2). The stall guard taking hold and letting go is a change of the
+     * fifth cell too, so it is shown at once as well. Everything else, which the engine and the sensors change continuously, waits for
+     * its turn.
      */
     fun isRiderAction(
         previous: OverlayUiState,
         next: OverlayUiState,
-    ): Boolean = previous.control != next.control || previous.paused != next.paused
+    ): Boolean =
+        previous.control != next.control ||
+            previous.paused != next.paused ||
+            previous.hold?.targetBpm != next.hold?.targetBpm
 }
 
 /**

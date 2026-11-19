@@ -1,5 +1,6 @@
 package app.overdrive.uikit.overlay
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -10,12 +11,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -140,6 +145,8 @@ private fun MainRow(state: OverlayUiState) {
             TimeValue(state.elapsedSeconds)
             ControlValue(state.control, state.paused)
         }
+        val hold = state.hold
+        if (hold != null) HoldLine(hold, state.paused)
     }
 }
 
@@ -213,17 +220,35 @@ private fun ControlLabel(control: OverlayControl) {
                     maxLines = 1,
                     softWrap = false,
                 )
+                if (control.intensityPercent != null) {
+                    OdText(
+                        UiFormat.percent(control.intensityPercent),
+                        style = OdType.captionNum,
+                        color = OverdriveColors.textSecondary,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
+            }
+
+            // A word in primary text, not tertiary: the guard is the thing to notice (design/system.md §5.6). It may run into the
+            // frame's right padding, which is 16 dp.
+            is OverlayControl.Guard -> {
                 OdText(
-                    UiFormat.percent(control.intensityPercent),
-                    style = OdType.captionNum,
-                    color = OverdriveColors.textSecondary,
+                    "Cadence guard",
+                    Modifier.requiredWidth(GUARD_LABEL_WIDTH),
+                    style = OdType.caption,
+                    color = OverdriveColors.textPrimary,
                     maxLines = 1,
                     softWrap = false,
+                    overflow = TextOverflow.Visible,
                 )
             }
         }
     }
 }
+
+private val GUARD_LABEL_WIDTH = 96.dp
 
 /** Live power in the zone colour, 36 sp; paused or without power it is tertiary text. */
 @Composable
@@ -288,6 +313,7 @@ private fun RowScope.ControlValue(
         when (control) {
             is OverlayControl.Gear -> control.gear
             is OverlayControl.Target -> control.watts
+            is OverlayControl.Guard -> control.watts
         }
     SlotValue(UiFormat.count(value), value == null, paused, OverdriveDimens.overlaySlotGearOrTarget)
 }
@@ -347,6 +373,16 @@ private fun IntervalSection(interval: OverlayInterval) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        val previous = interval.previousLine
+        if (previous != null) {
+            OdText(
+                previous,
+                style = OdType.label,
+                color = OverdriveColors.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         WorkoutProfile(
             data = interval.profile,
             look = ProfileLook.Overlay,
@@ -396,6 +432,104 @@ private fun IntervalHead(
             color = OverdriveColors.textSecondary,
             maxLines = 1,
             softWrap = false,
+        )
+    }
+}
+
+// ---- The heart-rate hold line ---------------------------------------------------------------------
+
+/** The gauge: 72 dp by 8 dp, the band in the middle half of it, the heart rate a 3 dp marker. Flat fills, no animation. */
+private val gaugeWidth = 72.dp
+private val gaugeHeight = 8.dp
+
+/**
+ * One line under the main row while a heart-rate step plays (spec §11.2): where the heart rate is against the band, as a position on a
+ * small gauge **and** as words ("In band", "Above band", "Below band"), never colour alone; the target with what the gear buttons moved
+ * it by; and what the strap is doing. The controller's power is the fifth cell's target above, so it is not repeated here.
+ */
+@Composable
+private fun HoldLine(
+    hold: OverlayHold,
+    paused: Boolean,
+) {
+    val words = remember(hold) { holdWords(hold) }
+    val colour = if (paused) OverdriveColors.textTertiary else OverdriveColors.textSecondary
+    Row(
+        Modifier.padding(top = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (hold.place != null && hold.heartRate != null) {
+            HoldGauge(hold.heartRate, hold.targetBpm, hold.band, paused)
+        }
+        OdText(words, style = OdType.labelNum, color = colour, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** The words of the line, one plain sentence (design/system.md §5.6). Public so a test can read them. */
+fun holdWords(hold: OverlayHold): String {
+    val target = "${hold.targetBpm} bpm" + offsetWords(hold.offsetBpm)
+    return when (hold.phase) {
+        HoldPhase.EasingIn -> {
+            "Easing in · target $target ±${hold.band}"
+        }
+
+        HoldPhase.StrapLost -> {
+            "Strap lost · holding ${UiFormat.count(hold.watts)} W"
+        }
+
+        HoldPhase.StrapDropped -> {
+            "Strap lost · power at the minimum, ${UiFormat.count(hold.minimumWatts)} W"
+        }
+
+        HoldPhase.Holding -> {
+            when (hold.place) {
+                HoldPlace.In -> "Target $target ±${hold.band} · In band"
+                HoldPlace.Above -> "Target $target ±${hold.band} · Above band"
+                HoldPlace.Below -> "Target $target ±${hold.band} · Below band"
+                null -> "No heart rate · target $target"
+            }
+        }
+    }
+}
+
+private fun offsetWords(offsetBpm: Int): String =
+    when {
+        offsetBpm > 0 -> " (+$offsetBpm)"
+        offsetBpm < 0 -> " (−${-offsetBpm})"
+        else -> ""
+    }
+
+/**
+ * The position of [heartRate] against the band: a track, the band in its middle half (target ± band, the track shows ± two bands), and
+ * a marker clamped to the ends. Redrawn only when a value changes, like everything on the overlay.
+ */
+@Composable
+private fun HoldGauge(
+    heartRate: Int,
+    targetBpm: Int,
+    band: Int,
+    paused: Boolean,
+) {
+    Canvas(Modifier.size(gaugeWidth, gaugeHeight)) {
+        val radius = CornerRadius(size.height / 2f)
+        drawRoundRect(OverdriveColors.surface3, size = size, cornerRadius = radius)
+        val span = 4f * band
+        val bandStart = size.width * 0.25f
+        drawRoundRect(
+            OverdriveColors.borderStrong,
+            topLeft = Offset(bandStart, 0f),
+            size = Size(size.width * 0.5f, size.height),
+            cornerRadius = radius,
+        )
+        val position = ((heartRate - targetBpm + 2f * band) / span).coerceIn(0f, 1f)
+        val markerWidth = 3.dp.toPx()
+        val x = (position * (size.width - markerWidth)).coerceIn(0f, size.width - markerWidth)
+        drawRoundRect(
+            if (paused) OverdriveColors.textTertiary else OverdriveColors.textPrimary,
+            topLeft = Offset(x, 0f),
+            size = Size(markerWidth, size.height),
+            cornerRadius = CornerRadius(markerWidth / 2f),
         )
     }
 }

@@ -59,6 +59,8 @@ import app.overdrive.uikit.Zones
 import app.overdrive.uikit.chart.ProfileLook
 import app.overdrive.uikit.chart.WorkoutProfile
 import app.overdrive.uikit.icons.OverdriveIcons
+import app.overdrive.uikit.overlay.HoldPhase
+import app.overdrive.uikit.overlay.holdWords
 import app.overdrive.uikit.tokens.OverdriveColors
 import kotlin.math.roundToInt
 
@@ -92,6 +94,7 @@ fun RidingScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 if (paused) PausedBanner(snapshot)
+                strapNotice(snapshot)?.let { StrapBanner(it) }
                 if (ui.logFailed) NotSavedNotice()
                 Row(Modifier.fillMaxWidth().height(312.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     PowerCard(ui, paused, Modifier.width(424.dp).fillMaxHeight())
@@ -139,6 +142,32 @@ private fun PausedBanner(snapshot: RideSnapshot) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+/**
+ * What to say when the heart-rate strap is lost during a heart-rate step (spec §11.2), or null: "Strap lost · holding 140 W" after 15 s, and
+ * "Strap lost · power at the minimum, 80 W" after 60 s. The overlay says the same in its own line.
+ */
+fun strapNotice(snapshot: RideSnapshot): String? =
+    RideMapping
+        .hold(snapshot)
+        ?.takeIf { it.phase == HoldPhase.StrapLost || it.phase == HoldPhase.StrapDropped }
+        ?.let(::holdWords)
+
+@Composable
+private fun StrapBanner(words: String) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .background(OverdriveColors.surface2, RoundedCornerShape(8.dp))
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OdIcon(OverdriveIcons.TriangleAlert)
+        OdText(words, style = OdType.bodyStrong, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -196,8 +225,18 @@ private fun PowerCard(
         )
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             if (snapshot.mode == TrainerMode.ERG) {
-                SmallStat("Target", snapshot.targetPower?.toString(), "W", dim)
-                SmallStat("Intensity", UiFormat.percent(snapshot.intensityPercent), null, dim)
+                val hold = snapshot.heartRateHold
+                if (snapshot.stallGuardActive && snapshot.stallGuardWatts != null) {
+                    // The cadence guard holds the target down (spec §11.1): the word and what the trainer is held at.
+                    SmallStat("Cadence guard", snapshot.stallGuardWatts.toString(), "W", dim)
+                } else {
+                    SmallStat("Target", snapshot.targetPower?.toString(), "W", dim)
+                }
+                if (hold != null) {
+                    SmallStat("Heart rate target", hold.targetBpm.toString(), "bpm", dim)
+                } else {
+                    SmallStat("Intensity", UiFormat.percent(snapshot.intensityPercent), null, dim)
+                }
             } else if (snapshot.workout != null) {
                 SmallStat("Gear", snapshot.gear?.toString(), null, dim)
             }
@@ -392,6 +431,9 @@ private fun RideControls(
     actions: RideActions,
 ) {
     val erg = snapshot.mode == TrainerMode.ERG
+
+    // In a heart-rate step the two buttons move the target heart rate by 2 bpm (spec §11.2), not the intensity.
+    val hold = snapshot.heartRateHold
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         if (snapshot.workout != null) {
             OdButton("Previous", actions::previousInterval, leadingIcon = OverdriveIcons.SkipBack, height = 64.dp)
@@ -399,24 +441,48 @@ private fun RideControls(
         OdIconButton(
             OverdriveIcons.Minus,
             actions::levelDown,
-            if (erg) "Intensity down" else "Gear down",
+            if (hold != null) {
+                "Target heart rate down"
+            } else if (erg) {
+                "Intensity down"
+            } else {
+                "Gear down"
+            },
             variant = ButtonVariant.Secondary,
             size = 64.dp,
             repeating = true,
         )
         Column(Modifier.width(112.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             OdText(
-                if (erg) UiFormat.percent(snapshot.intensityPercent) else UiFormat.count(snapshot.gear),
+                when {
+                    hold != null -> "${hold.targetBpm} bpm"
+                    erg -> UiFormat.percent(snapshot.intensityPercent)
+                    else -> UiFormat.count(snapshot.gear)
+                },
                 style = OdType.numS,
                 maxLines = 1,
                 softWrap = false,
             )
-            OdText(if (erg) "Intensity" else "Gear", style = OdType.caption, color = OverdriveColors.textTertiary)
+            OdText(
+                when {
+                    hold != null -> "Target heart rate"
+                    erg -> "Intensity"
+                    else -> "Gear"
+                },
+                style = OdType.caption,
+                color = OverdriveColors.textTertiary,
+            )
         }
         OdIconButton(
             OverdriveIcons.Plus,
             actions::levelUp,
-            if (erg) "Intensity up" else "Gear up",
+            if (hold != null) {
+                "Target heart rate up"
+            } else if (erg) {
+                "Intensity up"
+            } else {
+                "Gear up"
+            },
             variant = ButtonVariant.Secondary,
             size = 64.dp,
             repeating = true,

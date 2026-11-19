@@ -17,7 +17,6 @@ import android.view.WindowManager
 import androidx.compose.ui.platform.ComposeView
 import app.overdrive.core.ride.RideState
 import app.overdrive.ride.host.RideMapping
-import app.overdrive.ride.settings.OverlayStartMode
 import app.overdrive.uikit.tokens.OverdriveDimens
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,6 +50,7 @@ class OverlayService :
     private val main = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val viewOwner = OverlayViewOwner()
     private val stopRule = ServiceStopRule()
+    private val modeState = OverlayModeState()
     private var windowContext: Context? = null
     private var windowManager: WindowManager? = null
     private var controller: OverlayWindowController? = null
@@ -172,7 +172,12 @@ class OverlayService :
             delay(OverlayPolicy.START_GRACE_MS)
             if (stopRule.onGraceElapsed()) stopSelf()
         }
+        // The window around a step change (spec §11.3): a dismissal lasts only as long as the window it was made in.
+        main.launch { windowOpen().collect(modeState::onWindow) }
     }
+
+    /** Whether the overlay is expanded around a step change; read off the main thread, changes twice per step change. */
+    private fun windowOpen() = modeState.windowOpen(model.rides, model.settings).flowOn(Dispatchers.Default)
 
     private fun showWindow() {
         val controller = controller ?: return
@@ -180,12 +185,14 @@ class OverlayService :
         if (controller.isShown) return
         val ride = model.rides.value
         val settings = model.settings.value
-        val initial = RideMapping.overlayState(ride.snapshot, ride.profile)
+        val initial = RideMapping.overlayState(ride.snapshot, ride.profile, ride.previousLine)
         val states = overlayStates(model.rides)
-        val look = model.settings.map { it.toOverlaySettings() }.distinctUntilChanged()
+        // The mode shown is the rider's, widened around a step change (spec §11.3, docs/adr/0034).
+        val look = modeState.looks(windowOpen(), model.settings)
+        val initialLook = modeState.look(ride.snapshot, settings)
         val content =
             ComposeView(context).apply {
-                setContent { OverlayWindowContent(states, initial, look, settings.toOverlaySettings()) }
+                setContent { OverlayWindowContent(states, initial, look, initialLook) }
             }
         val shown = controller.show(content, settings.overlayX, settings.overlayY, blurRadiusPx())
         if (!shown) {
@@ -226,19 +233,10 @@ class OverlayService :
 
     // ---- Window callbacks -------------------------------------------------------------------------
 
+    // A tap flips what is shown: collapsing an overlay that expanded around a step change leaves the chosen mode as it was.
     override fun onTap() {
-        model.updateSettings {
-            it.copy(
-                overlayMode =
-                    if (it.overlayMode ==
-                        OverlayStartMode.Compact
-                    ) {
-                        OverlayStartMode.Detailed
-                    } else {
-                        OverlayStartMode.Compact
-                    },
-            )
-        }
+        val mode = modeState.tap(model.rides.value.snapshot, model.settings.value)
+        if (mode != model.settings.value.overlayMode) model.updateSettings { it.copy(overlayMode = mode) }
     }
 
     override fun onLongPress() = openApp()

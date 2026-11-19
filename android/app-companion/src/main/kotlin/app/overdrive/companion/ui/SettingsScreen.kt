@@ -87,6 +87,8 @@ class SettingsActions(
     val onToken: (String) -> Unit,
     val onSyncNow: () -> Unit,
     val onLicences: () -> Unit,
+    /** The coach notebook, read-only (design/companion.md §4.13). */
+    val onNotebook: () -> Unit = {},
     /** **Manage**, or **Allow** while nothing is allowed. */
     val onAccess: (AccessAction) -> Unit = {},
     val onBackgroundFix: (BackgroundFix) -> Unit = {},
@@ -223,6 +225,7 @@ fun SettingsScreen(
             },
             onSyncNow = container::syncNow,
             onLicences = { container.nav.push(Route.Licences) },
+            onNotebook = { container.nav.push(Route.Notebook) },
             onAccess = { action -> if (action == AccessAction.Allow) request() else openHealthConnect(context) },
             onBackgroundFix = { fix ->
                 when (fix) {
@@ -353,6 +356,31 @@ fun SettingsView(
                             OdText(state.outdoorNote, style = OdType.label, color = OverdriveColors.textSecondary)
                         }
                         OdText(state.outdoorValue, style = OdType.numXS, maxLines = 2)
+                    }
+                }
+            }
+            item { GroupLabel("Coach") }
+            item {
+                SettingsCard {
+                    val source = rememberInteractionSource()
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .plainClickable(source, role = Role.Button, onClick = actions.onNotebook)
+                            .heightIn(min = OverdriveDimens.sizeListRowTwoLine)
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            OdText("Coach notebook", style = OdType.bodyStrong)
+                            OdText(
+                                "What the coach keeps about you. Read-only.",
+                                style = OdType.label,
+                                color = OverdriveColors.textSecondary,
+                            )
+                        }
+                        OdIcon(OverdriveIcons.ChevronRight, tint = OverdriveColors.textSecondary)
                     }
                 }
             }

@@ -66,6 +66,11 @@ data class VariantRow(
     val intensity: String?,
     /** The agent's note, kept for the detail beside the Start button. */
     val note: String?,
+    /**
+     * The service's hash of the structure of the primary with the variant's steps: a variant ride is a session of its own (ADR 0036), so
+     * this, and not the planned workout's, is what the previous attempt of the ride is asked for (spec §11.7, docs/adr/0034).
+     */
+    val structureHash: String? = null,
 ) {
     val enabled: Boolean get() = mark != PlanMark.Blocked
 
@@ -207,7 +212,16 @@ data class PlanUi(
             val subtitle = listOfNotNull(note ?: kinds, routeText(variant.steps, routes)).joinToString(" · ")
             return when (val playability = workout.playability()) {
                 is Playability.Unrunnable -> {
-                    VariantRow(workout, VariantRow.TITLE, playability.reason, PlanMark.Blocked, null, null, note)
+                    VariantRow(
+                        workout,
+                        VariantRow.TITLE,
+                        playability.reason,
+                        PlanMark.Blocked,
+                        null,
+                        null,
+                        note,
+                        variant.structureHash,
+                    )
                 }
 
                 Playability.Runnable -> {
@@ -219,6 +233,7 @@ data class PlanUi(
                         duration = UiFormat.minutes(workout.flatSteps().totalDurationSeconds()),
                         intensity = workout.intensityFactor()?.let { "IF " + UiFormat.decimal(it, 2) },
                         note = note,
+                        structureHash = variant.structureHash,
                     )
                 }
             }

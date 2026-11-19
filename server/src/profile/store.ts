@@ -2,6 +2,7 @@ import {
   applyProfilePatch,
   defaultProfile,
   type Profile,
+  type RiderWeight,
   validateProfile,
 } from "@overdrive/contracts";
 import type { Db } from "../db.ts";
@@ -48,7 +49,16 @@ export interface ProfileStore {
  */
 export type HeartRateEstimator = () => Promise<{ max: number | null; threshold: number | null }>;
 
-type Stored = Omit<Profile, "updatedAt" | "estimatedMaxHeartRate" | "estimatedThresholdHeartRate">;
+/**
+ * The rider's 7-day average weight from Health Connect (spec §12.5, ADR 0034), or null when none of the last seven days has a weighing.
+ * Worked out when the profile is read, never stored with it.
+ */
+export type RiderWeightSource = () => Promise<RiderWeight | null>;
+
+type Stored = Omit<
+  Profile,
+  "updatedAt" | "estimatedMaxHeartRate" | "estimatedThresholdHeartRate" | "riderWeight"
+>;
 
 const PARTS = [
   "ftp",
@@ -59,6 +69,7 @@ const PARTS = [
   "physics",
   "maxHeartRate",
   "thresholdHeartRate",
+  "bikeWeightKg",
 ] as const;
 
 /** What is stored: the profile without its stamp and without the estimates, which are read-only and computed. */
@@ -67,6 +78,7 @@ function withoutStamp(profile: Profile): Stored {
     updatedAt: _stamp,
     estimatedMaxHeartRate: _max,
     estimatedThresholdHeartRate: _threshold,
+    riderWeight: _weight,
     ...rest
   } = profile;
   return rest;
@@ -77,16 +89,20 @@ export function createProfileStore(
   bus: EventBus,
   now: () => Date,
   estimator?: HeartRateEstimator,
+  riderWeight?: RiderWeightSource,
 ): ProfileStore {
-  /** The profile with the estimates the rides give. */
+  /** The profile with the estimates the rides give, and the rider's weight when there is a recent one (the key is absent otherwise). */
   async function withEstimates(profile: Profile): Promise<Profile> {
-    if (estimator === undefined) return profile;
-    const estimates = await estimator();
-    return {
-      ...profile,
-      estimatedMaxHeartRate: estimates.max,
-      estimatedThresholdHeartRate: estimates.threshold,
-    };
+    const estimated: Profile =
+      estimator === undefined
+        ? profile
+        : await estimator().then((estimates) => ({
+            ...profile,
+            estimatedMaxHeartRate: estimates.max,
+            estimatedThresholdHeartRate: estimates.threshold,
+          }));
+    const weight = riderWeight === undefined ? null : await riderWeight();
+    return weight === null ? estimated : { ...estimated, riderWeight: weight };
   }
 
   async function read(tx: Pick<Db, "query">, lock: boolean): Promise<Profile> {

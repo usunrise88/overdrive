@@ -24,7 +24,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  *   settings, untouched: the app works exactly as it did before there was a profile, offline included.
  * - **FTP** is the profile's when it has one; a profile whose FTP is null (the owner has not set it) leaves the tablet's own.
  * - **Mass, CdA, Crr, air density and drivetrain efficiency** are the profile's: it always has them, with the engine's defaults
- *   where nobody set them.
+ *   where nobody set them. **The mass is the exception that the rider asks for** (spec §12.5, docs/adr/0034): when the profile has both
+ *   the rider's 7-day average weight and a bike weight, the mass is their sum, and `physics.systemMassKg` stands aside until the bike
+ *   weight is cleared; with either missing it is `physics.systemMassKg` as before. The tablet's own mass never beats the profile's.
  *
  * Nothing is written to the tablet's stored settings: this value is derived every time, so taking the service away (clearing the
  * address) returns the rider to their own values. The result is **not** sanitized: a value the service holds off the tablet's
@@ -36,7 +38,9 @@ fun AppSettings.withProfile(profile: Profile?): AppSettings =
     } else {
         copy(
             ftp = profile.ftp ?: ftp,
-            massKg = profile.physics.systemMassKg,
+            massKg = profile.systemMassKgFromWeights() ?: profile.physics.systemMassKg,
+            bikeWeightKg = profile.bikeWeightKg,
+            riderWeight = profile.riderWeight,
             cdA = profile.physics.cdA,
             crr = profile.physics.crr,
             airDensity = profile.physics.airDensity,
@@ -46,7 +50,7 @@ fun AppSettings.withProfile(profile: Profile?): AppSettings =
 
 /**
  * The profile patch that makes [before] into [after], for the values the Settings screen can change and the profile holds: FTP,
- * mass, CdA and Crr. Empty when none of them differ.
+ * mass, CdA, Crr and the bike's weight. Empty when none of them differ.
  */
 fun riderPatch(
     before: AppSettings,
@@ -60,6 +64,7 @@ fun riderPatch(
                 cdA = after.cdA.takeIf { it != before.cdA },
                 crr = after.crr.takeIf { it != before.crr },
             ),
+        bikeWeightKg = if (after.bikeWeightKg != before.bikeWeightKg) Change.Set(after.bikeWeightKg) else Change.Keep,
     )
 
 /**

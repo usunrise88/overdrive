@@ -39,6 +39,11 @@ export interface PlannedWorkout {
   workout: Workout;
   /** The easier version, when the agent wrote one; absent otherwise. */
   variant?: PlannedVariant;
+  /**
+   * The workout's structure hash (spec §11.7, ADR 0026, `workoutHash`), worked out by the service from the workout as it serves it, so the
+   * tablet can ask for the previous attempt (`GET /v1/repeats/{hash}/previous`) without computing it (ADR 0034). Absent from an older service.
+   */
+  structureHash?: string;
 }
 
 /** The workout a variant would play: the primary with the variant's steps. */

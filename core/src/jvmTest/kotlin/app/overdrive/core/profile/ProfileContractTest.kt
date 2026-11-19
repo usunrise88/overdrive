@@ -78,8 +78,10 @@ class ProfileContractTest {
             val written = ProfileApiJson.encodeProfile(profile)
             assertEquals(profile, ProfileApiJson.decodeProfile(written), file.name)
             val original = parse(file.readText()).jsonObject
+            // The weight keys are written only when they have a value, so a null one in the fixture is an absent one here.
+            val expected = JsonObject(original.filter { (key, value) -> key !in weightKeys || value != JsonNull })
             assertEquals(
-                normalize(original),
+                normalize(expected),
                 normalize(withoutAbsentNulls(parse(written).jsonObject, original)),
                 file.name,
             )
@@ -90,11 +92,84 @@ class ProfileContractTest {
     private val heartRateKeys =
         setOf("maxHeartRate", "thresholdHeartRate", "estimatedMaxHeartRate", "estimatedThresholdHeartRate")
 
+    /** `bikeWeightKg` and `riderWeight` (spec §12.5, docs/adr/0034): optional on read, written only when they have a value. */
+    private val weightKeys = setOf("bikeWeightKg", "riderWeight")
+
     private fun withoutAbsentNulls(
         written: JsonObject,
         original: JsonObject,
     ): JsonObject =
         JsonObject(written.filter { (key, value) -> key !in heartRateKeys || key in original || value != JsonNull })
+
+    @Test
+    fun `reads the weights of the fixtures and the system mass they make`() {
+        val both =
+            ProfileApiJson.decodeProfile(
+                File(contracts, "fixtures/profile/profile/valid/weights.json").readText(),
+            )
+        assertEquals(9.0, both.bikeWeightKg)
+        assertEquals(RiderWeight(78.4, "2026-11-18", 5), both.riderWeight)
+        // Both weights, and only both, make the mass: rider plus bike.
+        assertEquals(87.4, both.systemMassKgFromWeights()!!, 1e-9)
+        val bikeOnly =
+            ProfileApiJson.decodeProfile(
+                File(contracts, "fixtures/profile/profile/valid/bike-weight-only.json").readText(),
+            )
+        assertEquals(8.5, bikeOnly.bikeWeightKg)
+        assertNull(bikeOnly.riderWeight)
+        assertNull(bikeOnly.systemMassKgFromWeights())
+        val none =
+            ProfileApiJson.decodeProfile(
+                File(contracts, "fixtures/profile/profile/valid/weights-not-set.json").readText(),
+            )
+        assertNull(none.bikeWeightKg)
+        assertNull(none.riderWeight)
+        assertNull(none.systemMassKgFromWeights())
+        assertNull(Profile.default().systemMassKgFromWeights())
+        // A rider weight without the bike weight leaves the mass to the physics.
+        assertNull(both.copy(bikeWeightKg = null).systemMassKgFromWeights())
+    }
+
+    @Test
+    fun `a profile written without weights has no weight keys at all`() {
+        val written = parse(ProfileApiJson.encodeProfile(Profile.default())).jsonObject
+        assertTrue("bikeWeightKg" !in written.keys)
+        assertTrue("riderWeight" !in written.keys)
+        val withWeights =
+            parse(
+                ProfileApiJson.encodeProfile(
+                    Profile.default().copy(bikeWeightKg = 9.0, riderWeight = RiderWeight(78.4, "2026-11-18", 5)),
+                ),
+            ).jsonObject
+        assertEquals(JsonPrimitive(9.0), withWeights.getValue("bikeWeightKg"))
+        assertEquals(setOf("kg", "date", "days"), withWeights.getValue("riderWeight").jsonObject.keys)
+    }
+
+    @Test
+    fun `bike weight patches set, clear and merge like the other fields`() {
+        val before = Profile.default().copy(bikeWeightKg = 9.0)
+        assertEquals(9.5, ProfileApiJson.decodePatch("""{"bikeWeightKg":9.5}""").applyTo(before).bikeWeightKg)
+        assertNull(ProfileApiJson.decodePatch("""{"bikeWeightKg":null}""").applyTo(before).bikeWeightKg)
+        assertEquals(9.0, ProfileApiJson.decodePatch("""{"ftp":250}""").applyTo(before).bikeWeightKg)
+        val patch = ProfilePatch(bikeWeightKg = Change.Set(8.0)).andThen(ProfilePatch(bikeWeightKg = Change.Set(null)))
+        assertEquals("""{"bikeWeightKg":null}""", ProfileApiJson.encodePatch(patch))
+        assertEquals(patch, ProfileApiJson.decodePatch(ProfileApiJson.encodePatch(patch)))
+        assertTrue(!patch.isEmpty)
+        assertFailsWith<IllegalArgumentException> { ProfileApiJson.decodePatch("""{"bikeWeightKg":"9"}""") }
+        assertFailsWith<IllegalArgumentException> {
+            ProfileApiJson.decodePatch("""{"bikeWeightKg":0}""").applyTo(before)
+        }
+        // The rider's weight is derived: no patch can carry it.
+        assertFailsWith<IllegalArgumentException> {
+            ProfileApiJson.decodePatch("""{"riderWeight":{"kg":70,"date":"2026-11-18","days":7}}""")
+        }
+    }
+
+    @Test
+    fun `a mass above what the profile allows is not made from the weights`() {
+        val heavy = Profile.default().copy(bikeWeightKg = 100.0, riderWeight = RiderWeight(450.0, "2026-11-18", 7))
+        assertNull(heavy.systemMassKgFromWeights())
+    }
 
     @Test
     fun `a profile without the heart-rate keys reads them as null`() {

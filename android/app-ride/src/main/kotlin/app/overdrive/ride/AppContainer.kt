@@ -24,6 +24,7 @@ import app.overdrive.core.remote.CacheText
 import app.overdrive.core.remote.Refresh
 import app.overdrive.core.remote.RemoteResource
 import app.overdrive.core.remote.ServiceClient
+import app.overdrive.core.remote.previousAttemptOf
 import app.overdrive.core.remote.recoveryResource
 import app.overdrive.core.route.Route
 import app.overdrive.core.route.RouteLibrary
@@ -56,6 +57,7 @@ import app.overdrive.ride.host.AudioManagerMediaController
 import app.overdrive.ride.host.BleRideSessionFactory
 import app.overdrive.ride.host.DeviceSourceFactory
 import app.overdrive.ride.host.MediaController
+import app.overdrive.ride.host.PreviousAttemptSource
 import app.overdrive.ride.host.RideChoice
 import app.overdrive.ride.host.RideHost
 import app.overdrive.ride.host.SimulatedRideSessionFactory
@@ -113,6 +115,8 @@ import java.util.concurrent.atomic.AtomicLong
  * @param profileTransport the network under the rider's profile `GET` (ADR 0021): the same `HttpURLConnection` class.
  * @param profilePatchTransport the network under the profile's `PATCH`. The same class again; a test on a JDK, whose
  * `HttpURLConnection` refuses that verb, passes one with a way round it.
+ * @param previousTransport the network under the one request for the previous attempt of a session (docs/adr/0034): the same
+ * `HttpURLConnection` class; a test points it at a local server.
  * @param profileFile the profile's cache (`filesDir/profile/profile`): the service's last answer and the unsent edit; a test
  * passes a temporary one.
  * @param routesTransport the network under the routes' and the recovery state's `GET` (ADR 0037): the same `HttpURLConnection` class.
@@ -140,6 +144,7 @@ class AppContainer(
     planFile: File = File(context.applicationContext.filesDir, "plan/workouts"),
     profileTransport: HttpGetTransport = UrlConnectionTransport(),
     profilePatchTransport: HttpPatchTransport = UrlConnectionTransport(),
+    previousTransport: HttpGetTransport = UrlConnectionTransport(),
     profileFile: File = File(context.applicationContext.filesDir, "profile/profile"),
     routesTransport: HttpGetTransport = UrlConnectionTransport(),
     routesDirectory: File = File(context.applicationContext.filesDir, "routes"),
@@ -414,6 +419,12 @@ class AppContainer(
     private val bleRows = BleDevicesModel(pairedDevices, ble.environment)
 
     /**
+     * The service for the one request a ride makes: the previous attempt of its session, for the overlay's line (docs/adr/0034). The
+     * address and token are read at every request, like the plan's; with none set it asks nothing.
+     */
+    private val previousClient = ServiceClient({ serviceConfig.value ?: SyncConfig("", "") }, previousTransport)
+
+    /**
      * The one ride. The first bundled workout is selected at start. The developer setting chooses the real devices (the
      * default) or the simulated ones; a change of what is paired rebuilds a ride that has not started.
      */
@@ -433,6 +444,7 @@ class AppContainer(
                     changes to routes.downloaded.keys
                 },
             downloadedRoutes = { routeLibrary.details.value.downloaded },
+            previousAttempts = PreviousAttemptSource { hash -> previousAttemptOf(previousClient, hash) },
         )
 
     /** The media keys of the ride bar and of the Click: system volume and a media key for whichever app plays. */

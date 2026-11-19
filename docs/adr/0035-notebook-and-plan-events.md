@@ -89,3 +89,4 @@ is untested against real ones, as ADR 0018 says); the wording of the two Telegra
   is told what became of each; no code in the service moves a workout.
 - `PlanStore.mirror` returns `MirrorChange` (the old three lists plus `moved` and `deleted`); `plan-changed` still carries only the three.
 - `createMcpServer(ctx, caller?)`: tools can now depend on the token's scopes.
+- The companion's read-only view of the notebook exists (`GET /v1/notebook`, Settings, Coach notebook; `design/companion.md` §4.13); the phone never writes it.

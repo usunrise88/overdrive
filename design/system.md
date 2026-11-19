@@ -187,7 +187,8 @@ intensity press changes the percentage and the target (ERG).
 
 ### 5.5 Interaction
 
-- **Tap** (up within 8 dp of down, before 500 ms) toggles compact/detailed. The window resizes
+- **Tap** (up within 8 dp of down, before 500 ms) toggles compact/detailed: it flips the mode that is **shown**, so on an overlay that expanded by itself around a step change
+  (§5.6) it collapses it for the rest of that window and leaves the saved mode as it was. The window resizes
   once, with no animation. Keep the edge the window is snapped to fixed: snapped to the bottom,
   it grows upward.
 - **Long press** 500 ms opens the ride app (no haptic needed; the app appearing is the feedback).
@@ -202,6 +203,23 @@ intensity press changes the percentage and the target (ERG).
 - **Blur (optional setting, off by default):** Android 12+ `FLAG_BLUR_BEHIND`,
   `blurBehindRadius` 24 dp. The backing keeps its opacity: blur calms busy video but does not
   darken bright video. Hide the setting where cross-window blur is unsupported.
+
+### 5.6 Engine states (stage A1c, ADR 0034; screenshot `overlay--engine-states`)
+
+What the engine's newer features add to the overlay. Nothing here animates, and the overlay still redraws at most once a second.
+
+| State | What changes |
+|---|---|
+| **Cadence guard has hold** (spec §11.1) | The fifth cell's label is **"Cadence guard"** in `text.primary` (caption, a word and not a colour), 96 dp wide so it may run into the frame's 16 dp padding; its value is what the trainer is held at. Replaces "Target 100%" for as long as the guard is active (the climb back included). Shown at once, like a gear press |
+| **Heart-rate step, the fifth cell** | "Target" with no percentage (the intensity does not apply) and the controller's power |
+| **Heart-rate step, the line** (spec §11.2) | One **hold line** under the main row, **in both modes**, 4 dp below the values: label style (13/18, tabular), `text.secondary` (`text.tertiary` paused). A **gauge** 72 × 8 dp (track `surface3`, the band `border-strong` in its middle half, the heart rate a 3 dp `text.primary` marker clamped to the ends) then the words: "Target 135 bpm ±5 · **In band**" / "**Above band**" / "**Below band**". Position and words together, never colour alone. The gauge is left out when the heart rate is not judged |
+| | "Easing in · target 135 bpm ±5" while the start ramp runs; "No heart rate · target 135 bpm" before the strap counts as lost; **"Strap lost · holding 142 W"** after 15 s; **"Strap lost · power at the minimum, 80 W"** after 60 s |
+| | The gear buttons move the target by 2 bpm: the number changes at once, and the step's own target shows as what it differs by, "137 bpm (+2)", "133 bpm (−2)" |
+| **Previous attempt** (spec §11.7) | One line in the **detailed** interval section, between "Next" and the profile (label, `text.secondary`, one line): "Heart rate 3 below last time", "Heart rate same as last time", "Heart rate 4 above last time". Only in an ERG steady step and only with data; never the word "fitter". Not in the compact overlay |
+
+Heights: the hold line is one line in every state, so compact is 108 dp and detailed with a workout 306 dp whenever it shows (84 and 282 without); the previous-attempt line adds 22 dp to the detailed
+interval section (304). **Around a step change** (spec §11.3) the overlay shows its detailed mode from 10 s before to 10 s after, the one resize of a tap; a tap while it is expanded collapses it and the chosen mode
+stays (§5.5).
 
 ## 6. Ride app screens (tablet, 1280 × 800 dp landscape)
 
@@ -377,6 +395,15 @@ Two columns of grouped cards; group label (label, text 3) above each card; setti
   nothing waits or an upload is under way).
 - **Developer · Click** (stage M4-2), last in the right column: setting rows only (switches, segmented controls, steppers with
   "ms") for the Click's connection options and the two gesture timings, and a final **Reset** (secondary, off at the defaults).
+- **Ride** (stage A1c, ADR 0034), right column under **Rider and gears**: **Cadence guard** (switch, "Lowers the target when your cadence drops…") and **Cadence floor** (stepper, rpm). The Overlay card has one more
+  row after Mode: **Expand at step changes** (switch, "Shows the detail 10 s before and after each new step. A tap collapses it. No sound").
+- **Developer · Resuming after a pause**, **Developer · Cadence guard** and **Developer · Heart-rate hold** (stage A1c), left column under Developer: one setting row for each engine number the owner tunes on the bike (ADR 0032, 0033), generated from
+  `TuningFields`: the title is a plain label ("Resume at power"), the note says what it does and ends with **"Default 10 W"**, the control is a stepper with the unit in its value ("10 W", "0.5 km/h") or a switch. A step the rule or another
+  number stops is a disabled button, and where another number is the reason the note says so in place of the usual one ("Not above 30 s (the other strap time). …"). Each card ends with **Reset to defaults** (secondary 40 dp **Reset**, off at
+  the defaults). A change reaches the next ride.
+- **Physics for speed and distance** with a weight (stage A1c, spec §12.5): when the profile has the rider's 7-day average weight and a bike weight, **Rider and bike mass** is a value, not a stepper ("87.4 kg", source marker **From your weight**) with the one
+  line under the title: "Rider 78.4 kg (7-day average) + bike 9 kg" ("…, last weighed 4 days ago" once the newest weighing is over 3 days old). A **Bike and kit weight** row follows (drawn only with a profile in force): stepper in 0.5 kg steps, "Not set" until the first
+  **+** sets 9 kg, **−** below 3 kg clears it; its note says what setting it does. No weight appears anywhere else.
 - Later groups (About) use the same row.
 
 ## 7. Components
@@ -492,7 +519,8 @@ No tooltips on the ride screen (no hover); the companion may show a value on pre
   top), baseline at the bottom.
 - Steady step: a rectangle from the baseline to its target, zone colour. Ramp: a trapezoid
   split at zone boundaries (boundary at the half percent, e.g. 55.5%) into pieces, each in its
-  own zone colour. Free-ride step: rectangle to 50% in surface3. Repeats are unrolled.
+  own zone colour. Free-ride step: rectangle to 50% in surface3. **Heart-rate step** (spec §11.2): a floating band from 40% to 65%
+  in `border-strong`, not touching the baseline, so it reads as "held between limits" and not as the free ride's block. Repeats are unrolled.
 - 1 dp gap between steps (2 dp on charts wider than 600 dp) in the surface colour, cut from the
   right of each step. No border on marks.
 - Past: blended with the surface (§2). Now marker: 2 dp text-1 rectangle, full plot height.

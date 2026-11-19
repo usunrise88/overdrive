@@ -33,6 +33,9 @@ sealed interface Route {
 
     data object Notes : Route
 
+    /** The coach notebook, read-only, from Settings (design/companion.md §4.13). */
+    data object Notebook : Route
+
     data class RideDetail(
         val id: String,
     ) : Route

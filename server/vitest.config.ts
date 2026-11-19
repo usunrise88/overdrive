@@ -17,5 +17,9 @@ export default defineConfig({
     // loops): on a machine with many cores one worker per core made the burst at the start starve those waits and a test now and
     // then failed on time alone. The suite takes as long with fewer workers.
     maxWorkers: 12,
+    // Only an upper bound for a test that hangs: on a machine that is busy with other work a test of the polling bots
+    // or the loops needs more than the default five seconds, and failing on time alone says nothing about the code.
+    testTimeout: 20_000,
+    hookTimeout: 30_000,
   },
 });

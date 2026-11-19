@@ -8,6 +8,8 @@ import app.overdrive.core.device.ConnectionState
 import app.overdrive.core.record.CompositeRideRecorder
 import app.overdrive.core.record.InMemoryRideRecorder
 import app.overdrive.core.record.RideRecord
+import app.overdrive.core.repeats.PreviousAttemptComparison
+import app.overdrive.core.repeats.RepeatPreviousAttempt
 import app.overdrive.core.ride.FlatStep
 import app.overdrive.core.ride.RideSession
 import app.overdrive.core.ride.RideSnapshot
@@ -23,6 +25,7 @@ import app.overdrive.ride.settings.SimulatedClick
 import app.overdrive.ride.workouts.WorkoutDescriber
 import app.overdrive.uikit.DeviceStatus
 import app.overdrive.uikit.chart.ProfileData
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -80,6 +83,11 @@ class RideHost(
      * waits for the network, so a route that is not here is the flat road. When this changes, [rideTriggers] is what rebuilds a ready ride.
      */
     private val downloadedRoutes: () -> Map<String, Route> = { emptyMap() },
+    /**
+     * Where the previous attempt of a planned workout's session comes from (spec §11.7, docs/adr/0034): asked **once, when the ride
+     * starts**, on the ride's own coroutine, so the ride never waits for it; anything but a clean answer is no line.
+     */
+    private val previousAttempts: PreviousAttemptSource = PreviousAttemptSource.None,
 ) : AutoCloseable {
     /** What a session was built from: the ride-affecting settings and the latest trigger. */
     private data class Inputs(
@@ -104,6 +112,12 @@ class RideHost(
         val stepsOfWorkout: List<FlatStep>,
     ) {
         var finished: FinishedRide? = null
+
+        /** The live comparison with the previous attempt (docs/adr/0034); touched only on the host's thread. */
+        val comparison = PreviousAttemptComparison()
+
+        /** The previous attempt has been asked for (once per ride). */
+        var previousRequested = false
 
         /** The finished ride's record, kept for a retry of the save. */
         var record: RideRecord? = null
@@ -350,6 +364,8 @@ class RideHost(
         val stats = run.stats.accept(snapshot)
         run.lastSnapshot = snapshot
         run.lastStats = stats
+        run.comparison.onSnapshot(snapshot)
+        if (snapshot.state == RideState.RIDING && !run.previousRequested) requestPrevious(run)
         var justFinished = false
         if (snapshot.state == RideState.FINISHED && run.finished == null) {
             run.recorder.record?.let { record ->
@@ -361,6 +377,30 @@ class RideHost(
         mutableSnapshots.value = snapshot
         mutableUi.value = uiOf(run, snapshot, stats)
         if (justFinished) store(run)
+    }
+
+    /**
+     * Asks for the previous attempt of the session, once, when the ride starts: only a workout that came from the plan has a structure
+     * hash to ask with. It runs on the ride's coroutine and suspends on the network (the transport works on `Dispatchers.IO`), so the
+     * engine and this thread are never held up; a failure of any kind is no answer.
+     */
+    private fun requestPrevious(run: Run) {
+        run.previousRequested = true
+        val hash = (run.choice as? RideChoice.Planned)?.structureHash ?: return
+        run.scope.launch {
+            val previous =
+                try {
+                    previousAttempts.previous(hash)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    null
+                }
+            if (previous != null && active === run) {
+                run.comparison.setPrevious(previous)
+                republish(run)
+            }
+        }
     }
 
     /** Publishes the current ride again without a new snapshot: the save state or the log's health changed. */
@@ -384,6 +424,7 @@ class RideHost(
         finished = run.finished,
         rideNumber = run.number,
         logFailed = run.disk.failed.value,
+        previousLine = run.comparison.line()?.text,
     )
 
     /**
@@ -525,4 +566,21 @@ object DeviceRows {
                 DeviceRowUi(DeviceStatus.NotPaired, "Not paired")
             }
         }
+}
+
+/**
+ * Where the host gets the previous attempt of a session (docs/adr/0034). The real one asks the service (`previousAttemptOf`); a test
+ * gives one that answers from a script, or never.
+ */
+fun interface PreviousAttemptSource {
+    /**
+     * The attempt before the one that is starting, for the session with the service's structure [hash], or null: none, no connection,
+     * a refused or bad answer. It suspends (it may take as long as the network does) and the ride never waits for it.
+     */
+    suspend fun previous(hash: String): RepeatPreviousAttempt?
+
+    companion object {
+        /** No source: no previous attempt, no line. */
+        val None: PreviousAttemptSource = PreviousAttemptSource { null }
+    }
 }

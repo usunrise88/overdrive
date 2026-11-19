@@ -29,13 +29,70 @@ sealed interface OverlayControl {
         val gear: Int?,
     ) : OverlayControl
 
-    /** An ERG step: the target in [watts] with the intensity percentage next to the label. */
+    /**
+     * An ERG step: the target in [watts] with the intensity percentage next to the label. A heart-rate step has no intensity to scale
+     * (the controller chooses the watts), so there [intensityPercent] is null and the label says only "Target".
+     */
     @Immutable
     data class Target(
         val watts: Int?,
-        val intensityPercent: Int,
+        val intensityPercent: Int?,
+    ) : OverlayControl
+
+    /**
+     * The ERG stall guard has hold (spec §11.1): cadence fell, so the trainer is held at [watts], below the step's target, until the
+     * rider pedals again. The label says "Cadence guard" in primary text, so it is read as a word and not as a colour.
+     */
+    @Immutable
+    data class Guard(
+        val watts: Int?,
     ) : OverlayControl
 }
+
+/** Where the heart rate is against the band of a heart-rate step (spec §11.2). */
+enum class HoldPlace {
+    Below,
+    In,
+    Above,
+}
+
+/** What a heart-rate step is doing, in the overlay's words. */
+enum class HoldPhase {
+    /** The start ramp: the heart rate is not judged yet. */
+    EasingIn,
+
+    /** The controller is in charge. */
+    Holding,
+
+    /** No heart rate for 15 s: the last power is held. */
+    StrapLost,
+
+    /** No heart rate for 60 s: the power dropped to the minimum. */
+    StrapDropped,
+}
+
+/**
+ * The line under the main row while a heart-rate step plays (spec §11.2, design/system.md §5.6): the target heart rate and band, where the
+ * heart rate is against them, and the strap states. The controller's power is the fifth cell's target. The target moves by 2 bpm with the
+ * gear buttons, which shows as [targetBpm] changing at once (and [offsetBpm] saying by how much it differs from the step's own).
+ */
+@Immutable
+data class OverlayHold(
+    val targetBpm: Int,
+    /** Half-width of the band, in bpm. */
+    val band: Int,
+    /** What the gear buttons moved the target by, in bpm; 0 when they have not. */
+    val offsetBpm: Int,
+    /** The live heart rate, for the gauge's marker; null without a signal. */
+    val heartRate: Int?,
+    /** Null while the heart rate is not judged (easing in) or missing. */
+    val place: HoldPlace?,
+    val phase: HoldPhase,
+    /** The controller's current power in watts, for "holding 140 W". */
+    val watts: Int?,
+    /** The step's lowest power, for "power at the minimum, 80 W". */
+    val minimumWatts: Int?,
+)
 
 /** The workout section of the detailed overlay (design/system.md §5.3). */
 @Immutable
@@ -52,6 +109,11 @@ data class OverlayInterval(
     val profile: ProfileData,
     /** Seconds into the workout, for the now marker. */
     val nowSeconds: Int,
+    /**
+     * The one line against the previous attempt of this session (spec §11.7), such as "Heart rate 3 below last time", or null when
+     * there is nothing to say yet (no earlier attempt, no connection, not enough of this step ridden). Detailed mode only.
+     */
+    val previousLine: String? = null,
 )
 
 /**
@@ -73,4 +135,6 @@ data class OverlayUiState(
     val distanceMeters: Double,
     /** Null in a free ride without a workout. */
     val interval: OverlayInterval?,
+    /** Set while a heart-rate step plays (spec §11.2): the line under the main row, in both modes. */
+    val hold: OverlayHold? = null,
 )

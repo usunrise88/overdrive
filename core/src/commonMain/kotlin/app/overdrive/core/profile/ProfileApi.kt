@@ -42,13 +42,15 @@ public data class ProfilePatch(
     val wPrimeKj: Change<Double?> = Change.Keep,
     val maxHeartRate: Change<Int?> = Change.Keep,
     val thresholdHeartRate: Change<Int?> = Change.Keep,
+    /** The bike's weight in kg (spec §12.5, docs/adr/0034); set to null clears it. */
+    val bikeWeightKg: Change<Double?> = Change.Keep,
 ) {
     /** Whether the patch changes nothing. */
     public val isEmpty: Boolean
         get() =
             ftp == Change.Keep && zones == Change.Keep && weeklyAvailability.isEmpty() && goals == null &&
                 physics == PhysicsPatch() && wPrimeKj == Change.Keep && maxHeartRate == Change.Keep &&
-                thresholdHeartRate == Change.Keep
+                thresholdHeartRate == Change.Keep && bikeWeightKg == Change.Keep
 
     /**
      * The one patch that does what this one does and then [later] does: where both name a field, [later] wins (the last write
@@ -73,6 +75,7 @@ public data class ProfilePatch(
             maxHeartRate = if (later.maxHeartRate == Change.Keep) maxHeartRate else later.maxHeartRate,
             thresholdHeartRate =
                 if (later.thresholdHeartRate == Change.Keep) thresholdHeartRate else later.thresholdHeartRate,
+            bikeWeightKg = if (later.bikeWeightKg == Change.Keep) bikeWeightKg else later.bikeWeightKg,
         )
 
     /**
@@ -120,6 +123,11 @@ public data class ProfilePatch(
                     Change.Keep -> profile.thresholdHeartRate
                     is Change.Set -> thresholdHeartRate.value
                 },
+            bikeWeightKg =
+                when (bikeWeightKg) {
+                    Change.Keep -> profile.bikeWeightKg
+                    is Change.Set -> bikeWeightKg.value
+                },
         )
     }
 }
@@ -141,6 +149,7 @@ public object ProfileApiJson {
             "physics",
             "maxHeartRate",
             "thresholdHeartRate",
+            "bikeWeightKg",
         )
     private val physicsKeys = setOf("systemMassKg", "cdA", "crr", "airDensity", "drivetrainEfficiency")
 
@@ -161,6 +170,12 @@ public object ProfileApiJson {
             "estimatedThresholdHeartRate",
         )) {
             root[key]?.let { requireNumber(it, key) }
+        }
+        // The weight keys are optional too: written only when they have a value (spec §12.5).
+        root["bikeWeightKg"]?.let { requireNumber(it, "bikeWeightKg") }
+        (root["riderWeight"] as? JsonObject)?.let { weight ->
+            weight["kg"]?.let { requireNumber(it, "riderWeight.kg") }
+            weight["days"]?.let { requireNumber(it, "riderWeight.days") }
         }
         (root["zones"] as? JsonObject)?.let { requireBoundsAreNumbers(it) }
         (root["weeklyAvailability"] as? JsonObject)?.forEach { (day, value) -> requireNumber(value, day) }
@@ -201,6 +216,7 @@ public object ProfileApiJson {
         (patch.thresholdHeartRate as? Change.Set)?.let {
             body["thresholdHeartRate"] = it.value?.let(::JsonPrimitive) ?: JsonNull
         }
+        (patch.bikeWeightKg as? Change.Set)?.let { body["bikeWeightKg"] = it.value?.let(::JsonPrimitive) ?: JsonNull }
         val physics =
             listOfNotNull(
                 patch.physics.systemMassKg?.let { "systemMassKg" to JsonPrimitive(it) },
@@ -234,6 +250,8 @@ public object ProfileApiJson {
             maxHeartRate = element["maxHeartRate"]?.let { Change.Set(nullableInt(it, "maxHeartRate")) } ?: Change.Keep,
             thresholdHeartRate =
                 element["thresholdHeartRate"]?.let { Change.Set(nullableInt(it, "thresholdHeartRate")) } ?: Change.Keep,
+            bikeWeightKg =
+                element["bikeWeightKg"]?.let { Change.Set(nullableNumber(it, "bikeWeightKg")) } ?: Change.Keep,
         )
     }
 

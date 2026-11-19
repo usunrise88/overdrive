@@ -1,5 +1,6 @@
 package app.overdrive.ride.shots
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onRoot
@@ -35,6 +36,54 @@ class OverlayGeometryTest : ShotTest() {
         val (w, h) = size { OverlayDetailed(PreviewSamples.overlayErg, OverlaySettings()) }
         assertEquals(464f, w.value, 0.5f)
         assertEquals(282f, h.value, 0.5f)
+    }
+
+    @Test
+    fun theGuardChangesTheFifthCellAndNotTheHeight() {
+        val (w, h) = size { OverlayCompact(PreviewSamples.overlayGuard, OverlaySettings()) }
+        assertEquals(464f, w.value, 0.5f)
+        assertEquals(84f, h.value, 0.5f)
+    }
+
+    @Test
+    fun theHeartRateLineAddsOneLineToCompact() {
+        // 2 dp label-to-value gap, 4 dp, one 18 dp line (label style).
+        val (w, h) = size { OverlayCompact(PreviewSamples.overlayHeartRate, OverlaySettings()) }
+        assertEquals(464f, w.value, 0.5f)
+        assertEquals(84f + 24f, h.value, 0.5f)
+    }
+
+    @Test
+    fun theHeartRateLineAddsTheSameLineToDetailed() {
+        val (w, h) = size { OverlayDetailed(PreviewSamples.overlayHeartRate, OverlaySettings()) }
+        assertEquals(464f, w.value, 0.5f)
+        assertEquals(282f + 24f, h.value, 0.5f)
+    }
+
+    @Test
+    fun everyHeartRateStateIsTheSameHeight() {
+        val states =
+            listOf(
+                PreviewSamples.overlayHeartRate,
+                PreviewSamples.overlayHeartRateAbove,
+                PreviewSamples.overlayHeartRateBelow,
+                PreviewSamples.overlayHeartRateEasingIn,
+                PreviewSamples.overlayStrapLost,
+                PreviewSamples.overlayStrapDropped,
+            )
+        // One column of all six: the line is one line in each, so no state grows the overlay.
+        val (_, h) =
+            size {
+                Column { for (state in states) OverlayCompact(state, OverlaySettings()) }
+            }
+        assertEquals(states.size * (84f + 24f), h.value, 1f)
+    }
+
+    @Test
+    fun thePreviousAttemptLineAddsOneLineToTheIntervalSection() {
+        val (w, h) = size { OverlayDetailed(PreviewSamples.overlayPreviousAttempt, OverlaySettings()) }
+        assertEquals(464f, w.value, 0.5f)
+        assertEquals(282f + 22f, h.value, 0.5f)
     }
 
     @Test

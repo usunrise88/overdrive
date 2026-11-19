@@ -383,11 +383,13 @@ describe("the easier variant", () => {
   it("is not in the answer at all when there is none: the tablet's old shape is unchanged", async () => {
     await create({ workout: { name: "Sweet spot", steps: SWEET_SPOT_STEPS } });
     const body = await tablet();
+    // Only the structure hash (ADR 0034) is added to the tablet's old shape: no `variant` key.
     expect(Object.keys(body.workouts[0] as object).sort()).toEqual([
       "date",
       "id",
       "name",
       "source",
+      "structureHash",
       "workout",
     ]);
   });

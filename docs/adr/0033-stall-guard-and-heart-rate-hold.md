@@ -133,7 +133,7 @@ does the cadence come back?
 
 - `RideSnapshot` and `RideSettings` have new fields at the end with defaults; `FlatStep` has `heartRate` at the end; `RideRecord` has `events` and `RideSample` has `targetHeartRate` at the end; `RideRecorder` has a default method. Existing code compiles unchanged.
 - `Workout.flatSteps(thresholdHeartRate)` is the one place a fraction of the threshold becomes beats on the tablet; the apps do not pass it today (the service resolves it).
-- **Not built (stage A1c, or not asked):** the overlay's look for the guard and the heart-rate step, the settings screens, the previous-attempt line; the profile chart draws an `hr` step as a free-ride block; `SimulatedRideSession` (the M1 demo session) plays an `hr`
+- **Built later, in stage A1c (ADR 0034):** the overlay's look for the guard and the heart-rate step, the settings screens, the previous-attempt line and the chart's band for an `hr` step. **Still not built:** `SimulatedRideSession` (the M1 demo session) plays an `hr`
   step without a controller (the real engine over `SimulatedBike` runs it); the plan's weekly planned load counts only the power part of a workout that has an `hr` step.
 - A workout of `hr` steps only has no planned load and so no load-off-plan topic; its compliance is the band.
 - The guard and the controller assume the trainer's cadence and the strap's heart rate are as the engine already reads them (ADR 0004, 0032); a D500 whose cadence reads 0 below some power (ADR 0032, a hypothesis) is not a case the guard handles: it would only fire with auto-pause off.

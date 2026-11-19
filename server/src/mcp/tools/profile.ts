@@ -23,6 +23,9 @@ export function describeProfile(profile: Profile) {
     thresholdHeartRate: profile.thresholdHeartRate ?? null,
     estimatedMaxHeartRate: profile.estimatedMaxHeartRate ?? null,
     estimatedThresholdHeartRate: profile.estimatedThresholdHeartRate ?? null,
+    // The weight keys are shown only when they have a value (spec §12.5, ADR 0034).
+    ...(profile.bikeWeightKg == null ? {} : { bikeWeightKg: profile.bikeWeightKg }),
+    ...(profile.riderWeight == null ? {} : { riderWeight: profile.riderWeight }),
     zones: {
       upperPercentOfFtp: bounds,
       isDefault: bounds.every((bound, i) => bound === COGGAN_ZONE_UPPER_PERCENT[i]),
@@ -58,6 +61,9 @@ export function registerProfileTools(server: McpServer, ctx: ToolContext): void 
         "efficiency). Also the rider's maximum and threshold heart rate in bpm (null when not set) and the read-only estimates the " +
         "rides give (estimatedMaxHeartRate: the highest heart rate in any ride; estimatedThresholdHeartRate: 95% of the best 20-minute " +
         "average heart rate in any ride; null when the rides do not say), which scale the heart-rate load of workouts from the watch. " +
+        "When set, bikeWeightKg (the bike, kit and bottles in kg) and, when the rider has weighed in the last seven days, riderWeight " +
+        "(read-only: the 7-day average kg from Health Connect, the date of the newest weighing and the days that had one); with both the " +
+        "tablet rides with their sum as the system mass of the virtual speed, otherwise with physics.systemMassKg. " +
         "Also when it last changed. Use it before planning: workouts are written as fractions of FTP, so the FTP " +
         "turns them into watts.",
       input: {},
@@ -82,6 +88,8 @@ export function registerProfileTools(server: McpServer, ctx: ToolContext): void 
         "weeklyAvailability: minutes (0 to 1440) for the weekdays named (mon to sun), null makes a day unknown again. " +
         "goals: the complete new list of short lines (at most 10, each at most 200 characters), replacing the old one; [] clears it. " +
         "physics: any of systemMassKg (rider, bike and kit together), cdA, crr, airDensity, drivetrainEfficiency (0 to 1). " +
+        "bikeWeightKg: the bike, kit and bottles in kg (above 0, at most 100), null clears it; once it is set the tablet's system mass is the " +
+        "rider's 7-day average weight plus this, while the rider has weighed within the week (the rider's weight itself cannot be set here). " +
         "Ask the rider before changing the FTP or the physics: they change what the tablet shows and holds. " +
         "A change that is not valid is refused whole and nothing is changed.",
       input: {
@@ -110,6 +118,11 @@ export function registerProfileTools(server: McpServer, ctx: ToolContext): void 
           .describe(
             "Threshold heart rate in bpm, 80 to 220 and below the maximum, or null to clear.",
           ),
+        bikeWeightKg: z
+          .number()
+          .nullable()
+          .optional()
+          .describe("The bike, kit and bottles in kg, above 0 and at most 100, or null to clear."),
         zones: z
           .strictObject({
             upperPercentOfFtp: z

@@ -2,6 +2,7 @@ import {
   validateWorkoutsResponse,
   type Workout,
   type WorkoutsResponse,
+  workoutHash,
 } from "@overdrive/contracts";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -429,10 +430,34 @@ describe("GET /v1/workouts", () => {
             name: "Sweet spot",
             steps: [{ type: "steady", duration: 600, target: 0.88 }],
           },
+          structureHash: workoutHash({
+            schema: 1,
+            id: "x",
+            name: "y",
+            steps: [{ type: "steady", duration: 600, target: 0.88 }],
+          }),
         },
       ],
     });
     expect(fake.requests).toEqual([]);
+  });
+
+  it("gives every workout its structure hash, the one the repeats are keyed by (docs/adr/0034)", async () => {
+    fake.addEvent(plannedEvent("2026-11-20", "A", [steady(600, 88), steady(300, 50)]));
+    fake.addEvent(
+      plannedEvent("2026-11-21", "B (renamed copy)", [steady(600, 88), steady(300, 50)]),
+    );
+    fake.addEvent(plannedEvent("2026-11-22", "C", [steady(600, 90), steady(300, 50)]));
+    await h.services.refresher?.refresh();
+    const body = await answer("?from=2026-11-18&to=2026-11-25");
+    const hashes = body.workouts.map((w) => w.structureHash);
+    for (const [index, w] of body.workouts.entries()) {
+      expect(hashes[index], w.name).toBe(workoutHash(w.workout));
+      expect(hashes[index]).toMatch(/^[0-9a-f]{16}$/);
+    }
+    // A renamed copy is the same session; one changed target is not.
+    expect(hashes[0]).toBe(hashes[1]);
+    expect(hashes[0]).not.toBe(hashes[2]);
   });
 
   it("answers only the days asked for", async () => {

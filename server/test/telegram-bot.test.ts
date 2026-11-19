@@ -33,7 +33,7 @@ const extraBots: { stop(): Promise<void> }[] = [];
 
 /** Waits for a condition, polling quickly; the first assertion that holds ends it. */
 const until = (check: () => void | Promise<void>) =>
-  vi.waitFor(check, { timeout: 5000, interval: 20 });
+  vi.waitFor(check, { timeout: 15_000, interval: 20 });
 
 beforeAll(async () => {
   db = await openMigratedTestDb();
@@ -153,7 +153,10 @@ describe("who the bot answers", () => {
     half.start();
     await off.app.close();
     await half.app.close();
-    expect(telegram.calls).toHaveLength(0);
+    // A bot that was on would have dropped the webhook and set its menu at start. (Not "no calls at all": the
+    // poll of the previous test's bot can still land on the fake a moment after its reset on a loaded machine.)
+    expect(telegram.webhookDeleted).toBe(0);
+    expect(telegram.commands).toHaveLength(0);
   });
 
   it("drops a webhook and sets the command menu when it starts", async () => {

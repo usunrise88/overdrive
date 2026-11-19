@@ -54,6 +54,7 @@ class SettingsRepository(
         val overlayMode = stringPreferencesKey("overlay_mode")
         val overlayOpacity = intPreferencesKey("overlay_opacity_percent")
         val overlayBlur = booleanPreferencesKey("overlay_blur")
+        val overlayExpandsAtSteps = booleanPreferencesKey("overlay_expands_at_steps")
         val overlayX = floatPreferencesKey("overlay_x")
         val overlayY = floatPreferencesKey("overlay_y")
         val demoSpeed = stringPreferencesKey("dev_demo_speed")
@@ -90,6 +91,7 @@ class SettingsRepository(
             overlayMode = enumOr(this[Keys.overlayMode], defaults.overlayMode),
             overlayOpacityPercent = this[Keys.overlayOpacity] ?: defaults.overlayOpacityPercent,
             overlayBlur = this[Keys.overlayBlur] ?: defaults.overlayBlur,
+            overlayExpandsAtSteps = this[Keys.overlayExpandsAtSteps] ?: defaults.overlayExpandsAtSteps,
             overlayX = this[Keys.overlayX],
             overlayY = this[Keys.overlayY],
             demoSpeed = enumOr(this[Keys.demoSpeed], defaults.demoSpeed),
@@ -101,10 +103,38 @@ class SettingsRepository(
             // reaches the gesture layer.
             buttonMapping = this[Keys.buttonMapping]?.let { ButtonMapping.parse(it) } ?: defaults.buttonMapping,
             click = clickSettings(defaults.click),
+            tuning = tuning(),
             syncUrl = this[Keys.syncUrl].orEmpty(),
             syncToken = SecretText(this[Keys.syncToken].orEmpty()),
             routeDifficultyPercent = this[Keys.routeDifficulty] ?: defaults.routeDifficultyPercent,
         ).sanitized()
+    }
+
+    /**
+     * The tuning numbers, each under `tune_<id>`. A value that is missing is the default; one outside its rule is put on it by
+     * [AppSettings.sanitized], so nothing the file holds can reach the engine (docs/adr/0034).
+     */
+    private fun Preferences.tuning(): RideTuning {
+        var tuning = RideTuning()
+        for (field in TuningFields.all) {
+            tuning =
+                when (field) {
+                    is SwitchTuning -> this[booleanPreferencesKey(TUNE + field.id)]?.let { field.write(tuning, it) }
+                    is IntTuning -> this[intPreferencesKey(TUNE + field.id)]?.let { field.write(tuning, it) }
+                    is DecimalTuning -> this[doublePreferencesKey(TUNE + field.id)]?.let { field.write(tuning, it) }
+                } ?: tuning
+        }
+        return tuning
+    }
+
+    private fun MutablePreferences.writeTuning(tuning: RideTuning) {
+        for (field in TuningFields.all) {
+            when (field) {
+                is SwitchTuning -> this[booleanPreferencesKey(TUNE + field.id)] = field.read(tuning)
+                is IntTuning -> this[intPreferencesKey(TUNE + field.id)] = field.read(tuning)
+                is DecimalTuning -> this[doublePreferencesKey(TUNE + field.id)] = field.read(tuning)
+            }
+        }
     }
 
     private fun Preferences.clickSettings(defaults: ClickSettings) =
@@ -133,6 +163,7 @@ class SettingsRepository(
         this[Keys.overlayMode] = settings.overlayMode.name
         this[Keys.overlayOpacity] = settings.overlayOpacityPercent
         this[Keys.overlayBlur] = settings.overlayBlur
+        this[Keys.overlayExpandsAtSteps] = settings.overlayExpandsAtSteps
         settings.overlayX?.let { this[Keys.overlayX] = it } ?: remove(Keys.overlayX)
         settings.overlayY?.let { this[Keys.overlayY] = it } ?: remove(Keys.overlayY)
         this[Keys.demoSpeed] = settings.demoSpeed.name
@@ -141,6 +172,7 @@ class SettingsRepository(
         this[Keys.deviceSource] = settings.deviceSource.name
         this[Keys.recordBleSessions] = settings.recordBleSessions
         this[Keys.buttonMapping] = settings.buttonMapping.serialize()
+        writeTuning(settings.tuning)
         val click = settings.click
         this[Keys.clickPostHandshake] = click.sendPostHandshake
         this[Keys.clickKeepAlive] = click.keepAlive.name
@@ -156,6 +188,11 @@ class SettingsRepository(
         if (settings.syncUrl.isEmpty()) remove(Keys.syncUrl) else this[Keys.syncUrl] = settings.syncUrl
         if (settings.syncToken.isEmpty) remove(Keys.syncToken) else this[Keys.syncToken] = settings.syncToken.value
         this[Keys.routeDifficulty] = settings.routeDifficultyPercent
+    }
+
+    private companion object {
+        /** The prefix of every tuning key (docs/adr/0034). */
+        const val TUNE = "tune_"
     }
 
     private inline fun <reified E : Enum<E>> enumOr(

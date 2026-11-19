@@ -24,7 +24,10 @@ class ProfileUiTest {
         assertEquals(ProfileUi(), ui)
         assertEquals(List(4) { ValueSource.Tablet }, markers(ui))
         assertNull(ui.note)
-        assertEquals(listOf(null, "From service", "Not sent yet"), ValueSource.entries.map { it.marker })
+        assertEquals(
+            listOf(null, "From service", "Not sent yet", "From your weight"),
+            ValueSource.entries.map { it.marker },
+        )
     }
 
     @Test

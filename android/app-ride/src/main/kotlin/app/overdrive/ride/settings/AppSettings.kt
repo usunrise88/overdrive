@@ -2,6 +2,7 @@ package app.overdrive.ride.settings
 
 import app.overdrive.core.control.ButtonMapping
 import app.overdrive.core.physics.PhysicsSettings
+import app.overdrive.core.profile.RiderWeight
 import java.math.BigDecimal
 import java.math.RoundingMode
 import kotlin.math.roundToInt
@@ -66,6 +67,11 @@ data class AppSettings(
     /** Backing opacity in percent, 85 to 100 in steps of 5 (design/system.md §5.1). */
     val overlayOpacityPercent: Int = SettingsRules.DEFAULT_OPACITY_PERCENT,
     val overlayBlur: Boolean = false,
+    /**
+     * The overlay expands to its detailed mode 10 s before a step change and returns to the rider's mode 10 s after it (spec §11.3,
+     * docs/adr/0034). On by default; no sound either way.
+     */
+    val overlayExpandsAtSteps: Boolean = true,
     /** Overlay position as a fraction of the screen, null until the rider has dragged it (written by M1-B). */
     val overlayX: Float? = null,
     val overlayY: Float? = null,
@@ -96,6 +102,18 @@ data class AppSettings(
      * grade of the road scaled by it is what the trainer simulates and what the virtual speed uses.
      */
     val routeDifficultyPercent: Int = SettingsRules.DEFAULT_ROUTE_DIFFICULTY_PERCENT,
+    /**
+     * The engine's tuning numbers: resuming after a pause, the cadence guard and the heart-rate hold (docs/adr/0034). Always inside
+     * their rules (see [RideTuning.sanitized]); they reach the engine through [app.overdrive.ride.host.toRideSettings].
+     */
+    val tuning: RideTuning = RideTuning(),
+    /**
+     * The bike, kit and bottles in kilograms **from the rider's profile on the service** (spec §12.5, docs/adr/0034). **Never stored on the
+     * tablet** (like [airDensity]): null without a profile or while the profile has none. With [riderWeight] it makes the ride's mass.
+     */
+    val bikeWeightKg: Double? = null,
+    /** The rider's 7-day average weight from the profile: read-only, never stored, null without one. */
+    val riderWeight: RiderWeight? = null,
 ) {
     /** The neutral gear, the one that rides the flat: the middle, with the spare gear on the hard side. */
     val neutralGear: Int get() = (gearCount + 1) / 2
@@ -104,6 +122,7 @@ data class AppSettings(
     fun sanitized(): AppSettings =
         copy(
             click = click.sanitized(),
+            tuning = tuning.sanitized(),
             syncUrl = SyncRules.cleanUrl(syncUrl),
             syncToken = SecretText(SyncRules.cleanToken(syncToken.value)),
             ftp = SettingsRules.ftp.normalize(ftp),
@@ -133,6 +152,7 @@ data class AppSettings(
             scriptedDropouts,
             deviceSource,
             routeDifficultyPercent,
+            tuning,
         )
 
     companion object {
@@ -231,4 +251,10 @@ object SettingsRules {
 
     /** Route difficulty in percent of the road's grade, 0 to 100 in steps of 10 (spec §11.4). */
     val routeDifficulty = IntRule(min = 0, max = 100, step = 10)
+
+    /** The bike's weight in kg, 3 to 30 in steps of 0.5 (the profile itself takes anything above 0 up to 100). */
+    val bikeWeight = DecimalRule(min = 3.0, max = 30.0, step = 0.5)
+
+    /** What the first press of the stepper sets when the bike's weight was not set: a typical road bike with bottles. */
+    const val DEFAULT_BIKE_WEIGHT_KG: Double = 9.0
 }

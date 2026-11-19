@@ -55,6 +55,9 @@ class Words(
         return if (sameDay) "Today $text" else text.replaceFirstChar { it.uppercase() }
     }
 
+    /** The phone's local date today, `YYYY-MM-DD`: the day a "changed 3 days ago" is counted from. */
+    fun today(): String = clock.today()
+
     /** "Wednesday 18 November". */
     fun todayLine(): String = format("EEEE d MMMM", local(clock.nowMillis()))
 
