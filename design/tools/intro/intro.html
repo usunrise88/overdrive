@@ -25,6 +25,7 @@ canvas{position:absolute;inset:0;display:block}
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "/three/examples/jsm/loaders/GLTFLoader.js";
+
 const q = new URLSearchParams(location.search);
 const A = "#" + (q.get("accent") || "ffb020"), B = "#" + (q.get("accent2") || "ff5a1f");
 const sub = q.get("sub") || "";
@@ -32,7 +33,7 @@ const W = innerWidth, H = innerHeight, aspect = W / H;
 const SPEED = +(q.get("speed") || 1);            // 1.3 = 30% faster: the whole timeline is shortened
 const DUR = +(q.get("dur") || 6.4) / SPEED;
 window.DUR = DUR;
-const ease = { out: (x) => 1 - Math.pow(1 - x, 3), inout: (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2, lin: (x) => x };
+const ease = { out: (x) => 1 - (1 - x) ** 3, inout: (x) => x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2, lin: (x) => x };
 const cl = (x) => Math.max(0, Math.min(1, x));
 const seg = (t, a, b, f = ease.lin) => f(cl((t - a) / (b - a)));
 

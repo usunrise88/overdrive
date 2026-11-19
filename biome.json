@@ -15,7 +15,8 @@
       "!design/icons",
       "!design/mockups/tokens.css",
       "!design/mockups/**/*.html",
-      "!design/tools/brand/*.html"
+      "!design/tools/brand/*.html",
+      "!design/tools/intro/*.html"
     ]
   },
   "formatter": {
