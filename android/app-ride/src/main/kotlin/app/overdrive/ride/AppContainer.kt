@@ -214,7 +214,7 @@ class AppContainer(
     /**
      * The tablet's settings with the profile in force on top (ADR 0021, [withProfile]): FTP and the physics of the ride. A cold
      * flow that **waits until the profile is known** (the cache read and the settings looked at), so the ride built first uses the
-     * right FTP and not the tablet's own for a moment, **for [PROFILE_WAIT_MILLIS] at most** (ADR 0027): a ride never depends on the
+     * right FTP and not the tablet's own for a moment, **for [PROFILE_WAIT_MILLIS] at most** (ADR 0029): a ride never depends on the
      * profile or its cache. The ride, the Ready screen and the Settings rows read this; the stored [settings] stay what the rider
      * set on the tablet and are never overwritten by the service's.
      */

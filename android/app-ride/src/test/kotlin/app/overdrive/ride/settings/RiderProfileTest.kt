@@ -118,7 +118,7 @@ class RiderProfileTest {
         assertTrue(riderPatch(before, before.copy(gearCount = 12, overlayBlur = true)).isEmpty)
     }
 
-    // ---- Waiting for the profile, and not for ever (ADR 0021, ADR 0027) -----------------------------
+    // ---- Waiting for the profile, and not for ever (ADR 0021, ADR 0029) -----------------------------
 
     @Test
     fun `the first value waits for the profile to be known and is then built with it`() =

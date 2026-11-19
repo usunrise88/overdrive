@@ -87,7 +87,7 @@ fun profileInForce(
 /**
  * The tablet's settings with the profile in force on top ([withProfile]), as a flow that changes only when a value does. The first
  * value waits for the profile to be known, within [PROFILE_WAIT_MILLIS], so the ride built first uses the right FTP and not the
- * tablet's own for a moment (ADR 0021), and never waits for it longer than that (ADR 0027).
+ * tablet's own for a moment (ADR 0021), and never waits for it longer than that (ADR 0029).
  */
 fun effectiveSettingsOf(
     own: Flow<AppSettings>,

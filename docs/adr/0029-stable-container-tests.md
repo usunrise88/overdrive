@@ -1,4 +1,4 @@
-# ADR 0027: Stable container tests, and a ride that never waits on the profile
+# ADR 0029: Stable container tests, and a ride that never waits on the profile
 
 Status: accepted (2026-11-18, between stages P3-7 and the companion's second half).
 
