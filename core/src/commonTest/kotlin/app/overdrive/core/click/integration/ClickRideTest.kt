@@ -115,7 +115,7 @@ class ClickRideTest {
             )
 
             // All ten distinct actions were decided on, and each came from its own gesture.
-            assertEquals(ClickAction.entries.toSet(), rig.actions.toSet())
+            assertEquals(ClickAction.entries.toSet() - ClickAction.MUTE_COACH, rig.actions.toSet())
             assertEquals(
                 listOf(
                     ClickAction.GEAR_UP,

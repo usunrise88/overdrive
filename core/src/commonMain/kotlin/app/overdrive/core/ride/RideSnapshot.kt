@@ -86,9 +86,17 @@ public data class RideSnapshot(
      * nothing draws it yet.
      */
     val route: RouteProgress? = null,
+    /**
+     * The ride's own clock **with the pauses in it**: the offset of the latest sample of the ride record (spec §8.2), which grows by one at
+     * every tick of the 1 Hz clock whether the ride is moving or paused. [elapsedSeconds] is the moving time and stops in a pause. 0
+     * before the first tick. It is what tells two snapshots of the same tick apart (the engine also publishes one after every command), and
+     * it is the live coach's `elapsedSeconds` (spec §12.1, docs/adr/0039).
+     */
+    val rideSeconds: Int = 0,
 ) {
     init {
         require(ftp > 0) { "FTP must be positive, got $ftp" }
+        require(rideSeconds >= 0) { "The ride's clock must not be negative, got $rideSeconds" }
         require(elapsedSeconds >= 0) { "Elapsed time must not be negative, got $elapsedSeconds" }
         require(secondsSinceResume == null || secondsSinceResume >= 0) {
             "Seconds since the resume must not be negative, got $secondsSinceResume"

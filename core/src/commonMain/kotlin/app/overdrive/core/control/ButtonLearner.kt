@@ -158,7 +158,8 @@ public class ButtonLearner(
 
     private fun finish(): LearnState {
         val all = HandlebarButton.entries.associateWith { currentMask(it) }
-        val mapping = ButtonMapping.of(all)
+        // The live coach's button, if the rider gave it one, stays unless a role has just been given the same button.
+        val mapping = ButtonMapping.of(all, base.coachMuteMask) ?: ButtonMapping.of(all)
         // Cannot fail: every learned mask was checked against every other, and the kept ones come from a valid mapping.
         return if (mapping != null) LearnState.Complete(mapping) else asking()
     }

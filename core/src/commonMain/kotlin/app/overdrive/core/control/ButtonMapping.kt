@@ -19,10 +19,28 @@ import app.overdrive.core.click.ClickBits
  * **play-and-pause** role, a deliberate and rare one, is the farthest, **Y at the top**, which also keeps a stray thumb from
  * pausing the video. Nothing in the notes says which button is which in the spec's list ("Button 2 to 5"), so this is a guess
  * the bench replaces (bench-checklist 5.5, `ButtonLearner`).
+ *
+ * ### The sixth button, for the live coach ([coachMuteMask])
+ *
+ * [ClickAction.MUTE_COACH] (spec §12.1, docs/adr/0039) is on **no** button by default: [coachMuteMask] is 0, the default mapping is exactly the
+ * one above and writes exactly the text it wrote before. The rider may give the action one more button of the Click (`CoachButtonLearner`, under
+ * Devices): a bit no role owns, which fires the action **when it is pressed** (it has no hold). A mapping with one is written with one more
+ * `COACH_MUTE=` field, which an older reader of the text would refuse and so read as the default.
  */
 public class ButtonMapping private constructor(
     private val masks: Map<HandlebarButton, Int>,
+    /** The bits of the button that mutes the live coach, or 0 when it has none (the default). Never shares a bit with a role. */
+    public val coachMuteMask: Int = 0,
 ) {
+    /** Whether the live coach's button is down when the buttons in [held] (1 for pressed) are. False when it has none. */
+    public fun coachMuteDown(held: Int): Boolean = coachMuteMask and held != 0
+
+    /**
+     * This mapping with [mask] as the live coach's button, or without one for 0; null when [mask] shares a bit with a role (the caller would
+     * have to move that role first).
+     */
+    public fun withCoachMute(mask: Int): ButtonMapping? = of(masks, mask)
+
     /** The mask of bits that make [button] down. Never 0. */
     public fun maskOf(button: HandlebarButton): Int = masks.getValue(button)
 
@@ -34,8 +52,8 @@ public class ButtonMapping private constructor(
                 0
         }
 
-    /** Every bit that belongs to some role. */
-    public val allBits: Int get() = masks.values.fold(0) { all, mask -> all or mask }
+    /** Every bit that belongs to some role, or to the live coach's button. */
+    public val allBits: Int get() = masks.values.fold(coachMuteMask) { all, mask -> all or mask }
 
     /** The role that owns [bit], or null. */
     public fun roleOf(bit: Int): HandlebarButton? =
@@ -51,21 +69,33 @@ public class ButtonMapping private constructor(
     public fun with(
         button: HandlebarButton,
         mask: Int,
-    ): ButtonMapping? = of(masks + (button to mask))
+    ): ButtonMapping? = of(masks + (button to mask), coachMuteMask)
 
     /**
-     * The mapping as text for the settings file: `PLUS=00001000;BUTTON_2=00000020;…`, eight hex digits a role, in role order.
-     * [parse] reads it back.
+     * The mapping as text for the settings file: `PLUS=00001000;BUTTON_2=00000020;…`, eight hex digits a role, in role order, and
+     * `;COACH_MUTE=…` after them only when the live coach has a button. [parse] reads it back.
      */
     public fun serialize(): String =
-        HandlebarButton.entries.joinToString(";") { "${it.name}=${hex8(masks.getValue(it))}" }
+        HandlebarButton.entries.joinToString(";") { "${it.name}=${hex8(masks.getValue(it))}" } +
+            if (coachMuteMask == 0) "" else ";$COACH_KEY=${hex8(coachMuteMask)}"
 
-    override fun equals(other: Any?): Boolean = other is ButtonMapping && masks == other.masks
+    override fun equals(other: Any?): Boolean =
+        other is ButtonMapping && masks == other.masks && coachMuteMask == other.coachMuteMask
 
-    override fun hashCode(): Int = masks.hashCode()
+    override fun hashCode(): Int = masks.hashCode() * HASH_PRIME + coachMuteMask
 
     override fun toString(): String =
-        HandlebarButton.entries.joinToString(", ", "ButtonMapping(", ")") {
+        HandlebarButton.entries.joinToString(
+            ", ",
+            "ButtonMapping(",
+            if (coachMuteMask ==
+                0
+            ) {
+                ")"
+            } else {
+                ", Coach mute=${ClickBits.namesOf(coachMuteMask).joinToString("+")})"
+            },
+        ) {
             "${it.label}=${ClickBits.namesOf(masks.getValue(it)).joinToString("+")}"
         }
 
@@ -85,10 +115,13 @@ public class ButtonMapping private constructor(
             ) { "The default mapping is invalid" }
 
         /**
-         * A mapping from [masks], which must give every role a non-empty mask that no other role shares; null otherwise.
-         * Never throws.
+         * A mapping from [masks], which must give every role a non-empty mask that no other role shares; null otherwise. [coachMuteMask] is
+         * the live coach's button: 0 for none, otherwise bits that no role has. Never throws.
          */
-        public fun of(masks: Map<HandlebarButton, Int>): ButtonMapping? {
+        public fun of(
+            masks: Map<HandlebarButton, Int>,
+            coachMuteMask: Int = 0,
+        ): ButtonMapping? {
             if (HandlebarButton.entries.any { (masks[it] ?: 0) == 0 }) return null
             var seen = 0
             for (button in HandlebarButton.entries) {
@@ -96,26 +129,39 @@ public class ButtonMapping private constructor(
                 if (seen and mask != 0) return null
                 seen = seen or mask
             }
-            return ButtonMapping(HandlebarButton.entries.associateWith { masks.getValue(it) })
+            if (seen and coachMuteMask != 0) return null
+            return ButtonMapping(HandlebarButton.entries.associateWith { masks.getValue(it) }, coachMuteMask)
         }
 
         /** Reads [serialize]'s text, or returns null for anything that is not a valid mapping. Never throws. */
         public fun parse(text: String): ButtonMapping? {
             val parts = text.split(';').map { it.trim() }.filter { it.isNotEmpty() }
             val masks = HashMap<HandlebarButton, Int>()
+            var coach: Int? = null
             for (part in parts) {
                 val pair = part.split('=')
                 if (pair.size != 2) return null
-                val button = HandlebarButton.entries.firstOrNull { it.name == pair[0].trim() } ?: return null
+                val key = pair[0].trim()
                 val digits = pair[1].trim()
                 // Exactly eight hex digits, so a text cut short is never read as another, valid mapping.
-                if (digits.length != HEX_DIGITS || !digits.all { it in HEX_ALPHABET } || button in masks) return null
-                masks[button] = (digits.toLongOrNull(HEX_RADIX) ?: return null).toInt()
+                if (digits.length != HEX_DIGITS || !digits.all { it in HEX_ALPHABET }) return null
+                val mask = (digits.toLongOrNull(HEX_RADIX) ?: return null).toInt()
+                if (key == COACH_KEY) {
+                    if (coach != null || mask == 0) return null
+                    coach = mask
+                    continue
+                }
+                val button = HandlebarButton.entries.firstOrNull { it.name == key } ?: return null
+                if (button in masks) return null
+                masks[button] = mask
             }
-            return of(masks)
+            return of(masks, coach ?: 0)
         }
 
         private fun hex8(mask: Int): String = mask.toUInt().toString(HEX_RADIX).padStart(HEX_DIGITS, '0')
+
+        private const val COACH_KEY = "COACH_MUTE"
+        private const val HASH_PRIME = 31
 
         private const val HEX_RADIX = 16
         private const val HEX_DIGITS = 8

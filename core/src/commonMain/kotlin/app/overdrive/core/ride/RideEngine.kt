@@ -788,6 +788,7 @@ public class RideEngine(
                 },
             heartRateHold = if (finished) null else heartRateHold?.state(),
             route = routeProgress(),
+            rideSeconds = rideSeconds,
         )
     }
 

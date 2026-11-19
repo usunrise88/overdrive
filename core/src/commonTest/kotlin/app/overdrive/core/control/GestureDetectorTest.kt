@@ -79,8 +79,13 @@ class GestureDetectorTest {
     fun `five buttons with two gestures each are exactly the ten actions of the spec`() {
         val table = HandlebarButton.entries.flatMap { listOf(it.press, it.hold) }
         assertEquals(10, table.size)
-        assertEquals(ClickAction.entries.toSet(), table.toSet(), "every action is bound once")
-        assertEquals(10, ClickAction.entries.size)
+        // The eleventh action, the live coach's mute (spec §12.1, docs/adr/0039), is on no role: it is unmapped by default.
+        assertEquals(
+            ClickAction.entries.toSet() - ClickAction.MUTE_COACH,
+            table.toSet(),
+            "every action of the table is bound once",
+        )
+        assertEquals(11, ClickAction.entries.size)
         assertEquals(
             listOf(
                 PLUS to (GEAR_UP to NEXT_INTERVAL),

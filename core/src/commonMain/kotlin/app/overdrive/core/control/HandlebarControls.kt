@@ -78,6 +78,7 @@ public class HandlebarControls(
     private suspend fun loop() {
         var current = mapping()
         var down = emptySet<HandlebarButton>()
+        var coachDown = false
         while (true) {
             val deadline = detector.nextDeadlineMillis
             val change =
@@ -94,14 +95,20 @@ public class HandlebarControls(
             if (change.synthetic) {
                 detector.cancelAll()
                 down = emptySet()
+                coachDown = false
                 continue
             }
             val latest = mapping()
             if (latest != current) {
                 detector.cancelAll()
                 down = emptySet()
+                coachDown = false
                 current = latest
             }
+            // The live coach's button, when it has one (spec §12.1): the action fires on the press, once, and there is no hold.
+            val coachNowDown = current.coachMuteDown(change.held)
+            if (coachNowDown && !coachDown) fireCoach()
+            coachDown = coachNowDown
             val nowDown = current.rolesDown(change.held)
             for (button in HandlebarButton.entries) {
                 if (button in down && button !in nowDown) emit(detector.release(button, now))
@@ -110,6 +117,17 @@ public class HandlebarControls(
                 if (button in nowDown && button !in down) emit(detector.press(button, now))
             }
             down = nowDown
+        }
+    }
+
+    /** The live coach's button was pressed. It is on no [HandlebarButton], so it is carried out and not announced as a gesture of one. */
+    private fun fireCoach() {
+        try {
+            onAction(ClickAction.MUTE_COACH)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Dropped, like any action that fails: the ride goes on.
         }
     }
 
