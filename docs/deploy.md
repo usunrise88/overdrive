@@ -208,6 +208,17 @@ Values in `.env` are never in the repository.
 | `BROUTER_URL` | unset | `http://brouter:17777`: the routing server of section 20. **Empty: road routing is off**; the agent's routes from a GPX file or a synthetic profile still work. ADR 0036 |
 | `BROUTER_TIMEOUT_SECONDS` | `30` | 1 to 300: how long a routing request may take. **`compose.yaml` does not pass it yet**: to set it, add `BROUTER_TIMEOUT_SECONDS: ${BROUTER_TIMEOUT_SECONDS:-}` under `environment:` of the `server` service |
 | `ROUTE_STEP_METERS` | `20` | 5 to 200: a route is resampled to one point every this many metres (coarser for a very long route). Same note: `compose.yaml` does not pass it yet |
+| `LIVE_COACH_ENABLED` | `true` | `false` turns the live coach off whatever else is set (a session start answers `feature-off`). Section 21. ADR 0038 |
+| `TTS_BASE_URL` | unset | The address of your own OpenAI-compatible speech service, `https://tts.example.com/v1` (http or https, no credentials, no query: validated like `BROUTER_URL`); the path `/audio/speech` is added. **With `TTS_MODEL` and `TTS_VOICE`, turns the live coach's voice on.** Only the cue's text (at most 80 characters) is sent there |
+| `TTS_API_KEY` | unset | The key of that service, if it wants one. **Secret: only in `.env`**, never logged |
+| `TTS_MODEL`, `TTS_VOICE` | unset | Its model and voice names |
+| `TTS_SPEED` | `1` | 0.25 to 4: how fast it speaks |
+| `TTS_FORMAT` | `mp3` | `mp3`, `opus`, `aac`, `flac` or `wav`: the audio it is asked for and the tablet plays |
+| `TTS_TIMEOUT_SECONDS` | `4` | 1 to 60: how long one speech request may take (a cue is dropped after `LIVE_COACH_DEADLINE_SECONDS` in any case) |
+| `LIVE_COACH_LANGUAGE` | `INSIGHTS_LANGUAGE` | A language name or code put in the cue's prompt |
+| `LIVE_COACH_LLM_MODEL` | `LLM_MODEL` | A model for the cues other than the one that writes the notes (same endpoint and key): a small, fast one is enough for a sentence |
+| `LIVE_COACH_CUE_MAX_CHARS`, `LIVE_COACH_SILENT_FINAL_SECONDS`, `LIVE_COACH_RECOVERY_MAX_CUES`, `LIVE_COACH_RECOVERY_BELOW_PERCENT`, `LIVE_COACH_MAX_PER_TRIGGER_PER_STEP`, `LIVE_COACH_TRIGGER_COOLDOWN_SECONDS`, `LIVE_COACH_MIN_GAP_SECONDS`, `LIVE_COACH_MAX_CUES_PER_HOUR` | `80`, `15`, `1`, `60`, `2`, `180`, `60`, `12` | The limits on talking (spec §12.1), enforced by the server; the table and the order they apply in are in section 21 |
+| `LIVE_COACH_LEAD_SECONDS`, `LIVE_COACH_DEADLINE_SECONDS` | `6`, `5` | A line known beforehand (a step about to begin) is triggered this many seconds early (0 to 20); a cue not ready this many seconds after its trigger is dropped (1 to 30) |
 | `PUBLIC_BASE_URL` | unset | `https://overdrive.llmto.day`: the service's public address (https, no path). **With `OWNER_PASSPHRASE_HASH`, turns the MCP server on.** ADR 0018 |
 | `OWNER_PASSPHRASE_HASH` | unset | The hash of the owner's passphrase, `scrypt:…` (section 12). **With `PUBLIC_BASE_URL`, turns the MCP server on.** The plain passphrase is never configured |
 | `MCP_STATIC_TOKENS` | empty | `name:token,name:token`: fixed bearer tokens for an MCP client that cannot do OAuth; at least 32 characters each; open `/mcp` only |
@@ -229,6 +240,7 @@ Values in `.env` are never in the repository.
 | `INTERVALS_*`, `PLAN_REFRESH_MINUTES`, `TIMEZONE` | from `.env` | As above; empty means the default |
 | `WELLNESS_*` | from `.env` | As above; empty means the default (wellness and recovery need no key: only the intervals.icu pull and the forwarding of the watch's workouts do) |
 | `INSIGHTS_ENABLED`, `LLM_*`, `INSIGHTS_LANGUAGE`, `INSIGHT_*`, `ALERT_*` | from `.env` | As above; empty means the default or unset (written notes need no key: without `LLM_BASE_URL` and `LLM_MODEL` they are written from templates) |
+| `TTS_*`, `LIVE_COACH_*` | from `.env` | As above; empty means the default or unset (the live coach speaks only with `LLM_*` and `TTS_BASE_URL`, `TTS_MODEL` and `TTS_VOICE` all set) |
 | `PUBLIC_BASE_URL`, `OWNER_PASSPHRASE_HASH`, `MCP_STATIC_TOKENS` | from `.env` | As above; empty means unset |
 | `STRAVA_*` | from `.env` | As above; empty means unset (the upload is off unless the first three are all set) |
 | `LOG_LEVEL` | from `.env` | As above |
@@ -680,6 +692,116 @@ smoke test again. The tiles are not versioned by the image: if the new BRouter c
 **What it costs.** Memory: the container is capped at 640 MB (`mem_limit`); the JVM heap is at most 256 MB (`JAVA_OPTS`), and the probe measured
 107 to 173 MiB resident for the four tiles in use. Two routing threads (`MAXTHREADS=2`). Disk: the image about 266 MB, and the Serbia tiles about
 305 MiB (sizes as the server reported them when this section was written).
+
+## 21. The live coach (spoken cues during a ride)
+
+During a workout the agent marked `live_coach`, a coach on the server watches the ride and speaks short cues in the rider's earphones
+(spec §12.1, ADR 0038): the tablet streams a snapshot of the ride every 5 seconds; **rules on the server decide when a cue may happen**; a
+fast model writes the line; **your own speech service** speaks it; the audio is pushed to the tablet, which plays it over the video and shows
+the text. The coach only talks: it never changes a target, the intensity or the workout. It needs a connection; without one the feature is
+off and the ride is unaffected. The service never calls the tablet.
+
+**It is off until you set it up.** It needs three things, and a session start answers which is missing (`feature-off`, `no-tts`, `no-llm`):
+
+1. **A language model**: the `LLM_BASE_URL` and `LLM_MODEL` of section 17 (the cues use the same endpoint and key; `LIVE_COACH_LLM_MODEL` lets
+   them use a smaller, faster model than the notes: aim for under 3 seconds from trigger to the first sound, and the model's answer is most of
+   it).
+2. **A speech service**, yours: any OpenAI-compatible endpoint that answers `POST {TTS_BASE_URL}/audio/speech` with the audio. In `.env`:
+   `TTS_BASE_URL=https://<your server>/v1`, `TTS_MODEL=<its model>`, `TTS_VOICE=<one of its voices>` and, if it wants one,
+   `TTS_API_KEY=<the key>` (in an editor on the host; never in a chat, an issue or a commit). `TTS_SPEED` (default 1), `TTS_FORMAT` (default
+   `mp3`; the tablet plays mp3, opus, aac, flac and wav) and `TTS_TIMEOUT_SECONDS` (default 4) are optional. The request is
+   `{ "model", "voice", "input", "response_format", "speed" }` with `Authorization: Bearer <key>`; the answer must be audio (the owner's server
+   was checked once, by hand: `200 audio/mpeg`, 48 kHz mono, about 27 KB for 34 characters, about half a second to the first byte).
+3. **A workout that asks for it**: the planning agent sets `live_coach` (with a `coach_brief` and, rarely, `must_say` lines) through
+   `create_workout` and `update_workout`. They live only in this service: intervals.icu and the calendars never see them.
+
+Then `docker compose up -d server`. The log says whether the coach is on ("the live coach is on for the workouts that ask for it") or which
+setting it lacks.
+
+### What it does, and the limits on talking
+
+Triggers (the rules are code, not the model's judgment): a hard step begins (triggered a few seconds early, from the step before); two
+minutes remain in a step; power has been off target by more than 10% for 20 seconds; cadence has sagged below 70 rpm (or 12 below the step's
+cadence); heart rate is running 7 bpm above the attempt before's average for this step and still rising (only for a session ridden before); a
+strong finish (the last hard step's final 3 minutes, on target); and the agent's `must_say` lines, spoken exactly as written with no model.
+When a trigger fires **and every limit allows**, the model is asked; it may answer that nothing is worth saying. The server checks what it
+wrote (length, no number that was not in the facts, no word of the deny list, no repeat of a line already said). A cue that is not ready within
+5 seconds of its trigger is dropped, never played late.
+
+The limits are enforced by the server and are settings (`LIVE_COACH_*`). **The order they are checked in** is also the reason a cue is
+held back:
+
+| # | Limit | Setting | Default |
+|---|---|---|---|
+| 1 | The rider muted the coach (the overlay's control): nothing is said, the model is not asked; it holds for the rest of the ride | | |
+| 2 | One cue at a time: none while another is being made | | |
+| 3 | The final seconds of a step are silent, so the countdown stays clear (a cue about the step that is about to begin is the one exception) | `LIVE_COACH_SILENT_FINAL_SECONDS` | 15 s |
+| 4 | A recovery step (a target below 60% of FTP, or a label that says recovery or rest) gets at most this many cues | `LIVE_COACH_RECOVERY_MAX_CUES`, `LIVE_COACH_RECOVERY_BELOW_PERCENT` | 1, 60 |
+| 5 | The same trigger speaks at most this many times in one step | `LIVE_COACH_MAX_PER_TRIGGER_PER_STEP` | 2 |
+| 6 | ... and not again within this many seconds of its last cue | `LIVE_COACH_TRIGGER_COOLDOWN_SECONDS` | 180 |
+| 7 | The least time between any two cues | `LIVE_COACH_MIN_GAP_SECONDS` | 60 s |
+| 8 | The most cues in a rolling hour | `LIVE_COACH_MAX_CUES_PER_HOUR` | 12 |
+| 9 | A trigger whose last try produced no cue (the model said nothing, or its line was refused) is not tried for a minute | | 60 s |
+| | The longest cue the model may write, in characters | `LIVE_COACH_CUE_MAX_CHARS` | 80 |
+
+The agent's own `must_say` lines are held back by 1 to 3 and by a short gap of 8 seconds (so two voices never overlap), not by 4 to 6, 8 and 9.
+
+### Where the audio comes from, and what leaves the server
+
+**Privacy.** A snapshot holds the rider's power, heart rate and cadence, and the model's prompt holds them with the workout's purpose, the
+agent's brief and the coach notebook's sections about the rider (profile, what works, methodology: never the game master's). **They go to the
+language model's endpoint (`LLM_BASE_URL`) and nowhere else.** The speech service receives **only the cue's text**, at most 80 characters, which
+may quote a number of the ride ("hold 285 watts"). Telegram and Strava never see them. The service logs the trigger's name, the outcome and the
+milliseconds each stage took (`docker compose logs server | grep "live cue"`), never a reading, a line, a key or an address. The audio is
+not kept; the cue's text, trigger and time are stored on the ride (`live_cues`) and are part of what the planning agent sees afterwards.
+
+### Smoke test
+
+Without the tablet, with `curl` and a device token (section 3). You need a planned workout with `live_coach` on (ask the agent to set it, or see it in
+`GET /v1/workouts`, which also gives its `structureHash`), and a first step that is not hard followed by a hard one (a warm-up, then an interval).
+
+```bash
+BASE=https://overdrive.llmto.day
+AUTH="authorization: Bearer <a device token>"
+JSON='content-type: application/json'
+
+# 1. Start a session. "on": true, with a session id, means the coach will speak; "on": false says why (feature-off, no-tts, no-llm, no-workout,
+#    no-live-coach, structure-changed) and the ride is unaffected.
+curl -sS -X POST "$BASE/v1/live/sessions" -H "$AUTH" -H "$JSON" \
+  -d '{"rideId":"ride-1795000000000","workoutId":"icu-123","structureHash":"<the workout'"'"'s structureHash>","clock":'"$(date +%s%3N)"'}'
+SESSION=<the sessionId>
+
+# 2. In a second terminal, listen. -N turns curl's own buffering off. You should see `retry: 3000` and `: open` at once, then `: hb` every 15 s.
+curl -N -sS "$BASE/v1/live/sessions/$SESSION/cues" -H "$AUTH" -H 'accept: text/event-stream'
+
+# 3. A snapshot in the last seconds of the step before a hard one (step 0 of 600 s with 5 s left): the next step is hard, so a cue is triggered.
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST "$BASE/v1/live/sessions/$SESSION/snapshots" -H "$AUTH" -H "$JSON" -d '{
+  "seq":0,"clock":'"$(date +%s%3N)"',"elapsedSeconds":595,"paused":false,"muted":false,
+  "step":{"index":0,"type":"steady","label":"Warm-up","durationSeconds":600,"timeLeftSeconds":5,"targetWatts":150},
+  "stepCount":6,"power":148,"heartRate":120,"cadence":88,"compliancePercent":95}'
+# 204. (stepCount is the number of steps of your workout with repeats expanded; a snapshot that disagrees silences the coach and the log
+#      says the workout does not match.) Within a few seconds the listener prints:  id: 1 / event: cue / data: {"id":1,"text":"…","trigger":"step-start","audio":{"format":"mp3","base64":"…"},…}
+# Decode the audio to hear it:  jq -r .audio.base64 | base64 -d > cue.mp3
+
+# 4. End it (also the way to clean up a test): 200 {"sessionId":…,"status":"ended","cues":1}
+curl -sS -X POST "$BASE/v1/live/sessions/$SESSION/end" -H "$AUTH"
+```
+
+**Is the proxy buffering the stream?** If the comments (`: hb`) arrive in bunches rather than one every 15 seconds, or the first lines appear
+only when the request ends, something between the tablet and the service buffers it. Caddy's `reverse_proxy` flushes `text/event-stream`
+immediately, so `deploy/overdrive.llmto.day.caddy` needs no change; the service also sends `Cache-Control: no-cache, no-transform` and
+`X-Accel-Buffering: no`. If you added an `encode` or another layer in the shared `common` snippet and it compresses event streams, exclude
+`text/event-stream` from it, or add `flush_interval -1` to the `reverse_proxy` block.
+
+**Troubleshooting.** The start answers `no-tts` or `no-llm`: the variable named in the log is missing or the address is invalid (the start stops
+with `Invalid configuration:` for an invalid one). The coach is on but never speaks: look at the `live cue` log lines: `held back` (debug level)
+names the limit; `a live cue was not made` names the outcome (`silence`, `rejected` with how many violations of each kind, `llm-failed` or
+`tts-failed` with a status, `deadline`); a `deadline` is a model or a speech service that is too slow, so use a faster model
+(`LIVE_COACH_LLM_MODEL`) or raise nothing: a late cue is worse than none. One live session exists at a time: a new start ends the one before it,
+and a session with no snapshot for 10 minutes ends by itself.
+
+**Rollout.** The tablet and the companion must learn `live_coach`, `coach_brief` and `must_say` (their decoders reject unknown keys) **before**
+the planning agent writes any of them: until then the agent must not set them.
 
 ## Troubleshooting
 
