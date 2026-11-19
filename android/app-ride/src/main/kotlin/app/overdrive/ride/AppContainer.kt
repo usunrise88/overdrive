@@ -54,6 +54,7 @@ import app.overdrive.ride.overlay.OverlayModel
 import app.overdrive.ride.rides.RideLibrary
 import app.overdrive.ride.settings.AppSettings
 import app.overdrive.ride.settings.SettingsRepository
+import app.overdrive.ride.settings.effectiveSettingsOf
 import app.overdrive.ride.settings.riderPatch
 import app.overdrive.ride.settings.withProfile
 import app.overdrive.ride.ui.AndroidBluetoothController
@@ -69,9 +70,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -215,17 +214,11 @@ class AppContainer(
     /**
      * The tablet's settings with the profile in force on top (ADR 0021, [withProfile]): FTP and the physics of the ride. A cold
      * flow that **waits until the profile is known** (the cache read and the settings looked at), so the ride built first uses the
-     * right FTP and not the tablet's own for a moment. The ride, the Ready screen and the Settings rows read this; the stored
-     * [settings] stay what the rider set on the tablet and are never overwritten by the service's.
+     * right FTP and not the tablet's own for a moment, **for [PROFILE_WAIT_MILLIS] at most** (ADR 0027): a ride never depends on the
+     * profile or its cache. The ride, the Ready screen and the Settings rows read this; the stored [settings] stay what the rider
+     * set on the tablet and are never overwritten by the service's.
      */
-    private val effectiveSource: Flow<AppSettings> =
-        combine(
-            settingsRepository.settings,
-            profile.state
-                .filter { it.ready }
-                .map { it.profile }
-                .distinctUntilChanged(),
-        ) { own, inForce -> own.withProfile(inForce) }.distinctUntilChanged()
+    private val effectiveSource: Flow<AppSettings> = effectiveSettingsOf(settingsRepository.settings, profile.state)
 
     /** The latest of [effectiveSource]; the defaults until the settings have been read from disk, a few milliseconds after start. */
     val effectiveSettings: StateFlow<AppSettings> =

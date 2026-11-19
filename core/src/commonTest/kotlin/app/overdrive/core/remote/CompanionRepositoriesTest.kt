@@ -7,9 +7,12 @@ import app.overdrive.core.remote.RemoteSamples.ridesPage
 import app.overdrive.core.sync.SyncConfig
 import app.overdrive.core.sync.TransportException
 import app.overdrive.core.sync.TransportFailure
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -121,6 +124,112 @@ class CompanionRepositoriesTest {
             repository.refresh(Refresh.REQUESTED)
             assertEquals(3, repository.view.value.list.items.size, "the newest page again: the older ones are dropped")
             assertTrue(repository.view.value.list.hasMore)
+        }
+
+    @Test
+    fun `a page asked for while one is on its way is not fetched twice, and the next one is asked once it is shown`() =
+        runTest {
+            val first = ridesPage("2026-11-18", count = 3, hasMore = true, limit = 3)
+            val second = ridesPage("2026-11-15", count = 3, hasMore = true, before = first.nextBefore, limit = 3)
+            val third = ridesPage("2026-11-12", count = 2, hasMore = false, before = second.nextBefore, limit = 3)
+            val transport = ScriptedTransport(ok(json(first)), ok(json(second)), ok(json(third)))
+            val repository =
+                RidesRepository(
+                    scope(),
+                    ServiceClient({ config }, transport),
+                    { config },
+                    null,
+                    { wall },
+                    { elapsed },
+                    pageSize = 3,
+                )
+            repository.refresh(Refresh.START)
+            val answer = CompletableDeferred<Unit>()
+            transport.beforeAnswer = { answer.await() }
+            val one = scope().launch { repository.loadMore() }
+            val again = scope().launch { repository.loadMore() }
+            assertTrue(repository.view.value.list.loadingMore, "the page is on its way")
+            again.join()
+            answer.complete(Unit)
+            one.join()
+            transport.beforeAnswer = {}
+            assertEquals(2, transport.gets.size, "one page was asked for")
+            assertEquals(6, repository.view.value.list.items.size)
+            assertEquals(false, repository.view.value.list.loadingMore)
+            // The page is shown: the next call goes out at once.
+            repository.loadMore()
+            assertEquals(8, repository.view.value.list.items.size)
+            assertEquals(3, transport.gets.size)
+        }
+
+    @Test
+    fun `the next page asked for the moment the newest one is shown is kept by that refresh`() =
+        runTest {
+            val first = ridesPage("2026-11-18", count = 3, hasMore = true, limit = 3)
+            val second = ridesPage("2026-11-15", count = 3, hasMore = true, before = first.nextBefore, limit = 3)
+            val transport = ScriptedTransport(ok(json(first)), ok(json(second)))
+            val repository =
+                RidesRepository(
+                    scope(),
+                    ServiceClient({ config }, transport),
+                    { config },
+                    null,
+                    { wall },
+                    { elapsed },
+                    pageSize = 3,
+                )
+            // The screen asks for the next page as soon as it shows the newest one (it is near the end of a short list): in
+            // place, inside the very change that shows it, before the refresh that made it has returned.
+            var asked = false
+            scope().launch {
+                repository.view.collect { view ->
+                    if (view.list.hasMore && !asked) {
+                        asked = true
+                        launch { repository.loadMore() }
+                    }
+                }
+            }
+            repository.refresh(Refresh.START)
+            assertEquals(2, transport.gets.size)
+            assertEquals(6, repository.view.value.list.items.size, "the older page asked for meanwhile is there")
+            // And a refresh that brings a newer newest page still drops the older ones.
+            wall += 1000
+            transport.then(ok(json(first)))
+            repository.refresh(Refresh.REQUESTED)
+            assertEquals(3, repository.view.value.list.items.size)
+        }
+
+    @Test
+    fun `a page fetch that is cancelled leaves the list as it was and the next ask goes out`() =
+        runTest {
+            val first = ridesPage("2026-11-18", count = 3, hasMore = true, limit = 3)
+            val second = ridesPage("2026-11-15", count = 2, hasMore = false, before = first.nextBefore, limit = 3)
+            val transport = ScriptedTransport(ok(json(first)), ok(json(second)))
+            val repository =
+                RidesRepository(
+                    scope(),
+                    ServiceClient({ config }, transport),
+                    { config },
+                    null,
+                    { wall },
+                    { elapsed },
+                    pageSize = 3,
+                )
+            repository.refresh(Refresh.START)
+            transport.beforeAnswer = { awaitCancellation() }
+            val job = scope().launch { repository.loadMore() }
+            assertTrue(repository.view.value.list.loadingMore, "the page is on its way")
+            job.cancel()
+            job.join()
+            transport.beforeAnswer = {}
+            assertEquals(3, repository.view.value.list.items.size)
+            assertEquals(
+                false,
+                repository.view.value.list.loadingMore,
+                "the page that was cancelled is not still coming",
+            )
+            repository.loadMore()
+            assertEquals(5, repository.view.value.list.items.size)
         }
 
     @Test

@@ -138,6 +138,14 @@ class AppContainerProfileTest {
                         "effective ftp=${c.effectiveSettings.value.ftp} stored ftp=${c.settings.value.ftp} " +
                         "ride=${c.host.snapshots.value.state} ride ftp=${c.host.snapshots.value.ftp}",
                 )
+                // Which of the host's two steps is missing: no session was ever built (ride number 0), or the ones built are
+                // not from the settings in force (the sources differ).
+                appendLine(
+                    "  host: ride number=${c.host.ui.value.rideNumber} devices=${c.host.devices.value} " +
+                        "stored source=${c.settings.value.deviceSource} " +
+                        "effective source=${c.effectiveSettings.value.deviceSource} " +
+                        "devices loaded=${c.pairedDevices.loaded.value} changes=${c.pairedDevices.changes.value}",
+                )
             }
             val cached = cachedProfile()
             appendLine(
@@ -333,12 +341,16 @@ class AppContainerProfileTest {
         c.simulate()
         c.configure()
         c.awaitReadyRide(175)
-        await("the first read is done") { !c.profile.state.value.refreshing && gets >= 1 }
+        // Both start requests are over, so what is counted next is the rider's refresh and nothing else.
+        await("the first reads are done") {
+            !c.profile.state.value.refreshing && gets >= 1 && !c.plan.state.value.refreshing &&
+                service.planRequests.isNotEmpty()
+        }
         val plans = service.planRequests.size
 
         service.profile = profileOf(190)
+        c.refreshPlan()
         await("the rider's refresh asked for both and the tablet follows") {
-            c.refreshPlan()
             c.effectiveSettings.value.ftp == 190 && service.planRequests.size > plans
         }
         c.awaitReadyRide(190)
@@ -357,10 +369,8 @@ class AppContainerProfileTest {
         runBlocking { c.profile.refresh(ProfileRefresh.SCREEN_OPENED) }
         runBlocking { c.profile.refresh(ProfileRefresh.SCREEN_OPENED) }
         assertEquals("within the minute: not asked again", asked, gets)
-        await("the rider's refresh asks") {
-            c.refreshPlan()
-            gets > asked
-        }
+        c.refreshPlan()
+        await("the rider's refresh asks") { gets > asked }
     }
 
     @Test
@@ -438,10 +448,8 @@ class AppContainerProfileTest {
         assertEquals("beside the service's last answer", 175, cachedProfile()?.profile?.ftp)
 
         service.down = false
-        await("the rider's refresh sends it") {
-            c.refreshPlan()
-            service.profile?.ftp == 180
-        }
+        c.refreshPlan()
+        await("the rider's refresh sends it") { service.profile?.ftp == 180 }
         await(
             "nothing is left unsent",
         ) { c.profile.state.value.pending == null && c.profile.state.value.problem == null }

@@ -88,8 +88,16 @@ class ContainerWorld(
         cache.deleteRecursively()
     }
 
+    /** What the cache folder holds, file by file. A file written through a temporary name can be renamed away while this reads. */
     fun diskText(): String =
-        cache.walkTopDown().filter { it.isFile }.joinToString("\n") { it.name + ":\n" + it.readText() }
+        cache.walkTopDown().filter { it.isFile }.joinToString("\n") {
+            it.name + ":\n" +
+                try {
+                    it.readText()
+                } catch (e: java.io.IOException) {
+                    ""
+                }
+        }
 }
 
 /** A bound, not a pause: a condition that holds is seen within ten milliseconds. */

@@ -213,7 +213,14 @@ class AppContainerSyncTest {
             file: File,
         ) {
             if (!file.isFile) return
-            val bytes = file.readBytes()
+            // A file the app writes through a temporary name can be renamed away between the look and the read: there is
+            // nothing left under that name to leak.
+            val bytes =
+                try {
+                    file.readBytes()
+                } catch (e: java.io.IOException) {
+                    return
+                }
             val text = String(bytes, Charsets.ISO_8859_1)
             if (text.contains(token)) leaks += "$what: ${file.name} holds the token"
             if (text.contains("private-host")) leaks += "$what: ${file.name} holds the address"
@@ -297,6 +304,9 @@ class AppContainerSyncTest {
     fun aRejectedTokenIsSaidOnceAndAChangedTokenOrSendNowTriesAgain() {
         val c = container("rejected")
         val id = ride(c)
+        // The ride's own kick (it is queued a moment after it is saved) is spent once the coordinator has found nowhere to upload.
+        // Until then it could reach the wrong token and ask on its own, so the settings change below is the only thing that asks.
+        await("it waits: nothing to send to") { c.sync.status.value == SyncStatus.NotConfigured(1) }
         c.configure(token = "tok-wrong-0123456789abcdef0123456789abcdef")
         await("the token is rejected") { c.sync.status.value == SyncStatus.TokenRejected(1) }
         assertEquals("one request, then silence", 1, service.received.size)
@@ -304,7 +314,7 @@ class AppContainerSyncTest {
         await("send now asked again") { service.received.size == 2 }
         await("and it is rejected again") { c.sync.status.value == SyncStatus.TokenRejected(1) }
         Thread.sleep(300)
-        assertEquals(2, service.received.size)
+        assertEquals("nothing else asks by itself", 2, service.received.size)
 
         // The right token, typed: tried again without a restart.
         c.configure()
@@ -361,6 +371,8 @@ class AppContainerSyncTest {
                 .toString()
                 .contains(token),
         )
+        // The time of the upload is kept on a coroutine of its own, a moment after the ride has left the queue.
+        await("the time of the upload is on disk") { File(extra, "sync/last-upload").isFile }
         val stored = RideStore(directory)
         for (file in listOf(stored.recordFile(id), stored.fitFile(id), outboxFile, File(extra, "sync/last-upload"))) {
             assertFalse(file.name, String(file.readBytes(), Charsets.ISO_8859_1).contains(token))

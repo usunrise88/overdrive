@@ -36,7 +36,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -111,9 +111,16 @@ class RideHost(
     @Volatile
     private var active: Run? = null
 
-    private val currentSettings = MutableStateFlow(AppSettings())
+    /**
+     * The settings the sessions are built from: the latest value of [settings], written by **one** coroutine and so always in the
+     * order the values arrive (see `init`): an older value is never put over a newer one. Null until the first value has
+     * arrived, and **nothing is built before that** (a ride built from the defaults would be replaced a moment later).
+     */
+    private val received = MutableStateFlow<AppSettings?>(null)
+
+    private val currentSettings: AppSettings get() = received.value ?: AppSettings()
     private val mutableChoice = MutableStateFlow(initialChoice)
-    private val mutableSnapshots = MutableStateFlow(RideSnapshot(RideState.IDLE, ftp = currentSettings.value.ftp))
+    private val mutableSnapshots = MutableStateFlow(RideSnapshot(RideState.IDLE, ftp = AppSettings().ftp))
     private val mutableUi =
         MutableStateFlow(
             RideUi(mutableSnapshots.value, initialChoice, null, null, null, emptyList(), null, rideNumber = 0),
@@ -147,11 +154,17 @@ class RideHost(
     init {
         // The trigger is collected first, so on the host's single thread it is known before the first session is built.
         scope.launch { rideTriggers.collect { trigger.value = it } }
+        // The settings come in at **one place**: the first value is stored and the first session built from it in the same step, so
+        // every later one is a change that [observeRideInputs] compares with what that session was built from. (Two coroutines,
+        // one waiting for the first value and one following all of them, could store the first value after a newer one, and the
+        // ride then stayed built from the old settings until the next change.)
         scope.launch {
-            currentSettings.value = settings.first()
-            prepare(mutableChoice.value)
+            settings.collect { value ->
+                val first = received.value == null
+                received.value = value
+                if (first) prepare(mutableChoice.value)
+            }
         }
-        scope.launch { settings.collect { currentSettings.value = it } }
         scope.launch { observeRideInputs() }
     }
 
@@ -162,7 +175,10 @@ class RideHost(
      */
     @OptIn(FlowPreview::class)
     private suspend fun observeRideInputs() {
-        combine(settings.map { it.rideInputs() }.distinctUntilChanged(), trigger) { rideInputs, trigger ->
+        combine(
+            received.filterNotNull().map { it.rideInputs() }.distinctUntilChanged(),
+            trigger,
+        ) { rideInputs, trigger ->
             Inputs(rideInputs, trigger)
         }.debounce(debounceMillis)
             .collect { wanted ->
@@ -180,7 +196,8 @@ class RideHost(
         scope.launch {
             if (active?.isLive() == true) return@launch
             mutableChoice.value = choice
-            prepare(choice)
+            // Before the first settings have arrived the first session is still to come, and it takes this choice.
+            if (received.value != null) prepare(choice)
         }
     }
 
@@ -188,7 +205,7 @@ class RideHost(
     fun reset() {
         scope.launch {
             if (active?.isLive() == true) return@launch
-            prepare(mutableChoice.value)
+            if (received.value != null) prepare(mutableChoice.value)
         }
     }
 
@@ -223,7 +240,7 @@ class RideHost(
 
     private fun prepare(choice: RideChoice) {
         active?.job?.cancel()
-        val settings = currentSettings.value
+        val settings = currentSettings
         val number = ++counter
         val job = SupervisorJob(scope.coroutineContext[Job])
         val runScope = CoroutineScope(scope.coroutineContext + job)
@@ -258,7 +275,7 @@ class RideHost(
                 ?: combine(
                     handle.trainer.connection,
                     handle.heartRate?.connection ?: flowOf(null),
-                    currentSettings.map { it.simulatedClick }.distinctUntilChanged(),
+                    received.filterNotNull().map { it.simulatedClick }.distinctUntilChanged(),
                 ) { trainer, strap, click ->
                     DeviceRows
                         .of(

@@ -67,7 +67,7 @@ ride under way keeps the FTP it started with).
 
 **The first ride built after a start waits for the profile to be known** (the cache read and the settings looked at: `ProfileState.
 ready`), so it is built with the right FTP and not with the tablet's own for a moment. This costs the few milliseconds the cache takes
-to read.
+to read, **and never more than 3 s**: past that the tablet's own values apply until the profile is known (ADR 0027).
 
 ### 4. The cache file
 
