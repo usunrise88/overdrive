@@ -10,6 +10,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import kotlin.math.roundToInt
 
 /** What the window reports back to its owner: the three gestures that mean something outside the window. */
@@ -19,6 +21,9 @@ internal interface OverlayWindowCallbacks {
 
     /** A long press: open the full app. */
     fun onLongPress()
+
+    /** A tap on the live coach's mute control (spec §12.1, docs/adr/0039): mute the coach for the rest of the ride. It does not toggle the mode. */
+    fun onMuteTap() {}
 
     /** The position changed for good (drag released, or the height changed at the bottom edge): save it, as 0 to 1 fractions. */
     fun onPositionChanged(
@@ -64,6 +69,26 @@ internal class OverlayWindowController(
     private var snapFrame: Choreographer.FrameCallback? = null
     private var pendingLongPress: Runnable? = null
 
+    /**
+     * Where the live coach's mute control is, in the window's own pixels, or null when it is not shown. Set by the content when it is laid out, on the main
+     * thread, like every touch: a plain field, never state the composition reads.
+     */
+    private var controlBounds: Rect? = null
+    private var downRawX = 0f
+    private var downRawY = 0f
+
+    /** The content says where the mute control is (null: it is gone). */
+    fun setControlBounds(bounds: Rect?) {
+        controlBounds = bounds
+    }
+
+    /** Whether the finger went down on the mute control: its bounds are the window's, the touch is the screen's, the window's corner joins them. */
+    private fun downOnControl(): Boolean {
+        val bounds = controlBounds ?: return false
+        val corner = params ?: return false
+        return bounds.contains(Offset(downRawX - corner.x, downRawY - corner.y))
+    }
+
     /** How many times the window was moved or resized through the window manager (for tests and measuring). */
     var layoutUpdates: Int = 0
         private set
@@ -90,7 +115,8 @@ internal class OverlayWindowController(
 
                 override fun onDragEnd() = release()
 
-                override fun onTap() = callbacks.onTap()
+                // A tap that began on the mute control is for the control and not for the mode.
+                override fun onTap() = if (downOnControl()) callbacks.onMuteTap() else callbacks.onTap()
 
                 override fun onLongPress() = callbacks.onLongPress()
             },
@@ -140,6 +166,7 @@ internal class OverlayWindowController(
         root = null
         params = null
         dragArea = null
+        controlBounds = null
         try {
             windowManager.removeView(layout)
         } catch (error: IllegalArgumentException) {
@@ -296,6 +323,8 @@ internal class OverlayWindowController(
             val current = params ?: return
             dragOrigin = PxPoint(current.x, current.y)
             dragArea = null
+            downRawX = rawX
+            downRawY = rawY
             detector.down(rawX, rawY, timeMillis)
             val timer = Runnable { detector.timeout(SystemClock.uptimeMillis()) }
             pendingLongPress = timer

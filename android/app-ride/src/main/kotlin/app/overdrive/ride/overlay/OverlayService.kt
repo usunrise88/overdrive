@@ -190,9 +190,22 @@ class OverlayService :
         // The mode shown is the rider's, widened around a step change (spec §11.3, docs/adr/0034).
         val look = modeState.looks(windowOpen(), model.settings)
         val initialLook = modeState.look(ride.snapshot, settings)
+        // The live coach under the panel (docs/adr/0039): its own flow, mapped off the main thread, changing only when a cue or a mute does.
+        val coach = model.coach.map { it.toOverlayCoach() }.distinctUntilChanged().flowOn(Dispatchers.Default)
+        val initialCoach = model.coach.value.toOverlayCoach()
         val content =
             ComposeView(context).apply {
-                setContent { OverlayWindowContent(states, initial, look, initialLook) }
+                setContent {
+                    OverlayWindowContent(
+                        states,
+                        initial,
+                        look,
+                        initialLook,
+                        coach = coach,
+                        initialCoach = initialCoach,
+                        onControlBounds = { controller.setControlBounds(it) },
+                    )
+                }
             }
         val shown = controller.show(content, settings.overlayX, settings.overlayY, blurRadiusPx())
         if (!shown) {
@@ -240,6 +253,9 @@ class OverlayService :
     }
 
     override fun onLongPress() = openApp()
+
+    // A tap on the live coach's mute control (docs/adr/0039): the coach is muted for the rest of the ride; the mode is not touched.
+    override fun onMuteTap() = model.muteCoach()
 
     override fun onPositionChanged(
         x: Float,
