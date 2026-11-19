@@ -6,6 +6,8 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
@@ -15,11 +17,13 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.printToString
 import androidx.test.core.app.ApplicationProvider
+import app.overdrive.companion.model.TestClock
 import app.overdrive.companion.ui.CompanionRoot
 import app.overdrive.uikit.OverdriveTheme
 import org.junit.After
@@ -73,11 +77,18 @@ class CompanionFlowTest {
         }
     }
 
+    /** Today is longer than the screen now: a card below the fold is not composed until the list is scrolled to it. */
+    private fun scrollTo(text: String) {
+        rule.onNode(hasScrollAction()).performScrollToNode(hasText(text))
+    }
+
     private fun showsDescription(text: String) =
         rule.onAllNodesWithContentDescription(text).fetchSemanticsNodes().isNotEmpty()
 
     @Test
     fun `the first run says what is wrong with the token, then connects and shows the tabs`() {
+        // A service with no rating yet: without Health Connect there is nothing to rate recovery from.
+        world.service.recovery = null
         val container = world.container()
         rule.setContent { OverdriveTheme { CompanionRoot(container) } }
         waitForText("Connect to your service")
@@ -89,8 +100,73 @@ class CompanionFlowTest {
         rule.onNodeWithContentDescription("Token").performTextClearance()
         rule.onNodeWithContentDescription("Token").performTextInput(world.service.token)
         rule.onNodeWithText("Connect").performClick()
+        // Connected: the watch data's step. Not now goes on without access, and Today says where to allow it.
+        waitForText("Read your watch data")
+        assertTrue(showsText("Step 2 of 3"))
+        rule.onNodeWithText("Not now").performClick()
         waitForText("Planned today")
         assertEquals(world.service.baseUrl, container.settings.value!!.serviceUrl)
+        waitForText("Learning your usual range")
+        assertTrue(
+            showsText(
+                "Overdrive rates recovery after 14 nights with the watch. Allow Health Connect in Settings to rate recovery.",
+            ),
+        )
+    }
+
+    @Test
+    fun `the first run asks for the watch data, reads the last 60 days and lands on Today`() {
+        val health = FakeHealth()
+        FakeHealth.sixtyDays(health, TestClock.now, 3)
+        val container = world.container(health = health)
+        rule.setContent { OverdriveTheme { CompanionRoot(container) } }
+        waitForText("Connect to your service")
+        rule.onNodeWithContentDescription("Service address").performTextInput(world.service.baseUrl)
+        rule.onNodeWithContentDescription("Token").performTextInput(world.service.token)
+        rule.onNodeWithText("Connect").performClick()
+
+        // Step 2: what is asked and why, nothing read yet. The list is the design's, with the three optional ones marked.
+        waitForText("Read your watch data")
+        assertTrue(showsText("Resting heart rate"))
+        assertTrue(showsText("The main recovery signal"))
+        assertTrue(showsText("Weight · optional"))
+        assertTrue(world.service.wellnessBodies.isEmpty())
+        health.allow()
+        rule.onNodeWithText("Continue").performClick()
+
+        // Step 3: everything allowed goes on by itself.
+        waitForText("Read in the background")
+        assertTrue(showsText("Step 3 of 3"))
+        assertTrue(showsText("Autostart"))
+        assertTrue(showsText("Not checked"))
+        rule.onNodeWithText("Skip").performClick()
+
+        // Step 4 reads the first 60 days; Today opens when it ends.
+        waitForText("Planned today")
+        await("the watch data reached the service") { world.service.wellnessRecords.size == FakeHealth.idsOf(3).size }
+        assertEquals(app.overdrive.companion.settings.OnboardingStep.Done, container.settings.value!!.onboarding)
+    }
+
+    @Test
+    fun `a partly allowed Health Connect lists what is off, says what is lost and goes on`() {
+        val health = FakeHealth()
+        val container = world.container(health = health)
+        with(world) { container.configure(onboarded = false) }
+        rule.setContent { OverdriveTheme { CompanionRoot(container) } }
+        waitForText("Read your watch data")
+        health.allow(
+            app.overdrive.core.health.HealthDataType.entries
+                .toSet() - app.overdrive.core.health.HealthDataType.SLEEP,
+        )
+        rule.onNodeWithText("Continue").performClick()
+        waitForText("Sleep is off")
+        assertTrue(showsText("Health Connect allowed 8 of 9."))
+        assertTrue(
+            showsText("Recovery works from the other signals and says less. You can allow it later in Settings."),
+        )
+        assertTrue(showsText("Allow sleep"))
+        rule.onNodeWithText("Continue").performClick()
+        waitForText("Read in the background")
     }
 
     @Test
@@ -99,9 +175,12 @@ class CompanionFlowTest {
         with(world) { container.configure() }
         rule.setContent { OverdriveTheme { CompanionRoot(container) } }
         waitForText("Planned today")
-        assertTrue(showsText("Learning your usual range"))
+        assertTrue("the recovery card of the service", showsText("Ready"))
         assertTrue("the planned workout", showsText("Sweet spot 3×10"))
+        scrollTo("Your FTP may be 256 W")
         assertTrue("the FTP suggestion", showsText("Your FTP may be 256 W"))
+        scrollTo("Morning note · 07:30")
+        assertTrue("this morning's note", showsText("Morning note · 07:30"))
 
         // Fitness: a tap on the chart selects a day, the readout follows and the Today pill appears.
         rule.onNodeWithContentDescription("Fitness, tab, 2 of 5").performClick()
@@ -143,8 +222,10 @@ class CompanionFlowTest {
         val container = world.container()
         with(world) { container.configure() }
         rule.setContent { OverdriveTheme { CompanionRoot(container) } }
-        waitForText("Your FTP may be 256 W")
+        waitForText("Planned today")
+        scrollTo("Use 256 W")
         rule.onNodeWithText("Use 256 W").performClick()
+        scrollTo("FTP is now 256 W")
         waitForText("FTP is now 256 W")
         await("the service has it") { world.service.profile?.ftp == 256 }
     }

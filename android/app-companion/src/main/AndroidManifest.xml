@@ -2,10 +2,41 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- INTERNET: the only network access, used only to talk to the owner's own service, at the address typed in Settings
-         (spec section 6.1, ADR 0024): the metrics, the rides, the planned workout and the profile, and the answer to an FTP
-         suggestion. Nothing else: no network-state permission, no location, no Play Services, no Firebase. Health Connect and its
-         permissions come with the watch data stage (P3-4b). -->
+         (spec section 6.1, ADR 0024): the metrics, the rides, the planned workout, the profile, the notes, the wellness figures
+         and the recovery rating, the answer to an FTP suggestion, and the upload of the watch data (ADR 0027). Nothing else: no
+         network-state permission, no location, no Play Services, no Firebase. -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Health Connect, READ ONLY (spec sections 6.2, 12.5, ADR 0027): exactly the record types the app reads and nothing more. No
+         write permission is declared anywhere, and the code never writes. What each is for is on the first run's list
+         (design/companion.md section 4.10) and on the rationale screen below.
+           resting heart rate, heart rate (in sleep, and inside a watch activity), sleep sessions, respiratory rate, oxygen
+           saturation, exercise sessions (the watch's other activities), weight (the trend), heart rate variability (a recovery
+           signal when the watch writes it) and steps (kept for the assistant). -->
+    <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_SLEEP" />
+    <uses-permission android:name="android.permission.health.READ_RESPIRATORY_RATE" />
+    <uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION" />
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" />
+    <uses-permission android:name="android.permission.health.READ_WEIGHT" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE_VARIABILITY" />
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <!-- The first read goes back 60 days, and Health Connect lets an app read only the 30 days before it was first allowed unless it
+         holds this one; the daily read at 06:00 runs when the app is not on screen and needs the second. Both exist only on a
+         Health Connect that has them: the app asks for them only when it does. -->
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" />
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
+
+    <!-- The one-tap "no battery restrictions" request of the first run's third step (design/companion.md section 4.10): Xiaomi's
+         battery saving stops a daily job otherwise. The app is sideloaded, so no store policy applies. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!-- Health Connect is an app from the Play Store on Android 12 and 13 (part of the system from 14): the app asks the package
+         manager whether it is there. -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+    </queries>
 
     <!-- usesCleartextTraffic: Android 9 and later refuse plain http:// unless the app says it may use it. Settings accepts a plain
          address for a bench on the local network and flags it "Not encrypted" next to the field (ADR 0024, the same decision as
@@ -27,5 +58,26 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Health Connect asks every app that reads health data for a screen that says how the data is used (Android 13 and
+             earlier ask for the first action, Android 14 and later for the alias): without it the permission dialog does not open. -->
+        <activity
+            android:name=".PermissionsRationaleActivity"
+            android:exported="true"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE"
+            android:targetActivity=".PermissionsRationaleActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
     </application>
 </manifest>

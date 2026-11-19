@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.overdrive.core.remote.MetricsRange
+import app.overdrive.core.remote.WellnessRange
 import app.overdrive.core.sync.SyncConfig
 import app.overdrive.data.settings.SecretText
 import app.overdrive.data.settings.ServiceRules
@@ -16,14 +17,29 @@ import kotlinx.coroutines.flow.map
 import java.io.IOException
 
 /**
- * What the companion remembers (design/companion.md §3.4, §4.9): the service address and token, and the range the rider chose on
- * Fitness and on Power. The token is a [SecretText]: it prints as dots and never reaches a log, a cache or a state dump.
+ * Where the first run is after the connect step (design/companion.md §4.10): the permission list, the background reading, the first
+ * read of the last 60 days, and done. It is kept, so leaving the app mid-way comes back to the same step, and a phone that was set up
+ * before the watch data existed meets the new steps once.
+ */
+enum class OnboardingStep {
+    Health,
+    Background,
+    Reading,
+    Done,
+}
+
+/**
+ * What the companion remembers (design/companion.md §3.4, §4.9): the service address and token, the range the rider chose on Fitness,
+ * Power and Wellness, and the step of the first run. The token is a [SecretText]: it prints as dots and never reaches a log, a cache
+ * or a state dump.
  */
 data class CompanionSettings(
     val serviceUrl: String = "",
     val token: SecretText = SecretText(),
     val fitnessRange: MetricsRange = MetricsRange.DEFAULT,
     val powerRange: MetricsRange = MetricsRange.DEFAULT,
+    val wellnessRange: WellnessRange = WellnessRange.DEFAULT,
+    val onboarding: OnboardingStep = OnboardingStep.Health,
 ) {
     /** The address and token the repositories send with. */
     val config: SyncConfig get() = SyncConfig(serviceUrl, token.value)
@@ -58,6 +74,8 @@ class CompanionSettingsRepository(
             if (next.token.isEmpty) prefs.remove(Keys.token) else prefs[Keys.token] = next.token.value
             prefs[Keys.fitnessRange] = next.fitnessRange.name
             prefs[Keys.powerRange] = next.powerRange.name
+            prefs[Keys.wellnessRange] = next.wellnessRange.name
+            prefs[Keys.onboarding] = next.onboarding.name
         }
     }
 
@@ -66,6 +84,8 @@ class CompanionSettingsRepository(
         val token = stringPreferencesKey("service_token")
         val fitnessRange = stringPreferencesKey("fitness_range")
         val powerRange = stringPreferencesKey("power_range")
+        val wellnessRange = stringPreferencesKey("wellness_range")
+        val onboarding = stringPreferencesKey("onboarding_step")
     }
 
     private fun Preferences.toSettings(): CompanionSettings =
@@ -74,6 +94,10 @@ class CompanionSettingsRepository(
             token = SecretText(this[Keys.token].orEmpty()),
             fitnessRange = rangeOf(this[Keys.fitnessRange]),
             powerRange = rangeOf(this[Keys.powerRange]),
+            wellnessRange =
+                WellnessRange.entries.firstOrNull { it.name == this[Keys.wellnessRange] } ?: WellnessRange.DEFAULT,
+            onboarding =
+                OnboardingStep.entries.firstOrNull { it.name == this[Keys.onboarding] } ?: OnboardingStep.Health,
         ).sanitized()
 
     private fun rangeOf(name: String?): MetricsRange =

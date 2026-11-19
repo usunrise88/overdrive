@@ -24,6 +24,8 @@ sealed interface Body<out T> {
     data class Empty(
         val heading: String,
         val text: String,
+        /** A button under the sentence ("Allow"), or null for none. */
+        val action: String? = null,
     ) : Body<Nothing>
 
     data class Content<T>(

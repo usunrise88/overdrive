@@ -171,6 +171,31 @@ private fun ReadoutKeyMark(
     }
 }
 
+/**
+ * The line under Wellness' range selector while a past day is selected (design/companion.md §3.5): "Showing Sun 15 Nov" in text 1
+ * and the **Today** pill at the right, which returns every chart on the screen to rest.
+ */
+@Composable
+fun ShowingLine(
+    text: String,
+    onToday: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier.fillMaxWidth().heightIn(min = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        OdText(
+            text,
+            Modifier.weight(1f).heightIn(min = 24.dp).semantics { liveRegion = LiveRegionMode.Polite },
+            style = OdType.labelNum,
+            maxLines = 1,
+        )
+        TodayPill(onToday)
+    }
+}
+
 /** A 24 dp pill with a 48 dp hit area: the visual is small, the touch target is not. */
 @Composable
 private fun TodayPill(onClick: () -> Unit) {

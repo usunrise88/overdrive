@@ -53,6 +53,8 @@ class DotLayer(
     val color: Color,
     /** Whether the selected point, if it is one of these, is drawn larger like a selection dot. */
     val marked: Boolean = false,
+    /** Whether the 6 dp dots are drawn at rest; false makes the layer only the home of the selection dot. */
+    val drawn: Boolean = true,
 ) {
     init {
         require(xs.size == ys.size) { "A dot layer has one y per x" }
@@ -67,6 +69,23 @@ class BandLayer(
     val color: Color,
     val label: String? = null,
 )
+
+/**
+ * A band whose edges move with x (design/companion.md §6.7: the personal range of a wellness metric, which is the rolling mean plus
+ * and minus one spread, so it follows the days): [lows] and [highs] at each of [xs]. A day with NaN in either breaks the band, as it
+ * breaks a line; a run of one day draws nothing.
+ */
+@Immutable
+class RangeBandLayer(
+    val xs: DoubleArray,
+    val lows: DoubleArray,
+    val highs: DoubleArray,
+    val color: Color,
+) {
+    init {
+        require(xs.size == lows.size && xs.size == highs.size) { "A range band has a low and a high for every x" }
+    }
+}
 
 /** A reference line (1 dp `borderStrong`) with its caption 5 dp above its right end ("FTP 250"). */
 @Immutable
@@ -100,6 +119,7 @@ class PlotSpec(
     val bands: List<BandLayer> = emptyList(),
     val refLines: List<RefLine> = emptyList(),
     val gutterDp: Float = DEFAULT_GUTTER_DP,
+    val rangeBands: List<RangeBandLayer> = emptyList(),
 ) {
     init {
         require(xMax > xMin && yMax > yMin) { "A chart has a range on both axes" }

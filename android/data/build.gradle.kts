@@ -29,7 +29,11 @@ android {
 
 dependencies {
     api(libs.overdrive.core)
+    // Compiled against, not shipped by this module: the ride app uses `data` and has no use for Health Connect. The companion adds the
+    // library to its own dependencies, and the adapter is only ever loaded there.
+    compileOnly(libs.androidx.health.connect.client)
 
+    testImplementation(libs.androidx.health.connect.client)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 }

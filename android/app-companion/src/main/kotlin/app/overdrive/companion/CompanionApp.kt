@@ -1,10 +1,11 @@
 package app.overdrive.companion
 
 import android.app.Application
+import app.overdrive.companion.work.WorkManagerScheduler
 
 /** The process-wide owner of the companion's data: see [CompanionContainer]. Nothing starts until the container is first asked for. */
 class CompanionApp : Application() {
-    val container: CompanionContainer by lazy { CompanionContainer(this) }
+    val container: CompanionContainer by lazy { CompanionContainer(this, scheduler = WorkManagerScheduler(this)) }
 
     override fun onCreate() {
         super.onCreate()
