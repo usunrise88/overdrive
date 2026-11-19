@@ -19,12 +19,16 @@ class WorkoutContractTest {
     private val fixtures = File(contracts, "fixtures/workouts")
 
     /**
-     * The workout fixtures, and the `route_id` ones of stage A2b-1 under `fixtures/routes/workout` (ADR 0036, 0037): the same
-     * decoder reads both, so a step that carries a route id is strict like every other.
+     * The workout fixtures, the `route_id` ones of stage A2b-1 under `fixtures/routes/workout` (ADR 0036, 0037) and the live coach's
+     * `live_coach`, `coach_brief` and `must_say` under `fixtures/live-coach/workout` (ADR 0038, 0039): the same decoder reads all
+     * three, so a step that carries a route id or a line to say is strict like every other.
      */
     private fun fixtures(kind: String): List<File> =
-        listOf(File(fixtures, kind), File(contracts, "fixtures/routes/workout/$kind"))
-            .flatMap { dir -> dir.listFiles { f -> f.extension == "json" }.orEmpty().toList() }
+        listOf(
+            File(fixtures, kind),
+            File(contracts, "fixtures/routes/workout/$kind"),
+            File(contracts, "fixtures/live-coach/workout/$kind"),
+        ).flatMap { dir -> dir.listFiles { f -> f.extension == "json" }.orEmpty().toList() }
             .sortedBy { it.name }
 
     @Test

@@ -17,12 +17,23 @@ public data class Workout(
     val name: String,
     val description: String? = null,
     val steps: List<Step>,
+    /**
+     * `live_coach` (spec §12.1, docs/adr/0038): `true` when the live coach may speak short cues during this session. Absent and `false`
+     * mean it is silent. The tablet reads it to decide whether to ask the service for a live session ([wantsLiveCoach]).
+     */
+    @SerialName("live_coach") @Serializable(with = StrictBooleanSerializer::class) val liveCoach: Boolean? = null,
+    /**
+     * `coach_brief`: what the session is for, what to watch in this rider, what tone to take (1 to 1000 characters). **Never shown on the
+     * tablet**: it is the agent's brief to the coach's model on the service.
+     */
+    @SerialName("coach_brief") val coachBrief: String? = null,
 ) {
     init {
         require(schema == SCHEMA_VERSION) { "Unsupported workout schema $schema, expected $SCHEMA_VERSION" }
         require(id.isNotEmpty()) { "Workout id must not be empty" }
         require(name.isNotEmpty()) { "Workout name must not be empty" }
         require(steps.isNotEmpty()) { "A workout needs at least one step" }
+        requireValidCoachBrief(coachBrief)
     }
 
     public companion object {
@@ -43,6 +54,9 @@ public sealed interface LeafStep : Step {
     /** Target cadence in rpm. Display only. */
     public val cadence: Double?
     public val label: String?
+
+    /** Lines the live coach speaks as written (spec §12.1). Never shown on the tablet; the ride engine never sees them. */
+    public val mustSay: List<MustSay>?
 }
 
 @Serializable
@@ -53,11 +67,13 @@ public data class SteadyStep(
     val target: Double,
     override val cadence: Double? = null,
     override val label: String? = null,
+    @SerialName("must_say") override val mustSay: List<MustSay>? = null,
 ) : LeafStep {
     init {
         requireValidDuration(duration)
         requireValidTarget(target)
         requireValidCadence(cadence)
+        requireValidMustSay(duration, mustSay)
     }
 }
 
@@ -69,12 +85,14 @@ public data class RampStep(
     val to: Double,
     override val cadence: Double? = null,
     override val label: String? = null,
+    @SerialName("must_say") override val mustSay: List<MustSay>? = null,
 ) : LeafStep {
     init {
         requireValidDuration(duration)
         requireValidTarget(from)
         requireValidTarget(to)
         requireValidCadence(cadence)
+        requireValidMustSay(duration, mustSay)
     }
 }
 
@@ -92,11 +110,13 @@ public data class FreeStep(
     override val cadence: Double? = null,
     override val label: String? = null,
     @SerialName("route_id") val routeId: String? = null,
+    @SerialName("must_say") override val mustSay: List<MustSay>? = null,
 ) : LeafStep {
     init {
         requireValidDuration(duration)
         requireValidCadence(cadence)
         require(routeId == null || isValidRouteId(routeId)) { "Not a route id: '$routeId'" }
+        requireValidMustSay(duration, mustSay)
     }
 }
 
@@ -123,10 +143,12 @@ public data class HeartRateStep(
     @SerialName("power_max") val powerMax: Int,
     override val cadence: Double? = null,
     override val label: String? = null,
+    @SerialName("must_say") override val mustSay: List<MustSay>? = null,
 ) : LeafStep {
     init {
         requireValidDuration(duration)
         requireValidCadence(cadence)
+        requireValidMustSay(duration, mustSay)
         require((targetBpm == null) != (targetLthr == null)) {
             "A heart-rate step needs exactly one of target_bpm and target_lthr"
         }
