@@ -26,7 +26,7 @@ fun overlayStates(
     minIntervalMs: Long = OverlayPolicy.MIN_UPDATE_INTERVAL_MS,
 ): Flow<OverlayUiState> =
     rides
-        .map { RideMapping.overlayState(it.snapshot, it.profile) }
+        .map { RideMapping.overlayState(it.snapshot, it.profile, it.previousLine) }
         .distinctUntilChanged()
         .rateLimited(minIntervalMs, now, OverlayPolicy::isRiderAction)
 

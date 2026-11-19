@@ -30,7 +30,8 @@ import kotlin.math.min
 
 /**
  * One step of a workout profile with repeats expanded. Targets are fractions of FTP (1.0 = FTP): a steady step has
- * `from == to`, a ramp differs, a free-ride step has both null.
+ * `from == to`, a ramp differs, a free-ride step has both null. A heart-rate step (spec §11.2, [heartRate]) has both null too, and is
+ * drawn as a floating band, not as the free ride's block from the baseline: it holds a heart rate by choosing the power inside limits.
  */
 @Immutable
 data class ProfileStep(
@@ -38,6 +39,7 @@ data class ProfileStep(
     val durationSeconds: Int,
     val from: Float?,
     val to: Float?,
+    val heartRate: Boolean = false,
 )
 
 /**
@@ -89,6 +91,10 @@ data class ProfileLook(
 private const val Y_MAX = 1.5f
 private const val AXIS_HEIGHT_DP = 20f
 private const val FREE_RIDE_LEVEL = 0.5f
+
+/** A heart-rate step is a band between these two levels (fractions of the 150% scale's FTP): floating, so it is not the free ride's block. */
+internal const val HEART_RATE_BAND_LOW = 0.40f
+internal const val HEART_RATE_BAND_HIGH = 0.65f
 
 /** One filled mark: a rectangle or a trapezoid of one zone colour, with its x range for the "past" split. */
 private class Piece(
@@ -166,6 +172,13 @@ private class ProfileGeometry(
             val x1 = max(x0 + onePx, (step.startSeconds + step.durationSeconds) / total * widthPx - gapPx)
             val from = step.from
             val to = step.to
+            if (step.heartRate) {
+                // A floating band in the free ride's grey but lighter: "held between limits", not "ride as you like".
+                val path = Path().apply { addRect(Rect(x0, y(HEART_RATE_BAND_HIGH), x1, y(HEART_RATE_BAND_LOW))) }
+                val colour = OverdriveColors.borderStrong
+                out += Piece(path, colour, Zones.blend(look.surface, colour), x0, x1)
+                continue
+            }
             if (from == null || to == null) {
                 val path = Path().apply { addRect(Rect(x0, y(FREE_RIDE_LEVEL), x1, plotHeightPx)) }
                 val colour = OverdriveColors.surface3

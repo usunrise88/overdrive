@@ -165,6 +165,7 @@ object TodayUi {
                                 it.durationSeconds,
                                 it.targetFrom?.toFloat(),
                                 it.targetTo?.toFloat(),
+                                heartRate = it.heartRate != null,
                             )
                         },
                     )

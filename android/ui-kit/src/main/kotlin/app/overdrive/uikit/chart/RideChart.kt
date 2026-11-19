@@ -295,7 +295,13 @@ private class RideLayout(
             val x1 = max(x0, xScale.toPx((step.startSeconds + step.durationSeconds).toDouble()) - gap)
             val from = step.from
             val to = step.to
-            if (from == null || to == null) {
+            if (step.heartRate) {
+                // A heart-rate step: a floating band, as in the workout profile.
+                val top = powerScale.toPx(HEART_RATE_BAND_HIGH * ftp)
+                val bottom = powerScale.toPx(HEART_RATE_BAND_LOW * ftp)
+                pieces +=
+                    band(x0, x1, top, bottom) to Zones.blend(OverdriveColors.surface1, OverdriveColors.borderStrong)
+            } else if (from == null || to == null) {
                 val top = powerScale.toPx(0.5 * ftp)
                 pieces += rect(x0, x1, top) to Zones.blend(OverdriveColors.surface1, OverdriveColors.surface3, 1f)
             } else if (from == to) {
@@ -309,6 +315,20 @@ private class RideLayout(
         }
         return pieces
     }
+
+    private fun band(
+        x0: Float,
+        x1: Float,
+        top: Float,
+        bottom: Float,
+    ): Path =
+        Path().apply {
+            moveTo(x0, bottom)
+            lineTo(x0, top)
+            lineTo(x1, top)
+            lineTo(x1, bottom)
+            close()
+        }
 
     private fun rect(
         x0: Float,
