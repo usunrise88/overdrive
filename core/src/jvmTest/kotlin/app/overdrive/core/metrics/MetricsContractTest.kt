@@ -23,10 +23,10 @@ import kotlin.test.assertTrue
 class MetricsContractTest {
     private val contracts = File(System.getProperty("overdrive.contracts.dir"))
 
+    /** The metrics fixtures, and a ride detail whose plan has a `route_id` step (stage A2b-2) under `fixtures/routes/ride-detail-response`. */
     private fun fixtures(path: String): List<File> =
-        File(contracts, "fixtures/metrics/$path")
-            .listFiles { f -> f.extension == "json" }
-            .orEmpty()
+        listOf(File(contracts, "fixtures/metrics/$path"), File(contracts, "fixtures/routes/$path"))
+            .flatMap { dir -> dir.listFiles { f -> f.extension == "json" }.orEmpty().toList() }
             .sortedBy { it.name }
 
     /** Numbers compare by value (the fixtures write `612`, Kotlin writes a Double as `612.0`). */

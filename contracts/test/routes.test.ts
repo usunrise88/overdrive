@@ -17,6 +17,7 @@ import {
   variantStructureHash,
   type WorkoutsResponse,
 } from "../src/index.ts";
+import { validateRideDetailResponse } from "../src/metrics.ts";
 
 const fixtures = new URL("../fixtures/routes/", import.meta.url).pathname;
 
@@ -56,6 +57,30 @@ describe.each(KINDS)("route fixtures: %s", (kind, validate) => {
     const result = validate(body);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.errors?.length).toBeGreaterThan(0);
+  });
+});
+
+describe("a ride's detail whose plan has a free step on a route", () => {
+  it("is valid: the plan's workout is a workout, route_id included", () => {
+    const body = JSON.parse(
+      readFileSync(
+        join(fixtures, "ride-detail-response", "valid", "plan-with-a-route-step.json"),
+        "utf8",
+      ),
+    );
+    expect(validateRideDetailResponse(body)).toMatchObject({ ok: true });
+    expect(body.plan.workout.steps[0].route_id).toBe("route-gpx-0001");
+  });
+
+  it("refuses a route id that is not one", () => {
+    const body = JSON.parse(
+      readFileSync(
+        join(fixtures, "ride-detail-response", "valid", "plan-with-a-route-step.json"),
+        "utf8",
+      ),
+    );
+    body.plan.workout.steps[0].route_id = "not/an/id";
+    expect(validateRideDetailResponse(body).ok).toBe(false);
   });
 });
 
