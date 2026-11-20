@@ -83,6 +83,7 @@ class OverlayCoachWindowTest {
     private fun overlayView(controller: OverlayWindowController): View {
         val ride = model.rides.value
         val settings = model.settings.value
+        val coachNow = coach.value
         return ComposeView(context).apply {
             setContent {
                 OverlayWindowContent(
@@ -91,7 +92,7 @@ class OverlayCoachWindowTest {
                     look = kotlinx.coroutines.flow.flowOf(settings.toOverlaySettings()),
                     initialLook = settings.toOverlaySettings(),
                     coach = coach,
-                    initialCoach = coach.value,
+                    initialCoach = coachNow,
                     onControlBounds = {
                         control = it
                         controller.setControlBounds(it)
