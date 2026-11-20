@@ -17,6 +17,7 @@ import app.overdrive.core.ride.RideState
 import app.overdrive.core.ride.flatSteps
 import app.overdrive.core.route.RideRoutes
 import app.overdrive.core.route.Route
+import app.overdrive.core.workout.withoutLiveCoach
 import app.overdrive.ride.rides.RideDiskLog
 import app.overdrive.ride.rides.RidePersistence
 import app.overdrive.ride.rides.SaveState
@@ -88,6 +89,11 @@ class RideHost(
      * starts**, on the ride's own coroutine, so the ride never waits for it; anything but a clean answer is no line.
      */
     private val previousAttempts: PreviousAttemptSource = PreviousAttemptSource.None,
+    /**
+     * Where the host tells the live coach about the ride, one call for every snapshot it publishes (spec §12.1, docs/adr/0039). The coach decides by
+     * itself whether this ride has one; the host asks it nothing and never waits for it.
+     */
+    private val liveCoach: LiveCoachSink = LiveCoachSink.None,
 ) : AutoCloseable {
     /** What a session was built from: the ride-affecting settings and the latest trigger. */
     private data class Inputs(
@@ -118,6 +124,9 @@ class RideHost(
 
         /** The previous attempt has been asked for (once per ride). */
         var previousRequested = false
+
+        /** The ride record's id, read once the ride has started: what the live coach names its session by. Touched only on the host's thread. */
+        var rideId: String? = null
 
         /** The finished ride's record, kept for a retry of the save. */
         var record: RideRecord? = null
@@ -298,7 +307,8 @@ class RideHost(
             factory.create(
                 RideRequest(
                     runScope,
-                    workout,
+                    // The ride plays and keeps the steps and nothing of the live coach's: its brief and lines are for the service (docs/adr/0038).
+                    workout?.withoutLiveCoach(),
                     settings,
                     CompositeRideRecorder(disk.recorder, live),
                     number,
@@ -366,6 +376,14 @@ class RideHost(
         run.lastStats = stats
         run.comparison.onSnapshot(snapshot)
         if (snapshot.state == RideState.RIDING && !run.previousRequested) requestPrevious(run)
+        // The live coach is told of every snapshot and decides for itself; it is never waited for (docs/adr/0039).
+        val live = snapshot.state == RideState.RIDING || snapshot.state == RideState.PAUSED
+        if (live && run.rideId == null) run.rideId = run.recorder.record?.ride?.id
+        try {
+            liveCoach.onSnapshot(run.number, run.choice, run.rideId, snapshot)
+        } catch (e: RuntimeException) {
+            // Whatever the coach does, the ride's own screens keep updating: it is an extra and nothing here depends on it.
+        }
         var justFinished = false
         if (snapshot.state == RideState.FINISHED && run.finished == null) {
             run.recorder.record?.let { record ->
@@ -566,6 +584,34 @@ object DeviceRows {
                 DeviceRowUi(DeviceStatus.NotPaired, "Not paired")
             }
         }
+}
+
+/**
+ * Where the host tells the live coach about the ride (spec §12.1, docs/adr/0039): every snapshot it publishes, with what the coach needs to decide
+ * whether the ride has one (the choice: workout, structure hash, easier version) and to name its session (the ride record's [rideId], known once the ride
+ * has started). The real one is `app.overdrive.ride.live.LiveCoach`; a test gives one that records.
+ */
+interface LiveCoachSink {
+    /** Must not block: it is called on the host's thread, once a second while riding. */
+    fun onSnapshot(
+        number: Int,
+        choice: RideChoice,
+        rideId: String?,
+        snapshot: RideSnapshot,
+    )
+
+    companion object {
+        /** No coach. */
+        val None: LiveCoachSink =
+            object : LiveCoachSink {
+                override fun onSnapshot(
+                    number: Int,
+                    choice: RideChoice,
+                    rideId: String?,
+                    snapshot: RideSnapshot,
+                ) = Unit
+            }
+    }
 }
 
 /**

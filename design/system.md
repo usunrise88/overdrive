@@ -221,6 +221,26 @@ Heights: the hold line is one line in every state, so compact is 108 dp and deta
 interval section (304). **Around a step change** (spec §11.3) the overlay shows its detailed mode from 10 s before to 10 s after, the one resize of a tap; a tap while it is expanded collapses it and the chosen mode
 stays (§5.5).
 
+### 5.7 The live coach (stage A3 part 2, ADR 0039; **not seen on the tablet**)
+
+What the live coach (spec §12.1) adds to the overlay. It is drawn **under the panel and apart from it**, in the same window (the window wraps its content, so it grows by the coach's height and keeps the edge it is snapped to,
+the same single resize as a tap), so the panel's geometry in §5.1 and §5.6 is unchanged and a ride with no coach is exactly what it was. Three surfaces, each a rounded rectangle (radius 12 dp) with the panel's backing (at the same opacity) and
+1 dp `overlay.border`, **6 dp apart** (`overlay.coach.gap`), in this order, 464 dp wide where they hold text:
+
+| Surface | Size | Shown | What it says |
+|---|---|---|---|
+| **Mute control** | 132 × 40 dp (`overlay.coach.controlWidth`, `controlHeight`), left edge under the panel's | exactly while a live session is on | "Coach on" (label, `text.secondary`) or **"Coach muted"** (label, `text.primary`, as "Paused" is: the state to notice). Words only: no icon, no colour. The width does not change between the two words |
+| **Notice** | 40 dp high, as wide as its words plus 16 dp each side | once, for 8 s at the start (`overlay.coach.noticeMs`), when the service says why there is no coach (never for a workout that did not ask for it) | "Live coach unavailable" (label, `text.secondary`). Replaces the control for that time; never a permanent element |
+| **Plate** | 464 dp wide, 12 dp above and below its text (`plateVertical`), body text 15/22, `text.primary`, at most 2 lines (`plateMaxLines`), ellipsis after | from the moment the sound begins until 6 s after it ends (`plateHoldMs`) | the text of the cue being spoken. It is **below** the control, so the control never moves when it comes and goes; it is 46 dp high for one line and 68 dp for two |
+
+Heights, with the panel as in §5.1: compact with the control **130 dp**, with the control and a one-line plate **182 dp**, with a two-line plate **204 dp**; the notice is the control's height. With nothing to show there is nothing: the window is the panel.
+
+- **Touch.** The window takes every touch (§5.5). A tap that **goes down inside the mute control** mutes the coach and does nothing else (the mode does not toggle); a tap anywhere else is as before. The control's bounds are the content's own, reported when it is laid out;
+  a drag or a long press that begins on the control is a drag or a long press. **Mute cannot be undone**: the service keeps a muted session muted, so the control is a statement, not a switch. The Click reaches the same action (spec §4.7).
+- **No motion, no per-second work.** The coach's state is its own value (`OverlayCoach`), not part of the ride's: it changes when a cue starts, when its plate times out, when the rider mutes and when the notice ends, never once a second, and it does not
+  go through the 1 s spacing of the ride's numbers (a cue's plate must come when the sound does). The plate and the control appear and disappear in one step, with no fade; a hundred ride snapshots at rest with a coach on cause no recomposition.
+- **Words.** "Coach on", "Coach muted", "Live coach unavailable". The cue's text is the service's; it is never logged.
+
 ## 6. Ride app screens (tablet, 1280 × 800 dp landscape)
 
 All screens: top bar 64 dp (24 dp side padding, 1 dp bottom border): title (heading), a state
@@ -271,6 +291,8 @@ chip, then right-aligned: device status icons (16 dp, see §7.7), overlay button
     (a profile says "profile only", which is the word for "no map"), the chosen one surface 2 with a check; one tap chooses and closes, a tap outside closes without choosing.
     The description under the title says "Simulation on the route's grade with virtual gears…" while a route is chosen.
   - *A route a planned workout names* is used automatically and named at the end of the plan row's subtitle in one line: "Route: North road" (two: "Routes: A, B"), or **"Route not downloaded yet"**.
+  - *The live coach* (stage A3 part 2, ADR 0039): a workout that asks for it ends the subtitle with **"Live coach"**, in the same line and the same style as the route (and on the easier version's row too); **"Live coach · needs the connection"** when the last refresh could
+    not reach the service, **"Live coach off"** when the rider switched it off in Settings, Ride. Nothing for a workout that did not ask. The agent's brief and lines are in no text.
   - *The easier version*: a planned row that has one is followed, **indented 16 dp**, by a second **value row**: "Easier version" over the agent's note (else the kinds of step), the length and IF on the right;
     chosen like the row above it, one tap each, the chosen one surface 2 with a check. **"Recovery: ready / caution / rest"** is one label (label, text 2) under the two rows, indented 32 dp, on a
     workout of today only, and **absent** while the service is learning the rider's range, has no reading, or says nothing. The detail beside **Start** names the version under the title
@@ -407,6 +429,8 @@ Two columns of grouped cards; group label (label, text 3) above each card; setti
   nothing waits or an upload is under way).
 - **Developer · Click** (stage M4-2), last in the right column: setting rows only (switches, segmented controls, steppers with
   "ms") for the Click's connection options and the two gesture timings, and a final **Reset** (secondary, off at the defaults).
+- **Live coach** (stage A3 part 2, ADR 0039): the last row of the **Ride** card, before **Reset to defaults**: a switch, **on by default**, "Short spoken cues over your video, from the service. Needs the connection. Never changes your targets".
+  It is read when a ride starts and is not part of that card's Reset (it is not an engine number).
 - **Ride** (stage A1c, ADR 0034), right column under **Rider and gears**: **Cadence guard** (switch, "Lowers the target when your cadence drops…") and **Cadence floor** (stepper, rpm). The Overlay card has one more
   row after Mode: **Expand at step changes** (switch, "Shows the detail 10 s before and after each new step. A tap collapses it. No sound").
 - **Developer · Resuming after a pause**, **Developer · Cadence guard** and **Developer · Heart-rate hold** (stage A1c), left column under Developer: one setting row for each engine number the owner tunes on the bike (ADR 0032, 0033), generated from

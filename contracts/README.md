@@ -147,9 +147,10 @@ step) and `workouts-response/` (the optional `variant` of a planned workout: `st
 them next to the others. `route-key.json` holds the golden numbers of `routePointsHash` and `routeKey` (the route id and the hash of its points, which makes two
 rides on the same route one session, §11.7). Everything is synthetic, with invented coordinates. Run by `test/routes.test.ts`.
 
-`fixtures/live-coach/` holds the golden files of stage A3 (ADR 0038): the live coach (spec §12.1). The workout gains three optional fields,
-**additive and not yet read by Kotlin** (its decoders reject unknown keys), so the fixtures that carry them live here and not in `workouts/`
-or `plan/workouts-response/`, which Kotlin decodes: `live_coach` (boolean), `coach_brief` (at most 1000 characters, never shown on the
+`fixtures/live-coach/` holds the golden files of stage A3 (ADR 0038, 0039): the live coach (spec §12.1). The workout gains three optional fields,
+**additive**; the fixtures that carry them live here and not in `workouts/` or `plan/workouts-response/`, and **since stage A3 part 2 the Kotlin decoders read
+them from here** (`WorkoutContractTest`, `PlanApiContractTest`, and `LiveCoachContractTest` for the session bodies and `SseParserTest` for the stream), strictly, like every other
+fixture: `live_coach` (boolean), `coach_brief` (at most 1000 characters, never shown on the
 tablet) and, on a steady, ramp, free or heart-rate step (not a repeat), `must_say`: at most 3 lines `{ at: "start" | seconds, text }`, `text`
 at most 80 characters (code points, like a cue), `at` a whole second from 1 and below the step's duration, no two at the same moment (checked
 by `validateWorkout`, which says the path and never quotes a line). They are kept only by the service (never in intervals.icu or Google

@@ -167,7 +167,7 @@ class TuningSettingsUiTest : ShotTest() {
         rule.onNodeWithText("From your weight").assertIsDisplayed()
         // The mass is not a stepper then: the bike weight is.
         rule.onAllNodesWithText("Increase mass").assertCountEquals(0)
-        rule.onNodeWithText("9.0 kg").assertIsDisplayed()
+        rule.onNodeWithText("9.0 kg").performScrollTo().assertIsDisplayed()
     }
 
     @Test

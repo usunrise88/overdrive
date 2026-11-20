@@ -246,7 +246,11 @@ class AppContainerClickTest {
         c.router.dispatch(ClickAction.TOGGLE_RIDE_PAUSE)
         await("resumed") { c.host.snapshots.value.state == RideState.RIDING }
         assertEquals("the ride's own gear was never moved by the skips", neutral, c.host.snapshots.value.gear)
-        assertEquals("ten actions in all", 10, ClickAction.entries.size)
+        assertEquals(
+            "ten actions of the table and an eleventh, the live coach's, on no button",
+            11,
+            ClickAction.entries.size,
+        )
     }
 
     @Test

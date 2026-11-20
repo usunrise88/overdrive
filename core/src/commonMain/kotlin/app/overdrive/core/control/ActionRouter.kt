@@ -22,6 +22,19 @@ public interface MediaKeys {
 }
 
 /**
+ * The live coach as far as the handlebar needs it (spec §12.1, docs/adr/0039): one thing it can be told, to be quiet for the rest of the ride.
+ * The ride app's implementation reaches the session controller; it does nothing when there is no session.
+ */
+public fun interface CoachControl {
+    public fun mute()
+
+    public companion object {
+        /** No coach: muting it is nothing. */
+        public val None: CoachControl = CoachControl {}
+    }
+}
+
+/**
  * What each [ClickAction] does to the ride and to the media (spec §4.7): **the one routing rule of the system**. The
  * Click's gesture layer calls it, and so does the app's `RideActions` (android `RideHost.kt`), which the ride screen's
  * buttons call, so an on-screen button and a handlebar button can never diverge. It is proved with the whole chain and not
@@ -35,6 +48,7 @@ public interface MediaKeys {
  * | [ClickAction.PLAY_PAUSE_MEDIA] | [MediaKeys.playPause] |
  * | [ClickAction.VOLUME_UP], [ClickAction.VOLUME_UP_REPEAT] | [MediaKeys.volumeUp] |
  * | [ClickAction.VOLUME_DOWN], [ClickAction.VOLUME_DOWN_REPEAT] | [MediaKeys.volumeDown] |
+ * | [ClickAction.MUTE_COACH] | [CoachControl.mute] (the live coach, spec §12.1: it needs no ride and does nothing without a session) |
  *
  * The session's commands are fire and forget and a command that does not apply is a no-op (ADR 0003), so nothing here checks
  * more than the two things it must read: the step's mode and, for the pause toggle, the state. The media actions need no
@@ -48,10 +62,11 @@ public interface MediaKeys {
 public class ActionRouter(
     private val session: () -> RideSession?,
     private val media: MediaKeys,
+    private val coach: CoachControl = CoachControl.None,
     private val snapshot: (RideSession) -> RideSnapshot = { it.snapshots.value },
 ) {
     /** A router for one [session]. */
-    public constructor(session: RideSession, media: MediaKeys) : this({ session }, media)
+    public constructor(session: RideSession, media: MediaKeys) : this({ session }, media, CoachControl.None)
 
     /** Carries out [action]. Never throws for a state it does not apply in. */
     public fun dispatch(action: ClickAction) {
@@ -64,6 +79,7 @@ public class ActionRouter(
             ClickAction.PLAY_PAUSE_MEDIA -> media.playPause()
             ClickAction.VOLUME_UP, ClickAction.VOLUME_UP_REPEAT -> media.volumeUp()
             ClickAction.VOLUME_DOWN, ClickAction.VOLUME_DOWN_REPEAT -> media.volumeDown()
+            ClickAction.MUTE_COACH -> coach.mute()
         }
     }
 

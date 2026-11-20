@@ -55,6 +55,7 @@ class SettingsRepository(
         val overlayOpacity = intPreferencesKey("overlay_opacity_percent")
         val overlayBlur = booleanPreferencesKey("overlay_blur")
         val overlayExpandsAtSteps = booleanPreferencesKey("overlay_expands_at_steps")
+        val liveCoach = booleanPreferencesKey("live_coach")
         val overlayX = floatPreferencesKey("overlay_x")
         val overlayY = floatPreferencesKey("overlay_y")
         val demoSpeed = stringPreferencesKey("dev_demo_speed")
@@ -92,6 +93,7 @@ class SettingsRepository(
             overlayOpacityPercent = this[Keys.overlayOpacity] ?: defaults.overlayOpacityPercent,
             overlayBlur = this[Keys.overlayBlur] ?: defaults.overlayBlur,
             overlayExpandsAtSteps = this[Keys.overlayExpandsAtSteps] ?: defaults.overlayExpandsAtSteps,
+            liveCoach = this[Keys.liveCoach] ?: defaults.liveCoach,
             overlayX = this[Keys.overlayX],
             overlayY = this[Keys.overlayY],
             demoSpeed = enumOr(this[Keys.demoSpeed], defaults.demoSpeed),
@@ -164,6 +166,7 @@ class SettingsRepository(
         this[Keys.overlayOpacity] = settings.overlayOpacityPercent
         this[Keys.overlayBlur] = settings.overlayBlur
         this[Keys.overlayExpandsAtSteps] = settings.overlayExpandsAtSteps
+        this[Keys.liveCoach] = settings.liveCoach
         settings.overlayX?.let { this[Keys.overlayX] = it } ?: remove(Keys.overlayX)
         settings.overlayY?.let { this[Keys.overlayY] = it } ?: remove(Keys.overlayY)
         this[Keys.demoSpeed] = settings.demoSpeed.name

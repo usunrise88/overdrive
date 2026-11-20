@@ -8,6 +8,8 @@ import app.overdrive.core.sync.HttpPostBytesRequest
 import app.overdrive.core.sync.HttpPostBytesTransport
 import app.overdrive.core.sync.HttpPostRequest
 import app.overdrive.core.sync.HttpPostTransport
+import app.overdrive.core.sync.HttpStreamRequest
+import app.overdrive.core.sync.HttpStreamTransport
 import app.overdrive.core.sync.SyncApiJson
 import app.overdrive.core.sync.SyncConfig
 import app.overdrive.core.sync.TransportException
@@ -51,6 +53,7 @@ public class ServiceClient(
     private val reader: HttpGetTransport,
     private val poster: HttpPostTransport? = null,
     private val bytesPoster: HttpPostBytesTransport? = null,
+    private val streamer: HttpStreamTransport? = null,
 ) {
     private val rejected = MutableStateFlow<SyncConfig?>(null)
 
@@ -150,6 +153,37 @@ public class ServiceClient(
             }
         if (answer.status in HTTP_SUCCESS) return Outcome.Ok(answer, answer.body)
         return Outcome.Failed(problemOf(answer, settings), errorCodeOf(answer.body))
+    }
+
+    /**
+     * `GET` [path] as an event stream (the live coach's cues, docs/adr/0038): the text of the response is given to [onChunk] as it arrives,
+     * until the server ends it (an [Outcome.Ok] with an empty body) or the request is cancelled. **A stream that does not open is a failure
+     * like any other**: a `404` is [ProblemKind.NO_SUCH_ROUTE] (the session is gone), a rejected token the same remembered
+     * [ProblemKind.TOKEN_REJECTED] as everywhere, no network or a stream that broke [ProblemKind.NO_ANSWER] and its kin. [lastEventId] is sent
+     * as `Last-Event-ID`. Neither the token nor the text is in an outcome.
+     */
+    public suspend fun stream(
+        path: String,
+        lastEventId: String?,
+        onChunk: suspend (String) -> Unit,
+    ): Outcome<HttpAnswer> {
+        val settings = config()
+        if (!settings.isConfigured) return Outcome.NotSetUp
+        val transport = streamer ?: return Outcome.Failed(ServiceProblem.NotTheService)
+        refusalFor(settings)?.let { return Outcome.Failed(it) }
+        val answer =
+            try {
+                transport.stream(
+                    HttpStreamRequest(settings.baseUrl.trimEnd('/') + path, settings.token, lastEventId),
+                    onChunk,
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: TransportException) {
+                return Outcome.Failed(ServiceProblem.of(e))
+            }
+        if (answer.status == HTTP_OK) return Outcome.Ok(answer, answer.body)
+        return Outcome.Failed(problemOf(answer, settings))
     }
 
     private fun errorCodeOf(body: String): ApiErrorCode? =

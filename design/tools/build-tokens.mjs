@@ -302,9 +302,9 @@ for (const leaf of [...leaves(tokens.overlay, ["overlay"]), ...leaves(tokens.cha
     put("dimens", name, single(name, "Boolean", String(value)));
   } else if (path[1] === "opacity" || last === "pastAlpha") {
     put("dimens", name, single(name, "Float", flt(value)));
-  } else if (last === "yMaxPctFtp") {
+  } else if (last === "yMaxPctFtp" || last === "plateMaxLines") {
     put("dimens", name, single(name, "Int", String(value)));
-  } else if (last === "durationMs" || last === "longPressMs") {
+  } else if (last === "durationMs" || last === "longPressMs" || last.endsWith("Ms")) {
     put("motion", name, single(name, "Int", String(value)));
   } else if (typeof value === "number") {
     put("dimens", name, single(name, "Dp", dp(value)));

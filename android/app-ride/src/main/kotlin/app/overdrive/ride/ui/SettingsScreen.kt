@@ -122,7 +122,7 @@ fun SettingsScreen(
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(24.dp)) {
                 RiderGroup(settings, actions, profile)
-                TuningGroupCard(TuningGroup.Ride, settings, actions)
+                TuningGroupCard(TuningGroup.Ride, settings, actions) { LiveCoachRow(settings, actions) }
                 PhysicsGroup(settings, actions, profile)
                 SyncGroup(settings, actions, sync)
                 ClickDeveloperGroup(settings, actions)
@@ -757,10 +757,12 @@ private fun TuningGroupCard(
     group: TuningGroup,
     settings: AppSettings,
     actions: SettingsActions,
+    extraRows: @Composable () -> Unit = {},
 ) {
     val fields = TuningFields.of(group)
     Group(group.title) {
         fields.forEachIndexed { index, field -> TuningRow(field, settings.tuning, actions, first = index == 0) }
+        extraRows()
         SettingRow("Reset to defaults", description = "Back to the engine's own numbers") {
             OdButton(
                 "Reset",
@@ -769,6 +771,29 @@ private fun TuningGroupCard(
                 height = 40.dp,
             )
         }
+    }
+}
+
+/**
+ * The live coach's switch (spec §12.1, docs/adr/0039), in the Ride group: on by default, read when a ride starts. Its explanation is what a
+ * rider needs before turning it off: where the voice comes from, that it needs the connection and that it changes nothing about the ride.
+ */
+@Composable
+private fun LiveCoachRow(
+    settings: AppSettings,
+    actions: SettingsActions,
+) {
+    SettingRow(
+        "Live coach",
+        description =
+            "Short spoken cues over your video, from the service. " +
+                "Needs the connection. Never changes your targets",
+    ) {
+        OdSwitch(
+            settings.liveCoach,
+            { value -> actions.onChange { it.copy(liveCoach = value) } },
+            contentDescription = "Live coach",
+        )
     }
 }
 

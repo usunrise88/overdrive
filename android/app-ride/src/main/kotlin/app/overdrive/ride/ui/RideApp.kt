@@ -260,7 +260,7 @@ private fun RideRoot(
                     // list is made again from the clock whenever the plan or the rides change, never more often.
                     LaunchedEffect(Unit) { container.planScreenOpened() }
                     val planUi =
-                        remember(planState, ridden, routesView, recoveryState) {
+                        remember(planState, ridden, routesView, recoveryState, rider.liveCoach) {
                             val today = LocalDate.now().toString()
                             PlanUi.of(
                                 planState,
@@ -269,6 +269,7 @@ private fun RideRoot(
                                 System.currentTimeMillis(),
                                 routes = routesView,
                                 recovery = RecoveryLine.of(recoveryState, today),
+                                liveCoach = rider.liveCoach,
                             )
                         }
                     val routeChoice = remember(routesView, freeRoute) { RouteChoiceUi.of(routesView, freeRoute) }
@@ -359,6 +360,8 @@ private fun RideRoot(
                                 onForgetClick = { container.pairing.forget(DeviceRole.Click) },
                                 onLearnButtons = container.learning::begin,
                                 onResetButtons = container.learning::resetToDefault,
+                                onLearnCoachButton = container.learning::beginCoach,
+                                onClearCoachButton = container.learning::clearCoachButton,
                             ),
                         pairing = pairing,
                         bluetooth = bluetooth,

@@ -72,6 +72,12 @@ data class AppSettings(
      * docs/adr/0034). On by default; no sound either way.
      */
     val overlayExpandsAtSteps: Boolean = true,
+    /**
+     * The live coach (spec §12.1, docs/adr/0039): during a workout that asks for it, the service speaks short cues in the rider's earphones and
+     * the overlay shows them. It needs the connection, and it never changes a target, the intensity or the workout. **On by default.** Read when a ride
+     * starts: it is not something a ride is built from, so changing it rebuilds nothing.
+     */
+    val liveCoach: Boolean = true,
     /** Overlay position as a fraction of the screen, null until the rider has dragged it (written by M1-B). */
     val overlayX: Float? = null,
     val overlayY: Float? = null,

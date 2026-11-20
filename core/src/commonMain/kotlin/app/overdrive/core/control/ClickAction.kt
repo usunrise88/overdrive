@@ -1,9 +1,12 @@
 package app.overdrive.core.control
 
 /**
- * The ten things the handlebar can do (spec §4.7). One per gesture of the table: each of the five buttons has a press and a
+ * The things the handlebar can do. **Ten of them are the table of spec §4.7**: one per gesture, each of the five buttons has a press and a
  * hold. The two volume buttons have a *repeat* action for the steps after the hold threshold, so the first step (on press) and
- * the held steps can be told apart in a log and by a haptic, while the router sends both to the same volume key.
+ * the held steps can be told apart in a log and by a haptic, while the router sends both to the same volume key. **The eleventh,
+ * [MUTE_COACH] (spec §12.1, docs/adr/0039), is on no button of that table**: it is mapped to none by default and the rider may give it a
+ * sixth button of the Click under Devices (`ButtonMapping.coachMuteMask`, `CoachButtonLearner`), so the default map and the five roles are what
+ * they were.
  */
 public enum class ClickAction(
     /** Plain words for the notice or the overlay's "what the rider just did" line. */
@@ -38,6 +41,9 @@ public enum class ClickAction(
 
     /** One step of system volume down while the button is held. */
     VOLUME_DOWN_REPEAT("Volume down"),
+
+    /** Mute the live coach for the rest of the ride (spec §12.1). It cannot be undone: the service keeps a muted session muted. */
+    MUTE_COACH("Mute the live coach"),
 }
 
 /**

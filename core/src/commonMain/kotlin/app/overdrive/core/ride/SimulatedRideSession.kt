@@ -336,6 +336,7 @@ public class SimulatedRideSession(
             zone = powerReading?.let { PowerZone.of(it, ftp) },
             workout = progress(),
             pauseReason = if (state == RideState.PAUSED) PauseReason.MANUAL else null,
+            rideSeconds = sensorSecond,
         )
     }
 

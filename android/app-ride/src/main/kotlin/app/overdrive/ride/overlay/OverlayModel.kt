@@ -5,6 +5,7 @@ import android.app.Application
 import android.os.Bundle
 import app.overdrive.ride.AppContainer
 import app.overdrive.ride.host.RideUi
+import app.overdrive.ride.live.LiveCoachUi
 import app.overdrive.ride.settings.AppSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,7 +28,18 @@ interface OverlayModel {
 
     /** Changes the settings (mode and position); validation happens in the repository. */
     fun updateSettings(change: (AppSettings) -> AppSettings)
+
+    /**
+     * What the overlay shows of the live coach (spec §12.1, docs/adr/0039): the mute control while a session is on, the one-time "unavailable" notice, the
+     * plate. Nothing for a ride that has no coach, which is what a test's fake says unless it is told otherwise.
+     */
+    val coach: StateFlow<LiveCoachUi> get() = NoCoach
+
+    /** The rider tapped the mute control: the coach is muted for the rest of the ride. */
+    fun muteCoach() = Unit
 }
+
+private val NoCoach: StateFlow<LiveCoachUi> = MutableStateFlow(LiveCoachUi.None)
 
 /** The application hands the service its [OverlayModel]; a test application hands it a fake. */
 interface OverlayModelProvider {
@@ -42,6 +54,10 @@ class ContainerOverlayModel(
     override val appVisible: StateFlow<Boolean> get() = container.visibility.visible
 
     override fun updateSettings(change: (AppSettings) -> AppSettings) = container.updateSettings(change)
+
+    override val coach: StateFlow<LiveCoachUi> get() = container.liveCoach.ui
+
+    override fun muteCoach() = container.liveCoach.mute()
 }
 
 /**

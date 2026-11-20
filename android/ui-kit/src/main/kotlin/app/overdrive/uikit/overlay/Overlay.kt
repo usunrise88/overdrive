@@ -2,6 +2,7 @@ package app.overdrive.uikit.overlay
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -15,12 +16,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -48,16 +53,137 @@ import app.overdrive.uikit.tokens.OverdriveDimens
 private val frameShape = RoundedCornerShape(OverdriveDimens.overlayRadius)
 private val gap = OverdriveDimens.overlayCellGap
 
-/** The overlay in whichever mode [OverlaySettings.mode] says. */
+/**
+ * The overlay in whichever mode [OverlaySettings.mode] says, and, when [coach] has something to show, the live coach's surfaces **under it** (spec §12.1,
+ * design/system.md §5.7): the mute control (or the one-time "Live coach unavailable"), then the plate with the cue being spoken. With nothing of the coach
+ * to show this is exactly the panel, as it always was.
+ *
+ * @param onControlBounds tells where the mute control is, in this composition's pixels, whenever it is laid out, and null when it leaves: the window's root
+ * takes every touch and uses it to tell a tap on the control from a tap on the panel. It is called from layout and writes no state, so it recomposes nothing.
+ */
 @Composable
 fun OverlayContent(
     state: OverlayUiState,
     settings: OverlaySettings,
     modifier: Modifier = Modifier,
+    coach: OverlayCoach = OverlayCoach.None,
+    onControlBounds: (Rect?) -> Unit = {},
+) {
+    if (coach.isNone) {
+        OverlayPanel(state, settings, modifier)
+        return
+    }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(OverdriveDimens.overlayCoachGap)) {
+        OverlayPanel(state, settings, Modifier)
+        val control = coach.control
+        val notice = coach.notice
+        if (control != null) {
+            CoachControlPill(control, settings.opacity, onControlBounds)
+        } else if (notice != null) {
+            CoachNotice(notice, settings.opacity)
+        }
+        val plate = coach.plate
+        if (plate != null) CoachPlate(plate, settings.opacity)
+    }
+}
+
+@Composable
+private fun OverlayPanel(
+    state: OverlayUiState,
+    settings: OverlaySettings,
+    modifier: Modifier,
 ) {
     when (settings.mode) {
         OverlayMode.Compact -> OverlayCompact(state, settings, modifier)
         OverlayMode.Detailed -> OverlayDetailed(state, settings, modifier)
+    }
+}
+
+// ---- The live coach (spec §12.1, design/system.md §5.7) ----------------------------------------------------
+
+private val coachShape = RoundedCornerShape(OverdriveDimens.overlayRadius)
+
+/**
+ * The mute control: a 132 × 40 dp surface under the panel's left edge with the state **in words**, "Coach on" or "Coach muted" (a muted coach in
+ * `text.primary`, as "Paused" is: the state to notice). It is a place to tap on the screen; the touch itself is the window's (it takes every touch and checks
+ * [onControlBounds]), and the Click reaches the same action. It never moves while the plate comes and goes, because the plate is below it.
+ */
+@Composable
+private fun CoachControlPill(
+    control: OverlayCoachControl,
+    opacity: Float,
+    onControlBounds: (Rect?) -> Unit,
+) {
+    val backing = remember(opacity) { OverdriveColors.overlayBacking.copy(alpha = opacity) }
+    DisposableEffect(Unit) { onDispose { onControlBounds(null) } }
+    Box(
+        Modifier
+            .size(OverdriveDimens.overlayCoachControlWidth, OverdriveDimens.overlayCoachControlHeight)
+            .onGloballyPositioned { onControlBounds(it.boundsInRoot()) }
+            .surface(backing, coachShape, OverdriveColors.overlayBorder),
+        contentAlignment = Alignment.Center,
+    ) {
+        OdText(
+            control.words,
+            style = OdType.label,
+            color =
+                if (control ==
+                    OverlayCoachControl.Muted
+                ) {
+                    OverdriveColors.textPrimary
+                } else {
+                    OverdriveColors.textSecondary
+                },
+            maxLines = 1,
+            softWrap = false,
+        )
+    }
+}
+
+/** "Live coach unavailable": the same height as the control, as wide as its words, there for a few seconds at the start and then gone. */
+@Composable
+private fun CoachNotice(
+    text: String,
+    opacity: Float,
+) {
+    val backing = remember(opacity) { OverdriveColors.overlayBacking.copy(alpha = opacity) }
+    Box(
+        Modifier
+            .height(OverdriveDimens.overlayCoachControlHeight)
+            .surface(backing, coachShape, OverdriveColors.overlayBorder)
+            .padding(horizontal = OverdriveDimens.overlayPaddingHorizontal),
+        contentAlignment = Alignment.Center,
+    ) {
+        OdText(text, style = OdType.label, color = OverdriveColors.textSecondary, maxLines = 1, softWrap = false)
+    }
+}
+
+/**
+ * The plate: the text of the cue being spoken, in `text.primary`, body size, one or two lines (a cue is at most 80 characters) on a surface of the panel's
+ * width. It appears when the sound begins and goes a few seconds after it ends, in one step each way: no fade, no motion.
+ */
+@Composable
+private fun CoachPlate(
+    text: String,
+    opacity: Float,
+) {
+    val backing = remember(opacity) { OverdriveColors.overlayBacking.copy(alpha = opacity) }
+    Box(
+        Modifier
+            .width(OverdriveDimens.overlayCompactWidth)
+            .surface(backing, coachShape, OverdriveColors.overlayBorder)
+            .padding(
+                horizontal = OverdriveDimens.overlayPaddingHorizontal,
+                vertical = OverdriveDimens.overlayCoachPlateVertical,
+            ),
+    ) {
+        OdText(
+            text,
+            style = OdType.body,
+            color = OverdriveColors.textPrimary,
+            maxLines = OverdriveDimens.overlayCoachPlateMaxLines,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

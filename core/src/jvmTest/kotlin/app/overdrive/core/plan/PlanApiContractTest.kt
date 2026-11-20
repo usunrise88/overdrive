@@ -36,11 +36,15 @@ import kotlin.test.assertTrue
 class PlanApiContractTest {
     private val contracts = File(System.getProperty("overdrive.contracts.dir"))
 
-    /** The plan fixtures, and those of the easier variant and the route ids of stage A2b-1 under `fixtures/routes/workouts-response`. */
+    /**
+     * The plan fixtures, those of the easier variant and the route ids of stage A2b-1 under `fixtures/routes/workouts-response`, and those of
+     * the live coach (stage A3, ADR 0038, 0039) under `fixtures/live-coach/workouts-response`.
+     */
     private fun fixtures(kind: String): List<File> =
         listOf(
             File(contracts, "fixtures/plan/workouts-response/$kind"),
             File(contracts, "fixtures/routes/workouts-response/$kind"),
+            File(contracts, "fixtures/live-coach/workouts-response/$kind"),
         ).flatMap { dir -> dir.listFiles { f -> f.extension == "json" }.orEmpty().toList() }
             .sortedBy { it.name }
 

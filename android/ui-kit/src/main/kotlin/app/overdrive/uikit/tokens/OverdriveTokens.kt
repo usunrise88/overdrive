@@ -178,6 +178,18 @@ public object OverdriveDimens {
 
     public val overlayDetailedHeightFreeRide: Dp = 159.dp
 
+    public val overlayCoachGap: Dp = 6.dp
+
+    public val overlayCoachControlHeight: Dp = 40.dp
+
+    public val overlayCoachControlWidth: Dp = 132.dp
+
+    public val overlayCoachPlateVertical: Dp = 12.dp
+
+    public val overlayCoachPlateLineHeight: Dp = 22.dp
+
+    public val overlayCoachPlateMaxLines: Int = 2
+
     public val overlayEdgeSnapMargin: Dp = 16.dp
 
     public val overlayDragSlop: Dp = 8.dp
@@ -210,6 +222,10 @@ public object OverdriveDimens {
 }
 
 public object OverdriveMotion {
+    public val overlayCoachPlateHoldMs: Int = 6000
+
+    public val overlayCoachNoticeMs: Int = 8000
+
     public val overlayEdgeSnapDurationMs: Int = 180
 
     public val overlayLongPressMs: Int = 500

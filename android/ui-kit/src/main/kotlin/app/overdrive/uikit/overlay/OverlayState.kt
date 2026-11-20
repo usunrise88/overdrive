@@ -138,3 +138,39 @@ data class OverlayUiState(
     /** Set while a heart-rate step plays (spec §11.2): the line under the main row, in both modes. */
     val hold: OverlayHold? = null,
 )
+
+/** The state of the mute control under the overlay (spec §12.1, docs/adr/0039), in words: "Coach on" and "Coach muted". */
+enum class OverlayCoachControl(
+    val words: String,
+) {
+    /** A live session is on and the rider has not muted it. */
+    On("Coach on"),
+
+    /** The rider muted the coach for the rest of the ride; it cannot be undone. */
+    Muted("Coach muted"),
+}
+
+/**
+ * What the overlay shows of the live coach, **under the panel and apart from it** (spec §12.1, docs/adr/0039, design/system.md §5.7): the mute control while a
+ * session is on, the one-time notice that the coach is unavailable, and the plate with the text of the cue being spoken. It is its own value, and not part
+ * of [OverlayUiState], because it changes on its own clock (a cue, a mute) and must not wait for the once-a-second spacing of the ride's numbers.
+ */
+@Immutable
+data class OverlayCoach(
+    /** The mute control: present exactly while a session is on. Null otherwise. */
+    val control: OverlayCoachControl? = null,
+    /** "Live coach unavailable", once at the start and for a few seconds only; null otherwise. Never together with [control]. */
+    val notice: String? = null,
+    /** The cue being spoken and, for a few seconds after, its text; null otherwise. */
+    val plate: String? = null,
+) {
+    /** Nothing of the coach is shown: the overlay is exactly the panel. */
+    val isNone: Boolean get() = control == null && notice == null && plate == null
+
+    companion object {
+        val None = OverlayCoach()
+
+        /** The words of the notice. */
+        const val UNAVAILABLE = "Live coach unavailable"
+    }
+}
