@@ -7,7 +7,7 @@ rest is solid.
 
 **Where we are: M1 to M4 are done, and Phase 2 is complete.** `v0.1.0` is the MVP: everything automatic is green and
 nothing has touched real hardware. Phase 2 (P2-1 to P2-5) is built and merged, and `v0.2.0` is ready to be cut by the
-owner once CI is green. Phase 3 is built (see below). Multiple users (ADR 0015) comes last. The bench (below) is still open.
+owner once CI is green. Phase 3 is released (`v0.3.1`, `v0.3.2`). Phase 4 (`v0.4.0`) is built and out as `v0.4.0-rc.1` (see "Phase 4 stages"). Multiple users (ADR 0015) comes last. The bench (below) is still open.
 
 | Stage | Release | Goal | What the owner tests | State |
 |---|---|---|---|---|
@@ -132,8 +132,8 @@ to Phase 3 join the Phase 3 stages above and ship in `v0.3.0`; those that belong
 
 Started 2026-11-19 on the owner's word. Decisions (owner, 2026-11-19): the road-routing engine is **BRouter**; the TTS service is the
 owner's own (`TTS_BASE_URL`, `TTS_MODEL`, `TTS_VOICE`, `TTS_API_KEY` are in the server's `.env`; an OpenAI-compatible
-`/v1/audio/speech` answering `audio/mpeg`, about 0.5 s to the first byte). Still the owner's: the region whose BRouter tiles are downloaded,
-and whether the live coach comes before the macOS application (in this plan it is the last stage). The order inside a stage is the order in
+`/v1/audio/speech` answering `audio/mpeg`, about 0.5 s to the first byte). The owner rides in Serbia: the four BRouter tiles `E15_N40 E20_N40 E15_N45 E20_N45` (305 MiB) are downloaded. Still the owner's:
+whether the live coach comes before the macOS application (in this plan it is the last stage of the phase). The order inside a stage is the order in
 the table; stages merge without a release, the phase ends with `v0.4.0-rc.1` and then `v0.4.0`.
 
 | Stage | Goal | Task | State |
@@ -144,6 +144,6 @@ the table; stages merge without a release, the phase ends with `v0.4.0-rc.1` and
 | **A2a Notebook and replanning** (§11.6, §12.2, §12.4) | The coach notebook (versions, rollback, Methodology), plan events and their tools, the Telegram note, the companion's read-only view | OVD-20 | server side done (merged): ADR 0035, migration 0010; the companion's view is not built |
 | **A2b-1 Routes and the variant: the service** (§11.4, §11.5) | BRouter beside the service (container and tiles done: deploy guide section 20), `create_route` in three modes, the variant of a workout and its lifecycle, route sessions in repeats | OVD-20 | done (merged): ADR 0036, migration 0011 |
 | **A2b-2 Routes and the variant: the tablet** (§11.4, §11.5) | The Kotlin models, route choice, grade in the trainer's simulation, positions in the FIT, the variant choice at the start, the companion's notebook view | OVD-20 | done (merged): ADR 0037; the companion's notebook page is merged; nothing seen on a device |
-| **A3 Live coach** (§12.1) | Snapshots from the tablet, trigger rules, the LLM line, the owner's TTS, audio and text on the tablet, the cue log | OVD-21 | |
+| **A3 Live coach** (§12.1) | Snapshots from the tablet, trigger rules, the LLM line, the owner's TTS, audio and text on the tablet, the cue log | OVD-21 | done (merged): the service ADR 0038 (migration 0012), the tablet ADR 0039; checked once against the owner's real language model and speech service (2 to 3 s from trigger to cue); not heard on a bike |
 | **Release candidate `v0.4.0-rc.1`**, then **`v0.4.0`** | Long checks while the owner rides it | | |
 
