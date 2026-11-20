@@ -301,6 +301,19 @@ class LiveCoachTest {
     }
 
     @Test
+    fun aWorkoutFromAFileWhoseIdTheContractDoesNotTakeIsASessionWithNoWorkoutAndNeverAnError() {
+        val odd = RideChoice.Planned(workout.copy(id = "my workout (copy 2)"), structureHash = "not a hash")
+        feed(0, RideState.READY, odd)
+        scheduler.advanceTimeBy(1_000)
+        feed(1, choice = odd)
+        settle("the start") { service.requestsTo("/v1/live/sessions").isNotEmpty() }
+        val body = LiveCoachJson.decodeSessionStart(service.requestsTo("/v1/live/sessions").single().body)
+        assertNull(body.workoutId)
+        assertNull(body.structureHash)
+        assertEquals(RIDE_ID, body.rideId)
+    }
+
+    @Test
     fun aWorkoutThatRanToItsEndEndsTheSessionAsFinished() {
         startRide()
         openedStream()

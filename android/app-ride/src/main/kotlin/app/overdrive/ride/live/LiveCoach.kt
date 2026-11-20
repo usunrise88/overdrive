@@ -13,6 +13,7 @@ import app.overdrive.core.live.LivePlan
 import app.overdrive.core.live.LiveSessionController
 import app.overdrive.core.live.LiveSessionEnd
 import app.overdrive.core.live.LiveSessionEndReason
+import app.overdrive.core.live.LiveSessionStart
 import app.overdrive.core.ride.RideSnapshot
 import app.overdrive.core.ride.RideState
 import app.overdrive.core.workout.wantsLiveCoach
@@ -138,15 +139,26 @@ class LiveCoach(
         val planned = choice as? RideChoice.Planned ?: return null
         if (!planned.workout.wantsLiveCoach || !enabled() || !client.isConfigured) return null
         val id = rideId?.takeIf { it.isNotEmpty() } ?: return null
-        val plan =
-            LivePlan(
-                rideId = id,
-                workoutId = planned.workout.id,
-                structureHash = planned.structureHash,
-                variantRidden = planned.variant,
-            )
+        // A workout opened from a file may have an id the service's contract does not allow: it is then a session with no workout, which the service answers itself.
+        val workoutId = planned.workout.id.takeIf { accepted(id, it, null) }
+        val hash = planned.structureHash.takeIf { accepted(id, workoutId, it) }
+        if (!accepted(id, workoutId, hash)) return null
+        val plan = LivePlan(rideId = id, workoutId = workoutId, structureHash = hash, variantRidden = planned.variant)
         return Ride(number, LiveSessionController(plan, wallMillis))
     }
+
+    /** Whether the contract takes these ids in a start: checked before the controller is made, so a bad id costs the coach and never throws in the middle of a ride. */
+    private fun accepted(
+        rideId: String,
+        workoutId: String?,
+        hash: String?,
+    ): Boolean =
+        try {
+            LiveSessionStart(rideId = rideId, workoutId = workoutId, structureHash = hash, clock = 0)
+            true
+        } catch (e: IllegalArgumentException) {
+            false
+        }
 
     // ---- From the rider --------------------------------------------------------------------------
 

@@ -379,7 +379,11 @@ class RideHost(
         // The live coach is told of every snapshot and decides for itself; it is never waited for (docs/adr/0039).
         val live = snapshot.state == RideState.RIDING || snapshot.state == RideState.PAUSED
         if (live && run.rideId == null) run.rideId = run.recorder.record?.ride?.id
-        liveCoach.onSnapshot(run.number, run.choice, run.rideId, snapshot)
+        try {
+            liveCoach.onSnapshot(run.number, run.choice, run.rideId, snapshot)
+        } catch (e: RuntimeException) {
+            // Whatever the coach does, the ride's own screens keep updating: it is an extra and nothing here depends on it.
+        }
         var justFinished = false
         if (snapshot.state == RideState.FINISHED && run.finished == null) {
             run.recorder.record?.let { record ->
