@@ -291,6 +291,8 @@ chip, then right-aligned: device status icons (16 dp, see §7.7), overlay button
     (a profile says "profile only", which is the word for "no map"), the chosen one surface 2 with a check; one tap chooses and closes, a tap outside closes without choosing.
     The description under the title says "Simulation on the route's grade with virtual gears…" while a route is chosen.
   - *A route a planned workout names* is used automatically and named at the end of the plan row's subtitle in one line: "Route: North road" (two: "Routes: A, B"), or **"Route not downloaded yet"**.
+  - *The live coach* (stage A3 part 2, ADR 0039): a workout that asks for it ends the subtitle with **"Live coach"**, in the same line and the same style as the route (and on the easier version's row too); **"Live coach · needs the connection"** when the last refresh could
+    not reach the service, **"Live coach off"** when the rider switched it off in Settings, Ride. Nothing for a workout that did not ask. The agent's brief and lines are in no text.
   - *The easier version*: a planned row that has one is followed, **indented 16 dp**, by a second **value row**: "Easier version" over the agent's note (else the kinds of step), the length and IF on the right;
     chosen like the row above it, one tap each, the chosen one surface 2 with a check. **"Recovery: ready / caution / rest"** is one label (label, text 2) under the two rows, indented 32 dp, on a
     workout of today only, and **absent** while the service is learning the rider's range, has no reading, or says nothing. The detail beside **Start** names the version under the title
