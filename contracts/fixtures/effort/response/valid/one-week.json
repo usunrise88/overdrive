@@ -1,0 +1,54 @@
+{
+  "generatedAt": "2026-11-18T08:00:00Z",
+  "weeks": [
+    {
+      "weekStart": "2026-11-16",
+      "load": 121.7,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": true,
+      "days": [
+        {
+          "date": "2026-11-16",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-11-17",
+          "load": 58.5,
+          "activities": [
+            {
+              "id": "ride-f1",
+              "kind": "ride",
+              "name": "Threshold 3x8",
+              "load": 58.5,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-11-18",
+          "load": 63.2,
+          "activities": [
+            {
+              "id": "ride-f2",
+              "kind": "ride",
+              "name": "Sweet spot 2x10",
+              "load": 63.2,
+              "approximate": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "usual": null,
+  "thisWeek": {
+    "load": 121.7,
+    "usualSoFar": null,
+    "verdict": "unknown",
+    "verdictText": "Not enough weeks yet to say what is usual: it needs four completed weeks."
+  },
+  "note": "Effort is your training load: power for rides with power, heart rate for watch workouts and outdoor rides, all on one scale where 100 is about an hour at threshold. Your usual range is the middle half of your last eight completed weeks."
+}

@@ -1,0 +1,19 @@
+{
+  "generatedAt": "2026-11-18T08:00:00Z",
+  "usual": {
+    "low": 118,
+    "median": 150.5,
+    "high": 182,
+    "basedOnWeeks": 8
+  },
+  "thisWeek": {
+    "load": 121.7,
+    "usualSoFar": {
+      "low": 40,
+      "high": 110
+    },
+    "verdict": "above",
+    "verdictText": "Above your usual for this point of the week: 121.7 so far, usually 40 to 110 by Wednesday."
+  },
+  "note": "Effort is your training load: power for rides with power, heart rate for watch workouts and outdoor rides, all on one scale where 100 is about an hour at threshold. Your usual range is the middle half of your last eight completed weeks."
+}

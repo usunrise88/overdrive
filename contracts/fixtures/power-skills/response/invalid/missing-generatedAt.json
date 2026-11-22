@@ -1,0 +1,262 @@
+{
+  "window": {
+    "from": "2026-09-24",
+    "to": "2026-11-18",
+    "rideCount": 9
+  },
+  "durations": [
+    {
+      "seconds": 15,
+      "window": {
+        "watts": 780,
+        "wattsPerKg": 9.95,
+        "date": "2026-11-10",
+        "rideId": "ride-d"
+      },
+      "allTime": {
+        "watts": 812.5,
+        "wattsPerKg": 10.36,
+        "date": "2026-06-03",
+        "rideId": "ride-old"
+      }
+    },
+    {
+      "seconds": 30,
+      "window": {
+        "watts": 610,
+        "wattsPerKg": 7.78,
+        "date": "2026-10-22",
+        "rideId": "ride-b"
+      },
+      "allTime": {
+        "watts": 630,
+        "wattsPerKg": 8.04,
+        "date": "2026-06-03",
+        "rideId": "ride-old"
+      }
+    },
+    {
+      "seconds": 60,
+      "window": {
+        "watts": 470,
+        "wattsPerKg": 5.99,
+        "date": "2026-11-10",
+        "rideId": "ride-d"
+      },
+      "allTime": {
+        "watts": 470,
+        "wattsPerKg": 5.99,
+        "date": "2026-11-10",
+        "rideId": "ride-d"
+      }
+    },
+    {
+      "seconds": 120,
+      "window": {
+        "watts": 380,
+        "wattsPerKg": 4.85,
+        "date": "2026-10-22",
+        "rideId": "ride-b"
+      },
+      "allTime": {
+        "watts": 392,
+        "wattsPerKg": 5,
+        "date": "2026-06-03",
+        "rideId": "ride-old"
+      }
+    },
+    {
+      "seconds": 180,
+      "window": {
+        "watts": 340,
+        "wattsPerKg": 4.34,
+        "date": "2026-11-10",
+        "rideId": "ride-d"
+      },
+      "allTime": {
+        "watts": 351,
+        "wattsPerKg": 4.48,
+        "date": "2026-06-03",
+        "rideId": "ride-old"
+      }
+    },
+    {
+      "seconds": 300,
+      "window": {
+        "watts": 305,
+        "wattsPerKg": 3.89,
+        "date": "2026-10-22",
+        "rideId": "ride-b"
+      },
+      "allTime": {
+        "watts": 312.5,
+        "wattsPerKg": 3.99,
+        "date": "2026-06-03",
+        "rideId": "ride-old"
+      }
+    },
+    {
+      "seconds": 600,
+      "window": {
+        "watts": 280,
+        "wattsPerKg": 3.57,
+        "date": "2026-11-10",
+        "rideId": "ride-d"
+      },
+      "allTime": {
+        "watts": 288,
+        "wattsPerKg": 3.67,
+        "date": "2026-06-03",
+        "rideId": "ride-old"
+      }
+    },
+    {
+      "seconds": 900,
+      "window": {
+        "watts": 265,
+        "wattsPerKg": 3.38,
+        "date": "2026-10-22",
+        "rideId": "ride-b"
+      },
+      "allTime": {
+        "watts": 265,
+        "wattsPerKg": 3.38,
+        "date": "2026-10-22",
+        "rideId": "ride-b"
+      }
+    },
+    {
+      "seconds": 1200,
+      "window": {
+        "watts": 255,
+        "wattsPerKg": 3.25,
+        "date": "2026-11-10",
+        "rideId": "ride-d"
+      },
+      "allTime": {
+        "watts": 262,
+        "wattsPerKg": 3.34,
+        "date": "2026-06-03",
+        "rideId": "ride-old"
+      }
+    },
+    {
+      "seconds": 1800,
+      "window": {
+        "watts": 240,
+        "wattsPerKg": 3.06,
+        "date": "2026-10-22",
+        "rideId": "ride-b"
+      },
+      "allTime": {
+        "watts": 246,
+        "wattsPerKg": 3.14,
+        "date": "2026-06-03",
+        "rideId": "ride-old"
+      }
+    },
+    {
+      "seconds": 2700,
+      "window": {
+        "watts": 225,
+        "wattsPerKg": 2.87,
+        "date": "2026-11-10",
+        "rideId": "ride-d"
+      },
+      "allTime": {
+        "watts": 231,
+        "wattsPerKg": 2.95,
+        "date": "2026-06-03",
+        "rideId": "ride-old"
+      }
+    },
+    {
+      "seconds": 3600,
+      "window": {
+        "watts": 215,
+        "wattsPerKg": 2.74,
+        "date": "2026-10-22",
+        "rideId": "ride-b"
+      },
+      "allTime": {
+        "watts": 215,
+        "wattsPerKg": 2.74,
+        "date": "2026-10-22",
+        "rideId": "ride-b"
+      }
+    }
+  ],
+  "riderWeight": {
+    "kg": 78.4,
+    "asOf": "2026-11-17"
+  },
+  "skills": [
+    {
+      "id": "sprint",
+      "name": "Sprint",
+      "fromSeconds": 15,
+      "toSeconds": 30,
+      "level": {
+        "index": 8,
+        "name": "Excellent",
+        "bestWattsPerKg": 9.95,
+        "nextLevelWattsPerKg": 11.9,
+        "atSeconds": 15
+      }
+    },
+    {
+      "id": "attack",
+      "name": "Attack",
+      "fromSeconds": 60,
+      "toSeconds": 180,
+      "level": {
+        "index": 6,
+        "name": "Very strong",
+        "bestWattsPerKg": 5.99,
+        "nextLevelWattsPerKg": 6.2,
+        "atSeconds": 60
+      }
+    },
+    {
+      "id": "climb",
+      "name": "Climb",
+      "fromSeconds": 300,
+      "toSeconds": 600,
+      "level": {
+        "index": 5,
+        "name": "Strong",
+        "bestWattsPerKg": 3.89,
+        "nextLevelWattsPerKg": 4.9,
+        "atSeconds": 300
+      }
+    },
+    {
+      "id": "time-trial",
+      "name": "Time trial",
+      "fromSeconds": 900,
+      "toSeconds": 1800,
+      "level": {
+        "index": 4,
+        "name": "Capable",
+        "bestWattsPerKg": 3.38,
+        "nextLevelWattsPerKg": 3.6,
+        "atSeconds": 900
+      }
+    },
+    {
+      "id": "endurance",
+      "name": "Endurance",
+      "fromSeconds": 2700,
+      "toSeconds": 3600,
+      "level": {
+        "index": 3,
+        "name": "Regular",
+        "bestWattsPerKg": 2.87,
+        "nextLevelWattsPerKg": 3.1,
+        "atSeconds": 2700
+      }
+    }
+  ],
+  "levelsNote": "Levels are a rough guide from a table of watts per kilogram for men; they are not tied to your age or sex, and they need your weight.",
+  "outdoorNote": "Only rides on the tablet count here; outdoor rides and watch workouts are not in the power curve."
+}

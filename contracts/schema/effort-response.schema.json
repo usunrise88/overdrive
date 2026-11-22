@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive weekly effort",
+  "description": "The service's answer to GET /v1/effort?weeks=N (spec §6.3, §8.3, ADR 0042): the training load of the last N weeks (1 to 52, default 12), summed per local week (Monday to Sunday) and per day, with the rider's usual range and how this week compares with it. Effort is the training load the service already computes (ADR 0022, ADR 0023), not a second formula: the power-based score of a ride on the tablet, the heart-rate score of a workout from the watch or of an outdoor ride imported from a FIT file, on one scale (100 is one hour at threshold); every kind counts, and a watch session that overlaps a tablet ride is not counted twice. weeks are the N weeks ending with the current one, oldest first; weekStart is the Monday; load is the sum of the days' loads, activityCount the number of activities, durationSeconds their summed length, approximate true when any of the load rests on an estimated threshold or a thin heart rate, or when a workout in the week had no load because the heart-rate limits are not known; inProgress is true for the current week only. days is one entry for each local day of the week from Monday, seven of them for a completed week and, for the week in progress, up to and including today; a day's activities are every ride and workout that started on it, each with its id (a ride id, `watch-…` or `fit-…`), its kind (ride, watch or outdoor), name (when it has one), load and approximate. A load is one decimal and every sum is the sum of the rounded figures below it, so what the phone adds up is what the service says. usual is the rider's usual week: the median and the interquartile band (the lower and upper quartile, linear interpolation) of the loads of the previous completed weeks, at most the last 8, counted from the first week that had any activity; basedOnWeeks is how many; it is null with fewer than 4 such weeks. thisWeek is the current week against it: load, usualSoFar (the same band of what those weeks had reached by the same weekday, null when usual is null or the verdict is unknown), verdict (below, within, above, or unknown: always unknown with no usual range and on Monday and Tuesday, when too little of the week has happened) and verdictText, a plain sentence the app shows as it is. note is a plain sentence about what Effort is. Rules a schema cannot state, checked by every implementation: dates and instants are real; weekStart is a Monday and the weeks follow one another; only the last is in progress; a week's days follow one another from its Monday, seven for a completed week; every sum above holds to the decimal; an activity's approximate makes its week approximate; low is not above median and median is not above high; thisWeek.load is the last week's load; the verdict follows from load and usualSoFar (below the low edge, above the high edge, otherwise within) and is unknown exactly when usualSoFar is null.",
+  "type": "object",
+  "required": ["generatedAt", "weeks", "usual", "thisWeek", "note"],
+  "additionalProperties": false,
+  "properties": {
+    "generatedAt": { "$ref": "#/$defs/instant" },
+    "weeks": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 52,
+      "items": { "$ref": "#/$defs/week" }
+    },
+    "usual": { "oneOf": [{ "$ref": "#/$defs/usual" }, { "type": "null" }] },
+    "thisWeek": {
+      "type": "object",
+      "required": ["load", "usualSoFar", "verdict", "verdictText"],
+      "additionalProperties": false,
+      "properties": {
+        "load": { "$ref": "#/$defs/load" },
+        "usualSoFar": { "oneOf": [{ "$ref": "#/$defs/band" }, { "type": "null" }] },
+        "verdict": { "enum": ["below", "within", "above", "unknown"] },
+        "verdictText": { "type": "string", "minLength": 1, "maxLength": 300 }
+      }
+    },
+    "note": { "type": "string", "minLength": 1, "maxLength": 600 }
+  },
+  "$defs": {
+    "instant": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "load": { "type": "number", "minimum": 0, "maximum": 100000 },
+    "band": {
+      "type": "object",
+      "required": ["low", "high"],
+      "additionalProperties": false,
+      "properties": {
+        "low": { "$ref": "#/$defs/load" },
+        "high": { "$ref": "#/$defs/load" }
+      }
+    },
+    "usual": {
+      "type": "object",
+      "required": ["low", "high", "median", "basedOnWeeks"],
+      "additionalProperties": false,
+      "properties": {
+        "low": { "$ref": "#/$defs/load" },
+        "high": { "$ref": "#/$defs/load" },
+        "median": { "$ref": "#/$defs/load" },
+        "basedOnWeeks": { "type": "integer", "minimum": 4, "maximum": 8 }
+      }
+    },
+    "activity": {
+      "type": "object",
+      "required": ["id", "kind", "load", "approximate"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 140 },
+        "kind": { "enum": ["ride", "watch", "outdoor"] },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "load": { "$ref": "#/$defs/load" },
+        "approximate": { "type": "boolean" }
+      }
+    },
+    "day": {
+      "type": "object",
+      "required": ["date", "load", "activities"],
+      "additionalProperties": false,
+      "properties": {
+        "date": { "$ref": "#/$defs/date" },
+        "load": { "$ref": "#/$defs/load" },
+        "activities": { "type": "array", "items": { "$ref": "#/$defs/activity" } }
+      }
+    },
+    "week": {
+      "type": "object",
+      "required": [
+        "weekStart",
+        "load",
+        "activityCount",
+        "durationSeconds",
+        "approximate",
+        "inProgress",
+        "days"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "weekStart": { "$ref": "#/$defs/date" },
+        "load": { "$ref": "#/$defs/load" },
+        "activityCount": { "type": "integer", "minimum": 0 },
+        "durationSeconds": { "type": "integer", "minimum": 0 },
+        "approximate": { "type": "boolean" },
+        "inProgress": { "type": "boolean" },
+        "days": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 7,
+          "items": { "$ref": "#/$defs/day" }
+        }
+      }
+    }
+  }
+}

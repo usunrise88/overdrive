@@ -1,0 +1,3165 @@
+{
+  "generatedAt": "2026-11-18T08:00:00Z",
+  "weeks": [
+    {
+      "weekStart": "2025-11-24",
+      "load": 110,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2025-11-24",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-11-25",
+          "load": 50,
+          "activities": [
+            {
+              "id": "ride-w0a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 50,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2025-11-26",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-11-27",
+          "load": 60,
+          "activities": [
+            {
+              "id": "ride-w0b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 60,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2025-11-28",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-11-29",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-11-30",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2025-12-01",
+      "load": 112,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2025-12-01",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-12-02",
+          "load": 51,
+          "activities": [
+            {
+              "id": "ride-w1a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 51,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2025-12-03",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-12-04",
+          "load": 61,
+          "activities": [
+            {
+              "id": "ride-w1b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 61,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2025-12-05",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-12-06",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-12-07",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2025-12-08",
+      "load": 114,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2025-12-08",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-12-09",
+          "load": 52,
+          "activities": [
+            {
+              "id": "ride-w2a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 52,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2025-12-10",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-12-11",
+          "load": 62,
+          "activities": [
+            {
+              "id": "ride-w2b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 62,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2025-12-12",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-12-13",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-12-14",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2025-12-15",
+      "load": 116,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2025-12-15",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-12-16",
+          "load": 53,
+          "activities": [
+            {
+              "id": "ride-w3a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 53,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2025-12-17",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-12-18",
+          "load": 63,
+          "activities": [
+            {
+              "id": "ride-w3b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 63,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2025-12-19",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-12-20",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-12-21",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2025-12-22",
+      "load": 118,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2025-12-22",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-12-23",
+          "load": 54,
+          "activities": [
+            {
+              "id": "ride-w4a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 54,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2025-12-24",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-12-25",
+          "load": 64,
+          "activities": [
+            {
+              "id": "ride-w4b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 64,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2025-12-26",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-12-27",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-12-28",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2025-12-29",
+      "load": 115,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2025-12-29",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2025-12-30",
+          "load": 55,
+          "activities": [
+            {
+              "id": "ride-w5a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 55,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2025-12-31",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-01-01",
+          "load": 60,
+          "activities": [
+            {
+              "id": "ride-w5b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 60,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-01-02",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-01-03",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-01-04",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-01-05",
+      "load": 117,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-01-05",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-01-06",
+          "load": 56,
+          "activities": [
+            {
+              "id": "ride-w6a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 56,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-01-07",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-01-08",
+          "load": 61,
+          "activities": [
+            {
+              "id": "ride-w6b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 61,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-01-09",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-01-10",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-01-11",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-01-12",
+      "load": 112,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-01-12",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-01-13",
+          "load": 50,
+          "activities": [
+            {
+              "id": "ride-w7a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 50,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-01-14",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-01-15",
+          "load": 62,
+          "activities": [
+            {
+              "id": "ride-w7b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 62,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-01-16",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-01-17",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-01-18",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-01-19",
+      "load": 114,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-01-19",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-01-20",
+          "load": 51,
+          "activities": [
+            {
+              "id": "ride-w8a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 51,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-01-21",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-01-22",
+          "load": 63,
+          "activities": [
+            {
+              "id": "ride-w8b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 63,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-01-23",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-01-24",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-01-25",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-01-26",
+      "load": 116,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-01-26",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-01-27",
+          "load": 52,
+          "activities": [
+            {
+              "id": "ride-w9a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 52,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-01-28",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-01-29",
+          "load": 64,
+          "activities": [
+            {
+              "id": "ride-w9b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 64,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-01-30",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-01-31",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-02-01",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-02-02",
+      "load": 113,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-02-02",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-02-03",
+          "load": 53,
+          "activities": [
+            {
+              "id": "ride-w10a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 53,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-02-04",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-02-05",
+          "load": 60,
+          "activities": [
+            {
+              "id": "ride-w10b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 60,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-02-06",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-02-07",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-02-08",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-02-09",
+      "load": 115,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-02-09",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-02-10",
+          "load": 54,
+          "activities": [
+            {
+              "id": "ride-w11a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 54,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-02-11",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-02-12",
+          "load": 61,
+          "activities": [
+            {
+              "id": "ride-w11b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 61,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-02-13",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-02-14",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-02-15",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-02-16",
+      "load": 117,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-02-16",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-02-17",
+          "load": 55,
+          "activities": [
+            {
+              "id": "ride-w12a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 55,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-02-18",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-02-19",
+          "load": 62,
+          "activities": [
+            {
+              "id": "ride-w12b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 62,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-02-20",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-02-21",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-02-22",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-02-23",
+      "load": 119,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-02-23",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-02-24",
+          "load": 56,
+          "activities": [
+            {
+              "id": "ride-w13a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 56,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-02-25",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-02-26",
+          "load": 63,
+          "activities": [
+            {
+              "id": "ride-w13b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 63,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-02-27",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-02-28",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-03-01",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-03-02",
+      "load": 114,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-03-02",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-03-03",
+          "load": 50,
+          "activities": [
+            {
+              "id": "ride-w14a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 50,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-03-04",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-03-05",
+          "load": 64,
+          "activities": [
+            {
+              "id": "ride-w14b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 64,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-03-06",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-03-07",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-03-08",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-03-09",
+      "load": 111,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-03-09",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-03-10",
+          "load": 51,
+          "activities": [
+            {
+              "id": "ride-w15a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 51,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-03-11",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-03-12",
+          "load": 60,
+          "activities": [
+            {
+              "id": "ride-w15b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 60,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-03-13",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-03-14",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-03-15",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-03-16",
+      "load": 113,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-03-16",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-03-17",
+          "load": 52,
+          "activities": [
+            {
+              "id": "ride-w16a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 52,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-03-18",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-03-19",
+          "load": 61,
+          "activities": [
+            {
+              "id": "ride-w16b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 61,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-03-20",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-03-21",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-03-22",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-03-23",
+      "load": 115,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-03-23",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-03-24",
+          "load": 53,
+          "activities": [
+            {
+              "id": "ride-w17a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 53,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-03-25",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-03-26",
+          "load": 62,
+          "activities": [
+            {
+              "id": "ride-w17b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 62,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-03-27",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-03-28",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-03-29",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-03-30",
+      "load": 117,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-03-30",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-03-31",
+          "load": 54,
+          "activities": [
+            {
+              "id": "ride-w18a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 54,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-04-01",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-04-02",
+          "load": 63,
+          "activities": [
+            {
+              "id": "ride-w18b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 63,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-04-03",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-04-04",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-04-05",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-04-06",
+      "load": 119,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-04-06",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-04-07",
+          "load": 55,
+          "activities": [
+            {
+              "id": "ride-w19a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 55,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-04-08",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-04-09",
+          "load": 64,
+          "activities": [
+            {
+              "id": "ride-w19b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 64,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-04-10",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-04-11",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-04-12",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-04-13",
+      "load": 116,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-04-13",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-04-14",
+          "load": 56,
+          "activities": [
+            {
+              "id": "ride-w20a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 56,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-04-15",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-04-16",
+          "load": 60,
+          "activities": [
+            {
+              "id": "ride-w20b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 60,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-04-17",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-04-18",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-04-19",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-04-20",
+      "load": 111,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-04-20",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-04-21",
+          "load": 50,
+          "activities": [
+            {
+              "id": "ride-w21a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 50,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-04-22",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-04-23",
+          "load": 61,
+          "activities": [
+            {
+              "id": "ride-w21b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 61,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-04-24",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-04-25",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-04-26",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-04-27",
+      "load": 113,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-04-27",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-04-28",
+          "load": 51,
+          "activities": [
+            {
+              "id": "ride-w22a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 51,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-04-29",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-04-30",
+          "load": 62,
+          "activities": [
+            {
+              "id": "ride-w22b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 62,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-05-01",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-05-02",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-05-03",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-05-04",
+      "load": 115,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-05-04",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-05-05",
+          "load": 52,
+          "activities": [
+            {
+              "id": "ride-w23a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 52,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-05-06",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-05-07",
+          "load": 63,
+          "activities": [
+            {
+              "id": "ride-w23b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 63,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-05-08",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-05-09",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-05-10",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-05-11",
+      "load": 117,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-05-11",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-05-12",
+          "load": 53,
+          "activities": [
+            {
+              "id": "ride-w24a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 53,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-05-13",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-05-14",
+          "load": 64,
+          "activities": [
+            {
+              "id": "ride-w24b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 64,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-05-15",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-05-16",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-05-17",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-05-18",
+      "load": 114,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-05-18",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-05-19",
+          "load": 54,
+          "activities": [
+            {
+              "id": "ride-w25a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 54,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-05-20",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-05-21",
+          "load": 60,
+          "activities": [
+            {
+              "id": "ride-w25b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 60,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-05-22",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-05-23",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-05-24",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-05-25",
+      "load": 116,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-05-25",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-05-26",
+          "load": 55,
+          "activities": [
+            {
+              "id": "ride-w26a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 55,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-05-27",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-05-28",
+          "load": 61,
+          "activities": [
+            {
+              "id": "ride-w26b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 61,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-05-29",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-05-30",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-05-31",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-06-01",
+      "load": 118,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-06-01",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-06-02",
+          "load": 56,
+          "activities": [
+            {
+              "id": "ride-w27a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 56,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-06-03",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-06-04",
+          "load": 62,
+          "activities": [
+            {
+              "id": "ride-w27b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 62,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-06-05",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-06-06",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-06-07",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-06-08",
+      "load": 113,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-06-08",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-06-09",
+          "load": 50,
+          "activities": [
+            {
+              "id": "ride-w28a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 50,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-06-10",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-06-11",
+          "load": 63,
+          "activities": [
+            {
+              "id": "ride-w28b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 63,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-06-12",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-06-13",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-06-14",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-06-15",
+      "load": 115,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-06-15",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-06-16",
+          "load": 51,
+          "activities": [
+            {
+              "id": "ride-w29a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 51,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-06-17",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-06-18",
+          "load": 64,
+          "activities": [
+            {
+              "id": "ride-w29b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 64,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-06-19",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-06-20",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-06-21",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-06-22",
+      "load": 112,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-06-22",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-06-23",
+          "load": 52,
+          "activities": [
+            {
+              "id": "ride-w30a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 52,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-06-24",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-06-25",
+          "load": 60,
+          "activities": [
+            {
+              "id": "ride-w30b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 60,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-06-26",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-06-27",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-06-28",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-06-29",
+      "load": 114,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-06-29",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-06-30",
+          "load": 53,
+          "activities": [
+            {
+              "id": "ride-w31a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 53,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-07-01",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-07-02",
+          "load": 61,
+          "activities": [
+            {
+              "id": "ride-w31b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 61,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-07-03",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-07-04",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-07-05",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-07-06",
+      "load": 116,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-07-06",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-07-07",
+          "load": 54,
+          "activities": [
+            {
+              "id": "ride-w32a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 54,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-07-08",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-07-09",
+          "load": 62,
+          "activities": [
+            {
+              "id": "ride-w32b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 62,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-07-10",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-07-11",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-07-12",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-07-13",
+      "load": 118,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-07-13",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-07-14",
+          "load": 55,
+          "activities": [
+            {
+              "id": "ride-w33a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 55,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-07-15",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-07-16",
+          "load": 63,
+          "activities": [
+            {
+              "id": "ride-w33b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 63,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-07-17",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-07-18",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-07-19",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-07-20",
+      "load": 120,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-07-20",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-07-21",
+          "load": 56,
+          "activities": [
+            {
+              "id": "ride-w34a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 56,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-07-22",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-07-23",
+          "load": 64,
+          "activities": [
+            {
+              "id": "ride-w34b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 64,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-07-24",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-07-25",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-07-26",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-07-27",
+      "load": 110,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-07-27",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-07-28",
+          "load": 50,
+          "activities": [
+            {
+              "id": "ride-w35a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 50,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-07-29",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-07-30",
+          "load": 60,
+          "activities": [
+            {
+              "id": "ride-w35b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 60,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-07-31",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-08-01",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-08-02",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-08-03",
+      "load": 112,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-08-03",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-08-04",
+          "load": 51,
+          "activities": [
+            {
+              "id": "ride-w36a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 51,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-08-05",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-08-06",
+          "load": 61,
+          "activities": [
+            {
+              "id": "ride-w36b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 61,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-08-07",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-08-08",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-08-09",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-08-10",
+      "load": 114,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-08-10",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-08-11",
+          "load": 52,
+          "activities": [
+            {
+              "id": "ride-w37a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 52,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-08-12",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-08-13",
+          "load": 62,
+          "activities": [
+            {
+              "id": "ride-w37b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 62,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-08-14",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-08-15",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-08-16",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-08-17",
+      "load": 116,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-08-17",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-08-18",
+          "load": 53,
+          "activities": [
+            {
+              "id": "ride-w38a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 53,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-08-19",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-08-20",
+          "load": 63,
+          "activities": [
+            {
+              "id": "ride-w38b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 63,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-08-21",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-08-22",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-08-23",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-08-24",
+      "load": 118,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-08-24",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-08-25",
+          "load": 54,
+          "activities": [
+            {
+              "id": "ride-w39a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 54,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-08-26",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-08-27",
+          "load": 64,
+          "activities": [
+            {
+              "id": "ride-w39b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 64,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-08-28",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-08-29",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-08-30",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-08-31",
+      "load": 115,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-08-31",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-09-01",
+          "load": 55,
+          "activities": [
+            {
+              "id": "ride-w40a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 55,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-09-02",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-09-03",
+          "load": 60,
+          "activities": [
+            {
+              "id": "ride-w40b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 60,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-09-04",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-09-05",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-09-06",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-09-07",
+      "load": 117,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-09-07",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-09-08",
+          "load": 56,
+          "activities": [
+            {
+              "id": "ride-w41a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 56,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-09-09",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-09-10",
+          "load": 61,
+          "activities": [
+            {
+              "id": "ride-w41b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 61,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-09-11",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-09-12",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-09-13",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-09-14",
+      "load": 112,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-09-14",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-09-15",
+          "load": 50,
+          "activities": [
+            {
+              "id": "ride-w42a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 50,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-09-16",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-09-17",
+          "load": 62,
+          "activities": [
+            {
+              "id": "ride-w42b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 62,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-09-18",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-09-19",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-09-20",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-09-21",
+      "load": 114,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-09-21",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-09-22",
+          "load": 51,
+          "activities": [
+            {
+              "id": "ride-w43a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 51,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-09-23",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-09-24",
+          "load": 63,
+          "activities": [
+            {
+              "id": "ride-w43b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 63,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-09-25",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-09-26",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-09-27",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-09-28",
+      "load": 116,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-09-28",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-09-29",
+          "load": 52,
+          "activities": [
+            {
+              "id": "ride-w44a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 52,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-09-30",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-10-01",
+          "load": 64,
+          "activities": [
+            {
+              "id": "ride-w44b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 64,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-10-02",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-10-03",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-10-04",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-10-05",
+      "load": 113,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-10-05",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-10-06",
+          "load": 53,
+          "activities": [
+            {
+              "id": "ride-w45a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 53,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-10-07",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-10-08",
+          "load": 60,
+          "activities": [
+            {
+              "id": "ride-w45b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 60,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-10-09",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-10-10",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-10-11",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-10-12",
+      "load": 115,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-10-12",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-10-13",
+          "load": 54,
+          "activities": [
+            {
+              "id": "ride-w46a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 54,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-10-14",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-10-15",
+          "load": 61,
+          "activities": [
+            {
+              "id": "ride-w46b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 61,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-10-16",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-10-17",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-10-18",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-10-19",
+      "load": 117,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-10-19",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-10-20",
+          "load": 55,
+          "activities": [
+            {
+              "id": "ride-w47a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 55,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-10-21",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-10-22",
+          "load": 62,
+          "activities": [
+            {
+              "id": "ride-w47b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 62,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-10-23",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-10-24",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-10-25",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-10-26",
+      "load": 119,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-10-26",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-10-27",
+          "load": 56,
+          "activities": [
+            {
+              "id": "ride-w48a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 56,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-10-28",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-10-29",
+          "load": 63,
+          "activities": [
+            {
+              "id": "ride-w48b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 63,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-10-30",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-10-31",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-11-01",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-11-02",
+      "load": 114,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-11-02",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-11-03",
+          "load": 50,
+          "activities": [
+            {
+              "id": "ride-w49a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 50,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-11-04",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-11-05",
+          "load": 64,
+          "activities": [
+            {
+              "id": "ride-w49b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 64,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-11-06",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-11-07",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-11-08",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-11-09",
+      "load": 111,
+      "activityCount": 2,
+      "durationSeconds": 7200,
+      "approximate": false,
+      "inProgress": false,
+      "days": [
+        {
+          "date": "2026-11-09",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-11-10",
+          "load": 51,
+          "activities": [
+            {
+              "id": "ride-w50a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 51,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-11-11",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-11-12",
+          "load": 60,
+          "activities": [
+            {
+              "id": "ride-w50b",
+              "kind": "ride",
+              "name": "Endurance 60",
+              "load": 60,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-11-13",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-11-14",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-11-15",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-11-16",
+      "load": 52,
+      "activityCount": 1,
+      "durationSeconds": 3600,
+      "approximate": false,
+      "inProgress": true,
+      "days": [
+        {
+          "date": "2026-11-16",
+          "load": 0,
+          "activities": []
+        },
+        {
+          "date": "2026-11-17",
+          "load": 52,
+          "activities": [
+            {
+              "id": "ride-w51a",
+              "kind": "ride",
+              "name": "Free ride",
+              "load": 52,
+              "approximate": false
+            }
+          ]
+        },
+        {
+          "date": "2026-11-18",
+          "load": 0,
+          "activities": []
+        }
+      ]
+    }
+  ],
+  "usual": {
+    "low": 105,
+    "median": 112.5,
+    "high": 118,
+    "basedOnWeeks": 8
+  },
+  "thisWeek": {
+    "load": 52,
+    "usualSoFar": {
+      "low": 50,
+      "high": 58
+    },
+    "verdict": "within",
+    "verdictText": "Within your usual for this point of the week."
+  },
+  "note": "Effort is your training load: power for rides with power, heart rate for watch workouts and outdoor rides, all on one scale where 100 is about an hour at threshold. Your usual range is the middle half of your last eight completed weeks."
+}
