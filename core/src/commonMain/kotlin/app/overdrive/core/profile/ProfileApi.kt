@@ -44,13 +44,15 @@ public data class ProfilePatch(
     val thresholdHeartRate: Change<Int?> = Change.Keep,
     /** The bike's weight in kg (spec §12.5, docs/adr/0034); set to null clears it. */
     val bikeWeightKg: Change<Double?> = Change.Keep,
+    /** Which power-skills table the levels use (docs/adr/0042); set to null goes back to the default, the men's. */
+    val powerProfileTable: Change<PowerProfileTable?> = Change.Keep,
 ) {
     /** Whether the patch changes nothing. */
     public val isEmpty: Boolean
         get() =
             ftp == Change.Keep && zones == Change.Keep && weeklyAvailability.isEmpty() && goals == null &&
                 physics == PhysicsPatch() && wPrimeKj == Change.Keep && maxHeartRate == Change.Keep &&
-                thresholdHeartRate == Change.Keep && bikeWeightKg == Change.Keep
+                thresholdHeartRate == Change.Keep && bikeWeightKg == Change.Keep && powerProfileTable == Change.Keep
 
     /**
      * The one patch that does what this one does and then [later] does: where both name a field, [later] wins (the last write
@@ -76,6 +78,8 @@ public data class ProfilePatch(
             thresholdHeartRate =
                 if (later.thresholdHeartRate == Change.Keep) thresholdHeartRate else later.thresholdHeartRate,
             bikeWeightKg = if (later.bikeWeightKg == Change.Keep) bikeWeightKg else later.bikeWeightKg,
+            powerProfileTable =
+                if (later.powerProfileTable == Change.Keep) powerProfileTable else later.powerProfileTable,
         )
 
     /**
@@ -128,6 +132,11 @@ public data class ProfilePatch(
                     Change.Keep -> profile.bikeWeightKg
                     is Change.Set -> bikeWeightKg.value
                 },
+            powerProfileTable =
+                when (powerProfileTable) {
+                    Change.Keep -> profile.powerProfileTable
+                    is Change.Set -> powerProfileTable.value
+                },
         )
     }
 }
@@ -150,6 +159,7 @@ public object ProfileApiJson {
             "maxHeartRate",
             "thresholdHeartRate",
             "bikeWeightKg",
+            "powerProfileTable",
         )
     private val physicsKeys = setOf("systemMassKg", "cdA", "crr", "airDensity", "drivetrainEfficiency")
 
@@ -217,6 +227,9 @@ public object ProfileApiJson {
             body["thresholdHeartRate"] = it.value?.let(::JsonPrimitive) ?: JsonNull
         }
         (patch.bikeWeightKg as? Change.Set)?.let { body["bikeWeightKg"] = it.value?.let(::JsonPrimitive) ?: JsonNull }
+        (patch.powerProfileTable as? Change.Set)?.let {
+            body["powerProfileTable"] = it.value?.let { table -> JsonPrimitive(table.name.lowercase()) } ?: JsonNull
+        }
         val physics =
             listOfNotNull(
                 patch.physics.systemMassKg?.let { "systemMassKg" to JsonPrimitive(it) },
@@ -252,7 +265,15 @@ public object ProfileApiJson {
                 element["thresholdHeartRate"]?.let { Change.Set(nullableInt(it, "thresholdHeartRate")) } ?: Change.Keep,
             bikeWeightKg =
                 element["bikeWeightKg"]?.let { Change.Set(nullableNumber(it, "bikeWeightKg")) } ?: Change.Keep,
+            powerProfileTable = element["powerProfileTable"]?.let { Change.Set(tableOf(it)) } ?: Change.Keep,
         )
+    }
+
+    private fun tableOf(element: JsonElement): PowerProfileTable? {
+        if (element is JsonNull) return null
+        require(element is JsonPrimitive && element.isString) { "powerProfileTable must be men, women or null" }
+        return PowerProfileTable.entries.firstOrNull { it.name.lowercase() == element.content }
+            ?: throw IllegalArgumentException("powerProfileTable must be men, women or null")
     }
 
     private fun nullableNumber(
