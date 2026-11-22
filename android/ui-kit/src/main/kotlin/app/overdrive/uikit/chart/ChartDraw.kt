@@ -126,13 +126,15 @@ internal fun Modifier.chartSemantics(
     snapXs: DoubleArray,
     restX: Double,
     selection: ChartSelection,
+    previousAction: String = "Previous point",
+    nextAction: String = "Next point",
 ): Modifier =
     this.semantics {
         contentDescription = description
         customActions =
             listOf(
-                CustomAccessibilityAction("Previous point") { move(snapXs, restX, selection, -1) },
-                CustomAccessibilityAction("Next point") { move(snapXs, restX, selection, 1) },
+                CustomAccessibilityAction(previousAction) { move(snapXs, restX, selection, -1) },
+                CustomAccessibilityAction(nextAction) { move(snapXs, restX, selection, 1) },
             )
     }
 

@@ -1272,3 +1272,24 @@ stacked pairs (aerobic efficiency, weight) are two `PlotChart`s under one readou
 (selecting in one selects the same week in the other). Best power's x is months at mid-month on a day axis, with `marked` dots on
 every point. The readout's rest pill is **Latest** (`RestPill`, stage P3-4c). No new component, no new token, no animation. The
 words of §7.9 are pure functions in a `ProgressUi` model with tests, like `RepeatsUi`.
+
+### 14.1 Where the built screens differ from the design (release 0.4.1)
+
+The screens of §4.14 and §4.15 were built from this file and the mock-ups and rendered with the app's Robolectric shots (`app-companion/build/shots/charts--*.png`)
+beside the PNGs. They match in layout, text and colour. These are the places where the build had to decide something, each with its reason:
+
+- **Radar labels at a large font (§6.11 geometry).** The rule "centre moves by 15 × sin θ" leaves two neighbouring blocks on one side closer than a block is tall once the text
+  is 1.3× (44 dp against about 40), and they are aligned on nearly the same x. `RadarGeometry` therefore pushes the blocks of one side apart by 2 dp (the ones above the middle
+  up, the ones below down) and grows the canvas to hold them; the radius still shrinks with the measured label column. At 1× nothing moves. A test checks that no two blocks
+  intersect and none leaves the canvas at 296 and 346 dp, at 1× and at 1.3× (`RadarGeometryTest`).
+- **Effort's axis** is 0 to the largest of the twelve loads and of every week's usual high, not of the selected week's, so that the axis does not move while a week is selected.
+- **Effort, learning:** the week line (without the usual range) stays between the verdict and the sentence "Your usual range appears after 8 weeks of training. 5 so far.", so that the
+  selected week's load is stated and not only drawn.
+- **Effort, a cache from an earlier week:** the pill that returns to rest says **Latest** (not "This week") and there is no "Now" tick, the phone's clock decides which week is
+  in progress.
+- **Power skills, a window without rides** other than Custom has its own sentence ("No rides on the tablet in the last 8 weeks. Choose All time or a custom range."), and
+  the card's "No rides yet" is shown only when no ride ever had a power curve.
+- **Values sheets** head the Custom column "Range" (the fixed 76 dp column cannot hold a date range); a custom range longer than three years restarts the picker from the tapped day.
+- **Segmented control:** equal segments take 6 dp of side padding (was 16) and never wrap, so "8 weeks" holds at 360 dp and 1.3×. The Fitness and Power range selectors are unchanged otherwise.
+- **Settings** gains a **Power skills** group with the **Power profile table** (Men / Women) and one sentence that levels are approximate (§4.9 had no such row; ADR 0042 "The UI stage").
+- **In the states without content** (loading, error, empty) Fitness and Power keep the range selector where it was; it moves under the new cards only when there is content.

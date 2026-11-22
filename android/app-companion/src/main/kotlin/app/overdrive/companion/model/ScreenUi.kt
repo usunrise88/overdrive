@@ -2,7 +2,6 @@ package app.overdrive.companion.model
 
 import androidx.compose.runtime.Immutable
 import app.overdrive.core.remote.ResourceState
-import app.overdrive.uikit.chart.ColumnSpec
 import app.overdrive.uikit.chart.PlotSpec
 import app.overdrive.uikit.chart.ReadoutEntry
 import app.overdrive.uikit.chart.RideChartSpec
@@ -117,16 +116,6 @@ class LineChartUi(
     val table: ValuesTable,
     val summary: String,
     val note: String? = null,
-)
-
-/** A column chart with everything around it. */
-@Immutable
-class ColumnChartUi(
-    val heading: String,
-    val spec: ColumnSpec,
-    val readoutAt: (Double?) -> Readout,
-    val table: ValuesTable,
-    val summary: String,
 )
 
 /** The ride chart with everything around it. */

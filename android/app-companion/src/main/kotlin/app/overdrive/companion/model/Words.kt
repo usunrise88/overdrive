@@ -67,6 +67,21 @@ class Words(
     /** "18 Nov", "9 Nov": a day without its weekday (week starts, "Set 2 Oct"). */
     fun dayShort(date: String): String = format("d MMM", LocalDate.parse(date))
 
+    /** "Monday 2 November": a day in full, for TalkBack and the date picker. */
+    fun dayLong(date: String): String = format("EEEE d MMMM", LocalDate.parse(date))
+
+    /** "November 2026": a month's title in the date picker, always with its year. */
+    fun monthTitle(date: String): String = format("MMMM yyyy", LocalDate.parse(date))
+
+    /** "Mon", "Tue", …: the day names of a Monday-first week. */
+    fun weekdayNames(): List<String> {
+        val monday = LocalDate.of(MONDAY_YEAR, 1, MONDAY_DAY)
+        return (0 until DAYS_PER_WEEK).map { format("EEE", monday.plusDays(it.toLong())) }
+    }
+
+    /** The phone's local calendar year today. */
+    fun thisYear(): Int = local(clock.nowMillis()).year
+
     /** "Wed 18": a ride's row. */
     fun dayOfMonth(date: String): String = format("EEE d", LocalDate.parse(date))
 
@@ -162,6 +177,11 @@ class Words(
 
     private companion object {
         const val CLOCK_CHARS = 5
+
+        /** 4 January 2021 is a Monday: the anchor of the day names. */
+        const val MONDAY_YEAR = 2021
+        const val MONDAY_DAY = 4
+        const val DAYS_PER_WEEK = 7
         const val SECONDS_PER_MINUTE = 60
         const val SECONDS_PER_HOUR = 3600
     }

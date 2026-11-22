@@ -146,10 +146,24 @@ class ColumnSpec(
     val heightDp: Float,
     /** The label above a column that carries one (the selected and the highest). */
     val valueLabel: (Double) -> String,
+    /**
+     * A flat band behind the columns, per column: the usual range that goes with that column (design/companion.md §6.12). The band drawn
+     * is the **selected** column's, so it moves with the selection in the draw phase; NaN in either array is no band for that column.
+     */
+    val bandLows: DoubleArray? = null,
+    val bandHighs: DoubleArray? = null,
+    /** "Now": under the last column, text 2, right-aligned to the plot's end (the week in progress); null for none. */
+    val nowLabel: String? = null,
+    /** Whether the highest column carries a value label too (Effort labels only the selected week). */
+    val labelHighest: Boolean = true,
 ) {
     init {
         require(starts.size == values.size && values.size == selectXs.size && values.isNotEmpty()) {
             "A column chart has one value and one selection x per column, and at least one column"
+        }
+        require((bandLows == null) == (bandHighs == null)) { "A band has a low and a high" }
+        require(bandLows == null || (bandLows.size == values.size && bandHighs!!.size == values.size)) {
+            "A band has a low and a high for every column"
         }
     }
 

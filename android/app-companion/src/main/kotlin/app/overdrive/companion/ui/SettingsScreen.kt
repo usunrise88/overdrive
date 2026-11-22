@@ -36,6 +36,7 @@ import app.overdrive.companion.model.HeartRateUi
 import app.overdrive.companion.model.HeartRateWords
 import app.overdrive.companion.model.ProblemWords
 import app.overdrive.core.health.HealthStatus
+import app.overdrive.core.profile.PowerProfileTable
 import app.overdrive.core.remote.ProblemKind
 import app.overdrive.data.settings.AddressCheck
 import app.overdrive.data.settings.ServiceRules
@@ -49,6 +50,7 @@ import app.overdrive.uikit.OdIcon
 import app.overdrive.uikit.OdText
 import app.overdrive.uikit.OdTextField
 import app.overdrive.uikit.OdType
+import app.overdrive.uikit.SegmentedControl
 import app.overdrive.uikit.Spinner
 import app.overdrive.uikit.Stepper
 import app.overdrive.uikit.icons.OverdriveIcons
@@ -76,6 +78,8 @@ data class SettingsUiState(
     val health: HealthSettingsUi? = null,
     /** The Heart rate group, or null while the service has sent no profile (nothing to edit yet). */
     val heartRate: HeartRateUi? = null,
+    /** The table the Power skills' levels are read against, or null while the service has sent no profile (nothing to edit yet). */
+    val powerTable: PowerProfileTable? = null,
     /** The outdoor rides row (design/companion.md §4.9, §4.11): "2 files waiting" and why, or how to add a ride. */
     val outdoorValue: String = "No files waiting",
     val outdoorNote: String = "Share a .fit file from OnelapFit to Overdrive to add an outdoor ride.",
@@ -96,6 +100,7 @@ class SettingsActions(
     val onThresholdStep: (Int) -> Unit = {},
     val onUseMaxEstimate: (Int) -> Unit = {},
     val onUseThresholdEstimate: (Int) -> Unit = {},
+    val onPowerTable: (PowerProfileTable) -> Unit = {},
 )
 
 /** The words of Settings' "Last sync" row (design/companion.md §4.9), pure so they are tested. */
@@ -203,6 +208,7 @@ fun SettingsScreen(
             version = versionOf(context),
             health = HealthWords.settings(watch, battery, container.words),
             heartRate = profile.profile?.let(HeartRateWords::of),
+            powerTable = profile.profile?.let { it.powerProfileTable ?: PowerProfileTable.MEN },
             outdoorValue = FitWords.settingsValue(fits),
             outdoorNote = FitWords.settingsNote(fits, host),
         )
@@ -243,6 +249,7 @@ fun SettingsScreen(
             },
             onUseMaxEstimate = container::setMaxHeartRate,
             onUseThresholdEstimate = container::setThresholdHeartRate,
+            onPowerTable = container::setPowerProfileTable,
         ),
         modifier,
     )
@@ -339,6 +346,10 @@ fun SettingsView(
             state.heartRate?.let { heartRate ->
                 item { GroupLabel("Heart rate") }
                 item { HeartRateGroup(heartRate, actions) }
+            }
+            state.powerTable?.let { table ->
+                item { GroupLabel("Power skills") }
+                item { PowerTableGroup(table, actions) }
             }
             item { GroupLabel("Outdoor rides") }
             item {
@@ -528,6 +539,32 @@ private fun HeartRateRow(
             canIncrement = row.canIncrease,
             label = title.lowercase(),
         )
+    }
+}
+
+/**
+ * The Power profile table (ADR 0042): which table of watts per kilogram the Power skills' levels are read against, men's or women's. A
+ * written profile value like the heart rates, sent through the same PATCH; the sentence says the levels are approximate.
+ */
+@Composable
+private fun PowerTableGroup(
+    table: PowerProfileTable,
+    actions: SettingsActions,
+) {
+    SettingsCard {
+        FieldRow(
+            "Power profile table",
+            "Levels in Power skills are approximate: your watts per kilogram against a published table.",
+        ) {
+            SegmentedControl(
+                listOf("Men", "Women"),
+                PowerProfileTable.entries.indexOf(table),
+                { actions.onPowerTable(PowerProfileTable.entries[it]) },
+                Modifier.fillMaxWidth(),
+                segmentHeight = 44.dp,
+                equalWidth = true,
+            )
+        }
     }
 }
 

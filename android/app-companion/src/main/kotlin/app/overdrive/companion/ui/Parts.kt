@@ -14,7 +14,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.unit.dp
 import app.overdrive.companion.model.CardPosition
-import app.overdrive.companion.model.ColumnChartUi
 import app.overdrive.companion.model.LineChartUi
 import app.overdrive.companion.model.TileUi
 import app.overdrive.companion.model.ValuesTable
@@ -25,7 +24,6 @@ import app.overdrive.uikit.TileGroup
 import app.overdrive.uikit.chart.ChartCard
 import app.overdrive.uikit.chart.ChartReadout
 import app.overdrive.uikit.chart.ChartSelection
-import app.overdrive.uikit.chart.ColumnChart
 import app.overdrive.uikit.chart.PlotChart
 import app.overdrive.uikit.chart.ValuesSheet
 import app.overdrive.uikit.tokens.OverdriveColors
@@ -43,22 +41,6 @@ fun LineChartCard(
     ChartCard(ui.heading, modifier, onValues = onValues, note = ui.note) {
         ChartReadout(readout.x, readout.entries, away = selection.isAway(ui.spec.restX), onToday = selection::clear)
         PlotChart(ui.spec, selection, "${ui.summary}. ${readout.spoken()}")
-    }
-}
-
-/** A column chart card, like [LineChartCard]. */
-@Composable
-fun ColumnChartCard(
-    ui: ColumnChartUi,
-    selection: ChartSelection,
-    onValues: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val x = selection.x
-    val readout = remember(ui, x) { ui.readoutAt(x) }
-    ChartCard(ui.heading, modifier, onValues = onValues) {
-        ChartReadout(readout.x, readout.entries, away = selection.isAway(ui.spec.restX), onToday = selection::clear)
-        ColumnChart(ui.spec, selection, "${ui.summary}. ${readout.spoken()}")
     }
 }
 

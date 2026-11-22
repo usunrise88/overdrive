@@ -36,6 +36,7 @@ import app.overdrive.core.plan.PlanApiJson
 import app.overdrive.core.plan.WorkoutsResponse
 import app.overdrive.core.powerskills.PowerSkillsResponse
 import app.overdrive.core.profile.Change
+import app.overdrive.core.profile.PowerProfileTable
 import app.overdrive.core.profile.ProfileApiJson
 import app.overdrive.core.profile.ProfilePatch
 import app.overdrive.core.profile.ProfileRefresh
@@ -885,11 +886,19 @@ class CompanionContainer(
     private var sendEdit: Job? = null
 
     /** Settings' stepper: the maximum heart rate goes on the profile at once and to the service once the rider stops tapping. */
-    fun setMaxHeartRate(bpm: Int) = editHeartRate(ProfilePatch(maxHeartRate = Change.Set(bpm)))
+    fun setMaxHeartRate(bpm: Int) = editProfile(ProfilePatch(maxHeartRate = Change.Set(bpm)))
 
-    fun setThresholdHeartRate(bpm: Int) = editHeartRate(ProfilePatch(thresholdHeartRate = Change.Set(bpm)))
+    fun setThresholdHeartRate(bpm: Int) = editProfile(ProfilePatch(thresholdHeartRate = Change.Set(bpm)))
 
-    private fun editHeartRate(patch: ProfilePatch) {
+    /**
+     * Settings' **Power profile table**: which table of watts per kilogram the Power skills' levels are read against (ADR 0042). It goes on
+     * the profile at once and to the service once the rider stops tapping; the levels are the service's, so the Power skills are asked
+     * again afterwards.
+     */
+    fun setPowerProfileTable(table: PowerProfileTable) =
+        editProfile(ProfilePatch(powerProfileTable = Change.Set(table)))
+
+    private fun editProfile(patch: ProfilePatch) {
         if (!profile.edit(patch)) {
             // No profile in force yet (the service was never reached): ask for it, the rider can try again when it is here.
             scope.launch { profile.refresh(ProfileRefresh.REQUESTED) }
@@ -900,6 +909,7 @@ class CompanionContainer(
             scope.launch {
                 delay(EDIT_SETTLE_MILLIS)
                 profile.refresh(ProfileRefresh.EDITED)
+                if (patch.powerProfileTable != Change.Keep) refresh(RefreshTarget.Power)
             }
     }
 

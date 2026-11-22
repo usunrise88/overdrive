@@ -3,6 +3,7 @@ package app.overdrive.companion
 import android.app.Application
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import app.overdrive.core.profile.PowerProfileTable
 import app.overdrive.core.remote.PowerSkillsWindow
 import app.overdrive.core.remote.ProblemKind
 import org.junit.After
@@ -167,5 +168,36 @@ class ChartsContainerTest {
                 ?.kind,
         )
         assertNull(c.effort.state.value.value)
+    }
+
+    @Test
+    fun `the power profile table goes on the profile and to the service, and the skills are asked again`() {
+        serveSkills()
+        val c = world.container()
+        c.configure()
+        await("the profile", diagnostics = diagnostics(c)) { c.profile.state.value.profile != null }
+        assertNull(
+            "men's is the default and is not written",
+            c.profile.state.value.profile
+                ?.powerProfileTable,
+        )
+        c.screenOpened(RefreshTarget.PowerSkills(PowerSkillsWindow.EightWeeks))
+        await("the first answer", diagnostics = diagnostics(c)) {
+            service.requests("GET", "/v1/power-skills").isNotEmpty()
+        }
+        val before = service.requests("GET", "/v1/power-skills").size
+        c.setPowerProfileTable(PowerProfileTable.WOMEN)
+        assertEquals(
+            PowerProfileTable.WOMEN,
+            c.profile.state.value.profile
+                ?.powerProfileTable,
+        )
+        await("the service has it", diagnostics = diagnostics(c)) {
+            service.profile?.powerProfileTable ==
+                PowerProfileTable.WOMEN
+        }
+        await("the skills were asked again", diagnostics = diagnostics(c)) {
+            service.requests("GET", "/v1/power-skills").size > before
+        }
     }
 }

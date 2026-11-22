@@ -1004,6 +1004,30 @@ fields: an older app refuses the whole plan answer. The cues are about your own 
 
 ---
 
+## Session 15: Power skills and Effort on the phone (release 0.4.1)
+
+Needs: the Xiaomi 14 Ultra, the `app-companion` APK of the release, the service with the Power skills and Effort routes (ADR 0042), a few weeks of tablet rides with power
+(Power skills) and some weeks of rides and watch activities (Effort), and a weight in Health Connect from the last 7 days for the levels. Companion-only. What the JVM tests and the
+Robolectric renders cannot settle: how the two charts read in the hand (`design/companion.md` §4.14, §4.15; ADR 0042 "What only real data can settle").
+
+- [ ] **15.1 Power tab, Power skills.** The card sits after the FTP card, the range selector (6 weeks · 6 months · 1 year) under it. The radar: 15 s at the top, 10 min at the bottom, the ring split into
+  five colours with gaps, white outline (8 weeks) over a grey one (all time). Is the shape what you would draw of your own riding (a spike for sprint, a full hour)? Are the labels (duration over watts) readable at arm's length?
+  Do the five rows agree with the radar? Is "Strong · level 5 of 9" a fair word for you (your own judgement of the level words and of the tables)?
+- [ ] **15.2 The windows.** 8 weeks, All time, Custom: the outline changes at once, with no animation. Custom opens the date sheet: dots on the days you rode (only the newest 50 rides are known to the phone, so older months may lack dots),
+  future days are grey, Show applies only after two days, Cancel, Back and a tap outside change nothing. The range line shows "2 Nov – 15 Nov 2026 · 9 rides" with Change and the x. A range without rides says so in one sentence.
+- [ ] **15.3 Taps.** Tap a duration (its label or its wedge): the sheet shows the window's value and the best ever with the ride, and the ride opens. Tap a skill row: the table of its durations. Are the targets big enough with a thumb
+  (the wedge near the centre is narrow by design)? Values lists all twelve.
+- [ ] **15.4 No weight / gaps.** Without a weight in the last 7 days the radar is a share of your best ever with no levels and the card says why. A duration you never rode that long is a gap in the outline, labelled "—".
+- [ ] **15.5 Font and width.** Settings of the phone: font size to the largest normal step: the plot shrinks, no label is clipped, the skill rows still fit. Offline (flight mode): the cached card stays and the tab says why.
+- [ ] **15.6 Fitness tab, Effort.** After the tiles: the verdict in words ("Below your usual range so far" early in a week), 12 weekly columns, "Now" under this week, a band that moves when you tap another week. Hold and slide over the columns.
+  Does "usual range" feel right for you (the mean plus and minus one deviation of the 8 weeks before; ADR 0042 "What only real data can settle")? The days and the rows of a week: tap a row, the ride or the activity opens. A watch
+  activity says Watch and "approximate"; an outdoor ride without heart rate says "no load". The old Weekly load card is gone; Values shows every week.
+- [ ] **15.7 Settings, Power profile table.** Men / Women: the choice stays, the levels on the Power tab change after a moment. Do the women's levels look plausible for the same rides?
+- [ ] **15.8 Frames.** `adb shell dumpsys gfxinfo app.overdrive.companion framestats` while scrolling the Power tab and the Fitness tab, and while tapping the radar and the columns: dropped frames? The radar is drawn once and does not animate.
+- [ ] **15.9 What to send back.** Screenshots of anything that looks wrong (privately), the level words you disagree with, the weeks where the verdict surprised you.
+
+---
+
 ## Coverage: what settles what
 
 ### Acceptance criteria (`docs/phase1-acceptance.md`)
