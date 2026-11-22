@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Companion: Power skills</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../components.css">
+<link rel="stylesheet" href="companion.css">
+<style>
+  /* Power skills (design/companion.md §4.14, §6.11). */
+  .phone.w360 { width: 360px; }
+  .seg3 { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+  .rangeline { display: flex; align-items: center; gap: 4px; min-height: 48px; margin: -4px 0; }
+  .rangeline .grow { flex: 1; min-width: 0; }
+  .skill { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 8px; padding: 12px 0; border-top: 1px solid var(--color-border); min-height: 72px; }
+  .skill .name { display: flex; align-items: baseline; gap: 8px; }
+  .skill .end { display: flex; flex-direction: column; align-items: flex-end; }
+  .lvl { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(9, 1fr); gap: 2px; }
+  .lvl i { height: 6px; background: var(--color-surface3); }
+  .lvl i:first-child { border-radius: 3px 0 0 3px; }
+  .lvl i:last-child { border-radius: 0 3px 3px 0; }
+  .key-skill { display: inline-block; width: 12px; height: 4px; border-radius: 2px; margin-right: 2px; transform: translateY(-2px); }
+  .note-ann { font-size: 12px; line-height: 16px; color: #c9cdd3; padding: 0 4px; font-style: italic; }
+  .cal { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 2px; text-align: center; font-feature-settings: var(--font-numerals); }
+  .cal span { height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 15px; position: relative; }
+  .cal .h { height: 24px; font-size: 11px; color: var(--color-text-tertiary); }
+  .cal .in { background: var(--color-surface3); }
+  .cal .end { background: var(--color-text-primary); color: var(--color-text-on-primary); font-weight: 600; border-radius: 8px; }
+  .cal .start-band { background: linear-gradient(90deg, transparent 50%, var(--color-surface3) 50%); }
+  .cal .end-band { background: linear-gradient(90deg, var(--color-surface3) 50%, transparent 50%); }
+  .cal .fut { color: var(--color-text-tertiary); opacity: .55; }
+  .cal .today::after { content: ""; position: absolute; inset: 4px 8px; border: 1px solid var(--color-border-strong); border-radius: 8px; }
+  .cal .ride::before { content: ""; position: absolute; bottom: 6px; width: 4px; height: 4px; border-radius: 2px; background: var(--color-text-secondary); }
+  .cal .end.ride::before { background: var(--color-text-on-primary); }
+  .kv { display: grid; grid-template-columns: 1fr auto; column-gap: 0; }
+  .kv > span { min-height: 48px; display: flex; flex-direction: column; justify-content: center; border-top: 1px solid var(--color-border); }
+  .kv > span.r { align-items: flex-end; padding-left: 12px; }
+</style>
+</head>
+<body data-ready="false">
+
+<figure class="shot"><figcaption><b>Power · Power skills, 8 weeks, weight known.</b> The top of the tab: FTP, then the skills card with its own window; the range selector and the curve follow below the fold.</figcaption><div class="frame phone tall" id="skills"></div></figure>
+<figure class="shot"><figcaption><b>360 dp wide.</b> The same card on the narrowest phone: the plot shrinks, the labels keep their size.</figcaption><div class="frame phone tall w360" id="skills-360"></div></figure>
+<figure class="shot"><figcaption><b>An axis tapped: 5 min</b> (scrolled so the radar shows). The axis is marked on the radar and its detail opens in a sheet: both windows, their dates and rides, watts per kilogram, the level.</figcaption><div class="frame phone" id="skills-axis"></div></figure>
+<figure class="shot"><figcaption><b>A skill row tapped: Climb.</b> The skill's durations, each with both windows.</figcaption><div class="frame phone" id="skills-skill"></div></figure>
+<figure class="shot"><figcaption><b>No weight known.</b> Each axis is a share of the best ever, the all-time outline is the ring, and the rows show watts only, with one sentence saying why.</figcaption><div class="frame phone tall" id="skills-noweight"></div></figure>
+<figure class="shot"><figcaption><b>Custom range, 2–15 Nov.</b> No ride was longer than 41 minutes: 45 and 60 min are gaps in the outline, labelled “—”.</figcaption><div class="frame phone tall" id="skills-custom"></div></figure>
+<figure class="shot"><figcaption><b>Choosing a custom range.</b> A sheet with one month; a dot marks days with a ride. Cancel, Back, a tap on the scrim or a swipe down leave the window as it was.</figcaption><div class="frame phone" id="skills-picker"></div></figure>
+<figure class="shot"><figcaption><b>States of the card.</b> Loading, no rides, fewer than three durations (a list instead of the radar), a custom range with no rides, offline with cache.</figcaption><div class="frame phone tall" id="skills-states"></div></figure>
+
+<script type="module">
+import { head, ic, range, shell, statusLine } from "./companion.js";
+
+// ---------- Data (synthetic) ----------
+const DUR = [15, 30, 60, 120, 180, 300, 600, 900, 1200, 1800, 2700, 3600];
+const DL = ["15 s", "30 s", "1 min", "2 min", "3 min", "5 min", "10 min", "15 min", "20 min", "30 min", "45 min", "60 min"];
+// Level 1 floor (B) and level 9 floor (T) in W/kg, men's table, log-interpolated (design/companion.md §6.11).
+const B = [8.2, 6.9, 5.6, 4.2, 3.35, 2.3, 2.2, 2.1, 2.1, 2.0, 1.95, 1.9];
+const T = [18.5, 15.0, 11.5, 9.8, 8.85, 7.6, 7.25, 7.05, 6.95, 6.75, 6.55, 6.4];
+const KG = 72.0;
+const ALL = [1010, 760, 520, 400, 360, 330, 300, 290, 284, 270, 258, 250];
+const W8 = [930, 705, 478, 372, 341, 316, 289, 279, 273, 259, 244, 236];
+const CUSTOM = [905, 690, 462, 360, 333, 309, 281, 270, 266, 251, null, null];
+const score = (w, i) => (w == null ? null : 1 + (8 * (w / KG - B[i])) / (T[i] - B[i]));
+const SKILLS = [
+  { name: "Sprint", span: "15–30 s", axes: [0, 1], zone: "7", key: 0 },
+  { name: "Attack", span: "1–3 min", axes: [2, 3, 4], zone: "6", key: 2 },
+  { name: "Climb", span: "5–10 min", axes: [5, 6], zone: "5", key: 5 },
+  { name: "Time trial", span: "15–30 min", axes: [7, 8, 9], zone: "4", key: 8 },
+  { name: "Endurance", span: "45–60 min", axes: [10, 11], zone: "3", key: 11 },
+];
+const LEVELS = ["Starting", "Casual", "Regular", "Fit", "Strong", "Very strong", "Racer", "Elite", "World class"];
+const fmtW = (w) => (w == null ? "—" : `${w.toLocaleString("en-GB")}`);
+
+// ---------- Radar ----------
+const T1 = "var(--color-text-primary)";
+const T3 = "var(--color-text-tertiary)";
+/**
+ * o: { w, main:[r 0..1|null], ref:[r 0..1|null]|null, labels:[watts string], sel: axis|null,
+ *      rings:[0..1], outerRing: true }  r is the share of the plot radius.
+ */
+const radar = (o) => {
+  const W = o.w;
+  const labelW = 54;
+  const Rp = Math.min(W / 2 - labelW - 14, 118);
+  const Rr = Rp + 6; // the skill ring's centre line
+  const Rl = Rp + 14; // where the axis labels start
+  const cx = W / 2;
+  const cy = Rl + 34;
+  const H = 2 * cy;
+  const ang = (i) => ((-90 + 30 * i) * Math.PI) / 180;
+  const pt = (i, r) => [cx + Math.cos(ang(i)) * r, cy + Math.sin(ang(i)) * r];
+  const out = [];
+  // Rings and spokes: hairlines in border; the outer edge of the plot in border-strong.
+  for (const f of o.rings) {
+    out.push(`<circle cx="${cx}" cy="${cy}" r="${(Rp * f).toFixed(1)}" style="fill:none;stroke:var(--color-border);stroke-width:1"/>`);
+  }
+  out.push(`<circle cx="${cx}" cy="${cy}" r="${Rp}" style="fill:none;stroke:var(--color-border-strong);stroke-width:1"/>`);
+  for (let i = 0; i < 12; i++) {
+    const [x, y] = pt(i, Rp);
+    const on = o.sel === i;
+    out.push(`<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" style="stroke:${on ? "var(--color-text-secondary)" : "var(--color-border)"};stroke-width:1"/>`);
+  }
+  // Skill ring: one arc per skill, 4 dp, zone colour, a 2 dp surface gap between arcs.
+  for (const s of SKILLS) {
+    const gap = (2 / Rr) / 2; // half of a 2 dp gap, in radians
+    const a0 = ang(s.axes[0]) - Math.PI / 12 + gap;
+    const a1 = ang(s.axes.at(-1)) + Math.PI / 12 - gap;
+    const p0 = [cx + Math.cos(a0) * Rr, cy + Math.sin(a0) * Rr];
+    const p1 = [cx + Math.cos(a1) * Rr, cy + Math.sin(a1) * Rr];
+    const large = a1 - a0 > Math.PI ? 1 : 0;
+    out.push(`<path d="M${p0[0].toFixed(1)},${p0[1].toFixed(1)}A${Rr},${Rr} 0 ${large} 1 ${p1[0].toFixed(1)},${p1[1].toFixed(1)}" style="fill:none;stroke:var(--zone-${s.zone});stroke-width:4"/>`);
+  }
+  // Outlines: reference (all time) 1.5 dp text 3; main 2 dp text 1 with a 10% wash when complete.
+  const outline = (vals, color, sw, wash) => {
+    const rad = vals.map((v) => (v == null ? null : Math.max(6, Math.min(1, v) * Rp)));
+    const complete = rad.every((v) => v != null);
+    if (complete && wash) {
+      const d = rad.map((r, i) => pt(i, r).map((n) => n.toFixed(1)).join(",")).join(" ");
+      out.push(`<polygon points="${d}" style="fill:${color};fill-opacity:0.1"/>`);
+    }
+    for (let i = 0; i < 12; i++) {
+      const j = (i + 1) % 12;
+      if (rad[i] == null || rad[j] == null) continue;
+      const [x0, y0] = pt(i, rad[i]);
+      const [x1, y1] = pt(j, rad[j]);
+      out.push(`<line x1="${x0.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y1.toFixed(1)}" style="stroke:${color};stroke-width:${sw};stroke-linecap:round"/>`);
+    }
+    // An isolated vertex (both neighbours missing) is a 6 dp dot.
+    for (let i = 0; i < 12; i++) {
+      if (rad[i] == null) continue;
+      if (rad[(i + 11) % 12] == null && rad[(i + 1) % 12] == null) {
+        const [x, y] = pt(i, rad[i]);
+        out.push(`<circle cx="${x}" cy="${y}" r="3" style="fill:${color};stroke:var(--color-surface1);stroke-width:1.5"/>`);
+      }
+    }
+    return rad;
+  };
+  const refR = o.ref ? outline(o.ref, T3, 1.5, false) : null;
+  const mainR = outline(o.main, T1, 2, true);
+  if (o.sel != null) {
+    for (const [rad, color] of [[refR, T3], [mainR, T1]]) {
+      if (!rad || rad[o.sel] == null) continue;
+      const [x, y] = pt(o.sel, rad[o.sel]);
+      out.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" style="fill:${color};stroke:var(--color-surface1);stroke-width:2"/>`);
+    }
+  }
+  // Axis labels: duration (caption, text 3) over watts (label 600, text 1), placed by angle.
+  for (let i = 0; i < 12; i++) {
+    const a = ang(i);
+    const c = Math.cos(a);
+    const s = Math.sin(a);
+    const x = cx + c * Rl;
+    const y = cy + s * Rl;
+    const anchor = Math.abs(c) < 0.3 ? "middle" : c > 0 ? "start" : "end";
+    const top = y - 15 + s * 15;
+    const on = o.sel === i;
+    const missing = o.labels[i] === "—";
+    out.push(
+      `<text x="${x.toFixed(1)}" y="${(top + 11).toFixed(1)}" text-anchor="${anchor}" class="axis"${on ? ' style="fill:var(--color-text-primary)"' : ""}>${DL[i]}</text>`,
+      `<text x="${x.toFixed(1)}" y="${(top + 27).toFixed(1)}" text-anchor="${anchor}" style="font-size:13px;font-weight:${on ? 700 : 600};fill:${missing ? T3 : T1};font-feature-settings:'tnum'">${o.labels[i]}${missing ? "" : '<tspan style="font-weight:500;fill:var(--color-text-secondary)"> W</tspan>'}</text>`,
+    );
+  }
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible">${out.join("")}</svg>`;
+};
+
+const lvlRadius = (vals) => vals.map((w, i) => (w == null ? null : score(w, i) / 9));
+
+// ---------- Card pieces ----------
+const seg = (on) =>
+  `<div class="range seg3">${["8 weeks", "All time", "Custom"].map((o) => `<span class="${o === on ? "on" : ""}">${o}</span>`).join("")}</div>`;
+const legend = (main, ref) =>
+  `<div class="readout"><span class="k"><i class="key-line" style="background:${T1}"></i>${main}</span>${ref ? `<span class="k"><i class="key-line" style="background:${T3}"></i>${ref}</span>` : ""}</div>`;
+const levelBar = (lvl, zone) =>
+  `<div class="lvl" aria-hidden="true">${Array.from({ length: 9 }, (_, k) => `<i style="${k < lvl ? `background:var(--zone-${zone})` : ""}"></i>`).join("")}</div>`;
+
+const skillLevel = (vals, s) => {
+  const sc = s.axes.map((i) => score(vals[i], i)).filter((v) => v != null);
+  if (!sc.length) return null;
+  return Math.max(1, Math.min(9, Math.floor(sc.reduce((a, b) => a + b, 0) / sc.length)));
+};
+const skillRow = (vals, s, weight) => {
+  const w = vals[s.key];
+  const lvl = weight ? skillLevel(vals, s) : null;
+  const right = w == null
+    ? `<span class="num t-num-xs c3">—</span><span class="t-caption c3">${DL[s.key]}</span>`
+    : `<span class="num t-num-xs">${fmtW(w)}<span class="unit">W</span></span><span class="t-caption c3 num">${weight ? `${(w / KG).toFixed(1)} W/kg · ` : ""}${DL[s.key]}</span>`;
+  return `<div class="skill">
+    <div class="stack"><span class="name"><span class="t-strong"><i class="key-skill" style="background:var(--zone-${s.zone})"></i> ${s.name}</span><span class="t-label c3 num">${s.span}</span></span>
+    ${lvl ? `<span class="t-label c2">${LEVELS[lvl - 1]} · level ${lvl} of 9</span>` : w == null ? `<span class="t-label c2">No ride of ${DL[s.axes[0]]} or longer</span>` : ""}</div>
+    <div class="end">${right}</div>
+    ${lvl ? levelBar(lvl, s.zone) : ""}
+  </div>`;
+};
+
+const skillsCard = ({ w = 346, window = "8 weeks", vals = W8, weight = true, sel = null, custom = null }) => {
+  const isAll = window === "All time";
+  const mainR = weight ? lvlRadius(vals) : vals.map((v, i) => (v == null ? null : (v / ALL[i] - 0.5) / 0.5));
+  const refR = isAll ? null : weight ? lvlRadius(ALL) : ALL.map(() => 1);
+  const mainName = custom ? custom : window;
+  return `<div class="card chart" style="gap:12px">
+    <div class="between" style="height:24px"><span class="t-label c3">Power skills</span><span class="t-label c2">Values</span></div>
+    ${seg(custom ? "Custom" : window)}
+    ${custom ? `<div class="rangeline"><span class="grow t-label num">${custom} 2026 · 9 rides</span><span class="btn btn-ghost" style="height:40px;padding:0 12px">Change</span><span class="iconbtn" style="margin-right:-12px">${ic("x")}</span></div>` : ""}
+    ${legend(mainName, isAll ? null : "All time")}
+    <div style="display:flex;justify-content:center">${radar({ w, main: mainR, ref: refR, labels: vals.map(fmtW), sel, rings: weight ? [1 / 3, 2 / 3] : [0.5] })}</div>
+    <span class="chart-note">${weight ? "Rings mark levels 3, 6 and 9. Tap a duration or a skill for its rides." : "Each axis is a share of your best ever: the ring is your best, the inner ring 75%, the centre 50%."}</span>
+    <div class="stack">
+      ${SKILLS.map((s) => skillRow(vals, s, weight)).join("")}
+    </div>
+    <span class="chart-note">${weight
+      ? `Levels are approximate: your watts per kilogram (${KG.toFixed(1)} kg, 7-day average) against published power-profile tables.`
+      : "Levels need your weight. Weigh yourself with a scale that writes to Health Connect and they appear here."}
+      Outdoor rides have no power, so only rides from the tablet count.</span>
+  </div>`;
+};
+
+const ftpMini = `<div class="card pad"><div class="between" style="align-items:flex-start"><div class="stack"><span class="t-label c3">FTP</span><span class="num t-num-m">250<span class="unit">W</span></span><span class="t-label c2 num">Set 2 Oct · estimated 251 W</span></div></div></div>`;
+const below = `${range(["6 weeks", "6 months", "1 year"], "6 months")}
+  <div class="card chart"><div class="between"><span class="t-label c3">Power curve</span><span class="t-label c2">Values</span></div><span class="t-label c3">…</span></div>`;
+
+shell("skills", { tab: "Power", body: `${head("Power", "Updated 07:40")}${ftpMini}${skillsCard({})}${below}` });
+shell("skills-360", { tab: "Power", body: `${head("Power", "Updated 07:40")}${skillsCard({ w: 294 })}` });
+shell("skills-noweight", { tab: "Power", body: `${head("Power", "Updated 07:40")}${skillsCard({ weight: false })}` });
+shell("skills-custom", { tab: "Power", body: `${head("Power", "Updated 07:40")}${skillsCard({ vals: CUSTOM, custom: "2 Nov – 15 Nov" })}` });
+
+// ---------- Sheets ----------
+const sheet = (title, sub, body, top) => `<div class="sheet-scrim"></div><div class="bottom-sheet" style="gap:4px;padding-bottom:96px">
+  <span class="grabber"></span>
+  <div class="between"><div class="stack"><span class="t-heading">${title}</span><span class="t-label c2">${sub}</span></div><span class="iconbtn" style="margin-right:-12px">${ic("x")}</span></div>
+  ${body}</div>`;
+const rideLink = (when, name) => `<span class="t-label c2 num" style="display:flex;align-items:center;gap:4px">${when} · ${name} ${ic("chevron-right", "i-16")}</span>`;
+
+shell("skills-axis", {
+  tab: "Power",
+  body: `<div style="margin-top:-250px"></div>${skillsCard({ sel: 5 })}`,
+  overlay: sheet("5 min", "Climb", `
+    <div class="kv" style="margin-top:8px">
+      <span><span class="t-strong">Last 8 weeks</span>${rideLink("Thu 12 Nov", "VO2 5×3")}</span>
+      <span class="r"><span class="num t-num-xs">316<span class="unit">W</span></span><span class="t-caption c3 num">4.4 W/kg</span></span>
+      <span><span class="t-strong">All time</span>${rideLink("Sat 3 Oct", "Climb repeats")}</span>
+      <span class="r"><span class="num t-num-xs">330<span class="unit">W</span></span><span class="t-caption c3 num">4.6 W/kg</span></span>
+      <span><span class="t-strong">Level, 8 weeks</span><span class="t-label c2">Approximate, at 72.0 kg</span></span>
+      <span class="r"><span class="t-strong">Fit · 4 of 9</span></span>
+    </div>`, 470),
+});
+
+shell("skills-skill", {
+  tab: "Power",
+  body: `<div style="margin-top:-620px"></div>${skillsCard({})}`,
+  overlay: sheet("Climb", "5–10 min · Fit, level 4 of 9 in 8 weeks", `
+    <div class="tbl" style="grid-template-columns:1fr auto auto;margin-top:8px">
+      <span class="h">Duration</span><span class="h r">8 weeks</span><span class="h r">All time</span>
+      <span class="t-body">5 min</span><span class="r stack" style="align-items:flex-end;justify-content:center"><span class="num t-num-xs">316<span class="unit">W</span></span><span class="t-caption c3">Thu 12 Nov</span></span><span class="r stack" style="align-items:flex-end;justify-content:center"><span class="num t-num-xs c2">330<span class="unit">W</span></span><span class="t-caption c3">Sat 3 Oct</span></span>
+      <span class="t-body">10 min</span><span class="r stack" style="align-items:flex-end;justify-content:center"><span class="num t-num-xs">289<span class="unit">W</span></span><span class="t-caption c3">Mon 16 Nov</span></span><span class="r stack" style="align-items:flex-end;justify-content:center"><span class="num t-num-xs c2">300<span class="unit">W</span></span><span class="t-caption c3">Sat 3 Oct</span></span>
+    </div>
+    <span class="t-label c2" style="margin-top:8px">4.4 W/kg for 5 min and 4.0 W/kg for 10 min at 72.0 kg. Tap a value to open its ride.</span>`, 520),
+});
+
+// Date range picker: November 2026 (1 Nov is a Sunday), Monday first.
+const rideDays = new Set([2, 3, 5, 7, 9, 10, 12, 14, 16]);
+const cells = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => `<span class="h">${d}</span>`);
+for (let k = 0; k < 6; k++) cells.push("<span></span>");
+for (let d = 1; d <= 30; d++) {
+  const cls = [];
+  if (d === 2 || d === 15) cls.push("end");
+  else if (d > 2 && d < 15) cls.push("in");
+  if (d > 18) cls.push("fut");
+  if (d === 18) cls.push("today");
+  if (rideDays.has(d)) cls.push("ride");
+  cells.push(`<span class="${cls.join(" ")}">${d}</span>`);
+}
+shell("skills-picker", {
+  tab: "Power",
+  body: `${head("Power", "Updated 07:40")}${skillsCard({})}`,
+  overlay: `<div class="sheet-scrim"></div><div class="bottom-sheet" style="top:300px;gap:8px">
+    <span class="grabber"></span>
+    <div class="stack"><span class="t-heading">Custom range</span><span class="t-label c2 num">2 Nov – 15 Nov · 14 days · 9 rides</span></div>
+    <div class="between" style="margin:4px -12px 0"><span class="iconbtn">${ic("chevron-left")}</span><span class="t-strong">November 2026</span><span class="iconbtn" style="opacity:.35">${ic("chevron-right")}</span></div>
+    <div class="cal">${cells.join("")}</div>
+    <span class="t-label c3">Tap the first day, then the last. A dot marks a day with a ride.</span>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px"><span class="btn btn-primary full">Show 2 Nov – 15 Nov</span><span class="btn btn-ghost full">Cancel</span></div>
+  </div>`,
+});
+
+// ---------- States ----------
+const ann = (t) => `<span class="note-ann">${t}</span>`;
+const stateHead = `<div class="between" style="height:24px"><span class="t-label c3">Power skills</span></div>`;
+const listCard = `<div class="card chart" style="gap:12px">${stateHead}${seg("8 weeks")}
+  <span class="t-body c2">Ride longer to see the shape: the radar needs at least three durations.</span>
+  <div class="tbl" style="grid-template-columns:1fr auto auto">
+    <span class="t-body">15 s</span><span class="r num t-num-xs">880<span class="unit">W</span></span><span class="r t-label c2 num">Mon 16 Nov</span>
+    <span class="t-body">30 s</span><span class="r num t-num-xs">655<span class="unit">W</span></span><span class="r t-label c2 num">Mon 16 Nov</span>
+  </div></div>`;
+shell("skills-states", {
+  tab: "Power",
+  body: `${ann("Loading, nothing cached (whole tab: §5)")}
+  <div class="card chart">${stateHead}${seg("8 weeks")}<div class="fresh" style="height:120px;justify-content:center"><span class="spin"></span><span class="t-body c2">Loading your power skills…</span></div></div>
+  ${ann("No rides with power yet")}
+  <div class="card chart">${stateHead}<span class="t-heading">No rides yet</span><span class="t-body c2">Power skills fill in from rides on the tablet. They appear here after the tablet uploads its first ride.</span></div>
+  ${ann("Fewer than three durations with data: a list")}
+  ${listCard}
+  ${ann("Custom range with no rides")}
+  <div class="card chart" style="gap:12px">${stateHead}${seg("Custom")}
+    <div class="rangeline"><span class="grow t-label num">2 Aug – 9 Aug 2026 · no rides</span><span class="btn btn-ghost" style="height:40px;padding:0 12px">Change</span><span class="iconbtn" style="margin-right:-12px">${ic("x")}</span></div>
+    <span class="t-body c2">No rides on the tablet between 2 Aug and 9 Aug. Choose another range.</span></div>
+  ${ann("Offline: the status line under the header, the cached card unchanged")}
+  ${statusLine("Offline · updated 06:10", "No network connection. Pull down to try again.")}`,
+});
+
+document.body.dataset.ready = "true";
+</script>
+</body>
+</html>

@@ -33,9 +33,11 @@ const server = createServer((req, res) => {
     return;
   }
   try {
+    const body = readFileSync(file);
     res.writeHead(200, { "content-type": types[extname(file)] ?? "application/octet-stream" });
-    res.end(readFileSync(file));
+    res.end(body);
   } catch {
+    console.warn(`404 ${path}`);
     res.writeHead(404).end();
   }
 });
