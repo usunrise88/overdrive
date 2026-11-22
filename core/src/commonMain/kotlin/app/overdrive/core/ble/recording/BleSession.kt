@@ -74,6 +74,9 @@ public data class BleSessionEvent(
 /** The tokens of `S` lines. */
 public object BleStates {
     public const val CONNECTING: String = "connecting"
+
+    /** A connect that waits for the device to appear (`autoConnect`), docs/adr/0040. Replays like [CONNECTING]. */
+    public const val CONNECTING_BACKGROUND: String = "connecting-background"
     public const val CONNECTED: String = "connected"
     public const val DISCONNECTED: String = "disconnected"
     public const val CLOSED: String = "closed"

@@ -1,6 +1,7 @@
 package app.overdrive.core.ble.fake
 
 import app.overdrive.core.ble.BleAvailability
+import app.overdrive.core.ble.ConnectMode
 import app.overdrive.core.ble.DeviceId
 import app.overdrive.core.ble.GattCharacteristicInfo
 import app.overdrive.core.ble.GattFailure
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 
 /**
  * The simulated GATT client of [FakeBle]: one connection attempt to one [FakePeripheral], with the contract of
@@ -39,6 +41,8 @@ public class FakeGattTransport internal constructor(
     /** 1 for the first transport the world opened, 2 for the second… */
     public val index: Int,
     private val peripheral: FakePeripheral,
+    /** How the supervisor asked it to connect: a [ConnectMode.BACKGROUND] connect to an absent peripheral waits for it, with no limit. */
+    public val mode: ConnectMode = ConnectMode.ACTIVE,
 ) : GattTransport {
     private val mutableState = MutableStateFlow<GattLinkState>(GattLinkState.Idle)
     private val flow =
@@ -67,6 +71,8 @@ public class FakeGattTransport internal constructor(
         if (world.availability.value != BleAvailability.READY) {
             return failConnect(GattStatus.SUCCESS, GattFailureKind.UNAVAILABLE)
         }
+        // The controller of a background connect completes it the moment the device advertises, however long that takes.
+        if (mode == ConnectMode.BACKGROUND) peripheral.poweredState.first { it }
         delay(world.connectLatency)
         if (!peripheral.powered) {
             val after = peripheral.absentFailsAfter

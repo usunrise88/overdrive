@@ -56,6 +56,13 @@ public sealed interface LinkStatus {
     /** The link is up and the device is set up. */
     public data object Connected : LinkStatus
 
+    /**
+     * A background connect is pending (docs/adr/0040): the device is asleep, out of range or switched off, and the platform
+     * connects the moment it advertises (a Click woken by a press). **Not a failure**: nothing is wrong, nothing is retried
+     * on a timer and no error is shown. **Retry now** replaces the wait by an active attempt.
+     */
+    public data object WaitingForDevice : LinkStatus
+
     /** The last attempt or link ended with [failure]; the next attempt starts in [retryInMillis] unless Retry is pressed. */
     public data class WaitingToRetry(
         val failures: Int,
@@ -71,7 +78,8 @@ public interface LinkControls {
 
     /**
      * Try again now instead of waiting for the next backoff step, and start the backoff over. Fire and forget; does
-     * nothing while an attempt is under way, while connected or while Bluetooth is unavailable.
+     * nothing while an active attempt is under way, while connected or while Bluetooth is unavailable. A pending
+     * background connect (docs/adr/0040) is replaced by an active attempt.
      */
     public fun retryNow()
 

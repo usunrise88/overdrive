@@ -73,7 +73,14 @@ public abstract class FakePeripheral(
      * Whether it is on. A peripheral that is off does not advertise and a connect attempt gets no answer: it hangs until
      * the caller gives up, or fails with 133 after [absentFailsAfter].
      */
-    public var powered: Boolean = true
+    public var powered: Boolean
+        get() = poweredState.value
+        set(value) {
+            poweredState.value = value
+        }
+
+    /** [powered] as a flow: a background connect (`ConnectMode.BACKGROUND`) waits on it, as the controller waits for an advertisement. */
+    internal val poweredState = kotlinx.coroutines.flow.MutableStateFlow(true)
 
     /** How long a connect to an absent peripheral takes to fail with 133; null (the default) means it never answers. */
     public var absentFailsAfter: Duration? = null

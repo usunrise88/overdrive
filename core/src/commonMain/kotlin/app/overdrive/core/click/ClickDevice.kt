@@ -21,6 +21,7 @@ import app.overdrive.core.ble.codec.DecodeResult
 import app.overdrive.core.ble.codec.Hex
 import app.overdrive.core.ble.failureOrNull
 import app.overdrive.core.ble.link.BackoffPolicy
+import app.overdrive.core.ble.link.ConnectStrategy
 import app.overdrive.core.ble.link.LinkControls
 import app.overdrive.core.ble.link.LinkFailure
 import app.overdrive.core.ble.link.LinkFailureKind
@@ -89,6 +90,7 @@ public class ClickDevice(
     timeSource: TimeSource = TimeSource.Monotonic,
     random: Random = Random.Default,
     establishTimeout: Duration = LinkSupervisor.DEFAULT_ESTABLISH_TIMEOUT,
+    connectStrategy: () -> ConnectStrategy = { ConnectStrategy.LEGACY },
 ) : LinkControls {
     /** What the set-up and the first frames have shown about the current connection. */
     private enum class Probe { OFFLINE, HANDSHAKING, WAITING, SILENT, ACTIVE }
@@ -137,6 +139,7 @@ public class ClickDevice(
             timeSource = timeSource,
             random = random,
             establishTimeout = establishTimeout,
+            strategy = connectStrategy,
         )
 
     /** The three-state view of the link, like every device's. */
@@ -262,6 +265,10 @@ public class ClickDevice(
 
             is LinkStatus.Connecting -> {
                 ClickState.Connecting(link.attempt)
+            }
+
+            LinkStatus.WaitingForDevice -> {
+                ClickState.WaitingForDevice
             }
 
             LinkStatus.Connected -> {
