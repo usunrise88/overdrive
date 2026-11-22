@@ -2,6 +2,7 @@ package app.overdrive.ride.devices
 
 import app.overdrive.core.ble.BleAvailability
 import app.overdrive.core.ble.link.BackoffPolicy
+import app.overdrive.core.ble.link.ConnectStrategy
 import app.overdrive.core.ble.link.LinkStatus
 import app.overdrive.core.device.ConnectionState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -234,5 +235,45 @@ class PairedDevicesTest {
                     .device.name
             assertFalse(name.contains("12345678"))
             assertFalse(name.contains(TRAINER_ID.value))
+        }
+
+    @Test
+    fun aSleepingTrainerIsWaitedForInTheBackgroundAndForgettingItCancelsTheWait() =
+        runTest {
+            val world = BleWorld(this, connectStrategy = { ConnectStrategy.HYBRID })
+            world.fakeTrainer.powered = false
+            world.launchPaired()
+            world.advance(15_000)
+            val controls = world.devices.controls(DeviceRole.Trainer)!!
+            assertEquals(LinkStatus.WaitingForDevice, controls.status.value)
+            val pending = world.ble.transports.last { it.device == TRAINER_ID }
+            assertFalse(pending.isClosed)
+
+            world.devices.forget(DeviceRole.Trainer)
+            world.settle()
+            assertTrue("Forget cancelled the pending connect", pending.isClosed)
+            world.fakeTrainer.powerOn()
+            world.advance(5 * 60_000)
+            assertTrue(world.ble.transports.filter { it.device == TRAINER_ID }.all { it.isClosed })
+            world.assertNoViolations()
+        }
+
+    @Test
+    fun aTrainerThatWakesAfterMinutesConnectsWithoutAnotherAttemptFromTheApp() =
+        runTest {
+            val world = BleWorld(this, connectStrategy = { ConnectStrategy.HYBRID })
+            world.fakeTrainer.powered = false
+            world.launchPaired()
+            world.advance(5 * 60_000)
+            val opened = world.ble.transports.size
+            world.fakeTrainer.powerOn()
+            world.advance(1_000)
+            assertEquals(
+                ConnectionState.CONNECTED,
+                world.devices.trainer.value!!
+                    .device.connection.value,
+            )
+            assertEquals(opened, world.ble.transports.size)
+            world.assertNoViolations()
         }
 }

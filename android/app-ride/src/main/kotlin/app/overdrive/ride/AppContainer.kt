@@ -12,6 +12,7 @@ import app.overdrive.ble.log.BleLogRole
 import app.overdrive.ble.log.BleLogStore
 import app.overdrive.ble.log.BleSessionLogger
 import app.overdrive.core.ble.GattTransportFactory
+import app.overdrive.core.ble.link.ConnectStrategy
 import app.overdrive.core.control.ActionRouter
 import app.overdrive.core.control.CoachControl
 import app.overdrive.core.control.GestureTiming
@@ -412,6 +413,9 @@ class AppContainer(
                 }
             },
             clickOptions = settingsRepository.settings.map { it.click }.distinctUntilChanged().map { it.toOptions() },
+            connectStrategy = {
+                if (settings.value.connectInBackground) ConnectStrategy.HYBRID else ConnectStrategy.LEGACY
+            },
         )
 
     /** The Devices screen's scan, list and pairing. */

@@ -63,6 +63,7 @@ class SettingsRepository(
         val simulatedClick = stringPreferencesKey("dev_simulated_click")
         val deviceSource = stringPreferencesKey("dev_device_source")
         val recordBleSessions = booleanPreferencesKey("dev_record_ble_sessions")
+        val connectInBackground = booleanPreferencesKey("dev_connect_in_background")
         val buttonMapping = stringPreferencesKey("click_button_mapping")
         val clickPostHandshake = booleanPreferencesKey("dev_click_post_handshake")
         val clickKeepAlive = stringPreferencesKey("dev_click_keep_alive")
@@ -101,6 +102,7 @@ class SettingsRepository(
             simulatedClick = enumOr(this[Keys.simulatedClick], defaults.simulatedClick),
             deviceSource = enumOr(this[Keys.deviceSource], defaults.deviceSource),
             recordBleSessions = this[Keys.recordBleSessions] ?: defaults.recordBleSessions,
+            connectInBackground = this[Keys.connectInBackground] ?: defaults.connectInBackground,
             // A stored mapping that is not a valid one (cut, edited, two roles on one button) is the default, and never
             // reaches the gesture layer.
             buttonMapping = this[Keys.buttonMapping]?.let { ButtonMapping.parse(it) } ?: defaults.buttonMapping,
@@ -174,6 +176,7 @@ class SettingsRepository(
         this[Keys.simulatedClick] = settings.simulatedClick.name
         this[Keys.deviceSource] = settings.deviceSource.name
         this[Keys.recordBleSessions] = settings.recordBleSessions
+        this[Keys.connectInBackground] = settings.connectInBackground
         this[Keys.buttonMapping] = settings.buttonMapping.serialize()
         writeTuning(settings.tuning)
         val click = settings.click

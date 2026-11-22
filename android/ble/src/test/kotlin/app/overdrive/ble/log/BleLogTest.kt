@@ -16,6 +16,7 @@ import app.overdrive.core.ble.fake.FakeBle
 import app.overdrive.core.ble.fake.FakeFtmsTrainer
 import app.overdrive.core.ble.fake.FakePeripheral
 import app.overdrive.core.ble.link.BackoffPolicy
+import app.overdrive.core.ble.link.ConnectStrategy
 import app.overdrive.core.ble.recording.BleDirection
 import app.overdrive.core.ble.recording.BleSessionFormat
 import app.overdrive.core.device.ConnectionState
@@ -248,6 +249,40 @@ class BleLogTest {
             val text = files.single().readText()
             assertFalse(text.contains("log-trainer"))
             assertFalse(text.contains("DeviceId"))
+        }
+
+    @Test
+    fun `the logger passes the connect mode on, and the file says which connects were background ones`() =
+        runTest {
+            val writer = writeScope()
+            val rig = Rig(this, directory, writer, peripheral = FakeFtmsTrainer().also { it.powered = false })
+            val trainer =
+                FtmsTrainerDevice(
+                    backgroundScope,
+                    rig.deviceId,
+                    rig.transports,
+                    rig.world,
+                    "D500",
+                    reconnect = BackoffPolicy.EXACT,
+                    timeSource = testTimeSource,
+                    connectStrategy = { ConnectStrategy.HYBRID },
+                )
+            trainer.start()
+            rig.advance(20_000)
+            // The wrapper did not turn the background connect into an active one: the fake saw it as one.
+            assertTrue(rig.world.events.any { it.what.endsWith("(background)") })
+            trainer.close()
+            rig.advance(1_000)
+            settle(writer)
+
+            val states =
+                BleSessionFormat
+                    .parse(rig.store.files().joinToString("\n") { it.readText() })
+                    .events
+                    .filter { it.direction == BleDirection.STATE }
+                    .map { it.data }
+            assertTrue(states.toString(), "connecting" in states)
+            assertTrue(states.toString(), "connecting-background" in states)
         }
 
     @Test

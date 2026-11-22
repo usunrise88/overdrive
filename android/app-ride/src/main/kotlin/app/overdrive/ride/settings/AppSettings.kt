@@ -92,6 +92,12 @@ data class AppSettings(
      */
     val recordBleSessions: Boolean = true,
     /**
+     * Whether a trainer, strap or Click that is not found at once is waited for with a background connect, which the
+     * Bluetooth controller completes the moment the device wakes up (developer setting, **on**; ADR 0040). Off, every
+     * attempt is active with a growing wait between them, as in 0.4.0.
+     */
+    val connectInBackground: Boolean = true,
+    /**
      * Which of the Click's five buttons is which of the five roles (spec §4.7: "The mapping is a setting"), as learned on
      * the Devices screen. Always a valid mapping, never empty and never overlapping; a stored value that is not one reads as
      * [ButtonMapping.DEFAULT] (see [SettingsRepository]).

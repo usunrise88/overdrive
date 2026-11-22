@@ -522,6 +522,9 @@ class BluetoothUiTest : ShotTest() {
         assertTrue(current.recordBleSessions)
         rule.onNodeWithContentDescription("Record Bluetooth sessions").performScrollTo().performClick()
         assertFalse(current.recordBleSessions)
+        assertTrue("on by default", current.connectInBackground)
+        rule.onNodeWithContentDescription("Connect in the background").performScrollTo().performClick()
+        assertFalse(current.connectInBackground)
     }
 
     @Test

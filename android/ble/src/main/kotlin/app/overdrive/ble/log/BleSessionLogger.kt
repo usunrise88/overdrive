@@ -1,5 +1,6 @@
 package app.overdrive.ble.log
 
+import app.overdrive.core.ble.ConnectMode
 import app.overdrive.core.ble.DeviceId
 import app.overdrive.core.ble.GattResult
 import app.overdrive.core.ble.GattTransport
@@ -98,13 +99,21 @@ public class BleSessionLogger(
 
     /** [factory]'s transports, recorded while the setting is on. */
     public fun wrap(factory: GattTransportFactory): GattTransportFactory =
-        GattTransportFactory { device ->
-            val transport = factory.open(device)
-            if (enabled()) {
-                val session = sessionFor(device)
-                Tracked(RecordingGattTransport(transport, session.recorder, bleScope), session)
-            } else {
-                transport
+        object : GattTransportFactory {
+            override fun open(device: DeviceId): GattTransport = open(device, ConnectMode.ACTIVE)
+
+            // The mode must pass through: a wrapper that dropped it would turn every background connect into an active one.
+            override fun open(
+                device: DeviceId,
+                mode: ConnectMode,
+            ): GattTransport {
+                val transport = factory.open(device, mode)
+                return if (enabled()) {
+                    val session = sessionFor(device)
+                    Tracked(RecordingGattTransport(transport, session.recorder, bleScope, mode), session)
+                } else {
+                    transport
+                }
             }
         }
 
