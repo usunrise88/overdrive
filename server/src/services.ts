@@ -29,6 +29,7 @@ import { createPlanStore, type PlanStore } from "./plan/store.ts";
 import { createPlanEvents, type PlanEventsService } from "./plan-events/service.ts";
 import { createPlanEventStore } from "./plan-events/store.ts";
 import { createProfileStore, type ProfileStore, type RiderWeightSource } from "./profile/store.ts";
+import { createProgress, type ProgressService } from "./progress/service.ts";
 import { createRepeats, type RepeatsService } from "./repeats/service.ts";
 import { createRideStore, type RideStore } from "./ride-store.ts";
 import { createRideWorkoutResolver, type RideWorkoutResolver } from "./ride-workout.ts";
@@ -103,6 +104,8 @@ export interface Services {
   wellness: WellnessService;
   /** Repeat-session comparison: the workouts ridden more than once, their attempts side by side and their trend (spec §11.7, ADR 0026). */
   repeats: RepeatsService;
+  /** Progress over time: best power, aerobic efficiency, efficiency factor, drift, resting heart rate and weight, each with a trend (spec §6.3, ADR 0043). */
+  progress: ProgressService;
   /** Outdoor rides from FIT files, shared by the companion and sent to the Telegram bot (spec §11.8, ADR 0026). */
   outdoor: OutdoorService;
   /**
@@ -327,6 +330,17 @@ export function createServices(options: ServicesOptions): Services {
     },
   });
   riderWeightOf = () => wellness.riderWeight();
+  const progress = createProgress({
+    db,
+    rides,
+    metrics,
+    profile,
+    wellness,
+    bus,
+    timezone,
+    now: now ?? (() => new Date()),
+    log,
+  });
   const outdoor = createOutdoor({ db, bus, wellness, timezone, log });
   // The cue log of the live coach is part of what a ride's note and the planning agent know (spec §12.1).
   const liveCues = createLiveCueStore(db);
@@ -436,6 +450,7 @@ export function createServices(options: ServicesOptions): Services {
     telegram,
     wellness,
     repeats,
+    progress,
     outdoor,
     insights,
     notebook,
@@ -453,6 +468,7 @@ export function createServices(options: ServicesOptions): Services {
       wellness.start();
       metrics.start();
       repeats.start();
+      progress.start();
       insights.start();
       planEvents.start();
       variants.start();
@@ -468,6 +484,7 @@ export function createServices(options: ServicesOptions): Services {
         wellness.stop(),
         metrics.stop(),
         repeats.whenIdle(),
+        progress.whenIdle(),
         insights.stop(),
         planEvents.stop(),
         variants.stop(),

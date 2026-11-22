@@ -87,6 +87,18 @@ export interface WellnessService {
    * the newest weighing and the number of days that had one; null when none of the last seven local days has a weighing.
    */
   riderWeight(): Promise<RiderWeight | null>;
+  /**
+   * The watch's nightly resting heart rate and the daily body weight by local day from `from` to `to` (the preferred source's value of each
+   * day), and whether a source the service pulls from failed at its last read. What the Progress screen is built from (ADR 0043).
+   */
+  dailySeries(
+    from: string,
+    to: string,
+  ): Promise<{
+    restingHr: Map<string, number>;
+    weightKg: Map<string, number>;
+    stale: boolean;
+  }>;
   /** The state of this morning (or yesterday's while this morning's data has not arrived). */
   recovery(): Promise<RecoveryResponse>;
   /**
@@ -257,6 +269,16 @@ export function createWellness(options: WellnessOptions): WellnessService {
       const today = localDate(now(), timezone);
       const table = await store.dailyTable(addDaysToIsoDate(today, -7), today, order);
       return recentWeight(table.weightKg, today);
+    },
+
+    async dailySeries(from, to) {
+      const table = await store.dailyTable(from, to, order);
+      const plain = (key: "restingHr" | "weightKg"): Map<string, number> => {
+        const values = new Map<string, number>();
+        for (const [date, entry] of table[key] ?? []) values.set(date, entry.value);
+        return values;
+      };
+      return { restingHr: plain("restingHr"), weightKg: plain("weightKg"), stale: await isStale() };
     },
 
     async recovery() {

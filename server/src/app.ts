@@ -13,6 +13,7 @@ import { thresholdHeartRate } from "./plan/heart-rate.ts";
 import { planRoutes } from "./plan/routes.ts";
 import { planEventsRoutes } from "./plan-events/routes.ts";
 import { profileRoutes } from "./profile/routes.ts";
+import { progressRoutes } from "./progress/routes.ts";
 import { repeatsRoutes } from "./repeats/routes.ts";
 import { DEFAULT_LIMITS, type Limits, ridesRoutes } from "./rides.ts";
 import { routesRest } from "./routes/rest.ts";
@@ -101,6 +102,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
       v1.register(wellnessRoutes, { service: services.wellness });
       v1.register(outdoorRoutes, { service: services.outdoor });
       v1.register(repeatsRoutes, { service: services.repeats });
+      v1.register(progressRoutes, { service: services.progress });
       v1.register(insightsRoutes, { insights: services.insights });
       v1.register(notebookRoutes, { service: services.notebook });
       v1.register(planEventsRoutes, { service: services.planEvents });
