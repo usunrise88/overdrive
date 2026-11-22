@@ -103,6 +103,11 @@ export interface WellnessService {
    * that have some.
    */
   otherLoadByDay(from: string, to: string): Promise<OtherLoad[]>;
+  /**
+   * Every activity (the watch's workouts and the outdoor rides imported from FIT files) that started on a local day from `from` to
+   * `to`, oldest first, each with its load as {@link listActivities} gives it. The weekly effort reads it (ADR 0042).
+   */
+  activitiesInRange(from: string, to: string): Promise<ActivitySummary[]>;
   /** Pulls intervals.icu now; null without an API key. */
   refresh(): Promise<PullResult> | null;
   start(): void;
@@ -325,6 +330,19 @@ export function createWellness(options: WellnessOptions): WellnessService {
         .map(
           ([date, load]): OtherLoad => ({ date, kind: "other", load: Math.round(load * 10) / 10 }),
         );
+    },
+
+    async activitiesInRange(from, to) {
+      const rows = await activities.inRange(
+        dayStartMillis(from, timezone),
+        dayStartMillis(addDaysToIsoDate(to, 1), timezone),
+      );
+      if (rows.length === 0) return [];
+      const [current, resting] = await Promise.all([profile.get(), restingTable(to)]);
+      const limits = limitsInForce(current);
+      return rows.map((row) =>
+        summaryOf(row, activityLoad(row, limits, resting, timezone), timezone),
+      );
     },
 
     refresh() {

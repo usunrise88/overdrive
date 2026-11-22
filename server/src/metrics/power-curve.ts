@@ -40,19 +40,32 @@ export function hasPower(samples: readonly RideSample[]): boolean {
 }
 
 /**
- * The best average power over each duration of {@link POWER_CURVE_DURATIONS} that the ride is long
- * enough for, ascending by duration. Empty when no power was measured. Prefix sums of whole watts
- * are exact, so the only rounding is the one decimal of the result.
+ * The durations kept for each ride in addition to the 25 of the contract: the power skills (spec §6.3, ADR 0042) judge 45 minutes,
+ * which the companion's curve does not draw. They live in the same stored curve under their own keys, which {@link curveFromJson}
+ * leaves out, so no answer that lists the 25 changes.
  */
-export function meanMaximalPower(samples: readonly RideSample[]): RidePowerPoint[] {
+export const EXTRA_CURVE_DURATIONS: readonly number[] = [2700];
+
+/** A point of the curve at a duration the contract's 25 do not have. */
+export interface ExtraPowerPoint {
+  durationSec: number;
+  /** Watts, one decimal. */
+  power: number;
+}
+
+/** The best average power of a ride over each of `durations` (ascending) that it is long enough for; see {@link meanMaximalPower}. */
+function bestAverages(
+  samples: readonly RideSample[],
+  durations: readonly number[],
+): { durationSec: number; power: number }[] {
   if (!hasPower(samples)) return [];
   const timeline = powerTimeline(samples);
   const prefix = new Float64Array(timeline.length + 1);
   for (const [index, watts] of timeline.entries()) {
     prefix[index + 1] = (prefix[index] as number) + watts;
   }
-  const curve: RidePowerPoint[] = [];
-  for (const durationSec of POWER_CURVE_DURATIONS) {
+  const curve: { durationSec: number; power: number }[] = [];
+  for (const durationSec of durations) {
     if (timeline.length < durationSec) break;
     let best = 0;
     for (let end = durationSec; end <= timeline.length; end++) {
@@ -62,6 +75,20 @@ export function meanMaximalPower(samples: readonly RideSample[]): RidePowerPoint
     curve.push({ durationSec, power: round1(best / durationSec) });
   }
   return curve;
+}
+
+/**
+ * The best average power over each duration of {@link POWER_CURVE_DURATIONS} that the ride is long
+ * enough for, ascending by duration. Empty when no power was measured. Prefix sums of whole watts
+ * are exact, so the only rounding is the one decimal of the result.
+ */
+export function meanMaximalPower(samples: readonly RideSample[]): RidePowerPoint[] {
+  return bestAverages(samples, POWER_CURVE_DURATIONS) as RidePowerPoint[];
+}
+
+/** The same for the durations of {@link EXTRA_CURVE_DURATIONS}. */
+export function extraMeanMaximalPower(samples: readonly RideSample[]): ExtraPowerPoint[] {
+  return bestAverages(samples, EXTRA_CURVE_DURATIONS);
 }
 
 /** One ride's curve with where it comes from, as the aggregation takes it. */
@@ -114,9 +141,20 @@ export function bestEfforts(rides: readonly RideCurve[]): BestEffort[] {
   });
 }
 
-/** A curve as the table `ride_metrics` keeps it: `{"60": 312.5, …}` by duration in seconds. */
-export function curveToJson(curve: readonly RidePowerPoint[]): Record<string, number> {
-  return Object.fromEntries(curve.map((p) => [String(p.durationSec), p.power]));
+/** A curve as the table `ride_metrics` keeps it: `{"60": 312.5, …}` by duration in seconds, the extra durations beside the 25. */
+export function curveToJson(
+  curve: readonly RidePowerPoint[],
+  extra: readonly ExtraPowerPoint[] = [],
+): Record<string, number> {
+  return Object.fromEntries([...curve, ...extra].map((p) => [String(p.durationSec), p.power]));
+}
+
+/** The extra durations of a stored curve; the ones the code does not know are dropped. */
+export function extraCurveFromJson(json: Record<string, number>): ExtraPowerPoint[] {
+  return EXTRA_CURVE_DURATIONS.flatMap((durationSec) => {
+    const power = json[String(durationSec)];
+    return power === undefined ? [] : [{ durationSec, power }];
+  });
 }
 
 /** The inverse of {@link curveToJson}; durations the code does not know are dropped. */

@@ -2,11 +2,13 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { GAME_MASTER_SCOPE } from "../oauth/routes.ts";
 import type { McpCaller, ToolContext } from "./tool.ts";
 import { registerActivityTools } from "./tools/activities.ts";
+import { registerEffortTools } from "./tools/effort.ts";
 import { registerFitnessTools } from "./tools/fitness.ts";
 import { registerInsightTools } from "./tools/insights.ts";
 import { registerNotebookTools } from "./tools/notebook.ts";
 import { registerPlanTools } from "./tools/plan.ts";
 import { registerPlanEventTools } from "./tools/plan-events.ts";
+import { registerPowerSkillsTools } from "./tools/power-skills.ts";
 import { registerProfileTools } from "./tools/profile.ts";
 import { registerRepeatTools } from "./tools/repeats.ts";
 import { registerRideTools } from "./tools/rides.ts";
@@ -29,6 +31,8 @@ const INSTRUCTIONS =
   "notes the rider has already been written (read them before advising); get_facts gives the computed facts behind a note, to reason over. " +
   "list_repeats and get_repeat show the sessions the rider has ridden more than once, heart rate at the same power and its trend, and get_ride says " +
   "how a ride compared with the attempt before it (repeatOf); heart rate also moves with heat, sleep and caffeine, so trust a trend over several attempts. " +
+  "get_power_skills gives the best power at twelve durations (a window and all time) and a rough level per skill, and get_effort the training load per week with the " +
+  "rider's usual range and how this week compares: both are what the rider's phone shows, so quote them as they are; the levels are approximate. " +
   "When the rider opens a chat, list_discussion_topics holds what the post-ride analysis found worth discussing: start from the latest open one " +
   "and mark it discussed with mark_discussion_topic when it has been talked through. " +
   // The notebook and the plan events (spec §11.6, §12.2, §12.4, ADR 0035).
@@ -84,6 +88,8 @@ export function createMcpServer(base: ToolContext, caller?: McpCaller): McpServe
   registerActivityTools(server, ctx, rides);
   registerFitnessTools(server, ctx);
   registerRepeatTools(server, ctx);
+  registerPowerSkillsTools(server, ctx);
+  registerEffortTools(server, ctx);
   registerWellnessTools(server, ctx);
   registerInsightTools(server, ctx);
   registerNotebookTools(server, ctx);

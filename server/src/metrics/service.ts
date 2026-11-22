@@ -154,7 +154,7 @@ const SERIES_MAX_POINTS = 600;
 /** The effort steps of a workout: steady steps at this share of FTP or more. */
 const EFFORT_SHARE = 0.9;
 
-function rideNameOf(row: Pick<RideMetricsRow, "workoutId" | "workoutName">): string {
+export function rideNameOf(row: Pick<RideMetricsRow, "workoutId" | "workoutName">): string {
   return row.workoutName ?? (row.workoutId === null ? FREE_RIDE : PLANNED_RIDE);
 }
 

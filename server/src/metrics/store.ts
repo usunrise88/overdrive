@@ -1,7 +1,7 @@
 import type { Confidence, PowerCurveDuration } from "@overdrive/contracts";
 import type { Db } from "../db.ts";
 import type { DriftResult } from "./drift.ts";
-import { curveFromJson, curveToJson } from "./power-curve.ts";
+import { curveFromJson, curveToJson, extraCurveFromJson } from "./power-curve.ts";
 import { RIDE_METRICS_VERSION, type RideMetrics } from "./ride-metrics.ts";
 
 /**
@@ -95,6 +95,7 @@ function toRow(row: RideMetricsSql): RideMetricsRow {
     normalizedWatts: row.normalized_watts,
     averageWatts: row.average_watts,
     powerCurve: curveFromJson(row.power_curve),
+    extraCurve: extraCurveFromJson(row.power_curve),
     drift: row.drift,
   };
 }
@@ -213,7 +214,7 @@ export function createMetricsStore(db: Db): MetricsStore {
           metrics.load,
           metrics.normalizedWatts,
           metrics.averageWatts,
-          JSON.stringify(curveToJson(metrics.powerCurve)),
+          JSON.stringify(curveToJson(metrics.powerCurve, metrics.extraCurve)),
           JSON.stringify(metrics.drift),
           at.toISOString(),
         ],

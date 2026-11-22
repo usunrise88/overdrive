@@ -7,6 +7,7 @@ import type { LiveCoachSettings } from "./config-live-coach.ts";
 import type { RoutesSettings } from "./config-routes.ts";
 import { type StravaConfig, stravaSettings } from "./config-strava.ts";
 import type { Db } from "./db.ts";
+import { createEffort, type EffortService } from "./effort/service.ts";
 import { createEventBus, type EventBus } from "./events.ts";
 import { type CalendarMirror, createCalendar } from "./gcal/index.ts";
 import { createInsights, type InsightsService } from "./insights/service.ts";
@@ -28,6 +29,7 @@ import { createPlanRefresher, type PlanRefresher } from "./plan/refresher.ts";
 import { createPlanStore, type PlanStore } from "./plan/store.ts";
 import { createPlanEvents, type PlanEventsService } from "./plan-events/service.ts";
 import { createPlanEventStore } from "./plan-events/store.ts";
+import { createPowerSkills, type PowerSkillsService } from "./power-skills/service.ts";
 import { createProfileStore, type ProfileStore, type RiderWeightSource } from "./profile/store.ts";
 import { createRepeats, type RepeatsService } from "./repeats/service.ts";
 import { createRideStore, type RideStore } from "./ride-store.ts";
@@ -101,6 +103,10 @@ export interface Services {
    * the forwarding of the watch's activities run only with one.
    */
   wellness: WellnessService;
+  /** The power skills: the best power at twelve durations over a window and over all time, and a level per skill (spec §6.3, ADR 0042). */
+  powerSkills: PowerSkillsService;
+  /** Weekly effort: the training load per week and day, the usual range and how this week compares (spec §6.3, ADR 0042). */
+  effort: EffortService;
   /** Repeat-session comparison: the workouts ridden more than once, their attempts side by side and their trend (spec §11.7, ADR 0026). */
   repeats: RepeatsService;
   /** Outdoor rides from FIT files, shared by the companion and sent to the Telegram bot (spec §11.8, ADR 0026). */
@@ -327,6 +333,13 @@ export function createServices(options: ServicesOptions): Services {
     },
   });
   riderWeightOf = () => wellness.riderWeight();
+  const powerSkills = createPowerSkills({
+    metrics,
+    wellness,
+    timezone,
+    now: now ?? (() => new Date()),
+  });
+  const effort = createEffort({ metrics, wellness, timezone, now: now ?? (() => new Date()) });
   const outdoor = createOutdoor({ db, bus, wellness, timezone, log });
   // The cue log of the live coach is part of what a ride's note and the planning agent know (spec §12.1).
   const liveCues = createLiveCueStore(db);
@@ -435,6 +448,8 @@ export function createServices(options: ServicesOptions): Services {
     calendar,
     telegram,
     wellness,
+    powerSkills,
+    effort,
     repeats,
     outdoor,
     insights,
