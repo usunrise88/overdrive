@@ -127,7 +127,10 @@ Phase 1 delivers a complete offline ride: connect the devices, ride free or play
   0 bpm without RR (no signal), RR arrives in whole milliseconds (`RrIntervals.rawToMillis`, rounded half up, in the domain
   layer) and a dropout is only a gap.
   **Reconnect.** One `LinkSupervisor` per device: 1 s, doubling, 30 s cap, ±20 % jitter, back to 1 s after a link that held
-  30 s; Retry (`retryNow()`) cuts the wait; Bluetooth off or a revoked permission is a state (`LinkStatus.BluetoothUnavailable`),
+  30 s; Retry (`retryNow()`) cuts the wait; **since release 0.4.1 (ADR 0040) the first attempt is active and short (10 s) and a device that is not found is waited for
+  with a background connect (`autoConnect`) that the controller completes the moment it wakes, which a Zwift Click woken by a press needs; a dropped link goes
+  straight to one; the row says "Waiting for the Click to wake up"; Settings, Developer, "Connect in the background" (default on) turns it off, and the backoff above is then
+  all there is**; Bluetooth off or a revoked permission is a state (`LinkStatus.BluetoothUnavailable`),
   not a failure, and connects at once when it returns.
   **Recording.** A decorator writes every GATT event to a text file (`BleSessionFormat`, version 1, relative times, no
   addresses, identity values redacted) that replays through a fake peripheral on virtual time; the committed fixtures
@@ -152,7 +155,8 @@ Phase 1 delivers a complete offline ride: connect the devices, ride free or play
   `connectedDevice|specialUse`, passing `connectedDevice` only while `BLUETOOTH_CONNECT` is granted (Android 14 refuses a
   type whose permission is missing). **Every connection is recorded** to `filesDir/ble-logs/` (a file per session named by date
   and role, redacted, 2 MB a file, 60 files, 20 MB; Developer setting, on in the early builds) and **Share Bluetooth logs**
-  in Settings hands them to another app on the owner's explicit action only; they hold heart-rate values and are never
+  in Settings packs them into **one** `overdrive-ble-logs-<date>-<time>.zip` (newest sessions first, at most 20 MB, the oldest left out and counted in the share text) and
+  hands that to another app on the owner's explicit action only; they hold heart-rate values and are never
   uploaded. **Open until the bench:** every platform assumption of ADR 0010 section 10.
 
 ### 4.2 Ride engine

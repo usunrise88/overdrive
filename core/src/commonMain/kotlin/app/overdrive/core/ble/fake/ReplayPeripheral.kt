@@ -200,7 +200,7 @@ public class ReplayPeripheral(
                     continue
                 }
                 when (event.data) {
-                    BleStates.CONNECTING -> {
+                    BleStates.CONNECTING, BleStates.CONNECTING_BACKGROUND -> {
                         builder?.let { attempts += Attempt(null, it.build(null, 0)) }
                         builder = null
                         connecting = true

@@ -14,6 +14,7 @@ import app.overdrive.core.ble.fake.FakeClickOptions
 import app.overdrive.core.ble.fake.FakeFtmsTrainer
 import app.overdrive.core.ble.fake.FakeHeartRateStrap
 import app.overdrive.core.ble.link.BackoffPolicy
+import app.overdrive.core.ble.link.ConnectStrategy
 import app.overdrive.core.click.ClickOptions
 import app.overdrive.core.click.ClickSide
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -62,6 +63,8 @@ internal class BleWorld(
     val test: TestScope,
     val store: DeviceStore = DeviceStore(InMemoryPreferences()),
     clickOptions: Flow<ClickOptions> = flowOf(ClickOptions()),
+    /** The connection strategy of the paired devices; the container's setting decides it in the app. */
+    connectStrategy: () -> ConnectStrategy = { ConnectStrategy.LEGACY },
 ) {
     val ble = FakeBle(test.backgroundScope, nanoClock = { test.testScheduler.currentTime * NANOS_PER_MILLI })
     val fakeTrainer = FakeFtmsTrainer()
@@ -89,6 +92,7 @@ internal class BleWorld(
             reconnect = BackoffPolicy.EXACT,
             timeSource = test.testTimeSource,
             clickOptions = clickOptions,
+            connectStrategy = connectStrategy,
         )
 
     /**

@@ -1,5 +1,6 @@
 package app.overdrive.ble.gatt
 
+import app.overdrive.core.ble.ConnectMode
 import app.overdrive.core.ble.DeviceId
 import app.overdrive.core.ble.GattCharacteristicInfo
 import app.overdrive.core.ble.GattFailureKind
@@ -29,11 +30,21 @@ internal class CorePlatform(
     /** Every platform handle opened, oldest first. */
     val handles = mutableListOf<CoreGatt>()
 
+    /** The `autoConnect` flag of every `open`, oldest first. */
+    val backgroundFlags = mutableListOf<Boolean>()
+
     override fun open(
         device: DeviceId,
         listener: PlatformListener,
+        background: Boolean,
     ): PlatformGatt {
-        val handle = CoreGatt(world.open(device), listener, scope)
+        backgroundFlags += background
+        val handle =
+            CoreGatt(
+                world.open(device, if (background) ConnectMode.BACKGROUND else ConnectMode.ACTIVE),
+                listener,
+                scope,
+            )
         handles += handle
         handle.begin()
         return handle

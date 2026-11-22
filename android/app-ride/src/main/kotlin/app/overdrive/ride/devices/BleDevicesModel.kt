@@ -70,6 +70,11 @@ object BleDeviceRows {
                 DeviceRowUi(DeviceStatus.Lost, retryText(role, status, retryInSeconds), canForget = true)
             }
 
+            // A sleeping device that the controller is waiting for (ADR 0040) is not a failure: no "lost", no countdown.
+            LinkStatus.WaitingForDevice -> {
+                DeviceRowUi(DeviceStatus.Searching, wakeText(role), canForget = true)
+            }
+
             is LinkStatus.BluetoothUnavailable -> {
                 // The environment normally says so first; this is the supervisor catching up.
                 DeviceRowUi(DeviceStatus.Searching, "Connecting to $name…", canForget = true)
@@ -129,6 +134,10 @@ object BleDeviceRows {
                 DeviceRowUi(DeviceStatus.Locked, "$name · locked", canForget = true, locked = state.signal)
             }
 
+            ClickState.WaitingForDevice -> {
+                DeviceRowUi(DeviceStatus.Searching, wakeText(DeviceRole.Click), canForget = true)
+            }
+
             is ClickState.BluetoothUnavailable, is ClickState.Connecting, ClickState.Stopped, null -> {
                 DeviceRowUi(DeviceStatus.Searching, "Connecting to $name…", canForget = true)
             }
@@ -149,6 +158,14 @@ object BleDeviceRows {
             }
         return DeviceRowUi(DeviceStatus.Blocked, text, canForget = true)
     }
+
+    /** What a row says while a background connect waits for a sleeping device (ADR 0040). */
+    internal fun wakeText(role: DeviceRole): String =
+        when (role) {
+            DeviceRole.Trainer -> "Waiting for the trainer to wake up"
+            DeviceRole.Strap -> "Waiting for the strap to wake up"
+            DeviceRole.Click -> "Waiting for the Click to wake up"
+        }
 
     private fun waitText(seconds: Int?): String =
         if (seconds != null &&

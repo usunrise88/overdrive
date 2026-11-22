@@ -250,8 +250,38 @@ public interface GattTransport {
     public fun close()
 }
 
+/**
+ * How a transport connects (docs/adr/0040-background-connect-for-sleepy-devices.md). On Android this is the `autoConnect` flag of
+ * `connectGatt`.
+ */
+public enum class ConnectMode {
+    /**
+     * Connect now (`autoConnect = false`): the controller scans for the device at full duty and the attempt ends with an
+     * error after the platform's own limit (about 30 s, status 147 or 133) unless the caller gives up first. Fast when the
+     * device is awake, and nothing when it is asleep.
+     */
+    ACTIVE,
+
+    /**
+     * Connect whenever the device appears (`autoConnect = true`): the controller keeps a pending connection and completes
+     * it the moment the device advertises, which is what a device woken by a button press needs. It has **no limit of its
+     * own**: the call stays pending for hours. The caller bounds it with a watchdog and closes the transport to cancel it.
+     */
+    BACKGROUND,
+}
+
 /** Makes transports. The reconnect supervisor asks for a new one for every attempt and never reuses a dead one. */
 public fun interface GattTransportFactory {
-    /** A new, unconnected transport to [device]. Cheap and non-blocking; nothing happens on the air until `connect`. */
+    /** A new, unconnected transport to [device] that connects actively. Cheap and non-blocking; nothing happens on the air until `connect`. */
     public fun open(device: DeviceId): GattTransport
+
+    /**
+     * A new, unconnected transport to [device] that connects as [mode] says. **The default ignores the mode** (every
+     * connect is active), so a factory written before background connects keeps working; the Android factory, the fake
+     * and the recorder override it.
+     */
+    public fun open(
+        device: DeviceId,
+        mode: ConnectMode,
+    ): GattTransport = open(device)
 }

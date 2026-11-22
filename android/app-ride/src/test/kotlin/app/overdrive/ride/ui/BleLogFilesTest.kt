@@ -8,6 +8,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.core.content.FileProvider
 import androidx.test.core.app.ApplicationProvider
+import app.overdrive.ble.log.BleLogArchiveResult
 import app.overdrive.ble.log.BleLogSummary
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -24,10 +25,13 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.io.File
+import java.time.LocalDateTime
+import java.util.zip.ZipFile
+import java.util.zip.ZipInputStream
 
 /**
- * Sharing the raw Bluetooth logs (ADR 0010): one chooser over the log files, readable by the receiver and only those
- * files, named by date and role; nothing leaves the tablet by itself. A plain Application, as in [RideFilesTest].
+ * Sharing the raw Bluetooth logs (ADR 0010): one chooser over **one zip** of the log files, readable by the receiver and
+ * only that file, named by date and time; nothing leaves the tablet by itself. A plain Application, as in [RideFilesTest].
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = Application::class)
@@ -48,22 +52,27 @@ class BleLogFilesTest {
     @After
     fun cleanUp() {
         logs.deleteRecursively()
+        File(context.cacheDir, "ble-log-archives").deleteRecursively()
         File(context.filesDir, "elsewhere.txt").delete()
     }
 
     private fun files() = names.map { File(logs, it) }
 
+    private val now = LocalDateTime.of(2026, 11, 21, 7, 45)
+
     private fun sendIntent(chooser: Intent): Intent =
         @Suppress("DEPRECATION")
         chooser.getParcelableExtra(Intent.EXTRA_INTENT)!!
 
+    private fun readyChooser(prepared: PreparedShare): Intent = (prepared as PreparedShare.Ready).chooser
+
     @Test
-    fun oneFileIsOfferedAsASingleSend() {
-        val chooser = BleLogShare.chooser(context, listOf(files().first()))
+    fun theLogsGoAsOneZipNamedByTheDateAndTheTime() {
+        val chooser = readyChooser(prepareShare(context, files(), now))
         assertEquals(Intent.ACTION_CHOOSER, chooser.action)
         val send = sendIntent(chooser)
-        assertEquals(Intent.ACTION_SEND, send.action)
-        assertEquals("text/plain", send.type)
+        assertEquals("one file, not several", Intent.ACTION_SEND, send.action)
+        assertEquals("application/zip", send.type)
         assertTrue(send.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
         assertEquals("only reading is granted", 0, send.flags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
         @Suppress("DEPRECATION")
@@ -71,98 +80,153 @@ class BleLogFilesTest {
         assertEquals("content", uri.scheme)
         assertEquals("app.overdrive.ride.files", uri.authority)
         assertEquals(uri, send.clipData!!.getItemAt(0).uri)
-    }
-
-    @Test
-    fun severalFilesAreOfferedTogetherAndEachOneIsInTheClip() {
-        val send = sendIntent(BleLogShare.chooser(context, files()))
-        assertEquals(Intent.ACTION_SEND_MULTIPLE, send.action)
-        assertEquals("text/plain", send.type)
-        @Suppress("DEPRECATION")
-        val uris = send.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)!!
-        assertEquals(3, uris.size)
-        assertEquals(3, send.clipData!!.itemCount)
-        assertEquals(uris, (0 until 3).map { send.clipData!!.getItemAt(it).uri })
-        assertTrue(send.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
-    }
-
-    @Test
-    fun theReceiverReadsTheFileAndSeesADateAndARoleAndNothingElse() {
-        val send = sendIntent(BleLogShare.chooser(context, files()))
-
-        @Suppress("DEPRECATION")
-        val uris = send.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)!!
-        assertEquals(
-            "# overdrive-ble-session 1\n# model D500\n",
-            context.contentResolver
-                .openInputStream(
-                    uris[0],
-                )!!
-                .use {
-                    String(it.readBytes())
-                },
-        )
+        assertEquals(1, send.clipData!!.itemCount)
         val shown =
-            uris.map { uri ->
-                context.contentResolver.query(uri, null, null, null, null)!!.use { cursor ->
-                    assertTrue(cursor.moveToFirst())
-                    cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
-                }
+            context.contentResolver.query(uri, null, null, null, null)!!.use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
             }
-        assertEquals(names, shown)
-        for (name in shown) assertTrue(name, Regex("ble-\\d{8}T\\d{6}Z-(trainer|strap)\\.txt").matches(name))
+        assertEquals("overdrive-ble-logs-20261121-0745.zip", shown)
+    }
+
+    @Test
+    fun theZipIsInTheCacheFolderAndHoldsTheLogsUnderTheirOwnNames() {
+        prepareShare(context, files(), now)
+        val archive = File(context.cacheDir, "ble-log-archives/overdrive-ble-logs-20261121-0745.zip")
+        assertTrue(archive.exists())
+        ZipFile(archive).use { zip ->
+            assertEquals(names.sortedDescending(), zip.entries().asSequence().map { it.name }.toList())
+            assertEquals(
+                "# overdrive-ble-session 1\n# model D500\n",
+                zip.getInputStream(zip.getEntry(names[0])).use { String(it.readBytes()) },
+            )
+        }
+    }
+
+    @Test
+    fun theReceiverReadsTheZipAndSeesNothingButItsName() {
+        val send = sendIntent(readyChooser(prepareShare(context, files(), now)))
+
+        @Suppress("DEPRECATION")
+        val uri = send.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)!!
+        val bytes = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+        ZipInputStream(bytes.inputStream()).use { zip ->
+            assertEquals(names.sortedDescending(), generateSequence { zip.nextEntry }.map { it.name }.toList())
+        }
         assertFalse(
-            "no device name or address in what the receiver sees",
-            uris.any {
-                it.toString().contains(context.filesDir.absolutePath)
-            },
+            "no path of the tablet in what the receiver sees",
+            uri.toString().contains(context.cacheDir.absolutePath),
         )
     }
 
     @Test
-    fun aFileOutsideTheLogFolderOrTheRidesFolderIsRefused() {
+    fun theTextSaysHowManySessionsWentAndThatTheyHoldHeartRate() {
+        val text = send(prepareShare(context, files(), now)).getStringExtra(Intent.EXTRA_TEXT)!!
+        assertEquals(
+            "Overdrive Bluetooth logs: 3 sessions.\n" +
+                "These logs hold heart-rate values. They are never uploaded; they leave the tablet only when you send them.",
+            text,
+        )
+    }
+
+    private fun send(prepared: PreparedShare) = sendIntent(readyChooser(prepared))
+
+    @Test
+    fun theShareTextCountsWhatWasLeftOutAndWhatCouldNotBeRead() {
+        assertEquals(
+            "Overdrive Bluetooth logs: 1 session.\n${BleLogShare.PRIVACY}",
+            BleLogShare.shareText(BleLogArchiveResult(1, 0, 0, 100)),
+        )
+        assertEquals(
+            "Overdrive Bluetooth logs: 12 sessions. 3 older sessions left out to keep the file small. " +
+                "1 file could not be read.\n${BleLogShare.PRIVACY}",
+            BleLogShare.shareText(BleLogArchiveResult(12, 3, 1, 100)),
+        )
+        assertEquals(
+            "Overdrive Bluetooth logs: 5 sessions. 1 older session left out to keep the file small.\n${BleLogShare.PRIVACY}",
+            BleLogShare.shareText(BleLogArchiveResult(5, 1, 0, 100)),
+        )
+    }
+
+    @Test
+    fun theArchiveIsNamedWithTheLocalDateAndTime() {
+        assertEquals("overdrive-ble-logs-20261121-0745.zip", BleLogShare.archiveName(now))
+        assertEquals(
+            "overdrive-ble-logs-20270102-2359.zip",
+            BleLogShare.archiveName(LocalDateTime.of(2027, 1, 2, 23, 59)),
+        )
+    }
+
+    @Test
+    fun aNewShareDeletesTheZipOfTheLastOne() {
+        prepareShare(context, files(), now)
+        prepareShare(context, files(), now.plusMinutes(5))
+        val left = File(context.cacheDir, "ble-log-archives").listFiles()!!.map { it.name }
+        assertEquals(listOf("overdrive-ble-logs-20261121-0750.zip"), left)
+    }
+
+    @Test
+    fun theLeftoversAreDeletedAtTheNextLaunch() {
+        prepareShare(context, files(), now)
+        assertEquals(1, BleLogShare.archiveFolder(context).listFiles()!!.size)
+        BleLogShare.clearArchives(context)
+        assertEquals(0, BleLogShare.archiveFolder(context).listFiles()!!.size)
+        BleLogShare.clearArchives(context) // and nothing to delete is fine
+    }
+
+    @Test
+    fun aFileOutsideTheCacheArchiveFolderIsRefused() {
         val outside = File(context.filesDir, "elsewhere.txt").also { it.writeText("x") }
         try {
-            BleLogShare.chooser(context, listOf(files().first(), outside))
-            fail("the provider must serve its two folders only")
+            BleLogShare.chooser(context, outside, "text")
+            fail("the provider must serve its folders only")
         } catch (expected: IllegalArgumentException) {
-            // shareOrExplain turns this into "The files could not be shared."
+            // prepareShare turns this into "The files could not be shared."
         }
-    }
-
-    @Test
-    fun anEmptyListIsNotAChooser() {
+        val other = File(context.cacheDir, "other.zip").also { it.writeText("x") }
         try {
-            BleLogShare.chooser(context, emptyList())
-            fail("there is nothing to share")
+            BleLogShare.chooser(context, other, "text")
+            fail("only the archive folder of the cache is served")
         } catch (expected: IllegalArgumentException) {
             // as it should
+        } finally {
+            other.delete()
         }
     }
 
     @Test
-    fun sharingWithNoLogsSaysSoAndOpensNothing() {
+    fun sharingWithNoLogsSaysSoAndSharesNothing() {
         assertEquals(
             "There are no logs yet. Ride once with the trainer connected.",
-            shareOrExplain(context, emptyList()),
+            shareOrExplain(context, emptyList(), now),
         )
         assertNull(shadowOf(context as Application).peekNextStartedActivity())
+        assertFalse("no zip was made", File(context.cacheDir, "ble-log-archives").listFiles().orEmpty().isNotEmpty())
+    }
+
+    @Test
+    fun logsThatCannotBeReadShareNothingAndLeaveNoZipBehind() {
+        val broken = File(logs, "ble-20261120T093000Z-click.txt").also { it.mkdirs() }
+        assertEquals("The log files could not be read.", shareOrExplain(context, listOf(broken), now))
+        assertFalse(File(context.cacheDir, "ble-log-archives").listFiles().orEmpty().isNotEmpty())
+        assertNull(shadowOf(context as Application).peekNextStartedActivity())
+    }
+
+    @Test
+    fun aDamagedFileIsLeftOutAndCountedInTheText() {
+        val broken = File(logs, "ble-20261120T093000Z-click.txt").also { it.mkdirs() }
+        val text = send(prepareShare(context, files() + broken, now)).getStringExtra(Intent.EXTRA_TEXT)!!
+        assertTrue(text, text.startsWith("Overdrive Bluetooth logs: 3 sessions. 1 file could not be read."))
     }
 
     @Test
     fun sharingOpensTheChooserAndSaysNothingWhenItWorks() {
         // The screen calls it with its activity: a context that is not one needs a flag Android insists on.
         val activity = Robolectric.buildActivity(Activity::class.java).create().get()
-        assertNull(shareOrExplain(activity, files()))
+        assertNull(shareOrExplain(activity, files(), now))
         val started = shadowOf(activity).nextStartedActivity
         assertNotNull(started)
         assertEquals(Intent.ACTION_CHOOSER, started.action)
-    }
-
-    @Test
-    fun aFileTheProviderRefusesIsAPlainMessageNotACrash() {
-        val outside = File(context.filesDir, "elsewhere.txt").also { it.writeText("x") }
-        assertEquals("The files could not be shared.", shareOrExplain(context, listOf(outside)))
     }
 
     @Test

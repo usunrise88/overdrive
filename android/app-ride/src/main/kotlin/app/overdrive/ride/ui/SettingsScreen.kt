@@ -451,6 +451,16 @@ private fun DeveloperGroup(
             )
         }
         SettingRow(
+            "Connect in the background",
+            description = "Waits for a sleeping Click, strap or trainer and connects when it wakes. Off: retries often",
+        ) {
+            OdSwitch(
+                settings.connectInBackground,
+                { value -> actions.onChange { it.copy(connectInBackground = value) } },
+                contentDescription = "Connect in the background",
+            )
+        }
+        SettingRow(
             "Record Bluetooth sessions",
             description = "Writes each connection to a file on the tablet, to fix the app without a bench",
         ) {

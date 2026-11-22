@@ -1,6 +1,7 @@
 # ADR 0010: Android Bluetooth, pairing and the ride over real devices
 
-Status: accepted (stage M3-2, 2026-11-18)
+Status: accepted (stage M3-2, 2026-11-18). **Amended by ADR 0040 (release 0.4.1):** `connectGatt` is called with `autoConnect = true` for the background
+connect of a sleeping device (row C1 below is the active one); **and the sharing of the logs is one zip** (section "Sharing" below).
 
 ## Context
 
@@ -202,11 +203,18 @@ trainer and of the strap is written to a text file** in the format of core's `Bl
   ends that recording and nothing else. Nothing is written on the radio's or the ride's thread.
 - **Default on** (Developer setting "Record Bluetooth sessions") in the early builds, read at each `open`; a later release,
   once the codecs are settled, turns the default off.
-- **Sharing**: Settings, Developer, **Share Bluetooth logs** hands every file to another app through the system share sheet
-  (`ACTION_SEND` or `ACTION_SEND_MULTIPLE`, `text/plain`) over the app's `FileProvider` (`file_paths.xml` serves `rides/` and
-  `ble-logs/`, read-only, one-time grants, the provider not exported). The screens only know a `BleLogActions` interface, so
-  tests use a fake. **The logs leave the tablet only by this explicit action and are never uploaded**: the app has no network
-  permission, and the files are not part of any sync.
+- **Sharing (release 0.4.1: one archive, not up to 60 files)**: Settings, Developer, **Share Bluetooth logs** packs the log files into **one**
+  `overdrive-ble-logs-<yyyymmdd-hhmm>.zip` (`BleLogArchive`, `java.util.zip`, in `cacheDir/ble-log-archives/`) and hands that one file to another
+  app through the system share sheet (`ACTION_SEND`, `application/zip`) over the app's `FileProvider` (`file_paths.xml` serves `rides/`,
+  `ble-logs/` and the cache folder `ble-log-archives/`, read-only, one-time grants, the provider not exported). **Newest sessions first; the archive
+  is capped at 20 MB and the oldest sessions are left out first**; the share text says how many sessions went, how many older ones were left out,
+  how many files could not be read, and that the logs hold heart-rate values and are never uploaded. The entries are named exactly as the files
+  (a date and a role); the builder adds nothing of its own (no README, no listing, no comments; a test proves it) and the files are already redacted.
+  A damaged or locked file is skipped and counted; no logs, or none readable, share nothing and say so. **The temporary zip is deleted at the next
+  launch and before the next share.** It is *not* deleted when the share sheet returns: Android gives no signal that the receiving app has finished
+  reading, and a mail or chat app often reads the attachment after the sheet is gone, so deleting early would send an empty attachment. The screens only know a
+  `BleLogActions` interface, so tests use a fake. **The logs leave the tablet only by this explicit action and are never uploaded**: the app has no
+  network permission, and the files are not part of any sync.
 
 ### 9. Privacy and the logs
 
@@ -243,7 +251,7 @@ stack.** Each row is named in `docs/bench-checklist.md` (the step that settles i
 | R1 | The adapter-state broadcast and `refresh()` on resume are enough to follow Bluetooth being switched and the permission being changed | `AndroidBleEnvironment` | 3.13 |
 | F1 | `connectedDevice` plus `specialUse` starts with the permission and `specialUse` alone starts without it; `dumpsys` shows the types as designed | `ForegroundServiceTypes`, `OverlayService` | 3.13, 3.16 |
 | F2 | Android 15's time limits do not stop a `connectedDevice` plus `specialUse` service during an hour's ride (ADR 0006) | the manifest | 6.8 to 6.10 |
-| L1 | A 2 MB file, 60 files and 20 MB are enough, and the share sheet takes several `text/plain` files at once | `BleLogLimits`, `BleLogShare` | 3.17 |
+| L1 | A 2 MB file, 60 files and 20 MB are enough, and the share sheet takes the one zip (release 0.4.1; before, several `text/plain` files) | `BleLogLimits`, `BleLogArchive`, `BleLogShare` | 3.17 |
 | H1 | Everything the adapters assume about the D500 and the HR7 (ADR 0009 section 8) | `core` | FT 1 to FT 12 |
 
 **R8**: the release build minifies. The only classes the framework calls are `GattCallback`, `ScanCallback`'s anonymous

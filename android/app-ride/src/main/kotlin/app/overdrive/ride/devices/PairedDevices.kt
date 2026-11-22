@@ -7,6 +7,7 @@ import app.overdrive.core.ble.adapter.FtmsTrainerDevice
 import app.overdrive.core.ble.adapter.HeartRateOptions
 import app.overdrive.core.ble.adapter.HeartRateStrapDevice
 import app.overdrive.core.ble.link.BackoffPolicy
+import app.overdrive.core.ble.link.ConnectStrategy
 import app.overdrive.core.ble.link.LinkControls
 import app.overdrive.core.ble.recording.BleRecordingPolicy
 import app.overdrive.core.click.ButtonChange
@@ -67,6 +68,11 @@ class PairedDevices(
      * before the remembered Click starts, so it never connects once with the wrong ones.
      */
     private val clickOptions: Flow<ClickOptions> = flowOf(ClickOptions()),
+    /**
+     * How the devices connect (ADR 0040), read at the start of every attempt: the hybrid strategy waits for a sleeping
+     * device with a background connect, the legacy one tries actively with backoff, as 0.4.0 did.
+     */
+    private val connectStrategy: () -> ConnectStrategy = { ConnectStrategy.LEGACY },
 ) {
     /** A paired trainer: what the rider chose and the device that is connecting to it. */
     class PairedTrainer(
@@ -224,6 +230,7 @@ class PairedDevices(
                         reconnect = reconnect,
                         timeSource = timeSource,
                         random = random,
+                        connectStrategy = connectStrategy,
                     )
                 device.start()
                 PairedTrainer(it, device)
@@ -253,6 +260,7 @@ class PairedDevices(
                         reconnect = reconnect,
                         timeSource = timeSource,
                         random = random,
+                        connectStrategy = connectStrategy,
                     )
                 device.start()
                 PairedStrap(it, device)
@@ -290,6 +298,7 @@ class PairedDevices(
                         reconnect = reconnect,
                         timeSource = timeSource,
                         random = random,
+                        connectStrategy = connectStrategy,
                     )
                 // Collecting starts before the device does, so not one frame is missed.
                 clickForwarder =

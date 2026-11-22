@@ -520,7 +520,7 @@ found. No colour, no border.
 
 A row that has a paired device (stage M3-2) ends with a ghost **Forget** button, 40 dp, after the status. Searching reads
 "Connecting to <name>…". The Click's lost and blocked rows read like the others' ("Not found · retrying in 8 s", "Connection
-lost · …", "Could not connect · …", "Zwift Click (right) · Bluetooth is off").
+lost · …", "Could not connect · …", "Zwift Click (right) · Bluetooth is off"). A device that sleeps (release 0.4.1, ADR 0040) reads "Waiting for the Click to wake up" ("…the trainer…", "…the strap…"): Searching, no countdown, nothing in it that sounds like a failure.
 
 **Top-bar device status:** three 16 dp icons in the same order, text 2 when connected, text 3
 when not paired, text 1 + `triangle-alert` when lost, blocked or locked. Tapping opens Devices.

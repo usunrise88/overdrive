@@ -1,5 +1,6 @@
 package app.overdrive.core.ble.recording
 
+import app.overdrive.core.ble.ConnectMode
 import app.overdrive.core.ble.DeviceId
 import app.overdrive.core.ble.GattCharacteristicInfo
 import app.overdrive.core.ble.GattLinkState
@@ -37,6 +38,7 @@ public class RecordingGattTransport(
     private val delegate: GattTransport,
     private val recorder: BleSessionRecorder,
     scope: CoroutineScope,
+    private val mode: ConnectMode = ConnectMode.ACTIVE,
 ) : GattTransport {
     private val relayed =
         MutableSharedFlow<GattNotification>(extraBufferCapacity = BUFFER, onBufferOverflow = BufferOverflow.DROP_OLDEST)
@@ -163,7 +165,12 @@ public class RecordingGattTransport(
             }
 
             GattLinkState.Connecting -> {
-                recorder.record(BleDirection.STATE, null, null, BleStates.CONNECTING)
+                recorder.record(
+                    BleDirection.STATE,
+                    null,
+                    null,
+                    if (mode == ConnectMode.BACKGROUND) BleStates.CONNECTING_BACKGROUND else BleStates.CONNECTING,
+                )
             }
 
             GattLinkState.Connected -> {
@@ -221,6 +228,11 @@ public fun GattTransportFactory.recording(
     recorder: BleSessionRecorder,
     scope: CoroutineScope,
 ): GattTransportFactory =
-    GattTransportFactory { device: DeviceId ->
-        RecordingGattTransport(open(device), recorder, scope)
+    object : GattTransportFactory {
+        override fun open(device: DeviceId): GattTransport = open(device, ConnectMode.ACTIVE)
+
+        override fun open(
+            device: DeviceId,
+            mode: ConnectMode,
+        ): GattTransport = RecordingGattTransport(this@recording.open(device, mode), recorder, scope, mode)
     }

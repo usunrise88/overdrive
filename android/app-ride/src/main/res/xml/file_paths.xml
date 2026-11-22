@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- What the app's FileProvider may hand to other apps: the stored rides (ADR 0008) and the raw Bluetooth logs (ADR 0010),
-     nothing else under the app's files. -->
+<!-- What the app's FileProvider may hand to other apps: the stored rides (ADR 0008), the raw Bluetooth logs (ADR 0010) and the
+     one zip made of them when the rider shares them (cache, deleted at the next launch); nothing else. -->
 <paths>
     <files-path
         name="rides"
@@ -8,4 +8,7 @@
     <files-path
         name="ble_logs"
         path="ble-logs/" />
+    <cache-path
+        name="ble_log_archives"
+        path="ble-log-archives/" />
 </paths>

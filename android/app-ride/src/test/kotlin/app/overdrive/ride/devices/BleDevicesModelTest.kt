@@ -59,6 +59,34 @@ class BleDeviceRowsTest {
     }
 
     @Test
+    fun aDeviceThatSleepsIsWaitedForInPlainWordsAndIsNotAFailure() {
+        val trainer = row(LinkStatus.WaitingForDevice)
+        assertEquals(
+            DeviceRowUi(DeviceStatus.Searching, "Waiting for the trainer to wake up", canForget = true),
+            trainer,
+        )
+        assertEquals(
+            DeviceRowUi(DeviceStatus.Searching, "Waiting for the strap to wake up", canForget = true),
+            row(LinkStatus.WaitingForDevice, name = "HR7", role = DeviceRole.Strap),
+        )
+        assertEquals(
+            DeviceRowUi(DeviceStatus.Searching, "Waiting for the Click to wake up", canForget = true),
+            clickRow(ClickState.WaitingForDevice),
+        )
+        assertEquals(
+            DeviceRowUi(DeviceStatus.Searching, "Waiting for the Click to wake up", canForget = true),
+            row(LinkStatus.WaitingForDevice, name = "Zwift Click", role = DeviceRole.Click),
+        )
+        // Bluetooth that is off still comes first, and there is no countdown and no Retry-worthy word in it.
+        assertEquals(
+            DeviceStatus.Blocked,
+            row(LinkStatus.WaitingForDevice, availability = BleAvailability.BLUETOOTH_OFF).status,
+        )
+        assertFalse(trainer.subtitle.contains("retry", ignoreCase = true))
+        assertFalse(trainer.subtitle.contains("lost", ignoreCase = true))
+    }
+
+    @Test
     fun aLostLinkSaysWhyAndHowLongTheRetryWaits() {
         val lost = row(waiting(LinkFailureKind.LINK_LOST), seconds = 4)
         assertEquals(DeviceStatus.Lost, lost.status)

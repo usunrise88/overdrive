@@ -5,6 +5,7 @@ import app.overdrive.core.ble.DeviceId
 import app.overdrive.core.ble.GattTransportFactory
 import app.overdrive.core.ble.fake.FakeClick
 import app.overdrive.core.ble.link.BackoffPolicy
+import app.overdrive.core.ble.link.ConnectStrategy
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.testTimeSource
 
@@ -23,6 +24,7 @@ internal fun BleRig.click(
     options: ClickOptions = ClickOptions(),
     reconnect: BackoffPolicy = BackoffPolicy.EXACT,
     factory: GattTransportFactory = ble,
+    connectStrategy: () -> ConnectStrategy = { ConnectStrategy.LEGACY },
 ): ClickDevice =
     ClickDevice(
         scope = testScope.backgroundScope,
@@ -33,6 +35,7 @@ internal fun BleRig.click(
         options = options,
         reconnect = reconnect,
         timeSource = testScope.testTimeSource,
+        connectStrategy = connectStrategy,
     )
 
 /** Starts [this] and lets the first connection come up (a second of virtual time). */

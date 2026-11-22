@@ -2,6 +2,10 @@
 
 Status: accepted (stage M3-1, 2026-11-18). **Amended after the first bench (ADR 0013):** section 8 has a new option, `FtmsOptions.selfResetGrace`, and FT 1 is settled.
 
+**Amended by ADR 0040 (release 0.4.1):** `GattTransportFactory.open(device, mode)` (`ConnectMode.ACTIVE` or `BACKGROUND`, the `autoConnect` flag) and
+`ConnectStrategy` for `LinkSupervisor`: the first attempt is active and short, then a background connect that waits for a sleeping device. Everything
+else here (a transport is single-use, a failed or dropped one is closed and replaced, the backoff) stands; the backoff is the legacy strategy.
+
 ## Context
 
 Stage M3 puts real Bluetooth under the ride engine (spec §4.1) without the trainer, the strap or the tablet in reach

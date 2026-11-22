@@ -45,11 +45,16 @@ internal class ScriptedPlatform : PlatformGattOpener {
     /** Events to deliver from inside `open`, before it returns (a callback that beats `connectGatt`). */
     val eventsDuringOpen = mutableListOf<PlatformEvent>()
 
+    /** The `autoConnect` flag of every `open`, oldest first. */
+    val backgroundFlags = mutableListOf<Boolean>()
+
     override fun open(
         device: DeviceId,
         listener: PlatformListener,
+        background: Boolean,
     ): PlatformGatt? {
         opened++
+        backgroundFlags += background
         this.listener = listener
         openThrows?.let { throw it }
         if (openReturnsNull) return null

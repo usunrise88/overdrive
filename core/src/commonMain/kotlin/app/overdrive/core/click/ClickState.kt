@@ -31,6 +31,12 @@ public sealed interface ClickState {
         val availability: BleAvailability,
     ) : ClickState
 
+    /**
+     * A background connect is pending (docs/adr/0040): the Click is asleep or out of range and the platform connects the
+     * moment it advertises, which a button press makes it do. Not a failure: "Waiting for the Click to wake up".
+     */
+    public data object WaitingForDevice : ClickState
+
     /** Attempt number [attempt] to connect and set up is under way. */
     public data class Connecting(
         val attempt: Int,

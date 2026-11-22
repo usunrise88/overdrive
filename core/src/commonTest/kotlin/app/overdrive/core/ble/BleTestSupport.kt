@@ -10,6 +10,7 @@ import app.overdrive.core.ble.fake.FakeFtmsTrainerOptions
 import app.overdrive.core.ble.fake.FakeHeartRateStrap
 import app.overdrive.core.ble.fake.FakeHeartRateStrapOptions
 import app.overdrive.core.ble.link.BackoffPolicy
+import app.overdrive.core.ble.link.ConnectStrategy
 import app.overdrive.core.ble.recording.BleSessionFormat
 import app.overdrive.core.ble.recording.BleSessionRecorder
 import app.overdrive.core.ble.recording.recording
@@ -51,6 +52,7 @@ internal class BleRig(
         options: FtmsOptions = FtmsOptions(),
         reconnect: BackoffPolicy = BackoffPolicy.EXACT,
         factory: GattTransportFactory = ble,
+        connectStrategy: () -> ConnectStrategy = { ConnectStrategy.LEGACY },
     ) = FtmsTrainerDevice(
         scope = testScope.backgroundScope,
         device = TRAINER_ID,
@@ -60,12 +62,14 @@ internal class BleRig(
         options = options,
         reconnect = reconnect,
         timeSource = testScope.testTimeSource,
+        connectStrategy = connectStrategy,
     )
 
     fun strap(
         options: HeartRateOptions = HeartRateOptions(),
         reconnect: BackoffPolicy = BackoffPolicy.EXACT,
         factory: GattTransportFactory = ble,
+        connectStrategy: () -> ConnectStrategy = { ConnectStrategy.LEGACY },
     ) = HeartRateStrapDevice(
         scope = testScope.backgroundScope,
         device = STRAP_ID,
@@ -75,6 +79,7 @@ internal class BleRig(
         options = options,
         reconnect = reconnect,
         timeSource = testScope.testTimeSource,
+        connectStrategy = connectStrategy,
     )
 
     /** Advances virtual time by [millis] and runs everything due at or before then. */

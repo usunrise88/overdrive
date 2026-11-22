@@ -11,6 +11,7 @@ import app.overdrive.core.ble.fake.FakeBle
 import app.overdrive.core.ble.fake.FakeFtmsTrainer
 import app.overdrive.core.ble.fake.FakeHeartRateStrap
 import app.overdrive.core.ble.link.BackoffPolicy
+import app.overdrive.core.ble.link.ConnectStrategy
 import app.overdrive.core.ble.link.LinkFailureKind
 import app.overdrive.core.ble.link.LinkStatus
 import app.overdrive.core.device.ConnectionState
@@ -55,7 +56,7 @@ class AdaptersOverAndroidTransportTest {
         val platform = CorePlatform(world, test.backgroundScope)
         val transports = AndroidGattTransportFactory(platform, test.backgroundScope, clock, GattTimings(), BleLog.None)
 
-        fun trainer() =
+        fun trainer(strategy: ConnectStrategy = ConnectStrategy.LEGACY) =
             FtmsTrainerDevice(
                 scope = test.backgroundScope,
                 device = trainerId,
@@ -64,6 +65,7 @@ class AdaptersOverAndroidTransportTest {
                 name = "D500",
                 reconnect = BackoffPolicy.EXACT,
                 timeSource = test.testTimeSource,
+                connectStrategy = { strategy },
             )
 
         fun strap() =
@@ -324,5 +326,38 @@ class AdaptersOverAndroidTransportTest {
             assertNull((trainer.status.value as? LinkStatus.WaitingToRetry))
             rig.assertLegal()
             if (rig.world.transports.size != 1) fail("one transport, closed once: ${rig.world.transports.size}")
+        }
+
+    @Test
+    fun `a sleeping trainer is waited for with autoConnect on and connects when it wakes, and Forget cancels`() =
+        runTest {
+            val rig = rig()
+            rig.fakeTrainer.powered = false
+            val trainer = rig.trainer(ConnectStrategy.HYBRID)
+            trainer.start()
+            rig.advance(11_000)
+            assertEquals(listOf(false, true), rig.platform.backgroundFlags)
+            assertEquals(LinkStatus.WaitingForDevice, trainer.status.value)
+
+            rig.advance(5 * 60_000)
+            rig.fakeTrainer.powerOn()
+            rig.advance(3_000)
+            assertEquals(ConnectionState.CONNECTED, trainer.connection.value)
+            assertEquals("no extra connect was opened for the wake", listOf(false, true), rig.platform.backgroundFlags)
+
+            rig.fakeTrainer.powerOff()
+            rig.advance(1_500)
+            assertEquals(
+                "a drop goes straight to the background",
+                listOf(false, true, true),
+                rig.platform.backgroundFlags,
+            )
+            trainer.close() // Forget
+            rig.advance(5_000)
+            assertTrue("the pending connect was released", rig.platform.handles.last().released)
+            rig.fakeTrainer.powerOn()
+            rig.advance(60_000)
+            assertEquals(3, rig.platform.handles.size)
+            rig.assertLegal()
         }
 }

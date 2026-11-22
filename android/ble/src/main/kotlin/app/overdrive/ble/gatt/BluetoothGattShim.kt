@@ -337,10 +337,12 @@ internal class BluetoothGattOpener(
     override fun open(
         device: DeviceId,
         listener: PlatformListener,
+        background: Boolean,
     ): PlatformGatt? {
         val remote = adapter()?.getRemoteDevice(device.value) ?: return null
+        // autoConnect = background: a pending connection the controller completes when the device advertises (docs/adr/0040).
         val gatt =
-            remote.connectGatt(context, false, GattCallback(listener), BluetoothDevice.TRANSPORT_LE) ?: return null
+            remote.connectGatt(context, background, GattCallback(listener), BluetoothDevice.TRANSPORT_LE) ?: return null
         return BluetoothGattShim(gatt)
     }
 }

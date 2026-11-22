@@ -7,6 +7,7 @@ import app.overdrive.core.ble.codec.ControlPointCodec
 import app.overdrive.core.ble.codec.ControlPointCommand
 import app.overdrive.core.ble.codec.FitnessMachineFeatures
 import app.overdrive.core.ble.link.BackoffPolicy
+import app.overdrive.core.ble.link.ConnectStrategy
 import app.overdrive.core.ble.link.LinkControls
 import app.overdrive.core.ble.link.LinkStatus
 import app.overdrive.core.ble.link.LinkSupervisor
@@ -58,6 +59,7 @@ public class FtmsTrainerDevice(
     timeSource: TimeSource = TimeSource.Monotonic,
     random: Random = Random.Default,
     establishTimeout: Duration = LinkSupervisor.DEFAULT_ESTABLISH_TIMEOUT,
+    connectStrategy: () -> ConnectStrategy = { ConnectStrategy.LEGACY },
 ) : TrainerDevice,
     LinkControls {
     private val readings =
@@ -97,6 +99,7 @@ public class FtmsTrainerDevice(
             timeSource = timeSource,
             random = random,
             establishTimeout = establishTimeout,
+            strategy = connectStrategy,
         )
 
     override val connection: StateFlow<ConnectionState> get() = supervisor.connection

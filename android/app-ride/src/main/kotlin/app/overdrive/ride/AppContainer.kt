@@ -12,6 +12,7 @@ import app.overdrive.ble.log.BleLogRole
 import app.overdrive.ble.log.BleLogStore
 import app.overdrive.ble.log.BleSessionLogger
 import app.overdrive.core.ble.GattTransportFactory
+import app.overdrive.core.ble.link.ConnectStrategy
 import app.overdrive.core.control.ActionRouter
 import app.overdrive.core.control.CoachControl
 import app.overdrive.core.control.GestureTiming
@@ -79,6 +80,7 @@ import app.overdrive.ride.settings.effectiveSettingsOf
 import app.overdrive.ride.settings.riderPatch
 import app.overdrive.ride.settings.withProfile
 import app.overdrive.ride.ui.AndroidBluetoothController
+import app.overdrive.ride.ui.BleLogShare
 import app.overdrive.ride.ui.BluetoothController
 import app.overdrive.ride.workouts.WorkoutLibrary
 import kotlinx.coroutines.CoroutineScope
@@ -356,6 +358,11 @@ class AppContainer(
 
     private val recordBle: () -> Boolean = { settings.value.recordBleSessions }
 
+    // The zip of an earlier share of the Bluetooth logs is deleted at the next launch (ADR 0010).
+    init {
+        bleLogScope.launch { BleLogShare.clearArchives(appContext) }
+    }
+
     private val trainerTransports: GattTransportFactory =
         BleSessionLogger(
             bleLogs,
@@ -412,6 +419,9 @@ class AppContainer(
                 }
             },
             clickOptions = settingsRepository.settings.map { it.click }.distinctUntilChanged().map { it.toOptions() },
+            connectStrategy = {
+                if (settings.value.connectInBackground) ConnectStrategy.HYBRID else ConnectStrategy.LEGACY
+            },
         )
 
     /** The Devices screen's scan, list and pairing. */

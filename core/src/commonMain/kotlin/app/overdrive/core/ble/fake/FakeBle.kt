@@ -3,6 +3,7 @@ package app.overdrive.core.ble.fake
 import app.overdrive.core.ble.Advertisement
 import app.overdrive.core.ble.BleAvailability
 import app.overdrive.core.ble.BleEnvironment
+import app.overdrive.core.ble.ConnectMode
 import app.overdrive.core.ble.DeviceId
 import app.overdrive.core.ble.GattScanner
 import app.overdrive.core.ble.GattTransport
@@ -97,14 +98,19 @@ public class FakeBle(
         }
     }
 
-    override fun open(device: DeviceId): GattTransport {
+    override fun open(device: DeviceId): GattTransport = open(device, ConnectMode.ACTIVE)
+
+    override fun open(
+        device: DeviceId,
+        mode: ConnectMode,
+    ): GattTransport {
         val peripheral = peripheral(device)
         opened.filter { it.device == device && !it.isClosed }.forEach {
             violate("A new transport for $device was opened before #${it.index} was closed")
         }
-        val transport = FakeGattTransport(this, device, opened.size + 1, peripheral)
+        val transport = FakeGattTransport(this, device, opened.size + 1, peripheral, mode)
         opened += transport
-        record("open#${transport.index}")
+        record(if (mode == ConnectMode.BACKGROUND) "open#${transport.index}(background)" else "open#${transport.index}")
         return transport
     }
 

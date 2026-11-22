@@ -94,7 +94,7 @@ nothing, write down what Settings → About shows.)
 - After any failure, run `adb bugreport ~/bench/` straight away, while the state is still on the tablet.
 - **Raw Bluetooth session logs.** The app writes one text file per connection session of each device, on by default
   (Settings, Developer, **Record Bluetooth sessions**): `ble-<date>T<time>Z-trainer.txt`, `...-strap.txt` and
-  `...-click.txt`, in the app's private `files/ble-logs/` (capped at 2 MB a file, 20 MB and 60 files together). Format:
+  `...-click.txt`, in the app's private `files/ble-logs/` (capped at 2 MB a file, 20 MB and 60 files together; **Share Bluetooth logs** sends them as one zip). Format:
   `docs/protocols/ftms-hr.md` §7.1 and ADR 0009 §6. A file holds no address and no identity values, **but it does hold your
   heart rate and RR**: keep it out of the repository and send it privately. How to get the files off the tablet: 9.2. Where
   a step below says "the recording", it means these files; the HCI snoop log shows the same traffic.
@@ -265,10 +265,21 @@ Turn the HCI snoop log on for this whole session.
   30 s between attempts (each +/-20 %), starts again from 1 s after a link that held 30 s, and gives an attempt 45 s to
   finish (`LinkSupervisor.DEFAULT_ESTABLISH_TIMEOUT`). Also write down how long one attempt against the switched-off
   trainer takes to fail (`S connecting` to `S disconnected` and its status; 133 is expected) and whether any attempt
-  ended only because of the 45 s backstop. On the Devices screen the Trainer row says "Not found · retrying in N s" and
+  ended only because of the 45 s backstop. On the Devices screen (with **Connect in the background** off; on, it says "Waiting for the trainer to wake up", step 3.12b) the Trainer row says "Not found · retrying in N s" and
   counts down once a second: check that it does, and that nothing else on the screen ticks. Press **Retry now** during a
   wait: the next attempt should start at once. Settles: spec §4.1 (reconnect with backoff); the guesses to tune are
   `BackoffPolicy` (initial, factor, cap, jitter, stable time) and the establish timeout.
+- [ ] **3.12b A sleeping device is waited for (release 0.4.1, ADR 0040).** Settings, Developer: **Connect in the background** is on (the
+  default). **Click:** leave it idle for 10 minutes (it goes to sleep: the row says "Waiting for the Click to wake up", not "Not found"),
+  then press a button and **count the seconds** until the row says Connected (or the press does something): write the number down, three
+  times. **Strap and trainer:** take the strap off (or switch it off) for 10 minutes, put it back and count; the same for the trainer (stop
+  pedalling for 10 minutes so it sleeps, then pedal, or switch it off and on). Expect: a few seconds; the row never says "lost" or counts a
+  retry while a device sleeps; no error toast. Then open Settings, Developer, **Share Bluetooth logs**, send the zip and look in it at the
+  device's file: `S - - connecting` is the active attempt, `connecting-background` is the background connect, and the time between the press and
+  `connected` is the answer to "how long". Also try: **Retry now** during the wait (an active attempt starts at once); Forget during the wait
+  (no more attempts afterwards); Bluetooth off and on during the wait (the next attempt is active). **If a press takes 10 s or more, or never
+  connects** (HyperOS may batch or delay background connects, especially with the screen off or the app in the background), say when, then turn
+  **Connect in the background** off and repeat for the comparison. Settles: ADR 0040 ("what could not be verified").
 - [ ] **3.13 Bluetooth switched off, and the permission.** During a ride, switch the tablet's Bluetooth off from the
   quick settings. Expect: the ride pauses (the trainer link is gone), the Devices screen shows the notice "Bluetooth is
   off" with **Turn on**, both device rows say "<name> · Bluetooth is off", and nothing is retried
@@ -302,13 +313,13 @@ Turn the HCI snoop log on for this whole session.
 - [ ] **3.17 Record a first ride and share the logs.** Settings, Developer: **Record Bluetooth sessions** is on
   (the default of the early builds). Ride 10 minutes with the trainer and the strap, ERG then simulation, and
   put the trainer in a dropout once (3.11). Then Settings, Developer, **Share Bluetooth logs**: the row says how many
-  files and how big ("4 files · 120 KB"); tap **Share** and send them to yourself through any app. Expect: files named
-  `ble-<date>T<time>Z-trainer.txt` and `...-strap.txt`, a new file per connection session, readable text starting with
+  files and how big ("4 files · 120 KB"); tap **Share** and send the one archive to yourself through any app. Expect: **one file**,
+  `overdrive-ble-logs-<date>-<time>.zip`, with entries named `ble-<date>T<time>Z-trainer.txt` and `...-strap.txt` inside, a new file per connection session, readable text starting with
   `# overdrive-ble-session 1`, with no device address and no device name other than a cleaned model line. **They do
   contain your heart rate**: keep them out of the repository and share them only with whoever is fixing the codecs.
   Replay one with `BleSessionFormat` to confirm the notes' guesses (FT 1 to FT 12 above). Write down the file sizes after
-  the ride (the cap is 2 MB a file, 20 MB and 60 files together) and whether **Share** offered every file to the app
-  you chose. Settles: ADR 0010 section 8, row L1, and gives the evidence for FT 1 to FT 12.
+  the ride (the cap is 2 MB a file, 20 MB and 60 files together) and whether **Share** offered the zip to the app
+  you chose and what the message said (how many sessions went, how many older ones were left out). Settles: ADR 0010 section 8, row L1, and gives the evidence for FT 1 to FT 12.
 
 ---
 
@@ -368,6 +379,7 @@ the firmware revision at set-up (`ClickDevice.firmware`) and keeps it out of eve
 | Connecting to Zwift Click (right)… | the app is connecting or setting up |
 | Zwift Click (right) · press any button | connected, handshake done, no message yet, **only with Silence means locked on** (off by default). First bench (2026-11-18): a real Click sends nothing until a button is pressed, so with the rule off an answered Click is simply **Connected** |
 | Zwift Click (right) · battery 87% | delivering messages; the battery once the Click has said |
+| Waiting for the Click (trainer, strap) to wake up | release 0.4.1 (ADR 0040), with **Connect in the background** on: the device is asleep or out of range and a background connect waits for it; nothing is wrong; **Retry now** makes an active attempt |
 | Not found · retrying in 8 s / Connection lost · … / Could not connect · … | it is off, asleep, out of range or held by another app / the link dropped / a set-up step failed; **Retry now** tries at once |
 | Zwift Click (right) · locked, with a notice below | the Zwift service is hidden, or, only with Silence means locked on, it answered and says nothing (5.3) |
 | Zwift Click (right) · Bluetooth is off / needs Nearby devices | the same notice and fix as the others |
@@ -797,9 +809,9 @@ Everything a ride is, once, on all three devices, then the file it leaves.
   `adb bugreport` zips for any failure.
 - [ ] **9.2 Bluetooth session logs: how to send them back.** The files are the evidence for the open questions FT 1 to
   FT 12 and CK 1 to CK 14, so they are the most useful thing you can send. On the tablet: **Settings, Developer, Share
-  Bluetooth logs**. The row says how many files and how big ("6 files · 340 KB"); **Share** opens the system share sheet
-  with every file, and you choose where they go (email to yourself, a messaging app, a cloud drive). Expect: files named
-  `ble-<date>T<time>Z-trainer.txt`, `...-strap.txt` and `...-click.txt`, one per connection session, readable text starting
+  Bluetooth logs**. The row says how many files and how big ("6 files · 340 KB"); **Share** makes **one zip** and opens the system share sheet
+  with it, and you choose where it goes (email to yourself, a messaging app, a cloud drive). The message says how many sessions are in it. Expect: a file named
+  `overdrive-ble-logs-<date>-<time>.zip`, holding `ble-<date>T<time>Z-trainer.txt`, `...-strap.txt` and `...-click.txt`, one per connection session, readable text starting
   with `# overdrive-ble-session 1`. They hold no device address and no serial-like word, a name only as a cleaned model
   line, **and they hold your heart rate and RR intervals**: send them only to whoever is fixing the codecs and keep them out
   of the repository and out of any public issue. If there is no share target, `adb` cannot read the app's private folder in

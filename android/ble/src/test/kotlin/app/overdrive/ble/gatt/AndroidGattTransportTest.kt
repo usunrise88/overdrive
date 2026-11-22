@@ -1,5 +1,7 @@
 package app.overdrive.ble.gatt
 
+import app.overdrive.ble.AndroidGattTransportFactory
+import app.overdrive.core.ble.ConnectMode
 import app.overdrive.core.ble.GattFailure
 import app.overdrive.core.ble.GattFailureKind
 import app.overdrive.core.ble.GattLinkState
@@ -34,6 +36,7 @@ class AndroidGattTransportTest {
     private fun TestScope.transport(
         platform: ScriptedPlatform,
         timings: GattTimings = GattTimings(),
+        mode: ConnectMode = ConnectMode.ACTIVE,
     ) = AndroidGattTransport(
         opener = platform,
         device = TEST_DEVICE,
@@ -41,6 +44,7 @@ class AndroidGattTransportTest {
         nanoClock = { testScheduler.currentTime * 1_000_000 },
         timings = timings,
         log = { log += it },
+        mode = mode,
     )
 
     /** A transport that is connected: `connect` answered with the platform's success. */
@@ -756,4 +760,96 @@ class AndroidGattTransportTest {
             )
             assertTrue("the fingerprint identifies the device", log.any { it.contains("#") })
         }
+
+    // region background connect (docs/adr/0040)
+
+    @Test
+    fun `an active transport connects with autoConnect off and gives up at its own limit`() =
+        runTest {
+            val platform = ScriptedPlatform()
+            val transport = transport(platform)
+            val result = async { transport.connect() }
+            runCurrent()
+            assertEquals(listOf(false), platform.backgroundFlags)
+            advanceTimeBy(36.seconds)
+            runCurrent()
+            assertEquals(GattFailureKind.TIMEOUT, failure(result.await()).kind)
+        }
+
+    @Test
+    fun `a background transport connects with autoConnect on and has no limit of its own`() =
+        runTest {
+            val platform = ScriptedPlatform()
+            val transport = transport(platform, mode = ConnectMode.BACKGROUND)
+            val result = async { transport.connect() }
+            runCurrent()
+            assertEquals(listOf(true), platform.backgroundFlags)
+
+            advanceTimeBy(30 * 60 * 1000L) // half an hour of a Click asleep
+            runCurrent()
+            assertFalse("still pending: the controller waits for the device", result.isCompleted)
+            assertEquals(GattLinkState.Connecting, transport.state.value)
+
+            platform.connected() // it advertised
+            runCurrent()
+            assertEquals(GattResult.Ok(Unit), result.await())
+            assertEquals(GattLinkState.Connected, transport.state.value)
+        }
+
+    @Test
+    fun `closing a pending background transport cancels the connection and fails the waiting connect`() =
+        runTest {
+            val platform = ScriptedPlatform()
+            val transport = transport(platform, mode = ConnectMode.BACKGROUND)
+            val result = async { transport.connect() }
+            runCurrent()
+
+            transport.close()
+            runCurrent()
+            assertTrue("the platform was told to stop connecting", "disconnect" in platform.gatt.calls)
+            platform.dropped(status = 0) // the platform answers the disconnect
+            runCurrent()
+            assertTrue(result.await() is GattResult.Failed)
+            assertTrue(transport.state.value is GattLinkState.Disconnected)
+            advanceTimeBy(5.seconds)
+            runCurrent()
+            assertTrue("and released it", "close" in platform.gatt.calls)
+        }
+
+    @Test
+    fun `a background connect that fails with 133 is a dead transport like any other`() =
+        runTest {
+            val platform = ScriptedPlatform()
+            val transport = transport(platform, mode = ConnectMode.BACKGROUND)
+            val result = async { transport.connect() }
+            runCurrent()
+            platform.dropped(status = 133)
+            runCurrent()
+            val failed = failure(result.await())
+            assertEquals(133, failed.status)
+            assertTrue(failed.isGattError)
+            assertEquals(GattLinkState.Disconnected(133), transport.state.value)
+        }
+
+    @Test
+    fun `the factory passes the mode of the supervisor to the platform`() =
+        runTest {
+            val platform = ScriptedPlatform()
+            val factory =
+                AndroidGattTransportFactory(
+                    platform,
+                    backgroundScope,
+                    { testScheduler.currentTime * 1_000_000 },
+                    GattTimings(),
+                    BleLog.None,
+                )
+            val active = factory.open(TEST_DEVICE)
+            val explicit = factory.open(TEST_DEVICE, ConnectMode.ACTIVE)
+            val background = factory.open(TEST_DEVICE, ConnectMode.BACKGROUND)
+            listOf(active, explicit, background).forEach { backgroundScope.launch { it.connect() } }
+            runCurrent()
+            assertEquals(listOf(false, false, true), platform.backgroundFlags)
+        }
+
+    // endregion
 }

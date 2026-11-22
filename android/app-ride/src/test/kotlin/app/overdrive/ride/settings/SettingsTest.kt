@@ -177,6 +177,21 @@ class SettingsTest {
     }
 
     @Test
+    fun connectingInTheBackgroundIsOnByDefaultAndTheSwitchSurvivesARestart() =
+        runTest {
+            assertTrue(AppSettings().connectInBackground)
+            val (repository, _) = repository("background")
+            assertTrue(repository.settings.first().connectInBackground)
+            repository.update { it.copy(connectInBackground = false) }
+            assertFalse(repository.settings.first().connectInBackground)
+            repository.update { it.copy(connectInBackground = true) }
+            assertTrue(repository.settings.first().connectInBackground)
+            // It changes how the devices connect, never what a ride is built from.
+            val base = AppSettings()
+            assertEquals(base.rideInputs(), base.copy(connectInBackground = false).rideInputs())
+        }
+
+    @Test
     fun theDeviceSourceAndTheRecordingSwitchSurviveARestartAndBadValuesFallBack() =
         runTest {
             val (repository, store) = repository()
