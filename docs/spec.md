@@ -677,6 +677,23 @@ Health Connect batch or an intervals.icu account**: what OHealth really writes i
 - *W′ balance:* Skiba et al. (2012), integral model, 1 Hz; CP = the profile's FTP (else the ride's), W′ = the profile's `wPrimeKj` (new field,
   1 to 100 kJ) else 20 kJ.
 
+**Power skills and Effort** (release 0.4.1, ADR 0042; the data for two companion charts, `design/companion.md` §4.14, §4.15): the service computes, the
+phone draws.
+
+- *Power skills:* the best power of the **tablet's rides** (never the watch's workouts or outdoor rides, §11.8) at 15 s, 30 s, 1, 2, 3, 5, 10, 15,
+  20, 30, 45 and 60 min, over a window of local days (default the last 56 days, at most three years) and over all time up to its end, with the ride,
+  its name and its day. With the rider's weight (the 7-day average, §12.5) each effort has watts per kilogram and a **score** on that duration's
+  level scale (0 to 9: 1 is the floor of level 1, 9 the floor of level 9, from the published Allen and Coggan power-profile tables, log-interpolated
+  between 5 s, 1, 5 and 60 min; the men's table or the women's, the profile's `powerProfileTable`). Five skills, in our own words: Sprint (15 to
+  30 s), Attack (1 to 3 min), Climb (5 to 10 min), Time trial (15 to 30 min), Endurance (45 to 60 min); a skill's level is the mean of its scores
+  rounded down, 1 to 9: Starting, Casual, Regular, Fit, Strong, Very strong, Racer, Elite, World class. **Levels are approximate** (tables for young
+  adults, trained riders, indoor against outdoor power, a 7-day weight) and need the weight.
+- *Effort:* the training load the metrics already compute (power for rides, heart rate for watch workouts and outdoor rides, one scale), summed per
+  local week (Monday to Sunday) and day, with every activity and its share of the week. A week's **usual range** is the mean ± one standard deviation
+  of the 8 complete weeks before it, counted from the rider's first week with any activity (null while **learning**); its **verdict** is `below`,
+  `within` or `above` that range, `learning`, or `none` for a current week with nothing in it; for the week in progress the load so far is compared with
+  the whole range, so `below` there means "below so far". The words are the app's.
+
 ### 6.4 Recovery without HRV
 
 - For each daily metric, keep a personal baseline: rolling mean and spread over the last 28 to 60 days.
@@ -986,6 +1003,8 @@ path: everything is under `/v1`.
 | `POST /v1/plan-events` | Companion, Telegram bot | The rider declares illness or travel, so that the coach agent replans (§12.2). **Settled** (stage A2a, below) |
 | `POST /v1/activities/fit` | Companion, Telegram bot | An outdoor ride as a FIT file (`application/vnd.ant.fit`, up to 16 MiB): imported, or a duplicate of a ride already there. **Settled** (stage P3-7, below) |
 | `GET /v1/repeats`, `GET /v1/repeats/{hash}` | Companion | The sessions ridden more than once; every attempt at one side by side with its trend (§11.7). **Settled** (stage P3-7, below) |
+| `GET /v1/power-skills?from&to` | Companion | The best power at 12 durations over a window and all time, scores and a level per skill (§6.3). **Settled** (release 0.4.1, below) |
+| `GET /v1/effort?weeks` | Companion | The weekly training load with each week's usual range, verdict, days and activities (§6.3). **Settled** (release 0.4.1, below) |
 | `GET /v1/repeats/{hash}/previous?before=<rideId>` | Ride app (overlay line, stage v0.4.0) | The attempt before a ride with its step boundaries and heart rates. **Settled** (stage P3-7, below) |
 | `GET /v1/profile`, `PATCH /v1/profile` | Both | FTP, zones, physics settings. **Settled** (stage P2-3, below) |
 
@@ -1042,6 +1061,7 @@ path: everything is under `/v1`.
   `422 invalid_profile` (a new code of the closed list); a body that is not JSON is `400 invalid_json`. A change emits the
   `profile-changed` event inside the service.
 - *Stage A1c of v0.4.0:* the profile may also carry `bikeWeightKg` (writable by `PATCH`, `null` clears it) and the read-only derived `riderWeight` `{ kg, date, days }` (§12.5, ADR 0034); both keys are written only when they have a value.
+- *Release 0.4.1:* the profile may also carry `powerProfileTable` (`men` or `women`, writable by `PATCH` and `update_profile`, `null` goes back to `men`): which table of watts per kilogram the power skills' levels are read against (§6.3, ADR 0042); written only when chosen.
 
 **Settled in P2 fix: profile on the tablet (ADR 0021, `core` `ProfileRepository`, `android/data` `FileProfileCache`):** the ride app
 uses the profile. It reads `GET /v1/profile` with the same address, token and transport class as the plan (at start, when the Ready
@@ -1115,6 +1135,8 @@ yet", and sent first by the next refresh; a `4xx` other than 401, 408 and 429 dr
 - `GET /v1/repeats` answers `{ generatedAt, repeats: [{ hash, name, routeKey, attempts, firstDate, lastDate, latest, previous, comparison }] }`: the workouts ridden at least twice, most recently ridden first. `hash` is 16 hex characters (the structure of the workout, §11.7); `routeKey` is the route id and the hash of its points when every attempt followed the same route (stage A2b-1, §11.4), else `null`; `latest` and `previous` are `{ rideId, date, startTime }`; `comparison` has `heartRateAtPower` (bpm), `driftPercent` and `compliance` (percent of the planned time ridden), each `{ latest, previous, difference, reason }` with the difference latest minus previous, or a null difference and the reason.
 - `GET /v1/repeats/{hash}` answers one session in detail (`404 not_found` for a hash that is not a session ridden twice): `{ generatedAt, hash, name, routeKey, note, definition, steps, comparedSteps, attempts, trends }`. `note` is the standing caution (heart rate also moves with heat, sleep and caffeine: read the trend over several attempts); `definition` states `powerTolerancePercent` 3, `skipSeconds` 60, `minStepSeconds` 120, `minTrendAttempts` 3; `steps` are the fixed-power steps (1-based position in the flattened workout, label, length, target as a fraction of FTP); `comparedSteps` the steps the overall figure is taken over. Each attempt, oldest first, has `rideId`, `number`, `date`, `startTime`, `durationSeconds`, `ftp`, `averagePower`, `averageHeartRate`, `effortRating` (reserved, `null`), `heartRateAtPower` `{ value, seconds, reason }`, `stepHeartRates` (per step: `targetWatts`, `averagePower`, `averageHeartRate`, counted `seconds`, `reason`), `driftPercent` `{ value, reason }` and `compliance` `{ percent, stepsCompleted, stepsPlanned, powerDeltaPercent }`. `trends` has one per measure (`heartRateAtPower`, `driftPercent`, `compliance`): `unit`, `betterWhen`, `attempts` (with a figure), `minAttempts` 3, `direction` (`improving`, `worsening`, `steady`, or `unknown` below 3), `slopePerAttempt`, `change`, `steadyBelow`, `reason`.
 - `GET /v1/repeats/{hash}/previous[?before=<rideId>]` answers `{ generatedAt, hash, before, previous }`: `previous` is the attempt before the ride (the latest of all without `before`), or `null`: `{ rideId, date, startTime, durationSeconds, ftp, attempt, heartRateAtPower, steps: [{ step, label, startSeconds, endSeconds, targetWatts, averageHeartRate }] }` with the boundaries in seconds from the start of that ride. `before` may be a ride that is not stored yet if its id is `ride-<start millis>`; any other unknown id is `404 ride_not_found`, one that is not a ride id `400 invalid_ride_id`. The overlay line that will use it is stage v0.4.0.
+- `GET /v1/power-skills[?from=YYYY-MM-DD][&to=YYYY-MM-DD]` (release 0.4.1, ADR 0042) answers `{ generatedAt, table, window: { from, to, rideCount }, durations, riderWeight, skills, levelsNote, outdoorNote }`. `table` is `men` or `women` (the profile's `powerProfileTable`); `durations` has the twelve in order, each `{ seconds, window, allTime }` with an effort `{ watts, wattsPerKg, score, date, rideId, rideName }` or `null` (the best in the window, the best of all rides up to its end; a tie goes to the later ride); `wattsPerKg` and `score` (0 to 9, two decimals) are `null` exactly when `riderWeight` (`{ kg, date, days }`, the 7-day average) is; `skills` has Sprint, Attack, Climb, Time trial and Endurance each with `level` `{ index 1 to 9, name }` or `null`. Without parameters the window is the last 56 days up to today in the rider's time zone; a date that is not real, `from` after `to` or more than 1096 days is `400 invalid_range` naming the parameter. Only the tablet's rides count; `Cache-Control: no-store`.
+- `GET /v1/effort[?weeks=N]` (release 0.4.1, ADR 0042) answers `{ generatedAt, weeksNeeded: 8, weeksLogged, weeks }`, `weeks` the last N (1 to 52, default 12) Monday-first weeks, oldest first: `{ weekStart, load, approximate, current, usualLow, usualHigh, weeksLogged, verdict, days: [{ date, load }] × 7, activities: [{ id, kind (ride | activity), sport, name, date, load, approximate, share }] }`. `usualLow` and `usualHigh` are `null` while the week has fewer than 8 weeks of training before it; `verdict` is `above`, `within`, `below`, `none` or `learning`; an activity's `load` is `null` when it has no heart rate to be worked out from, and it is then in no sum. A `weeks` that is not a whole number from 1 to 52 is `400 invalid_query`.
 
 **Settled in stage A2a (coach notebook and plan events; ADR 0035, `contracts/schema/notebook-response.schema.json`, `plan-event.schema.json`, `plan-event-declaration.schema.json`; the Kotlin side is a later stage):**
 
@@ -1149,6 +1171,8 @@ yet", and sent first by the next refresh; a `4xx` other than 401, 408 and 429 dr
 | `list_rides` | Read | Completed rides with summaries |
 | `get_ride` | Read | One ride: laps, power and heart-rate statistics, compliance with plan |
 | `get_fitness` | Read | Load, fitness, fatigue, form series |
+| `get_power_skills` | Read | The best power at 12 durations over a window and all time, scores and a rough level per skill (§6.3) |
+| `get_effort` | Read | The weekly training load, each week's usual range and verdict, days and activities (§6.3) |
 | `list_repeats` | Read | The sessions ridden more than once, each latest against previous |
 | `get_repeat` | Read | Every attempt at one session side by side, with the trend |
 | `get_wellness` | Read | Daily wellness metrics and baselines |
@@ -1215,6 +1239,8 @@ rider has already been told. `get_facts` takes a `kind` and a day, a ride id or 
 the note when one exists (`stored: true`, with the note's id, how it was written and the hash), else worked out now. `list_discussion_topics` (open by default,
 newest first) gives each topic's text, opening question, ride (id, name, day) and the rule that found it; `mark_discussion_topic` sets `discussed` and nothing else (an
 expired topic stays expired). Every number is computed by the server; nothing here can change the plan or the profile.
+
+**Settled in release 0.4.1 (ADR 0042):** `get_power_skills` (optional `from` and `to`, the last 56 days by default, at most 1096 days) and `get_effort` (optional `weeks`, 1 to 52, default 12) return the answers of §8.3 as they are, with descriptions that say what each number is and that the levels are a rough guide from approximate tables; `update_profile` and `get_profile` carry `powerProfileTable` (`men` or `women`, `men` by default). Every number is computed by the server.
 
 **Settled in stage P3-7 (ADR 0026):** `list_repeats` gives the sessions ridden more than once (hash, name, attempts, first and last day, the latest and the previous attempt and the comparison of heart rate at the same power, drift and compliance, with the standing caution in its description) and `get_repeat` takes a hash and gives every attempt side by side with the trends; `get_ride` gains `repeatOf` (`{ hash, attemptNumber, attempts, previous: { rideId, date, heartRateAtSamePower: { thisRide, previous, difference, reason } } | null, note }`, null when the ride has no workout copy or its session has been ridden once). `list_activities` and `get_activity` cover the outdoor rides imported from FIT files (`source` `fit`, `type` `cycling-outdoor`; `list_activities` can filter on `source` `fit`; an id `fit-…`). Every number is computed by the server.
 

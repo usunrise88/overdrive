@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive power skills",
+  "description": "The service's answer to GET /v1/power-skills?from&to (spec §6.3, §8.3, ADR 0042, design/companion.md §4.14, §6.11): the best average power the rider has held at twelve durations (15 s, 30 s, 1, 2, 3, 5, 10, 15, 20, 30, 45 and 60 minutes) over a window of local days and over all time, and a level for each of five groups of durations (skills). Only the rides recorded on the tablet count: outdoor rides and the watch's workouts never feed it (spec §11.8). window is the range asked for, the local days from `from` to `to` (both included; by default the last 56 days up to today in the rider's time zone; at most 1096 days, which is three years) and rideCount, the number of rides in it that have a power curve. table says which table of watts per kilogram the levels were read against: men (the default) or women, the profile's powerProfileTable. durations has exactly the twelve durations in the order above; for each, `window` is the best mean-maximal power among the rides of the window and `allTime` the best among all rides up to the end of the window, either null when no ride is long enough for that duration. An effort is the watts, the ride it came from (its id, the name of its workout or Free ride, and its local day; the later ride when two tie), wattsPerKg (watts over riderWeight.kg, two decimals) and score: the rider's watts per kilogram placed on that duration's level scale, `1 + 8 * (wattsPerKg - B) / (T - B)` where B is the floor of level 1 and T the floor of level 9 at that duration, two decimals, held between 0 and 9 so that one huge effort cannot dominate a mean (so 1 is the floor of level 1, 9 the floor of level 9 and a score is a position, not a rank). wattsPerKg and score are null exactly when riderWeight is null. riderWeight is the rider's 7-day average weight from the watch as the profile has it (kg to one decimal, the local date of the newest weighing, the days of the seven that had one), or null when the service does not know it; the same weight is used for every figure, today's, not the weight of the day of the ride. skills has the five groups in a fixed order: Sprint (15 to 30 s), Attack (1 to 3 min), Climb (5 to 10 min), Time trial (15 to 30 min) and Endurance (45 to 60 min). A skill's level is the mean of the window's scores at its durations that have an effort, rounded down and held between 1 and 9: index and name (Starting, Casual, Regular, Fit, Strong, Very strong, Racer, Elite, World class); it is null when the weight is not known or the window has no effort at any of the skill's durations. The levels are our own ordinal scale from published power-profile tables (Allen and Coggan) and are approximate (ADR 0042). levelsNote and outdoorNote are plain sentences for readers of the answer that have no words of their own (the companion app writes its own). generatedAt is when the service computed the answer (UTC). Rules a schema cannot state, checked by every implementation: dates and instants are real; from is not after to and the window is at most 1096 days; the durations are the twelve in order; an effort's day is inside the window (window) or not after its end (allTime) and a window effort has an allTime effort at least as high; with rideCount 0 no window effort exists; wattsPerKg is watts over riderWeight.kg to two decimals; the skills are the five in order with their names and ranges; a level is the floor of the mean of its scores, with the name of its index, and is null exactly when there is no weight or no window effort among the skill's durations.",
+  "type": "object",
+  "required": [
+    "generatedAt",
+    "table",
+    "window",
+    "durations",
+    "riderWeight",
+    "skills",
+    "levelsNote",
+    "outdoorNote"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "generatedAt": { "$ref": "#/$defs/instant" },
+    "table": { "enum": ["men", "women"] },
+    "window": {
+      "type": "object",
+      "required": ["from", "to", "rideCount"],
+      "additionalProperties": false,
+      "properties": {
+        "from": { "$ref": "#/$defs/date" },
+        "to": { "$ref": "#/$defs/date" },
+        "rideCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "durations": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "items": { "$ref": "#/$defs/duration" }
+    },
+    "riderWeight": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["kg", "date", "days"],
+          "additionalProperties": false,
+          "properties": {
+            "kg": { "type": "number", "exclusiveMinimum": 0, "maximum": 500 },
+            "date": { "$ref": "#/$defs/date" },
+            "days": { "type": "integer", "minimum": 1, "maximum": 7 }
+          }
+        }
+      ]
+    },
+    "skills": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": { "$ref": "#/$defs/skill" }
+    },
+    "levelsNote": { "type": "string", "minLength": 1, "maxLength": 400 },
+    "outdoorNote": { "type": "string", "minLength": 1, "maxLength": 400 }
+  },
+  "$defs": {
+    "instant": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "rideId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "seconds": { "enum": [15, 30, 60, 120, 180, 300, 600, 900, 1200, 1800, 2700, 3600] },
+    "effort": {
+      "type": "object",
+      "required": ["watts", "wattsPerKg", "score", "date", "rideId", "rideName"],
+      "additionalProperties": false,
+      "properties": {
+        "watts": { "type": "number", "minimum": 0, "maximum": 3000 },
+        "wattsPerKg": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+        "score": { "type": ["number", "null"], "minimum": 0, "maximum": 9 },
+        "date": { "$ref": "#/$defs/date" },
+        "rideId": { "$ref": "#/$defs/rideId" },
+        "rideName": { "type": "string", "minLength": 1, "maxLength": 200 }
+      }
+    },
+    "duration": {
+      "type": "object",
+      "required": ["seconds", "window", "allTime"],
+      "additionalProperties": false,
+      "properties": {
+        "seconds": { "$ref": "#/$defs/seconds" },
+        "window": { "oneOf": [{ "$ref": "#/$defs/effort" }, { "type": "null" }] },
+        "allTime": { "oneOf": [{ "$ref": "#/$defs/effort" }, { "type": "null" }] }
+      }
+    },
+    "level": {
+      "type": "object",
+      "required": ["index", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "index": { "type": "integer", "minimum": 1, "maximum": 9 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 30 }
+      }
+    },
+    "skill": {
+      "type": "object",
+      "required": ["id", "name", "fromSeconds", "toSeconds", "level"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "enum": ["sprint", "attack", "climb", "time-trial", "endurance"] },
+        "name": { "type": "string", "minLength": 1, "maxLength": 30 },
+        "fromSeconds": { "$ref": "#/$defs/seconds" },
+        "toSeconds": { "$ref": "#/$defs/seconds" },
+        "level": { "oneOf": [{ "$ref": "#/$defs/level" }, { "type": "null" }] }
+      }
+    }
+  }
+}

@@ -4,6 +4,7 @@ import app.overdrive.core.physics.PhysicsSettings
 import app.overdrive.core.plan.PlanDates
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -52,6 +53,12 @@ public data class Profile(
      */
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val riderWeight: RiderWeight? = null,
+    /**
+     * Which table of watts per kilogram the power skills' levels are read against (spec §6.3, docs/adr/0042): null, or absent on the wire,
+     * is the men's. Written to the wire only when the owner has chosen one.
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val powerProfileTable: PowerProfileTable? = null,
 ) {
     init {
         require(ftp == null || ftp in MIN_FTP..MAX_FTP) { "FTP must be within $MIN_FTP..$MAX_FTP W, got $ftp" }
@@ -125,6 +132,16 @@ public data class Profile(
                 updatedAt = null,
             )
     }
+}
+
+/** The two tables of watts per kilogram the power skills' levels can be read against (spec §6.3, docs/adr/0042); [MEN] is the default. */
+@Serializable
+public enum class PowerProfileTable {
+    @SerialName("men")
+    MEN,
+
+    @SerialName("women")
+    WOMEN,
 }
 
 /**

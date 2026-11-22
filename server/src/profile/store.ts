@@ -70,6 +70,7 @@ const PARTS = [
   "maxHeartRate",
   "thresholdHeartRate",
   "bikeWeightKg",
+  "powerProfileTable",
 ] as const;
 
 /** What is stored: the profile without its stamp and without the estimates, which are read-only and computed. */

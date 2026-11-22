@@ -3,6 +3,7 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 import { liveCoachShapeErrors, type MustSay, mustSayConsistencyErrors } from "./live-coach.ts";
 
 // The sync API's request and response shapes (spec §8.3) live in their own files.
+export * from "./effort.ts";
 export * from "./insights.ts";
 export * from "./live-coach.ts";
 export * from "./metrics.ts";
@@ -10,6 +11,7 @@ export * from "./notebook.ts";
 export * from "./outdoor.ts";
 export * from "./plan.ts";
 export * from "./plan-events.ts";
+export * from "./power-skills.ts";
 export * from "./profile.ts";
 export * from "./repeats.ts";
 export * from "./routes.ts";

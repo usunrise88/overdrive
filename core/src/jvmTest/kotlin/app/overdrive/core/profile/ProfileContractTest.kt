@@ -93,7 +93,7 @@ class ProfileContractTest {
         setOf("maxHeartRate", "thresholdHeartRate", "estimatedMaxHeartRate", "estimatedThresholdHeartRate")
 
     /** `bikeWeightKg` and `riderWeight` (spec §12.5, docs/adr/0034): optional on read, written only when they have a value. */
-    private val weightKeys = setOf("bikeWeightKg", "riderWeight")
+    private val weightKeys = setOf("bikeWeightKg", "riderWeight", "powerProfileTable")
 
     private fun withoutAbsentNulls(
         written: JsonObject,
@@ -162,6 +162,42 @@ class ProfileContractTest {
         // The rider's weight is derived: no patch can carry it.
         assertFailsWith<IllegalArgumentException> {
             ProfileApiJson.decodePatch("""{"riderWeight":{"kg":70,"date":"2026-11-18","days":7}}""")
+        }
+    }
+
+    @Test
+    fun `the power profile table is read, written only when chosen, and patched like the other fields`() {
+        val women =
+            ProfileApiJson.decodeProfile(
+                File(contracts, "fixtures/profile/profile/valid/power-profile-table-women.json").readText(),
+            )
+        assertEquals(PowerProfileTable.WOMEN, women.powerProfileTable)
+        assertTrue("\"powerProfileTable\":\"women\"" in ProfileApiJson.encodeProfile(women))
+        assertNull(
+            ProfileApiJson
+                .decodeProfile(
+                    File(contracts, "fixtures/profile/profile/valid/power-profile-table-null.json").readText(),
+                ).powerProfileTable,
+        )
+        assertTrue("powerProfileTable" !in ProfileApiJson.encodeProfile(Profile.default()))
+        val patched = ProfileApiJson.decodePatch("""{"powerProfileTable":"women"}""").applyTo(Profile.default())
+        assertEquals(PowerProfileTable.WOMEN, patched.powerProfileTable)
+        assertNull(ProfileApiJson.decodePatch("""{"powerProfileTable":null}""").applyTo(patched).powerProfileTable)
+        assertEquals(
+            PowerProfileTable.WOMEN,
+            ProfileApiJson.decodePatch("""{"ftp":250}""").applyTo(patched).powerProfileTable,
+        )
+        val twice =
+            ProfilePatch(powerProfileTable = Change.Set(PowerProfileTable.MEN))
+                .andThen(ProfilePatch(powerProfileTable = Change.Set(PowerProfileTable.WOMEN)))
+        assertEquals("""{"powerProfileTable":"women"}""", ProfileApiJson.encodePatch(twice))
+        assertEquals(twice, ProfileApiJson.decodePatch(ProfileApiJson.encodePatch(twice)))
+        assertFailsWith<IllegalArgumentException> { ProfileApiJson.decodePatch("""{"powerProfileTable":"children"}""") }
+        assertFailsWith<IllegalArgumentException> { ProfileApiJson.decodePatch("""{"powerProfileTable":1}""") }
+        assertFailsWith<IllegalArgumentException> {
+            ProfileApiJson.decodeProfile(
+                File(contracts, "fixtures/profile/profile/invalid/power-profile-table-unknown.json").readText(),
+            )
         }
     }
 

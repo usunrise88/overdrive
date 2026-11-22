@@ -1,5 +1,7 @@
 package app.overdrive.companion
 
+import app.overdrive.core.effort.EffortApiJson
+import app.overdrive.core.effort.EffortResponse
 import app.overdrive.core.health.kindName
 import app.overdrive.core.insights.InsightsApiJson
 import app.overdrive.core.insights.InsightsResponse
@@ -9,6 +11,8 @@ import app.overdrive.core.metrics.FtpSuggestionDismissResponse
 import app.overdrive.core.metrics.MetricsApiJson
 import app.overdrive.core.metrics.RideItem
 import app.overdrive.core.plan.PlanApiJson
+import app.overdrive.core.powerskills.PowerSkillsApiJson
+import app.overdrive.core.powerskills.PowerSkillsResponse
 import app.overdrive.core.profile.Profile
 import app.overdrive.core.profile.ProfileApiJson
 import app.overdrive.core.repeats.RepeatDetailResponse
@@ -85,6 +89,13 @@ class LocalService(
     var repeats: RepeatsResponse? = null
 
     val repeatDetails = java.util.concurrent.ConcurrentHashMap<String, RepeatDetailResponse>()
+
+    /** What `GET /v1/power-skills` answers for a window (null is a 404, as a service that has not got the route yet), and `GET /v1/effort`. */
+    @Volatile
+    var powerSkills: ((from: String, to: String) -> PowerSkillsResponse)? = null
+
+    @Volatile
+    var effort: EffortResponse? = null
 
     /** The FIT files `POST /v1/activities/fit` holds, by the id it gave them: idempotent by the file's bytes, as the real one is. */
     val fitFiles = java.util.concurrent.ConcurrentHashMap<String, ByteArray>()
@@ -213,6 +224,20 @@ class LocalService(
 
             method == "GET" && path == "/v1/repeats" -> {
                 repeats?.let { 200 to RepeatsApiJson.encodeRepeats(it) } ?: (404 to error("not_found", "No such route"))
+            }
+
+            method == "GET" && path == "/v1/power-skills" -> {
+                powerSkills?.let {
+                    200 to
+                        PowerSkillsApiJson.encodePowerSkills(
+                            it(q.getValue("from"), q.getValue("to")),
+                        )
+                }
+                    ?: (404 to error("not_found", "No such route"))
+            }
+
+            method == "GET" && path == "/v1/effort" -> {
+                effort?.let { 200 to EffortApiJson.encodeEffort(it) } ?: (404 to error("not_found", "No such route"))
             }
 
             method == "GET" && path.startsWith("/v1/repeats/") -> {
