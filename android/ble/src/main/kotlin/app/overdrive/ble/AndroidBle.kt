@@ -12,6 +12,7 @@ import app.overdrive.ble.gatt.GattTimings
 import app.overdrive.ble.gatt.PlatformGattOpener
 import app.overdrive.ble.scan.AndroidGattScanner
 import app.overdrive.core.ble.BleEnvironment
+import app.overdrive.core.ble.ConnectMode
 import app.overdrive.core.ble.DeviceId
 import app.overdrive.core.ble.GattScanner
 import app.overdrive.core.ble.GattTransport
@@ -91,6 +92,10 @@ public class AndroidGattTransportFactory internal constructor(
     private val timings: GattTimings,
     private val log: BleLog,
 ) : GattTransportFactory {
-    override fun open(device: DeviceId): GattTransport =
-        AndroidGattTransport(opener, device, scope, nanoClock, timings, log)
+    override fun open(device: DeviceId): GattTransport = open(device, ConnectMode.ACTIVE)
+
+    override fun open(
+        device: DeviceId,
+        mode: ConnectMode,
+    ): GattTransport = AndroidGattTransport(opener, device, scope, nanoClock, timings, log, mode)
 }

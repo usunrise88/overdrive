@@ -69,14 +69,18 @@ internal interface PlatformGatt {
 /** Opens the platform connection (`connectGatt`) and says where its events go. */
 internal fun interface PlatformGattOpener {
     /**
-     * Starts connecting to [device] (`autoConnect = false`, LE) and returns the platform handle, or null if the
-     * platform gave none. Events, the first of which is the connection result, go to [listener]; they may arrive before
-     * this call returns. May throw (`SecurityException` without the permission, `IllegalArgumentException` for an id
-     * that is not an address): the transport turns that into a failed connect.
+     * Starts connecting to [device] (LE) and returns the platform handle, or null if the platform gave none. [background]
+     * is the `autoConnect` flag of `connectGatt` (docs/adr/0040): false connects now and gives up after the platform's own
+     * limit (about 30 s, status 147 or 133); true leaves a pending connection that the controller completes the moment the
+     * device advertises, however long that takes, until the handle is disconnected and closed. Events, the first of which
+     * is the connection result, go to [listener]; they may arrive before this call returns. May throw
+     * (`SecurityException` without the permission, `IllegalArgumentException` for an id that is not an address): the
+     * transport turns that into a failed connect.
      */
     fun open(
         device: DeviceId,
         listener: PlatformListener,
+        background: Boolean,
     ): PlatformGatt?
 }
 

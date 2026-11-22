@@ -1,5 +1,6 @@
 package app.overdrive.ble.gatt
 
+import app.overdrive.core.ble.ConnectMode
 import app.overdrive.core.ble.DeviceId
 import app.overdrive.core.ble.GattCharacteristicInfo
 import app.overdrive.core.ble.GattFailure
@@ -93,6 +94,8 @@ internal class AndroidGattTransport(
     private val nanoClock: () -> Long,
     private val timings: GattTimings = GattTimings(),
     private val log: BleLog = BleLog.None,
+    /** How to connect: [ConnectMode.BACKGROUND] is `autoConnect = true` and has no limit of the transport's own. */
+    private val mode: ConnectMode = ConnectMode.ACTIVE,
 ) : GattTransport,
     PlatformListener {
     private class Op(
@@ -160,7 +163,7 @@ internal class AndroidGattTransport(
         }
         val handle =
             try {
-                opener.open(device, this)
+                opener.open(device, this, mode == ConnectMode.BACKGROUND)
             } catch (e: SecurityException) {
                 log.log("$device: connectGatt needs a permission (${e.logName()})")
                 return failConnect(connecting, GattFailure(GattFailureKind.UNAVAILABLE))
@@ -185,7 +188,13 @@ internal class AndroidGattTransport(
         if (!keep) shutdown(handle)
         val event =
             try {
-                withTimeoutOrNull(timings.connect) { connecting.result.await() }
+                // A background connect has no limit here: the controller completes it when the device advertises, and the
+                // supervisor's watchdog or a close() ends it (docs/adr/0040). An active one ends at the platform's own limit.
+                if (mode == ConnectMode.BACKGROUND) {
+                    connecting.result.await()
+                } else {
+                    withTimeoutOrNull(timings.connect) { connecting.result.await() }
+                }
             } catch (cancelled: CancellationException) {
                 log.log("$device: connect cancelled; the transport is dead")
                 endLink(GattStatus.UNKNOWN)
