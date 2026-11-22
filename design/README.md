@@ -20,7 +20,7 @@ mock-ups for the ride app (tablet), its overlay and the companion (phone). Nothi
 | `fonts/` | Geist 400, 500, 600 (TTF, ~380 KB) and its licence, SIL OFL 1.1. From npm `geist` 1.9.2 |
 | `icons/` | The Lucide icons we use (SVG, stroke 1.5) and the ISC licence. From npm `lucide-static` 1.74.0 |
 | `mockups/*.html` | Static mock-ups: `overlay`, `ride`, `devices` (with the component sheet), `settings` |
-| `mockups/companion/` | Companion mock-ups (phone, 412 dp): `today`, `fitness`, `power`, `wellness`, `rides`, `settings` (with first run), `states`, and the charts stage's `skills` (Power skills) and `effort`; renders in `png/` |
+| `mockups/companion/` | Companion mock-ups (phone, 412 dp): `today`, `fitness`, `power`, `wellness`, `rides`, `settings` (with first run), `states`, and the charts stage's `skills` (Power skills), `effort` and `progress`; renders in `png/` |
 | `mockups/components.css`, `charts.js`, `overlay.js`, `ui.js` | Mock-up building blocks; `charts.js` holds the reference geometry of the workout profile |
 | `mockups/screenshots/` | Rendered PNGs at 2× (one per frame); the companion's are in `mockups/companion/png/` (index in `companion.md` §13) |
 

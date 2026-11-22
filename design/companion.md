@@ -11,8 +11,8 @@ Contents: 1 Frame and rules · 2 Navigation · 3 Shared patterns · 4 Screens ·
 9 Performance · 10 Components · 11 Data the screens need · 12 Tokens · 13 Mock-up index · 14 Implementation note (charts stage). Stage P3-4c adds §4.11 (the FIT share target),
 §4.12 (repeated sessions) and §6.10 (charts over attempts); they have no HTML mock-up, the Compose screenshots of the stage are their
 reference (`app-companion/build/shots/repeat*.png`, `repeats--*.png`, `import--*.png`, `rides--outdoor.png`, `settings--outdoor-*.png`).
-The charts stage adds **Power skills** (§4.14, §6.11) and **Effort** (§4.15, §6.12), with the copy in §7.8, the data in §11 and the
-implementation note in §14; mock-ups `skills.html` and `effort.html`.
+The charts stage adds **Power skills** (§4.14, §6.11), **Effort** (§4.15, §6.12) and **Progress** (§4.16, §6.13), with the copy in
+§7.8–7.9, the data in §11 and the implementation note in §14; mock-ups `skills.html`, `effort.html` and `progress.html`.
 
 ## 1. Frame and rules
 
@@ -45,6 +45,8 @@ Bottom navigation (system.md §7.9): **Today** (`house`), **Fitness** (`activity
 | Power, a duration of the Power skills radar or a skill row | A bottom sheet over the tab (§4.14); its ride rows open Ride detail |
 | Power, Power skills **Custom** | The date range sheet (§4.14) |
 | Fitness, an activity row of Effort's week | Ride detail or Activity detail |
+| Fitness or Power, the **Progress** row (their last card) | Progress (§4.16) |
+| Progress, a ride in a readout or in Values | Ride detail |
 | Notes, an after-ride note | Ride detail |
 | Rides, a row | Ride detail or Activity detail |
 | Rides, Repeats view, a session | Repeat detail (§4.12) |
@@ -173,7 +175,7 @@ are loaded; scrolling to the end loads 30 more.
    "−15 in 7 days", **Form** 11 with its word ("Fresh", §7.3). Always today; not affected by the range or the selection.
 4. **Effort** card (§4.15, §6.12): always the last 12 weeks, its own selection.
 5. Range selector. 6. **Fitness and fatigue** chart card (§6.1). 7. **Form** chart card (§6.2) with the note "Fitness minus
-   fatigue. Below −10 you are training hard; above 5 you are fresh."
+   fatigue. Below −10 you are training hard; above 5 you are fresh." 8. The **Progress** row (§4.16).
 
 **Charts stage:** the range selector moves below the tiles and Effort, so that everything above it is "now" and everything under
 it follows it (the rule of §3.4 stays true). The **Weekly load** card (§6.3) is **retired**: Effort draws the same weekly totals
@@ -186,7 +188,8 @@ Watch activities are part of the load (spec §6.7), so they are part of all thre
 ### 4.4 Power (`power--*.png`)
 
 **Charts stage order:** 1. Header. 2. StatusLine. 3. FTP card. 4. **Power skills** (§4.14; its own window). 5. Range selector.
-6. Power curve, Best efforts, FTP history, Aerobic drift as below. The range selector moves under the skills card for the reason
+6. Power curve, Best efforts, FTP history as below. 7. The **Progress** row (§4.16). The **Aerobic drift** card moves to Progress
+(§6.13.4). The range selector moves under the skills card for the reason
 given in §4.3: everything above it is "now" or has its own window, everything under it follows it. The list below keeps its
 earlier numbering.
 
@@ -536,6 +539,56 @@ the rows follow. **This week** returns to rest; leaving the tab does too. The da
 | A zero week | Nothing in its slot; Values says 0. |
 | A very large week | The y axis grows to it (step 100, or 200 above 400); the band gets thinner but its numbers stay in the week line. |
 
+### 4.16 Progress (pushed, charts stage; `progress--*.png`)
+
+**Purpose.** "Am I getting fitter?" over months, with measures other than FTP: one small chart per measure, each with the
+service's verdict in words, so the answer is one glance per card. Nothing here is a target.
+
+**Where it lives, and why a pushed screen.** Progress mixes power (tablet rides), heart rate (rides) and the watch (resting heart
+rate, weight), so it belongs to no single tab; each tab answers one question (Fitness: load and form now; Power: what the power is
+now; Wellness: how recovered this morning), and Power already carries FTP, Power skills, the curve, best efforts and FTP history.
+Adding six charts to a tab would bury the "now" cards that Power skills and Effort just put at the top. §2's rule is five tabs
+and pushed screens behind rows, so Progress is a **pushed screen** (back bar, no bottom nav) reached from **one row in two
+places**: the last card of **Fitness** (after Form) and the last card of **Power** (after FTP history). Both open the same screen
+at the top. The **Aerobic drift** card (§6.6) **moves from Power to Progress**, where it sits with the other heart-rate trends;
+the Power tab ends with FTP history and the Progress row.
+
+**The entry row** (`progress--progress-entry.png`): a card of one 64 dp row: "Progress" (bodyStrong) over the service's
+headline, the verdict of the measure it judges clearest ("Heart rate at the same power is trending down: fitter", label, text 2,
+at most two lines), `chevron-right` (text 3). Without a headline (no measure has a verdict yet) the line reads "How your power
+and heart rate change over the months". To TalkBack: "Progress. Heart rate at the same power is trending down: fitter. Opens
+the progress page."
+
+**The screen, top to bottom:**
+
+1. Back bar "Progress" over "Updated 07:40" (or "Updating…"); StatusLine when the last refresh failed (§3.2).
+2. Range selector **6 months · 1 year · All time** (default 6 months, remembered as on the other screens, §3.4). It scopes every
+   chart and every verdict on the page (the service judges the trend over the range shown).
+3. Group heading **Power** (heading, 8 dp above, 4 dp side inset): cards **Best power** (§6.13.1) and **Weight and watts per
+   kilogram** (§6.13.6).
+4. Group heading **Heart rate**, with the caution under it, once for the four cards below (label, text 2): "Heart rate also moves
+   with heat, sleep and caffeine, so trust a trend over several weeks, not one ride." Cards **Aerobic efficiency** (§6.13.2),
+   **Efficiency factor** (§6.13.3), **Aerobic drift** (§6.13.4), **Resting heart rate** (§6.13.5).
+
+**Every card** (ChartCard, 8 dp between parts): the name (label, text 3) with **Values**; the **verdict** (bodyStrong, text 1),
+the service's direction in words (§7.9); the **numbers line** (label, text 2, tabular), the service's comparison: now against the
+start of the range ("139 bpm at 180 W, 7 lower than in June"); the **readout** (§3.5) at rest on the latest point; the plot; a
+note only where the measure is not obvious (§6.13). A tap or a hold selects a point **in that card only** (the cards have
+different x steps: months, weeks, rides); the **Latest** pill returns it to rest (§6.10's pill). The verdict and the numbers line
+never follow the selection: they are about the range.
+
+**States** (`progress--progress-states.png`):
+
+| State | What the rider sees |
+|---|---|
+| Loading, nothing cached | §5: back bar, range selector, "Loading your progress…". |
+| Offline / out of date | The cached cards unchanged and the StatusLine (§7.5). A range never fetched shows "Not loaded yet. It loads when the service can be reached." |
+| Nothing at all (no ride, no watch data) | "No progress to show yet" (heading) and "Progress fills in from rides on the tablet and from the watch. Give it a few weeks of riding." |
+| Too few points for a verdict | The verdict reads **"Not enough data yet"**; the numbers line says how many there are and what adds one ("3 of 4 weeks have a figure. Ride steady for 5 minutes or more to add one."); the points that exist are drawn (one point: its dot, §5). |
+| A measure with no data in the range | The card is its name and one sentence, no frame (§7.9). |
+| A missing period | A gap in the line (week or month), never a zero and never bridged; ride-based charts (efficiency factor, drift) draw only the rides, and their 5-ride mean connects across days without rides, as §6.6. |
+| Weight unknown | Best power's note leaves out W/kg; the weight card is one sentence. |
+
 ## 5. States
 
 Every screen draws from cache first. The table says what each screen shows in each state; §7 has the words.
@@ -816,6 +869,60 @@ today in text 1 600; days after today at 50%. Baseline `borderStrong`.
 **Values:** "Week" · "Load" · "Usual" · the verdict word ("Above", "Within", "Below", "—"), every week the service sends (up to 52),
 newest first ("16 Nov · so far").
 
+### 6.13 Progress charts (charts stage)
+
+The geometry of §6 (32 dp gutter, 6 dp right, 10 dp top, 20 dp axis band, hairline gridlines, `borderStrong` baseline where zero
+is shown). **x** is time over the range; ticks at month starts (6 months: every month "Jun"; 1 year: every second month; all
+time: every quarter, or every year beyond two years). Lines 2 dp; dots 6 dp with a 1.5 dp surface ring; the selected or latest point
+8 dp with a 2 dp ring. **Verdicts** come from the service's trend, the model of the repeat page (spec §11.7): a least-squares line
+over the points with a figure, `steady` inside a stated band, else `improving` or `worsening` by which way is better, `unknown`
+below the minimum count (table). The phone computes no trend.
+
+| # | Card | x step | Points | Minimum for a verdict | Steady band (service) | Better when |
+|---|---|---|---|---|---|---|
+| 1 | Best power | month | best 5, 20, 60 min mean power of the month | 3 months with that duration, for each line | ±2% of the start | higher |
+| 2 | Aerobic efficiency | week | heart rate at the reference power; power at the reference heart rate | 4 weeks with a figure | 2 bpm / 4 W | lower bpm, higher W |
+| 3 | Efficiency factor | ride | normalised power ÷ average heart rate, steady rides | 5 rides | 0.02 | higher |
+| 4 | Aerobic drift | ride | drift %, steady rides of 40 min or more (§6.6) | 5 rides | 1 point | lower |
+| 5 | Resting heart rate | week | mean of the week's nights (at least 3 nights) | 4 weeks | 1 bpm | lower |
+| 6 | Weight and W/kg | week | mean weight (at least 2 weighings); FTP in force ÷ that weight | 4 weeks | 0.05 W/kg (weight has no verdict) | higher W/kg |
+
+**6.13.1 Best power.** Three lines on one watt axis, one per duration, each in the zone colour of its Power skills ring (5 min
+Z5, 20 min Z4, 60 min Z3, §6.11): the same durations mean the same colours across the tab, and the data is power. Monthly points
+at mid-month with their dots (a month is a single fact, so every point shows); a month without a ride of that length breaks that
+line; the current month is "so far" in the readout. y: a clean range over the three lines, step 50 W. Readout "Nov · so far ●
+5 min 326 W ● 20 min 281 W ● 60 min 247 W"; the line keys are the legend, so colour is never alone. Note: "Your best of each
+month." plus, with a weight, "3.9 W/kg at 20 min with 72.0 kg." Height 132 dp. The verdict judges the three together (the service:
+`improving` when at least two lines improve and none worsens; the reverse for `worsening`; else `steady`), and the numbers line
+gives each: "5 min +21 W · 20 min +19 W · 60 min +11 W since June".
+
+**6.13.2 Aerobic efficiency** (the repeat page's comparison, generalised to every ride). Two stacked plots on one x, each with a
+caption over it (caption, text 3): "Heart rate at 180 W, bpm" (2 dp text 1) and "Power at 140 bpm, W" (2 dp text 2), 96 dp each.
+The **reference power** is fixed for the range by the service (about 70% of the FTP at the range's start, rounded to 10 W) and the
+**reference heart rate** likewise (about 80% of the threshold heart rate, rounded to 5 bpm); both are named in the captions and the
+readout, so a change of FTP never moves the reference silently. Each week's figure is the median over that week's steady
+stretches (5 minutes or more of steady power after the ride's first 10 minutes, not paused, with heart rate; within 5% of the
+reference power, or within 3 bpm of the reference heart rate). Readout "Week of 16 Nov — At 180 W 140 bpm — At 140 bpm 184 W". Note:
+"From steady stretches of 5 minutes or more in every ride, the median of each week."
+
+**6.13.3 Efficiency factor.** §6.6's form: each steady ride a 6 dp text-2 dot, the mean of the last five rides a 2 dp text-1 line
+through the ride dates. y a clean range, two decimals in the readout ("1.42"), one on the ticks. Readout "Mon 16 Nov · Threshold
+2×20 ● Ride 1.42 — Last 5 rides 1.39"; scrubbing snaps to rides; a tap on the readout's name opens the ride. Note: "Normalised
+power divided by average heart rate on steady rides. Higher is better." Height 112 dp.
+
+**6.13.4 Aerobic drift.** §6.6 unchanged (band 0–5% "Steady", dots and 5-ride mean, its note), now on this page, height 112 dp.
+
+**6.13.5 Resting heart rate.** One weekly line 2 dp text 1; y a clean range (step 2 or 4 bpm); readout "Week of 16 Nov — Weekly
+mean 51 bpm". Note: "From the watch, the mean of each week's nights." Height 112 dp.
+
+**6.13.6 Weight and watts per kilogram.** Two stacked plots, 96 dp each, with captions: "Watts per kilogram (FTP)" (2 dp text 1, two
+decimals in the readout) and "Weight, kg" (2 dp text 3, one decimal). The verdict is about watts per kilogram only; weight is
+reported plainly in the numbers line ("weight 72.0 kg, 1.4 kg less") and never judged. Readout "Week of 16 Nov — FTP per kg
+3.47 W/kg — Weight 72.1 kg".
+
+**Values** of each card: the points newest first with the date ("Nov 2026", "16 Nov", "Mon 16 Nov · Threshold 2×20") and every
+figure of the card, "—" for none.
+
 ## 7. Copy
 
 Plain English, sentence case, no exclamation marks, no hype, no diagnosis, no medical words (system.md §11, spec §6.5).
@@ -917,6 +1024,38 @@ effort yet" / "Weekly effort starts with your first ride on the tablet or your f
 range appears after 8 weeks of training. 5 so far."; "No rides or activities yet this week." Never "good", "bad",
 "overtraining", "too much": the verdict compares the rider with their own weeks and says nothing more.
 
+### 7.9 Progress
+
+Title "Progress"; groups "Power", "Heart rate"; cards "Best power", "Weight and watts per kilogram", "Aerobic efficiency",
+"Efficiency factor", "Aerobic drift", "Resting heart rate". The caution, once, under "Heart rate": "Heart rate also moves with
+heat, sleep and caffeine, so trust a trend over several weeks, not one ride." Verdicts (the service sends the direction, the phone
+owns the words; the pattern of §4.12):
+
+| Card | improving | worsening | steady | unknown |
+|---|---|---|---|---|
+| Best power | Best power is trending up: better | Best power is trending down | Best power is steady | Not enough data yet |
+| Weight and W/kg | Watts per kilogram are trending up: better | Watts per kilogram are trending down | Watts per kilogram are steady | Not enough data yet |
+| Aerobic efficiency | Heart rate at the same power is trending down: fitter | Heart rate at the same power is trending up | Heart rate at the same power is steady | Not enough data yet |
+| Efficiency factor | Efficiency factor is trending up: fitter | Efficiency factor is trending down | Efficiency factor is steady | Not enough data yet |
+| Aerobic drift | Aerobic drift is trending down: better | Aerobic drift is trending up | Aerobic drift is steady | Not enough data yet |
+| Resting heart rate | Resting heart rate is trending down: better | Resting heart rate is trending up | Resting heart rate is steady | Not enough data yet |
+
+"Fitter" is said only for the two measures of heart rate against power (as on the repeat page); the others say "better", and a
+worsening trend has no judging word at all. Numbers lines (the service's figures, the phone's words): "5 min +21 W · 20 min
++19 W · 60 min +11 W since June"; "139 bpm at 180 W, 7 lower than in June · 185 W at 140 bpm, 13 more"; "1.41 over the last 5
+steady rides, 1.33 in June"; "4.2% over the last 5 long rides, 6.9% in June"; "51 bpm this week, 54 in June"; "3.47 W/kg now,
+3.24 in June · weight 72.0 kg, 1.4 kg less" ("more" when it rose). Not enough data: "3 of 4 weeks have a figure. Ride steady for
+5 minutes or more to add one." · "2 of 3 months have a 60-minute ride." · "4 of 5 steady rides so far." · "4 of 5 rides of
+40 minutes or more so far." · "2 of 4 weeks have 3 nights with the watch." · "2 of 4 weeks have 2 weighings." No data in the range:
+Best power "No rides with power in this range."; Aerobic efficiency "No steady stretch of 5 minutes or more with heart rate in
+this range."; Efficiency factor "No steady ride with heart rate in this range."; Aerobic drift "No steady rides yet. Drift is
+measured on steady rides of 40 minutes or more with heart rate."; Resting heart rate "No resting heart rate yet. It comes from the
+watch through Health Connect."; Weight "No weight yet. Weigh yourself with a scale that writes to Health Connect." Empty page "No
+progress to show yet" / "Progress fills in from rides on the tablet and from the watch. Give it a few weeks of riding."; loading
+"Loading your progress…"; entry row "Progress" with the headline or "How your power and heart rate change over the months".
+Outdoor rides have no power, so they are in none of the ride measures (each needs power and heart rate together); the page does
+not mention them, as the Power tab's closing notes already say it.
+
 ## 8. Accessibility
 
 - **Contrast:** all text uses the existing tiers (≥ 4.5:1 on every surface, system.md §2). Chart marks that carry data are text
@@ -950,6 +1089,13 @@ range appears after 8 weeks of training. 5 so far."; "No rides or activities yet
   are a polite live region. The days are one node: "Monday 97, Tuesday 0, Wednesday, today, …". Rows are buttons: "Threshold
   2×20, Monday 16, load 97, 100% of the week, opens the ride".
 - **Colour.** The skill colours never carry meaning alone (names, spans, gaps and order, §6.11); Effort uses no hue at all.
+- **Progress (TalkBack).** Reading order: back bar, range selector, "Power" heading, its cards, "Heart rate" heading and the
+  caution, its cards. In each card: name, verdict, numbers line, then the chart as one node (custom actions **Previous point** /
+  **Next point**; the readout is a polite live region) whose description reads the range and the trend in numbers: "Heart rate at
+  180 watts, last 6 months, weekly. 146 in the week of 1 June, 140 in the week of 16 November; 3 weeks without a figure. Trending
+  down: fitter." Best power: "Best power by month, last 6 months. 5 minutes from 305 to 326 watts, 20 minutes from 262 to 281, 60
+  minutes from 236 to 247, no 60-minute ride in August." A stacked pair is one node with both series. The "Latest" pill is "Back to
+  the latest point".
 ## 9. Performance
 
 - **Lists** (`Rides`, `Notes`, Values tables, Settings is short) are `LazyColumn`s with stable keys (ride id, note id, date);
@@ -1013,8 +1159,29 @@ computed it, UTC) and `stale` (true when an input source failed), as `GET /v1/wo
 | Power · Power skills, picker dots | `GET /v1/rides` (exists, cached) | the start days of the rides, to dot the calendar; no new field |
 | Profile (charts stage) | `GET/PATCH /v1/profile` | **new optional field** `powerProfileTable`: `men` (default) or `women`, which level table the service uses. Until it exists the service uses `men` and the closing note stays true ("published tables") |
 | Fitness · Effort (charts stage) | `GET /v1/metrics` → `effort` | 12 weeks, oldest first (and up to 52 for Values): [{`weekStart`, `load`, `approximate` (any part from heart rate), `usualLow`, `usualHigh` (null while learning), `verdict` (`above` / `within` / `below` / `none` / `learning`), `current` (true for the partial week)}]; `weeksLogged` and `weeksNeeded` (8) while learning; for each week its `days` [{`date`, `load`}] (7) and `activities` [{`id`, `kind` (`ride` / `activity`), `sport`, `name`, `date`, `load` (or null when there was no heart rate and no power), `approximate`, `share` (0–1 of the week, null when `load` is null)}]. The service computes every number and the verdict (the current week's `below` means "below so far") |
+| Progress (charts stage) | `GET /v1/progress?from&to` (new) | see the field list below the table |
 | Settings · heart rate | `GET/PATCH /v1/profile` | **new profile fields:** `maxHeartRate`, `thresholdHeartRate` (bpm or null) and their estimates from rides (`estimatedMaxHeartRate`, `estimatedThresholdHeartRate`, read-only) |
 | Settings · last sync | local | time of the last successful exchange, waiting record count, last failure cause |
+
+**Progress (`GET /v1/progress?from&to`, charts stage).** Every block carries `trend` {`direction` (`improving` / `worsening` /
+`steady` / `unknown`), `betterWhen` (`higher` / `lower`), `points` (with a figure), `minPoints`, `change` (signed, in the unit),
+`from` (the value at the range's start, for the numbers line), `latest`, `since` (date), `steadyBand`}, as the repeat trends do.
+Plus `generatedAt`, `stale`, `range` {`from`, `to`}, and `headline` {`measure`, `direction`} for the entry row (null when no
+measure has a verdict).
+
+- `bestPower`: `months` [{`month` (YYYY-MM), `partial`, `d300`, `d1200`, `d3600`: each {`watts` or null, `wattsPerKg` or null,
+  `date`, `rideId`, `rideName`}}]; a `trend` per duration and an overall `trend`; `weightKg` used (or null).
+- `aerobicEfficiency`: `referencePower` (W), `referenceHeartRate` (bpm), `weeks` [{`weekStart`, `heartRateAtPower` or null,
+  `powerAtHeartRate` or null, `stretches`, `seconds`}]; a `trend` for each of the two.
+- `efficiencyFactor`: `rides` [{`date`, `rideId`, `name`, `value`, `normalizedPower`, `averageHeartRate`}], `rolling5`
+  [{`date`, `value`}], `trend`.
+- `decoupling`: `rides` [{`date`, `rideId`, `name`, `driftPercent`}], `rolling5`, `trend` (the data of §6.6, moved here).
+- `restingHeartRate`: `weeks` [{`weekStart`, `mean` or null, `nights`}], `trend`.
+- `weight`: `weeks` [{`weekStart`, `kg` or null, `weighings`, `ftp`, `wattsPerKg` or null}], `trend` (of W/kg), `change` of weight
+  (reported, not judged).
+
+The service owns every rule in the table of §6.13 (steady stretch, references, minimum counts, bands); they belong in the spec and
+the contract with these names or better ones.
 
 ## 12. Tokens
 
@@ -1040,6 +1207,7 @@ regenerate `OverdriveTokens.kt`, which belongs to the implementation stage, not 
 | `settings.html` | `settings`, `settings-problems`, `onb-connect`, `onb-health`, `onb-partial`, `onb-background`, `onb-sync` |
 | `states.html` | `loading`, `error`, `stale`, `empty`, `values` |
 | `skills.html` (charts stage) | `skills` (8 weeks, weight known, top of the Power tab), `skills-360` (360 dp wide), `skills-axis` (5 min sheet), `skills-skill` (Climb sheet), `skills-noweight` (share of best, no levels), `skills-custom` (custom range with 45 and 60 min gaps), `skills-picker` (date range sheet), `skills-states` (loading, no rides, list fallback, empty custom range, offline) |
+| `progress.html` (charts stage) | `progress` (6 months, every card), `progress-entry` (the row at the end of Fitness), `progress-states` (too few points, no watch data, no weight, offline, nothing yet) |
 | `effort.html` (charts stage) | `effort` (Fitness top, this week at rest), `effort-selected` (a past week, approximate watch load), `effort-states` (learning, no load, nothing yet this week, activity without heart rate) |
 
 Render: `NODE_PATH=$(npm root -g) node design/tools/render-mockups.mjs companion/` (set `CHROMIUM_PATH` to use a browser
@@ -1096,3 +1264,11 @@ and are instant with animations off. Each card is one `LazyColumn` item, so an o
 **Testing.** Pure functions in the app's model (`PowerSkillsUi`, `EffortUi`, as the other `*Ui` files): radii from watts in both
 scales, the level words, the 3-durations threshold, gaps, the custom range line, the verdict words for past and current weeks, the
 shares that ignore activities without load, the TalkBack strings. Compose screenshot tests of every frame in §13's new rows.
+
+**Progress (§4.16, §6.13).** A pushed screen in the app's navigation like Notes, one `LazyColumn` with one item per card. Every
+chart is the existing `PlotChart` in a `ChartCard`: `LineLayer` (weekly and monthly lines; NaN is a gap), `DotLayer` plus a
+connected `LineLayer` for the ride measures (exactly the drift card's layers, which move here), `BandLayer` for "Steady". The
+stacked pairs (aerobic efficiency, weight) are two `PlotChart`s under one readout, each with its own `ChartSelection` kept equal
+(selecting in one selects the same week in the other). Best power's x is months at mid-month on a day axis, with `marked` dots on
+every point. The readout's rest pill is **Latest** (`RestPill`, stage P3-4c). No new component, no new token, no animation. The
+words of §7.9 are pure functions in a `ProgressUi` model with tests, like `RepeatsUi`.
