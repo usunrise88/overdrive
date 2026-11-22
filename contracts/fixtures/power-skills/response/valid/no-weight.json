@@ -1,5 +1,6 @@
 {
   "generatedAt": "2026-11-18T08:00:00Z",
+  "table": "men",
   "window": {
     "from": "2026-09-24",
     "to": "2026-11-18",
@@ -10,159 +11,232 @@
       "seconds": 15,
       "window": {
         "watts": 780,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-11-10",
-        "rideId": "ride-d"
+        "rideId": "ride-d",
+        "rideName": "VO2 5x3"
       },
       "allTime": {
         "watts": 812.5,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
       "seconds": 30,
       "window": {
         "watts": 610,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-10-22",
-        "rideId": "ride-b"
+        "rideId": "ride-b",
+        "rideName": "Free ride"
       },
       "allTime": {
         "watts": 630,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
       "seconds": 60,
       "window": {
         "watts": 470,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-11-10",
-        "rideId": "ride-d"
+        "rideId": "ride-d",
+        "rideName": "VO2 5x3"
       },
       "allTime": {
         "watts": 470,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-11-10",
-        "rideId": "ride-d"
+        "rideId": "ride-d",
+        "rideName": "VO2 5x3"
       }
     },
     {
       "seconds": 120,
       "window": {
         "watts": 380,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-10-22",
-        "rideId": "ride-b"
+        "rideId": "ride-b",
+        "rideName": "Free ride"
       },
       "allTime": {
         "watts": 392,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
       "seconds": 180,
       "window": {
         "watts": 340,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-11-10",
-        "rideId": "ride-d"
+        "rideId": "ride-d",
+        "rideName": "VO2 5x3"
       },
       "allTime": {
         "watts": 351,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
       "seconds": 300,
       "window": {
         "watts": 305,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-10-22",
-        "rideId": "ride-b"
+        "rideId": "ride-b",
+        "rideName": "Free ride"
       },
       "allTime": {
         "watts": 312.5,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
       "seconds": 600,
       "window": {
         "watts": 280,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-11-10",
-        "rideId": "ride-d"
+        "rideId": "ride-d",
+        "rideName": "VO2 5x3"
       },
       "allTime": {
         "watts": 288,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
       "seconds": 900,
       "window": {
         "watts": 265,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-10-22",
-        "rideId": "ride-b"
+        "rideId": "ride-b",
+        "rideName": "Free ride"
       },
       "allTime": {
         "watts": 265,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-10-22",
-        "rideId": "ride-b"
+        "rideId": "ride-b",
+        "rideName": "Free ride"
       }
     },
     {
       "seconds": 1200,
       "window": {
         "watts": 255,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-11-10",
-        "rideId": "ride-d"
+        "rideId": "ride-d",
+        "rideName": "VO2 5x3"
       },
       "allTime": {
         "watts": 262,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
       "seconds": 1800,
       "window": {
         "watts": 240,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-10-22",
-        "rideId": "ride-b"
+        "rideId": "ride-b",
+        "rideName": "Free ride"
       },
       "allTime": {
         "watts": 246,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
       "seconds": 2700,
       "window": {
         "watts": 225,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-11-10",
-        "rideId": "ride-d"
+        "rideId": "ride-d",
+        "rideName": "VO2 5x3"
       },
       "allTime": {
         "watts": 231,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
       "seconds": 3600,
       "window": {
         "watts": 215,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-10-22",
-        "rideId": "ride-b"
+        "rideId": "ride-b",
+        "rideName": "Free ride"
       },
       "allTime": {
         "watts": 215,
+        "wattsPerKg": null,
+        "score": null,
         "date": "2026-10-22",
-        "rideId": "ride-b"
+        "rideId": "ride-b",
+        "rideName": "Free ride"
       }
     }
   ],
+  "riderWeight": null,
   "skills": [
     {
       "id": "sprint",
@@ -200,6 +274,6 @@
       "level": null
     }
   ],
-  "levelsNote": "Levels are a rough guide from a table of watts per kilogram for men; they are not tied to your age or sex, and they need your weight.",
-  "outdoorNote": "Only rides on the tablet count here; outdoor rides and watch workouts are not in the power curve."
+  "levelsNote": "Levels are approximate: your watts per kilogram against published power-profile tables, read as a guide to how your own numbers move.",
+  "outdoorNote": "Only rides on the tablet count here: outdoor rides and workouts from your watch are not in the power curve."
 }

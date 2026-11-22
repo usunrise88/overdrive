@@ -26,6 +26,8 @@ export function describeProfile(profile: Profile) {
     // The weight keys are shown only when they have a value (spec §12.5, ADR 0034).
     ...(profile.bikeWeightKg == null ? {} : { bikeWeightKg: profile.bikeWeightKg }),
     ...(profile.riderWeight == null ? {} : { riderWeight: profile.riderWeight }),
+    // Which table the power skills' levels are read against: men unless the owner chose the women's (ADR 0042).
+    powerProfileTable: profile.powerProfileTable ?? "men",
     zones: {
       upperPercentOfFtp: bounds,
       isDefault: bounds.every((bound, i) => bound === COGGAN_ZONE_UPPER_PERCENT[i]),
@@ -64,6 +66,7 @@ export function registerProfileTools(server: McpServer, ctx: ToolContext): void 
         "When set, bikeWeightKg (the bike, kit and bottles in kg) and, when the rider has weighed in the last seven days, riderWeight " +
         "(read-only: the 7-day average kg from Health Connect, the date of the newest weighing and the days that had one); with both the " +
         "tablet rides with their sum as the system mass of the virtual speed, otherwise with physics.systemMassKg. " +
+        "powerProfileTable (men or women, men by default) says which table of watts per kilogram the levels of get_power_skills are read against. " +
         "Also when it last changed. Use it before planning: workouts are written as fractions of FTP, so the FTP " +
         "turns them into watts.",
       input: {},
@@ -123,6 +126,13 @@ export function registerProfileTools(server: McpServer, ctx: ToolContext): void 
           .nullable()
           .optional()
           .describe("The bike, kit and bottles in kg, above 0 and at most 100, or null to clear."),
+        powerProfileTable: z
+          .enum(["men", "women"])
+          .nullable()
+          .optional()
+          .describe(
+            "Which table of watts per kilogram the power skills' levels use: men (the default) or women; null goes back to the default. The rider's own choice: change it only when asked.",
+          ),
         zones: z
           .strictObject({
             upperPercentOfFtp: z

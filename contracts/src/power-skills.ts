@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js";
-import type { Validation } from "./index.ts";
+import type { PowerProfileTable, RiderWeight, Validation } from "./index.ts";
 import { isoDateToEpochDay, rangeDays } from "./plan.ts";
 import { parseInstant } from "./wellness.ts";
 
@@ -34,34 +34,36 @@ export const POWER_SKILLS: readonly PowerSkillDefinition[] = [
   { id: "endurance", name: "Endurance", fromSeconds: 2700, toSeconds: 3600 },
 ];
 
-/** The nine levels' names, level 1 first: our own scale (ADR 0042), not Strava's. */
+/** The nine levels' words, level 1 first: our own ordinal scale (ADR 0042, design/companion.md §6.11), not Strava's. */
 export const POWER_LEVEL_NAMES = [
   "Starting",
   "Casual",
   "Regular",
-  "Capable",
+  "Fit",
   "Strong",
   "Very strong",
-  "Competitive",
-  "Excellent",
+  "Racer",
   "Elite",
+  "World class",
 ] as const;
 
 /** The window of `GET /v1/power-skills` when none is asked for: the last 56 days (eight weeks), today included. */
 export const POWER_SKILLS_DEFAULT_DAYS = 56;
 /** The longest window, in days with both ends included: three years. */
 export const POWER_SKILLS_MAX_DAYS = 1096;
-/** The most watts per kilogram that any figure may be (a plausibility bound of the schema). */
-export const POWER_SKILLS_MAX_WATTS_PER_KG = 100;
 
 /** The best power at a duration with where it came from. */
 export interface PowerSkillEffort {
   watts: number;
-  /** Present exactly when the response has `riderWeight`. */
-  wattsPerKg?: number;
+  /** Null exactly when the response's `riderWeight` is. */
+  wattsPerKg: number | null;
+  /** The watts per kilogram on this duration's level scale, 0 to 9, two decimals; null exactly when `riderWeight` is. */
+  score: number | null;
   /** The rider's local day of the ride. */
   date: string;
   rideId: string;
+  /** The name of the workout the ride was played from, or "Free ride". */
+  rideName: string;
 }
 
 export interface PowerSkillDurationRow {
@@ -76,12 +78,6 @@ export interface PowerSkillLevel {
   /** 1 to 9. */
   index: number;
   name: string;
-  /** The watts per kilogram at {@link atSeconds}. */
-  bestWattsPerKg: number;
-  /** What the same duration needs for the next level; absent at level 9. */
-  nextLevelWattsPerKg?: number;
-  /** The duration of the skill that gave the level. */
-  atSeconds: PowerSkillDuration;
 }
 
 export interface PowerSkill {
@@ -97,14 +93,22 @@ export interface PowerSkill {
 export interface PowerSkillsResponse {
   /** UTC instant. */
   generatedAt: string;
+  /** The table the levels were read against. */
+  table: PowerProfileTable;
   window: { from: string; to: string; rideCount: number };
   /** The twelve durations in {@link POWER_SKILL_DURATIONS} order. */
   durations: PowerSkillDurationRow[];
-  /** The 7-day average weight; absent when not known. */
-  riderWeight?: { kg: number; asOf: string };
+  /** The 7-day average weight, or null when not known. */
+  riderWeight: RiderWeight | null;
   skills: PowerSkill[];
   levelsNote: string;
   outdoorNote: string;
+}
+
+/** The level of a skill from the scores of its durations: their mean rounded down, held between 1 and 9. */
+export function skillLevelIndex(scores: readonly number[]): number {
+  const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+  return Math.min(9, Math.max(1, Math.floor(mean + 1e-9)));
 }
 
 // ---- Validation ------------------------------------------------------------------------------------------------
@@ -127,8 +131,8 @@ const round2 = (value: number): number => Math.round(value * 100) / 100;
 
 /**
  * What the schema cannot say about the answer (see its description): real dates and instants, a window of at most 1096 days, the
- * twelve durations in order, where each effort's day lies, `wattsPerKg` against the weight, the five skills in order and each level's
- * name, duration and thresholds' order.
+ * twelve durations in order, where each effort's day lies, `wattsPerKg` and `score` against the weight, the five skills in order and
+ * each level against the scores it is the mean of.
  */
 export function powerSkillsConsistencyErrors(response: PowerSkillsResponse): string[] {
   const errors: string[] = [];
@@ -151,8 +155,8 @@ export function powerSkillsConsistencyErrors(response: PowerSkillsResponse): str
     }
   }
   const weight = response.riderWeight;
-  if (weight !== undefined && isoDateToEpochDay(weight.asOf) === null) {
-    errors.push("/riderWeight/asOf is not a real calendar date");
+  if (weight !== null && isoDateToEpochDay(weight.date) === null) {
+    errors.push("/riderWeight/date is not a real calendar date");
   }
 
   const efforts = new Map<number, PowerSkillDurationRow>();
@@ -176,12 +180,18 @@ export function powerSkillsConsistencyErrors(response: PowerSkillsResponse): str
           errors.push(`${where}/date is after the end of the window`);
         }
       }
-      if (weight === undefined) {
-        if (effort.wattsPerKg !== undefined) errors.push(`${where}/wattsPerKg needs riderWeight`);
-      } else if (effort.wattsPerKg === undefined) {
-        errors.push(`${where}/wattsPerKg is needed when riderWeight is given`);
-      } else if (Math.abs(effort.wattsPerKg - round2(effort.watts / weight.kg)) > 0.0051) {
-        errors.push(`${where}/wattsPerKg is not watts over the weight`);
+      if (weight === null) {
+        if (effort.wattsPerKg !== null) errors.push(`${where}/wattsPerKg needs riderWeight`);
+        if (effort.score !== null) errors.push(`${where}/score needs riderWeight`);
+      } else {
+        if (effort.wattsPerKg === null) {
+          errors.push(`${where}/wattsPerKg is needed when riderWeight is given`);
+        } else if (Math.abs(effort.wattsPerKg - round2(effort.watts / weight.kg)) > 0.0051) {
+          errors.push(`${where}/wattsPerKg is not watts over the weight`);
+        }
+        if (effort.score === null) {
+          errors.push(`${where}/score is needed when riderWeight is given`);
+        }
       }
     }
     if (row.window !== null) {
@@ -209,39 +219,27 @@ export function powerSkillsConsistencyErrors(response: PowerSkillsResponse): str
       errors.push(`${at} is not the skill the contract puts here`);
       continue;
     }
-    const inSkill = POWER_SKILL_DURATIONS.filter(
+    const scores = POWER_SKILL_DURATIONS.filter(
       (d) => d >= definition.fromSeconds && d <= definition.toSeconds,
-    );
-    const reached = inSkill.some((d) => efforts.get(d)?.window != null);
-    const judged = weight !== undefined && reached;
+    ).flatMap((d) => {
+      const effort = efforts.get(d)?.window;
+      return effort == null || effort.score === null ? [] : [effort.score];
+    });
+    const judged = weight !== null && scores.length > 0;
     const { level } = skill;
     if (level === null) {
       if (judged) errors.push(`${at}/level is needed: there is a weight and a window effort`);
       continue;
     }
-    if (!judged)
+    if (!judged) {
       errors.push(`${at}/level needs a weight and a window effort at one of its durations`);
+      continue;
+    }
+    if (level.index !== skillLevelIndex(scores)) {
+      errors.push(`${at}/level/index is not the mean of the scores of its durations, rounded down`);
+    }
     if (level.name !== POWER_LEVEL_NAMES[level.index - 1]) {
       errors.push(`${at}/level/name is not the name of level ${level.index}`);
-    }
-    if (!(inSkill as readonly number[]).includes(level.atSeconds)) {
-      errors.push(`${at}/level/atSeconds is not one of the skill's durations`);
-    } else {
-      const effort = efforts.get(level.atSeconds)?.window;
-      if (effort == null) {
-        errors.push(`${at}/level/atSeconds has no effort in the window`);
-      } else if (effort.wattsPerKg !== level.bestWattsPerKg) {
-        errors.push(`${at}/level/bestWattsPerKg is not the watts per kilogram at atSeconds`);
-      }
-    }
-    if (level.index === 9) {
-      if (level.nextLevelWattsPerKg !== undefined) {
-        errors.push(`${at}/level/nextLevelWattsPerKg must be absent at level 9`);
-      }
-    } else if (level.nextLevelWattsPerKg === undefined) {
-      errors.push(`${at}/level/nextLevelWattsPerKg is needed below level 9`);
-    } else if (level.nextLevelWattsPerKg <= level.bestWattsPerKg) {
-      errors.push(`${at}/level/nextLevelWattsPerKg is not above bestWattsPerKg`);
     }
   }
   return errors.slice(0, MAX_REPORTED);

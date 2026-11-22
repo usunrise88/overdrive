@@ -1,54 +1,69 @@
 {
   "generatedAt": "2026-11-18T08:00:00Z",
+  "weeksNeeded": 8,
+  "weeksLogged": 0,
   "weeks": [
     {
       "weekStart": "2026-11-16",
       "load": 121.7,
-      "activityCount": 2,
-      "durationSeconds": 7200,
       "approximate": false,
-      "inProgress": true,
+      "current": true,
+      "usualLow": null,
+      "usualHigh": null,
+      "weeksLogged": 0,
+      "verdict": "learning",
       "days": [
         {
           "date": "2026-11-16",
-          "load": 0,
-          "activities": []
+          "load": 0
         },
         {
           "date": "2026-11-17",
-          "load": 58.5,
-          "activities": [
-            {
-              "id": "ride-f1",
-              "kind": "ride",
-              "name": "Threshold 3x8",
-              "load": 58.5,
-              "approximate": false
-            }
-          ]
+          "load": 58.5
         },
         {
           "date": "2026-11-18",
+          "load": 63.2
+        },
+        {
+          "date": "2026-11-19",
+          "load": 0
+        },
+        {
+          "date": "2026-11-20",
+          "load": 0
+        },
+        {
+          "date": "2026-11-21",
+          "load": 0
+        },
+        {
+          "date": "2026-11-22",
+          "load": 0
+        }
+      ],
+      "activities": [
+        {
+          "id": "ride-0-0",
+          "kind": "ride",
+          "sport": null,
+          "name": "Sweet spot 2x10",
+          "load": 58.5,
+          "approximate": false,
+          "date": "2026-11-17",
+          "share": 0.481
+        },
+        {
+          "id": "ride-0-1",
+          "kind": "ride",
+          "sport": null,
+          "name": "Free ride",
           "load": 63.2,
-          "activities": [
-            {
-              "id": "ride-f2",
-              "kind": "ride",
-              "name": "Sweet spot 2x10",
-              "load": 63.2,
-              "approximate": false
-            }
-          ]
+          "approximate": false,
+          "date": "2026-11-18",
+          "share": 0.519
         }
       ]
     }
-  ],
-  "usual": null,
-  "thisWeek": {
-    "load": 121.7,
-    "usualSoFar": null,
-    "verdict": "unknown",
-    "verdictText": "Not enough weeks yet to say what is usual: it needs four completed weeks."
-  },
-  "note": "Effort is your training load: power for rides with power, heart rate for watch workouts and outdoor rides, all on one scale where 100 is about an hour at threshold. Your usual range is the middle half of your last eight completed weeks."
+  ]
 }

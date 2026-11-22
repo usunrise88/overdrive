@@ -49,6 +49,11 @@ export interface RiderWeight {
   days: number;
 }
 
+/** The two tables of watts per kilogram the power skills' levels can be read against (spec §6.3, ADR 0042). */
+export const POWER_PROFILE_TABLES = ["men", "women"] as const;
+export type PowerProfileTable = (typeof POWER_PROFILE_TABLES)[number];
+export const DEFAULT_POWER_PROFILE_TABLE: PowerProfileTable = "men";
+
 export interface Profile {
   /** Watts, or null when not set. */
   ftp: number | null;
@@ -76,6 +81,8 @@ export interface Profile {
   bikeWeightKg?: number | null;
   /** The rider's 7-day average weight from Health Connect; read-only and derived, absent when no weighing is recent. */
   riderWeight?: RiderWeight | null;
+  /** Which table the power skills' levels use (ADR 0042); absent or null is {@link DEFAULT_POWER_PROFILE_TABLE}. */
+  powerProfileTable?: PowerProfileTable | null;
 }
 
 /** What `PATCH /v1/profile` takes (see `profile-patch.schema.json`). */
@@ -94,6 +101,8 @@ export interface ProfilePatch {
   thresholdHeartRate?: number | null;
   /** null clears it. */
   bikeWeightKg?: number | null;
+  /** null goes back to the default, men. */
+  powerProfileTable?: PowerProfileTable | null;
 }
 
 /** The profile of a rider who has set nothing. */
@@ -229,6 +238,7 @@ export function applyProfilePatch(profile: Profile, patch: unknown): Validation<
   if (change.maxHeartRate !== undefined) next.maxHeartRate = change.maxHeartRate;
   if (change.thresholdHeartRate !== undefined) next.thresholdHeartRate = change.thresholdHeartRate;
   if (change.bikeWeightKg !== undefined) next.bikeWeightKg = change.bikeWeightKg;
+  if (change.powerProfileTable !== undefined) next.powerProfileTable = change.powerProfileTable;
   if (change.physics !== undefined) {
     next.physics = { ...next.physics, ...change.physics };
   }

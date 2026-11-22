@@ -3,10 +3,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   EFFORT_DEFAULT_WEEKS,
-  EFFORT_FIRST_VERDICT_WEEKDAY,
   EFFORT_MAX_WEEKS,
-  EFFORT_MIN_USUAL_WEEKS,
-  EFFORT_USUAL_WEEKS,
+  EFFORT_WEEKS_NEEDED,
   type EffortResponse,
   validateEffortResponse,
 } from "../src/index.ts";
@@ -26,7 +24,7 @@ describe("effort response", () => {
   const invalid = load("response", "invalid");
 
   it("has fixtures in both directories", () => {
-    expect(valid.length).toBeGreaterThanOrEqual(10);
+    expect(valid.length).toBeGreaterThanOrEqual(14);
     expect(invalid.length).toBeGreaterThanOrEqual(60);
   });
 
@@ -41,29 +39,25 @@ describe("effort response", () => {
     if (!result.ok) expect(result.errors.length).toBeGreaterThan(0);
   });
 
-  it("covers every verdict, every kind of activity and a week that is approximate", () => {
+  it("covers every verdict, both kinds, an activity with no load and a week that is approximate", () => {
     const bodies = valid.map(([, body]) => body as EffortResponse);
-    expect(new Set(bodies.map((b) => b.thisWeek.verdict))).toEqual(
-      new Set(["below", "within", "above", "unknown"]),
+    const weeks = bodies.flatMap((b) => b.weeks);
+    expect(new Set(weeks.map((w) => w.verdict))).toEqual(
+      new Set(["above", "within", "below", "none", "learning"]),
     );
-    const kinds = new Set(
-      bodies.flatMap((b) =>
-        b.weeks.flatMap((w) => w.days.flatMap((d) => d.activities.map((a) => a.kind))),
-      ),
-    );
-    expect(kinds).toEqual(new Set(["ride", "watch", "outdoor"]));
-    expect(bodies.some((b) => b.weeks.some((w) => w.approximate))).toBe(true);
-    expect(bodies.some((b) => b.usual === null)).toBe(true);
+    const activities = weeks.flatMap((w) => w.activities);
+    expect(new Set(activities.map((a) => a.kind))).toEqual(new Set(["ride", "activity"]));
+    expect(activities.some((a) => a.sport === "cycling-outdoor")).toBe(true);
+    expect(activities.some((a) => a.load === null)).toBe(true);
+    expect(weeks.some((w) => w.approximate)).toBe(true);
     expect(bodies.some((b) => b.weeks.length === EFFORT_MAX_WEEKS)).toBe(true);
   });
 });
 
 describe("the effort constants", () => {
-  it("are twelve weeks by default, at most fifty-two, a usual range of four to eight weeks and no verdict before Wednesday", () => {
+  it("are twelve weeks by default, at most fifty-two and eight weeks needed for a usual range", () => {
     expect(EFFORT_DEFAULT_WEEKS).toBe(12);
     expect(EFFORT_MAX_WEEKS).toBe(52);
-    expect(EFFORT_MIN_USUAL_WEEKS).toBe(4);
-    expect(EFFORT_USUAL_WEEKS).toBe(8);
-    expect(EFFORT_FIRST_VERDICT_WEEKDAY).toBe(3);
+    expect(EFFORT_WEEKS_NEEDED).toBe(8);
   });
 });

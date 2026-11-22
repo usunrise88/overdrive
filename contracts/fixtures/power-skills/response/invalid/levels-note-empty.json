@@ -1,5 +1,6 @@
 {
   "generatedAt": "2026-11-18T08:00:00Z",
+  "table": "men",
   "window": {
     "from": "2026-09-24",
     "to": "2026-11-18",
@@ -11,14 +12,18 @@
       "window": {
         "watts": 780,
         "wattsPerKg": 9.95,
+        "score": 2.36,
         "date": "2026-11-10",
-        "rideId": "ride-d"
+        "rideId": "ride-d",
+        "rideName": "VO2 5x3"
       },
       "allTime": {
         "watts": 812.5,
         "wattsPerKg": 10.36,
+        "score": 2.68,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -26,14 +31,18 @@
       "window": {
         "watts": 610,
         "wattsPerKg": 7.78,
+        "score": 1.87,
         "date": "2026-10-22",
-        "rideId": "ride-b"
+        "rideId": "ride-b",
+        "rideName": "Free ride"
       },
       "allTime": {
         "watts": 630,
         "wattsPerKg": 8.04,
+        "score": 2.13,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -41,14 +50,18 @@
       "window": {
         "watts": 470,
         "wattsPerKg": 5.99,
+        "score": 1.53,
         "date": "2026-11-10",
-        "rideId": "ride-d"
+        "rideId": "ride-d",
+        "rideName": "VO2 5x3"
       },
       "allTime": {
         "watts": 470,
         "wattsPerKg": 5.99,
+        "score": 1.53,
         "date": "2026-11-10",
-        "rideId": "ride-d"
+        "rideId": "ride-d",
+        "rideName": "VO2 5x3"
       }
     },
     {
@@ -56,14 +69,18 @@
       "window": {
         "watts": 380,
         "wattsPerKg": 4.85,
+        "score": 1.93,
         "date": "2026-10-22",
-        "rideId": "ride-b"
+        "rideId": "ride-b",
+        "rideName": "Free ride"
       },
       "allTime": {
         "watts": 392,
         "wattsPerKg": 5,
+        "score": 2.14,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -71,14 +88,18 @@
       "window": {
         "watts": 340,
         "wattsPerKg": 4.34,
+        "score": 2.44,
         "date": "2026-11-10",
-        "rideId": "ride-d"
+        "rideId": "ride-d",
+        "rideName": "VO2 5x3"
       },
       "allTime": {
         "watts": 351,
         "wattsPerKg": 4.48,
+        "score": 2.64,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -86,14 +107,18 @@
       "window": {
         "watts": 305,
         "wattsPerKg": 3.89,
+        "score": 3.4,
         "date": "2026-10-22",
-        "rideId": "ride-b"
+        "rideId": "ride-b",
+        "rideName": "Free ride"
       },
       "allTime": {
         "watts": 312.5,
         "wattsPerKg": 3.99,
+        "score": 3.55,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -101,14 +126,18 @@
       "window": {
         "watts": 280,
         "wattsPerKg": 3.57,
+        "score": 3.17,
         "date": "2026-11-10",
-        "rideId": "ride-d"
+        "rideId": "ride-d",
+        "rideName": "VO2 5x3"
       },
       "allTime": {
         "watts": 288,
         "wattsPerKg": 3.67,
+        "score": 3.33,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -116,14 +145,18 @@
       "window": {
         "watts": 265,
         "wattsPerKg": 3.38,
+        "score": 3.07,
         "date": "2026-10-22",
-        "rideId": "ride-b"
+        "rideId": "ride-b",
+        "rideName": "Free ride"
       },
       "allTime": {
         "watts": 265,
         "wattsPerKg": 3.38,
+        "score": 3.07,
         "date": "2026-10-22",
-        "rideId": "ride-b"
+        "rideId": "ride-b",
+        "rideName": "Free ride"
       }
     },
     {
@@ -131,14 +164,18 @@
       "window": {
         "watts": 255,
         "wattsPerKg": 3.25,
+        "score": 2.9,
         "date": "2026-11-10",
-        "rideId": "ride-d"
+        "rideId": "ride-d",
+        "rideName": "VO2 5x3"
       },
       "allTime": {
         "watts": 262,
         "wattsPerKg": 3.34,
+        "score": 3.05,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -146,14 +183,18 @@
       "window": {
         "watts": 240,
         "wattsPerKg": 3.06,
+        "score": 2.79,
         "date": "2026-10-22",
-        "rideId": "ride-b"
+        "rideId": "ride-b",
+        "rideName": "Free ride"
       },
       "allTime": {
         "watts": 246,
         "wattsPerKg": 3.14,
+        "score": 2.92,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -161,14 +202,18 @@
       "window": {
         "watts": 225,
         "wattsPerKg": 2.87,
+        "score": 2.6,
         "date": "2026-11-10",
-        "rideId": "ride-d"
+        "rideId": "ride-d",
+        "rideName": "VO2 5x3"
       },
       "allTime": {
         "watts": 231,
         "wattsPerKg": 2.95,
+        "score": 2.74,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -176,20 +221,25 @@
       "window": {
         "watts": 215,
         "wattsPerKg": 2.74,
+        "score": 2.49,
         "date": "2026-10-22",
-        "rideId": "ride-b"
+        "rideId": "ride-b",
+        "rideName": "Free ride"
       },
       "allTime": {
         "watts": 215,
         "wattsPerKg": 2.74,
+        "score": 2.49,
         "date": "2026-10-22",
-        "rideId": "ride-b"
+        "rideId": "ride-b",
+        "rideName": "Free ride"
       }
     }
   ],
   "riderWeight": {
     "kg": 78.4,
-    "asOf": "2026-11-17"
+    "date": "2026-11-17",
+    "days": 5
   },
   "skills": [
     {
@@ -198,11 +248,8 @@
       "fromSeconds": 15,
       "toSeconds": 30,
       "level": {
-        "index": 8,
-        "name": "Excellent",
-        "bestWattsPerKg": 9.95,
-        "nextLevelWattsPerKg": 11.9,
-        "atSeconds": 15
+        "index": 2,
+        "name": "Casual"
       }
     },
     {
@@ -211,11 +258,8 @@
       "fromSeconds": 60,
       "toSeconds": 180,
       "level": {
-        "index": 6,
-        "name": "Very strong",
-        "bestWattsPerKg": 5.99,
-        "nextLevelWattsPerKg": 6.2,
-        "atSeconds": 60
+        "index": 1,
+        "name": "Starting"
       }
     },
     {
@@ -224,11 +268,8 @@
       "fromSeconds": 300,
       "toSeconds": 600,
       "level": {
-        "index": 5,
-        "name": "Strong",
-        "bestWattsPerKg": 3.89,
-        "nextLevelWattsPerKg": 4.9,
-        "atSeconds": 300
+        "index": 3,
+        "name": "Regular"
       }
     },
     {
@@ -237,11 +278,8 @@
       "fromSeconds": 900,
       "toSeconds": 1800,
       "level": {
-        "index": 4,
-        "name": "Capable",
-        "bestWattsPerKg": 3.38,
-        "nextLevelWattsPerKg": 3.6,
-        "atSeconds": 900
+        "index": 2,
+        "name": "Casual"
       }
     },
     {
@@ -250,14 +288,11 @@
       "fromSeconds": 2700,
       "toSeconds": 3600,
       "level": {
-        "index": 3,
-        "name": "Regular",
-        "bestWattsPerKg": 2.87,
-        "nextLevelWattsPerKg": 3.1,
-        "atSeconds": 2700
+        "index": 2,
+        "name": "Casual"
       }
     }
   ],
   "levelsNote": "",
-  "outdoorNote": "Only rides on the tablet count here; outdoor rides and watch workouts are not in the power curve."
+  "outdoorNote": "Only rides on the tablet count here: outdoor rides and workouts from your watch are not in the power curve."
 }

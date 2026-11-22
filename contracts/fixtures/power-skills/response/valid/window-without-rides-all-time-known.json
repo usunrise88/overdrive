@@ -1,5 +1,6 @@
 {
   "generatedAt": "2026-11-18T08:00:00Z",
+  "table": "men",
   "window": {
     "from": "2026-10-01",
     "to": "2026-10-07",
@@ -12,8 +13,10 @@
       "allTime": {
         "watts": 812.5,
         "wattsPerKg": 10.36,
+        "score": 2.68,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -22,8 +25,10 @@
       "allTime": {
         "watts": 630,
         "wattsPerKg": 8.04,
+        "score": 2.13,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -32,8 +37,10 @@
       "allTime": {
         "watts": 470,
         "wattsPerKg": 5.99,
+        "score": 1.53,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -42,8 +49,10 @@
       "allTime": {
         "watts": 392,
         "wattsPerKg": 5,
+        "score": 2.14,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -52,8 +61,10 @@
       "allTime": {
         "watts": 351,
         "wattsPerKg": 4.48,
+        "score": 2.64,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -62,8 +73,10 @@
       "allTime": {
         "watts": 312.5,
         "wattsPerKg": 3.99,
+        "score": 3.55,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -72,8 +85,10 @@
       "allTime": {
         "watts": 288,
         "wattsPerKg": 3.67,
+        "score": 3.33,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -82,8 +97,10 @@
       "allTime": {
         "watts": 265,
         "wattsPerKg": 3.38,
+        "score": 3.07,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -92,8 +109,10 @@
       "allTime": {
         "watts": 262,
         "wattsPerKg": 3.34,
+        "score": 3.05,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -102,8 +121,10 @@
       "allTime": {
         "watts": 246,
         "wattsPerKg": 3.14,
+        "score": 2.92,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -112,8 +133,10 @@
       "allTime": {
         "watts": 231,
         "wattsPerKg": 2.95,
+        "score": 2.74,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     },
     {
@@ -122,14 +145,17 @@
       "allTime": {
         "watts": 215,
         "wattsPerKg": 2.74,
+        "score": 2.49,
         "date": "2026-06-03",
-        "rideId": "ride-old"
+        "rideId": "ride-old",
+        "rideName": "Sweet spot 2x10"
       }
     }
   ],
   "riderWeight": {
     "kg": 78.4,
-    "asOf": "2026-11-17"
+    "date": "2026-11-17",
+    "days": 5
   },
   "skills": [
     {
@@ -168,6 +194,6 @@
       "level": null
     }
   ],
-  "levelsNote": "Levels are a rough guide from a table of watts per kilogram for men; they are not tied to your age or sex, and they need your weight.",
-  "outdoorNote": "Only rides on the tablet count here; outdoor rides and watch workouts are not in the power curve."
+  "levelsNote": "Levels are approximate: your watts per kilogram against published power-profile tables, read as a guide to how your own numbers move.",
+  "outdoorNote": "Only rides on the tablet count here: outdoor rides and workouts from your watch are not in the power curve."
 }

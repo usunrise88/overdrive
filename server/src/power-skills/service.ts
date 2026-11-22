@@ -1,5 +1,6 @@
 import {
   addDaysToIsoDate,
+  DEFAULT_POWER_PROFILE_TABLE,
   isIsoDate,
   POWER_SKILL_DURATIONS,
   POWER_SKILLS_DEFAULT_DAYS,
@@ -7,8 +8,9 @@ import {
   type PowerSkillsResponse,
   rangeDays,
 } from "@overdrive/contracts";
-import type { MetricsService } from "../metrics/service.ts";
+import { type MetricsService, rideNameOf } from "../metrics/service.ts";
 import type { RideMetricsRow } from "../metrics/store.ts";
+import type { ProfileStore } from "../profile/store.ts";
 import { dayStartMillis, localDate } from "../time.ts";
 import type { WellnessService } from "../wellness/service.ts";
 import { buildPowerSkills, type SkillRide } from "./compute.ts";
@@ -41,6 +43,8 @@ export interface PowerSkillsService {
 export interface PowerSkillsOptions {
   metrics: Pick<MetricsService, "store" | "ensureComputed" | "whenIdle">;
   wellness: Pick<WellnessService, "riderWeight">;
+  /** The profile: which table of watts per kilogram the levels use. */
+  profile: Pick<ProfileStore, "get">;
   timezone: string;
   now: () => Date;
 }
@@ -54,6 +58,7 @@ export function skillRideOf(row: RideMetricsRow, timezone: string): SkillRide {
   }
   return {
     rideId: row.rideId,
+    rideName: rideNameOf(row),
     date: localDate(row.startEpochMillis, timezone),
     startEpochMillis: row.startEpochMillis,
     powers,
@@ -61,7 +66,7 @@ export function skillRideOf(row: RideMetricsRow, timezone: string): SkillRide {
 }
 
 export function createPowerSkills(options: PowerSkillsOptions): PowerSkillsService {
-  const { metrics, wellness, timezone, now } = options;
+  const { metrics, wellness, profile, timezone, now } = options;
 
   function resolveWindow(from?: string, to?: string): { from: string; to: string } {
     if (to !== undefined && !isIsoDate(to)) {
@@ -92,12 +97,13 @@ export function createPowerSkills(options: PowerSkillsOptions): PowerSkillsServi
       const rows = await metrics.store.listUntil(
         dayStartMillis(addDaysToIsoDate(window.to, 1), timezone),
       );
-      const weight = await wellness.riderWeight();
+      const [weight, current] = await Promise.all([wellness.riderWeight(), profile.get()]);
       return buildPowerSkills({
         rides: rows.map((row) => skillRideOf(row, timezone)),
         from: window.from,
         to: window.to,
-        weight: weight === null ? null : { kg: weight.kg, asOf: weight.date },
+        weight,
+        table: current.powerProfileTable ?? DEFAULT_POWER_PROFILE_TABLE,
         generatedAt: generated.toISOString(),
       });
     },

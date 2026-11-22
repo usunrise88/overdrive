@@ -1,0 +1,851 @@
+{
+  "generatedAt": "2026-11-18T08:00:00Z",
+  "weeksNeeded": 8,
+  "weeksLogged": 8,
+  "weeks": [
+    {
+      "weekStart": "2026-08-31",
+      "load": 142.7,
+      "approximate": true,
+      "current": false,
+      "usualLow": null,
+      "usualHigh": null,
+      "weeksLogged": 0,
+      "verdict": "learning",
+      "days": [
+        {
+          "date": "2026-08-31",
+          "load": 0
+        },
+        {
+          "date": "2026-09-01",
+          "load": 64
+        },
+        {
+          "date": "2026-09-02",
+          "load": 0
+        },
+        {
+          "date": "2026-09-03",
+          "load": 48.5
+        },
+        {
+          "date": "2026-09-04",
+          "load": 0
+        },
+        {
+          "date": "2026-09-05",
+          "load": 30.2
+        },
+        {
+          "date": "2026-09-06",
+          "load": 0
+        }
+      ],
+      "activities": [
+        {
+          "id": "ride-0-0",
+          "kind": "ride",
+          "sport": null,
+          "name": "Sweet spot 2x10",
+          "load": 64,
+          "approximate": false,
+          "date": "2026-09-01",
+          "share": 0.448
+        },
+        {
+          "id": "ride-0-1",
+          "kind": "ride",
+          "sport": null,
+          "name": "Free ride",
+          "load": 48.5,
+          "approximate": false,
+          "date": "2026-09-03",
+          "share": 0.34
+        },
+        {
+          "id": "watch-0-2",
+          "kind": "activity",
+          "sport": "other_workout",
+          "name": "Synthetic VR session",
+          "load": 30.2,
+          "approximate": true,
+          "date": "2026-09-05",
+          "share": 0.212
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-09-07",
+      "load": 207.5,
+      "approximate": true,
+      "current": false,
+      "usualLow": null,
+      "usualHigh": null,
+      "weeksLogged": 1,
+      "verdict": "learning",
+      "days": [
+        {
+          "date": "2026-09-07",
+          "load": 55
+        },
+        {
+          "date": "2026-09-08",
+          "load": 0
+        },
+        {
+          "date": "2026-09-09",
+          "load": 70.1
+        },
+        {
+          "date": "2026-09-10",
+          "load": 0
+        },
+        {
+          "date": "2026-09-11",
+          "load": 0
+        },
+        {
+          "date": "2026-09-12",
+          "load": 82.4
+        },
+        {
+          "date": "2026-09-13",
+          "load": 0
+        }
+      ],
+      "activities": [
+        {
+          "id": "ride-1-0",
+          "kind": "ride",
+          "sport": null,
+          "name": "Sweet spot 2x10",
+          "load": 55,
+          "approximate": false,
+          "date": "2026-09-07",
+          "share": 0.265
+        },
+        {
+          "id": "ride-1-1",
+          "kind": "ride",
+          "sport": null,
+          "name": "Free ride",
+          "load": 70.1,
+          "approximate": false,
+          "date": "2026-09-09",
+          "share": 0.338
+        },
+        {
+          "id": "fit-01020123456789ab",
+          "kind": "activity",
+          "sport": "cycling-outdoor",
+          "name": "Outdoor ride",
+          "load": 82.4,
+          "approximate": true,
+          "date": "2026-09-12",
+          "share": 0.397
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-09-14",
+      "load": 122.5,
+      "approximate": false,
+      "current": false,
+      "usualLow": null,
+      "usualHigh": null,
+      "weeksLogged": 2,
+      "verdict": "learning",
+      "days": [
+        {
+          "date": "2026-09-14",
+          "load": 0
+        },
+        {
+          "date": "2026-09-15",
+          "load": 60
+        },
+        {
+          "date": "2026-09-16",
+          "load": 0
+        },
+        {
+          "date": "2026-09-17",
+          "load": 62.5
+        },
+        {
+          "date": "2026-09-18",
+          "load": 0
+        },
+        {
+          "date": "2026-09-19",
+          "load": 0
+        },
+        {
+          "date": "2026-09-20",
+          "load": 0
+        }
+      ],
+      "activities": [
+        {
+          "id": "ride-2-0",
+          "kind": "ride",
+          "sport": null,
+          "name": "Sweet spot 2x10",
+          "load": 60,
+          "approximate": false,
+          "date": "2026-09-15",
+          "share": 0.49
+        },
+        {
+          "id": "ride-2-1",
+          "kind": "ride",
+          "sport": null,
+          "name": "Free ride",
+          "load": 62.5,
+          "approximate": false,
+          "date": "2026-09-17",
+          "share": 0.51
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-09-21",
+      "load": 215,
+      "approximate": true,
+      "current": false,
+      "usualLow": null,
+      "usualHigh": null,
+      "weeksLogged": 3,
+      "verdict": "learning",
+      "days": [
+        {
+          "date": "2026-09-21",
+          "load": 0
+        },
+        {
+          "date": "2026-09-22",
+          "load": 0
+        },
+        {
+          "date": "2026-09-23",
+          "load": 75
+        },
+        {
+          "date": "2026-09-24",
+          "load": 0
+        },
+        {
+          "date": "2026-09-25",
+          "load": 50
+        },
+        {
+          "date": "2026-09-26",
+          "load": 0
+        },
+        {
+          "date": "2026-09-27",
+          "load": 90
+        }
+      ],
+      "activities": [
+        {
+          "id": "ride-3-0",
+          "kind": "ride",
+          "sport": null,
+          "name": "Sweet spot 2x10",
+          "load": 75,
+          "approximate": false,
+          "date": "2026-09-23",
+          "share": 0.349
+        },
+        {
+          "id": "ride-3-1",
+          "kind": "ride",
+          "sport": null,
+          "name": "Free ride",
+          "load": 50,
+          "approximate": false,
+          "date": "2026-09-25",
+          "share": 0.233
+        },
+        {
+          "id": "fit-03020123456789ab",
+          "kind": "activity",
+          "sport": "cycling-outdoor",
+          "name": "Outdoor ride",
+          "load": 90,
+          "approximate": true,
+          "date": "2026-09-27",
+          "share": 0.419
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-09-28",
+      "load": 178.3,
+      "approximate": false,
+      "current": false,
+      "usualLow": null,
+      "usualHigh": null,
+      "weeksLogged": 4,
+      "verdict": "learning",
+      "days": [
+        {
+          "date": "2026-09-28",
+          "load": 40
+        },
+        {
+          "date": "2026-09-29",
+          "load": 0
+        },
+        {
+          "date": "2026-09-30",
+          "load": 72.3
+        },
+        {
+          "date": "2026-10-01",
+          "load": 0
+        },
+        {
+          "date": "2026-10-02",
+          "load": 66
+        },
+        {
+          "date": "2026-10-03",
+          "load": 0
+        },
+        {
+          "date": "2026-10-04",
+          "load": 0
+        }
+      ],
+      "activities": [
+        {
+          "id": "ride-4-0",
+          "kind": "ride",
+          "sport": null,
+          "name": "Sweet spot 2x10",
+          "load": 40,
+          "approximate": false,
+          "date": "2026-09-28",
+          "share": 0.224
+        },
+        {
+          "id": "ride-4-1",
+          "kind": "ride",
+          "sport": null,
+          "name": "Free ride",
+          "load": 72.3,
+          "approximate": false,
+          "date": "2026-09-30",
+          "share": 0.405
+        },
+        {
+          "id": "ride-4-2",
+          "kind": "ride",
+          "sport": null,
+          "name": "Sweet spot 2x10",
+          "load": 66,
+          "approximate": false,
+          "date": "2026-10-02",
+          "share": 0.37
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-10-05",
+      "load": 179.4,
+      "approximate": true,
+      "current": false,
+      "usualLow": null,
+      "usualHigh": null,
+      "weeksLogged": 5,
+      "verdict": "learning",
+      "days": [
+        {
+          "date": "2026-10-05",
+          "load": 0
+        },
+        {
+          "date": "2026-10-06",
+          "load": 80
+        },
+        {
+          "date": "2026-10-07",
+          "load": 0
+        },
+        {
+          "date": "2026-10-08",
+          "load": 71
+        },
+        {
+          "date": "2026-10-09",
+          "load": 0
+        },
+        {
+          "date": "2026-10-10",
+          "load": 28.4
+        },
+        {
+          "date": "2026-10-11",
+          "load": 0
+        }
+      ],
+      "activities": [
+        {
+          "id": "ride-5-0",
+          "kind": "ride",
+          "sport": null,
+          "name": "Sweet spot 2x10",
+          "load": 80,
+          "approximate": false,
+          "date": "2026-10-06",
+          "share": 0.446
+        },
+        {
+          "id": "ride-5-1",
+          "kind": "ride",
+          "sport": null,
+          "name": "Free ride",
+          "load": 71,
+          "approximate": false,
+          "date": "2026-10-08",
+          "share": 0.396
+        },
+        {
+          "id": "watch-5-2",
+          "kind": "activity",
+          "sport": "other_workout",
+          "name": "Synthetic VR session",
+          "load": 28.4,
+          "approximate": true,
+          "date": "2026-10-10",
+          "share": 0.158
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-10-12",
+      "load": 181.5,
+      "approximate": false,
+      "current": false,
+      "usualLow": null,
+      "usualHigh": null,
+      "weeksLogged": 6,
+      "verdict": "learning",
+      "days": [
+        {
+          "date": "2026-10-12",
+          "load": 58
+        },
+        {
+          "date": "2026-10-13",
+          "load": 0
+        },
+        {
+          "date": "2026-10-14",
+          "load": 64
+        },
+        {
+          "date": "2026-10-15",
+          "load": 0
+        },
+        {
+          "date": "2026-10-16",
+          "load": 59.5
+        },
+        {
+          "date": "2026-10-17",
+          "load": 0
+        },
+        {
+          "date": "2026-10-18",
+          "load": 0
+        }
+      ],
+      "activities": [
+        {
+          "id": "ride-6-0",
+          "kind": "ride",
+          "sport": null,
+          "name": "Sweet spot 2x10",
+          "load": 58,
+          "approximate": false,
+          "date": "2026-10-12",
+          "share": 0.32
+        },
+        {
+          "id": "ride-6-1",
+          "kind": "ride",
+          "sport": null,
+          "name": "Free ride",
+          "load": 64,
+          "approximate": false,
+          "date": "2026-10-14",
+          "share": 0.353
+        },
+        {
+          "id": "ride-6-2",
+          "kind": "ride",
+          "sport": null,
+          "name": "Sweet spot 2x10",
+          "load": 59.5,
+          "approximate": false,
+          "date": "2026-10-16",
+          "share": 0.328
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-10-19",
+      "load": 132,
+      "approximate": false,
+      "current": false,
+      "usualLow": null,
+      "usualHigh": null,
+      "weeksLogged": 7,
+      "verdict": "learning",
+      "days": [
+        {
+          "date": "2026-10-19",
+          "load": 0
+        },
+        {
+          "date": "2026-10-20",
+          "load": 62
+        },
+        {
+          "date": "2026-10-21",
+          "load": 0
+        },
+        {
+          "date": "2026-10-22",
+          "load": 0
+        },
+        {
+          "date": "2026-10-23",
+          "load": 0
+        },
+        {
+          "date": "2026-10-24",
+          "load": 70
+        },
+        {
+          "date": "2026-10-25",
+          "load": 0
+        }
+      ],
+      "activities": [
+        {
+          "id": "ride-7-0",
+          "kind": "ride",
+          "sport": null,
+          "name": "Sweet spot 2x10",
+          "load": 62,
+          "approximate": false,
+          "date": "2026-10-20",
+          "share": 0.47
+        },
+        {
+          "id": "watch-7-1",
+          "kind": "activity",
+          "sport": "strength_training",
+          "name": "Strength training",
+          "load": null,
+          "approximate": false,
+          "date": "2026-10-22",
+          "share": null
+        },
+        {
+          "id": "ride-7-2",
+          "kind": "ride",
+          "sport": null,
+          "name": "Sweet spot 2x10",
+          "load": 70,
+          "approximate": false,
+          "date": "2026-10-24",
+          "share": 0.53
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-10-26",
+      "load": 219.2,
+      "approximate": true,
+      "current": false,
+      "usualLow": 135.7,
+      "usualHigh": 204,
+      "weeksLogged": 8,
+      "verdict": "above",
+      "days": [
+        {
+          "date": "2026-10-26",
+          "load": 0
+        },
+        {
+          "date": "2026-10-27",
+          "load": 0
+        },
+        {
+          "date": "2026-10-28",
+          "load": 77
+        },
+        {
+          "date": "2026-10-29",
+          "load": 0
+        },
+        {
+          "date": "2026-10-30",
+          "load": 68
+        },
+        {
+          "date": "2026-10-31",
+          "load": 0
+        },
+        {
+          "date": "2026-11-01",
+          "load": 74.2
+        }
+      ],
+      "activities": [
+        {
+          "id": "ride-8-0",
+          "kind": "ride",
+          "sport": null,
+          "name": "Sweet spot 2x10",
+          "load": 77,
+          "approximate": false,
+          "date": "2026-10-28",
+          "share": 0.351
+        },
+        {
+          "id": "ride-8-1",
+          "kind": "ride",
+          "sport": null,
+          "name": "Free ride",
+          "load": 68,
+          "approximate": false,
+          "date": "2026-10-30",
+          "share": 0.31
+        },
+        {
+          "id": "fit-08020123456789ab",
+          "kind": "activity",
+          "sport": "cycling-outdoor",
+          "name": "Outdoor ride",
+          "load": 74.2,
+          "approximate": true,
+          "date": "2026-11-01",
+          "share": 0.339
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-11-02",
+      "load": 184,
+      "approximate": false,
+      "current": false,
+      "usualLow": 143.3,
+      "usualHigh": 215.5,
+      "weeksLogged": 8,
+      "verdict": "within",
+      "days": [
+        {
+          "date": "2026-11-02",
+          "load": 49
+        },
+        {
+          "date": "2026-11-03",
+          "load": 0
+        },
+        {
+          "date": "2026-11-04",
+          "load": 0
+        },
+        {
+          "date": "2026-11-05",
+          "load": 83
+        },
+        {
+          "date": "2026-11-06",
+          "load": 0
+        },
+        {
+          "date": "2026-11-07",
+          "load": 52
+        },
+        {
+          "date": "2026-11-08",
+          "load": 0
+        }
+      ],
+      "activities": [
+        {
+          "id": "ride-9-0",
+          "kind": "ride",
+          "sport": null,
+          "name": "Sweet spot 2x10",
+          "load": 49,
+          "approximate": false,
+          "date": "2026-11-02",
+          "share": 0.266
+        },
+        {
+          "id": "ride-9-1",
+          "kind": "ride",
+          "sport": null,
+          "name": "Free ride",
+          "load": 83,
+          "approximate": false,
+          "date": "2026-11-05",
+          "share": 0.451
+        },
+        {
+          "id": "ride-9-2",
+          "kind": "ride",
+          "sport": null,
+          "name": "Sweet spot 2x10",
+          "load": 52,
+          "approximate": false,
+          "date": "2026-11-07",
+          "share": 0.283
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-11-09",
+      "load": 184.5,
+      "approximate": false,
+      "current": false,
+      "usualLow": 142.1,
+      "usualHigh": 210.9,
+      "weeksLogged": 8,
+      "verdict": "within",
+      "days": [
+        {
+          "date": "2026-11-09",
+          "load": 0
+        },
+        {
+          "date": "2026-11-10",
+          "load": 66
+        },
+        {
+          "date": "2026-11-11",
+          "load": 61.5
+        },
+        {
+          "date": "2026-11-12",
+          "load": 0
+        },
+        {
+          "date": "2026-11-13",
+          "load": 57
+        },
+        {
+          "date": "2026-11-14",
+          "load": 0
+        },
+        {
+          "date": "2026-11-15",
+          "load": 0
+        }
+      ],
+      "activities": [
+        {
+          "id": "ride-10-0",
+          "kind": "ride",
+          "sport": null,
+          "name": "Sweet spot 2x10",
+          "load": 66,
+          "approximate": false,
+          "date": "2026-11-10",
+          "share": 0.358
+        },
+        {
+          "id": "ride-10-1",
+          "kind": "ride",
+          "sport": null,
+          "name": "Free ride",
+          "load": 61.5,
+          "approximate": false,
+          "date": "2026-11-11",
+          "share": 0.333
+        },
+        {
+          "id": "ride-10-2",
+          "kind": "ride",
+          "sport": null,
+          "name": "Sweet spot 2x10",
+          "load": 57,
+          "approximate": false,
+          "date": "2026-11-13",
+          "share": 0.309
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-11-16",
+      "load": 121.7,
+      "approximate": false,
+      "current": true,
+      "usualLow": 157.6,
+      "usualHigh": 210.9,
+      "weeksLogged": 8,
+      "verdict": "below",
+      "days": [
+        {
+          "date": "2026-11-16",
+          "load": 0
+        },
+        {
+          "date": "2026-11-17",
+          "load": 58.5
+        },
+        {
+          "date": "2026-11-18",
+          "load": 63.2
+        },
+        {
+          "date": "2026-11-19",
+          "load": 0
+        },
+        {
+          "date": "2026-11-20",
+          "load": 0
+        },
+        {
+          "date": "2026-11-21",
+          "load": 0
+        },
+        {
+          "date": "2026-11-22",
+          "load": 0
+        }
+      ],
+      "activities": [
+        {
+          "id": "ride-11-0",
+          "kind": "ride",
+          "sport": null,
+          "name": "Sweet spot 2x10",
+          "load": 58.5,
+          "approximate": false,
+          "date": "2026-11-17",
+          "share": 0.481
+        },
+        {
+          "id": "ride-11-1",
+          "kind": "ride",
+          "sport": null,
+          "name": "Free ride",
+          "load": 63.2,
+          "approximate": false,
+          "date": "2026-11-18",
+          "share": 0.519
+        }
+      ]
+    }
+  ]
+}

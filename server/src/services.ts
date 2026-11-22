@@ -336,6 +336,7 @@ export function createServices(options: ServicesOptions): Services {
   const powerSkills = createPowerSkills({
     metrics,
     wellness,
+    profile,
     timezone,
     now: now ?? (() => new Date()),
   });

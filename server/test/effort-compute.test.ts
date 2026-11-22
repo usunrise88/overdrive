@@ -2,16 +2,17 @@ import { validateEffortResponse } from "@overdrive/contracts";
 import { describe, expect, it } from "vitest";
 import {
   buildEffort,
-  EFFORT_NOTE,
   type EffortInput,
   firstMondayNeeded,
+  usualRange,
+  verdictOf,
 } from "../src/effort/compute.ts";
 
 let counter = 0;
 /** An activity of a given day: `at` orders those of one day. */
 function act(
   date: string,
-  load: number,
+  load: number | null,
   extra: Partial<EffortInput> & { at?: string } = {},
 ): EffortInput {
   counter++;
@@ -19,12 +20,12 @@ function act(
   return {
     id: `act-${counter}`,
     kind: "ride",
+    sport: null,
     name: "Free ride",
     date,
     startEpochMillis: Date.parse(`${date}T${at ?? "17:00:00"}Z`),
     load,
     approximate: false,
-    durationSeconds: 3600,
     ...rest,
   };
 }
@@ -41,197 +42,267 @@ function run(activities: EffortInput[], today: string, weeks: number) {
   return response;
 }
 
-/** Eight completed weeks (Mondays 2026-09-21 to 2026-11-09): totals 120, 150, 90, 200, 160, 0, 140, 110, by Wednesday 90, 60, 30, 120, 80, 0, 70, 60. */
-const HISTORY: EffortInput[] = [
-  act("2026-09-21", 90),
-  act("2026-09-26", 30),
-  act("2026-09-29", 60),
-  act("2026-10-03", 90),
-  act("2026-10-05", 30),
-  act("2026-10-09", 60),
-  act("2026-10-12", 50),
-  act("2026-10-14", 70),
-  act("2026-10-15", 40),
-  act("2026-10-17", 40),
-  act("2026-10-20", 80),
-  act("2026-10-23", 80),
-  // 2026-10-26 to 2026-11-01: a week off.
-  act("2026-11-02", 70),
-  act("2026-11-05", 70),
-  act("2026-11-11", 60),
-  act("2026-11-12", 50),
-];
+const addDays = (date: string, days: number): string =>
+  new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+
+/** One ride on the Wednesday of each week from `first` (a Monday): a week of 0 has none. */
+const wednesdays = (first: string, loads: number[]): EffortInput[] =>
+  loads.flatMap((load, i) => (load === 0 ? [] : [act(addDays(first, 7 * i + 2), load)]));
+
+/**
+ * Ten completed weeks from Monday 2026-09-07, a ride each Wednesday: 100, 150, 90, 200, 160, 0 (a week off), 140, 110, 130, 120.
+ * The current week begins on 2026-11-16.
+ */
+const L1 = [100, 150, 90, 200, 160, 0, 140, 110, 130, 120];
+const HISTORY = wednesdays("2026-09-07", L1);
+const NOW = [act("2026-11-17", 58.5), act("2026-11-18", 63.2)];
 
 describe("the weeks the answer needs", () => {
-  it("reach back eight completed weeks even when fewer are shown", () => {
+  it("reach back eight complete weeks before the oldest week shown", () => {
     expect(firstMondayNeeded("2026-11-18", 1)).toBe("2026-09-21");
-    expect(firstMondayNeeded("2026-11-18", 9)).toBe("2026-09-21");
-    expect(firstMondayNeeded("2026-11-18", 12)).toBe("2026-08-31");
-    expect(firstMondayNeeded("2026-11-16", 52)).toBe("2025-11-24");
+    expect(firstMondayNeeded("2026-11-18", 12)).toBe("2026-07-06");
+    expect(firstMondayNeeded("2026-11-16", 52)).toBe("2025-09-29");
     // A Sunday belongs to the week that began six days before.
     expect(firstMondayNeeded("2026-11-22", 1)).toBe("2026-09-21");
   });
 });
 
-describe("the weeks, by hand", () => {
-  const now = [...HISTORY, act("2026-11-17", 58.5), act("2026-11-18", 63.2)];
+describe("the usual range", () => {
+  it("is the mean minus and plus one sample standard deviation, to one decimal", () => {
+    // 90, 200, 160, 0, 140, 110, 130, 120: mean 118.75, the sum of squares 23887.5 over 7 is 3412.5, its root 58.4166.
+    expect(usualRange([90, 200, 160, 0, 140, 110, 130, 120])).toEqual({ low: 60.3, high: 177.2 });
+    expect(usualRange([100, 100, 100, 100, 100, 100, 100, 100])).toEqual({ low: 100, high: 100 });
+  });
 
-  it("sums each day, each week and each load, with the week in progress up to today", () => {
+  it("holds the low edge at 0: a load is never negative", () => {
+    // 0 seven times and 300: mean 37.5, spread 106.07.
+    expect(usualRange([0, 0, 0, 0, 0, 0, 0, 300])).toEqual({ low: 0, high: 143.6 });
+  });
+});
+
+describe("the verdict", () => {
+  const range = { low: 60.3, high: 177.2 };
+
+  it("is below under the low edge, above over the high edge and within between them, the edges included", () => {
+    expect(verdictOf(60.2, range, false)).toBe("below");
+    expect(verdictOf(60.3, range, false)).toBe("within");
+    expect(verdictOf(120, range, false)).toBe("within");
+    expect(verdictOf(177.2, range, false)).toBe("within");
+    expect(verdictOf(177.3, range, false)).toBe("above");
+  });
+
+  it("is learning without a range, and none for a week in which nothing has been recorded", () => {
+    expect(verdictOf(0, null, false)).toBe("learning");
+    expect(verdictOf(0, null, true)).toBe("learning");
+    expect(verdictOf(0, range, true)).toBe("none");
+  });
+});
+
+describe("the weeks, by hand", () => {
+  const now = [...HISTORY, ...NOW];
+
+  it("sums each day, each week and each load, with the days of the week in progress after today empty", () => {
     const response = run(now, "2026-11-18", 3);
-    expect(response.weeks.map((w) => [w.weekStart, w.load, w.activityCount, w.inProgress])).toEqual(
-      [
-        ["2026-11-02", 140, 2, false],
-        ["2026-11-09", 110, 2, false],
-        ["2026-11-16", 121.7, 2, true],
-      ],
-    );
-    const [first, , current] = response.weeks;
-    expect(first?.days.map((d) => [d.date, d.load])).toEqual([
-      ["2026-11-02", 70],
-      ["2026-11-03", 0],
-      ["2026-11-04", 0],
-      ["2026-11-05", 70],
-      ["2026-11-06", 0],
-      ["2026-11-07", 0],
-      ["2026-11-08", 0],
+    expect(
+      response.weeks.map((w) => [w.weekStart, w.load, w.current, w.activities.length]),
+    ).toEqual([
+      ["2026-11-02", 130, false, 1],
+      ["2026-11-09", 120, false, 1],
+      ["2026-11-16", 121.7, true, 2],
     ]);
-    // Monday to Wednesday only: the days after today do not exist yet.
+    const current = response.weeks[2];
     expect(current?.days.map((d) => [d.date, d.load])).toEqual([
       ["2026-11-16", 0],
       ["2026-11-17", 58.5],
       ["2026-11-18", 63.2],
+      ["2026-11-19", 0],
+      ["2026-11-20", 0],
+      ["2026-11-21", 0],
+      ["2026-11-22", 0],
     ]);
-    expect(current?.durationSeconds).toBe(7200);
+    // 58.5 and 63.2 of 121.7: 48.07% and 51.93%.
+    expect(current?.activities.map((a) => [a.date, a.load, a.share])).toEqual([
+      ["2026-11-17", 58.5, 0.481],
+      ["2026-11-18", 63.2, 0.519],
+    ]);
   });
 
-  it("gives the usual range of the eight weeks and a verdict against what they had reached by Wednesday", () => {
+  it("gives each week the usual range of the eight weeks before it, and learns until there are eight", () => {
     const response = run(now, "2026-11-18", 12);
-    // Sorted 0, 90, 110, 120, 140, 150, 160, 200: the quartiles are 105 and 152.5.
-    expect(response.usual).toEqual({ low: 105, median: 130, high: 152.5, basedOnWeeks: 8 });
-    expect(response.thisWeek).toEqual({
-      load: 121.7,
-      usualSoFar: { low: 52.5, high: 82.5 },
-      verdict: "above",
-      verdictText:
-        "Above your usual for this point of the week: 121.7 so far, usually 52.5 to 82.5 by Wednesday.",
+    const byStart = Object.fromEntries(response.weeks.map((w) => [w.weekStart, w]));
+    // The first week with a ride is 2026-09-07: eight complete weeks before 2026-11-02, the 10 weeks before it are not enough.
+    expect(byStart["2026-10-26"]).toMatchObject({
+      weeksLogged: 7,
+      usualLow: null,
+      usualHigh: null,
+      verdict: "learning",
     });
-    expect(response.weeks).toHaveLength(12);
-    expect(response.weeks[0]?.weekStart).toBe("2026-08-31");
-    expect(response.weeks[0]?.load).toBe(0);
-    expect(response.note).toBe(EFFORT_NOTE);
-  });
-
-  it("answers the same usual range and verdict however many weeks are shown", () => {
-    const one = run(now, "2026-11-18", 1);
-    const twelve = run(now, "2026-11-18", 12);
-    expect(one.weeks).toHaveLength(1);
-    expect(one.usual).toEqual(twelve.usual);
-    expect(one.thisWeek).toEqual(twelve.thisWeek);
-  });
-
-  it("calls a week below, within or above by the load so far", () => {
-    const quiet = run([...HISTORY, act("2026-11-17", 40)], "2026-11-18", 2);
-    expect(quiet.thisWeek).toMatchObject({ verdict: "below", load: 40 });
-    const usual = run([...HISTORY, act("2026-11-17", 40), act("2026-11-18", 20)], "2026-11-18", 2);
-    expect(usual.thisWeek).toMatchObject({ verdict: "within", load: 60 });
-  });
-
-  it("does not compare on Monday or Tuesday", () => {
-    const monday = run([...HISTORY, act("2026-11-16", 45)], "2026-11-16", 2);
-    expect(monday.weeks[1]?.days).toHaveLength(1);
-    expect(monday.thisWeek).toEqual({
-      load: 45,
-      usualSoFar: null,
-      verdict: "unknown",
-      verdictText:
-        "Too early in the week to compare: 45 so far. A comparison with your usual starts on Wednesday.",
-    });
-    expect(monday.usual).not.toBeNull();
-    expect(run(HISTORY, "2026-11-17", 2).thisWeek.verdict).toBe("unknown");
-  });
-
-  it("compares a Sunday against the whole usual weeks, with all seven days shown", () => {
-    const sunday = run([...HISTORY, act("2026-11-16", 80), act("2026-11-22", 50)], "2026-11-22", 2);
-    expect(sunday.weeks[1]?.days).toHaveLength(7);
-    expect(sunday.weeks[1]?.inProgress).toBe(true);
-    expect(sunday.thisWeek).toMatchObject({
-      load: 130,
+    expect(byStart["2026-11-02"]).toMatchObject({
+      weeksLogged: 8,
+      usualLow: 58.9,
+      usualHigh: 178.6,
       verdict: "within",
-      usualSoFar: { low: 105, high: 152.5 },
+      load: 130,
+    });
+    expect(byStart["2026-11-09"]).toMatchObject({
+      weeksLogged: 8,
+      usualLow: 63,
+      usualHigh: 182,
+      verdict: "within",
+      load: 120,
+    });
+    expect(byStart["2026-11-16"]).toMatchObject({
+      weeksLogged: 8,
+      usualLow: 60.3,
+      usualHigh: 177.2,
+      verdict: "within",
+      load: 121.7,
+      current: true,
+    });
+    expect(response.weeksNeeded).toBe(8);
+    expect(response.weeksLogged).toBe(8);
+    // Twelve weeks from 2026-08-31, the first of them before the rider began.
+    expect(response.weeks).toHaveLength(12);
+    expect(response.weeks[0]).toMatchObject({
+      weekStart: "2026-08-31",
+      load: 0,
+      weeksLogged: 0,
+      verdict: "learning",
+    });
+    expect(response.weeks[1]).toMatchObject({ weekStart: "2026-09-07", load: 100, weeksLogged: 0 });
+  });
+
+  it("answers the same range and verdict for the current week however many weeks are shown", () => {
+    const one = run(now, "2026-11-18", 1);
+    const many = run(now, "2026-11-18", 12);
+    expect(one.weeks).toHaveLength(1);
+    expect(one.weeks[0]).toEqual(many.weeks[11]);
+    expect(one.weeksLogged).toBe(many.weeksLogged);
+  });
+
+  it("compares the load so far with the whole usual range, never scaled to the weekday", () => {
+    // Below 60.3 on a Wednesday: below, which the app says "so far".
+    expect(run([...HISTORY, act("2026-11-18", 40)], "2026-11-18", 1).weeks[0]?.verdict).toBe(
+      "below",
+    );
+    // On the high edge: within; one tenth over: above.
+    expect(run([...HISTORY, act("2026-11-18", 177.2)], "2026-11-18", 1).weeks[0]?.verdict).toBe(
+      "within",
+    );
+    expect(run([...HISTORY, act("2026-11-18", 177.3)], "2026-11-18", 1).weeks[0]?.verdict).toBe(
+      "above",
+    );
+    // Monday morning with 40 against 60.3 to 177.2: the same plain comparison.
+    expect(run([...HISTORY, act("2026-11-16", 40)], "2026-11-16", 1).weeks[0]).toMatchObject({
+      verdict: "below",
+      days: [
+        { date: "2026-11-16", load: 40 },
+        { load: 0 },
+        { load: 0 },
+        { load: 0 },
+        { load: 0 },
+        { load: 0 },
+        { load: 0 },
+      ],
     });
   });
 
-  it("has no usual range with fewer than four weeks of history, and says how many there are", () => {
-    const young = [
-      act("2026-10-27", 60),
-      act("2026-11-04", 70),
-      act("2026-11-10", 80),
-      act("2026-11-18", 50),
-    ];
-    const response = run(young, "2026-11-18", 4);
-    expect(response.usual).toBeNull();
-    expect(response.thisWeek).toEqual({
-      load: 50,
-      usualSoFar: null,
-      verdict: "unknown",
-      verdictText:
-        "Not enough weeks yet to say what is usual: it needs 4 completed weeks of training, and there are 3 so far.",
+  it("says none when nothing at all is recorded in the current week yet, and learning when there is no range", () => {
+    expect(run(HISTORY, "2026-11-16", 1).weeks[0]).toMatchObject({
+      verdict: "none",
+      load: 0,
+      activities: [],
+    });
+    expect(run(HISTORY.slice(0, 5), "2026-10-14", 1).weeks[0]).toMatchObject({
+      verdict: "learning",
+      weeksLogged: 5,
+      usualLow: null,
+    });
+    expect(run([], "2026-11-16", 2).weeks.map((w) => [w.verdict, w.weeksLogged])).toEqual([
+      ["learning", 0],
+      ["learning", 0],
+    ]);
+  });
+});
+
+describe("a longer history", () => {
+  // Twelve weeks from 2026-08-24 (a ride each Wednesday): 100 eight times, then a week off, a week of 300 and two of 100.
+  const L2 = [100, 100, 100, 100, 100, 100, 100, 100, 0, 300, 100, 100];
+  const history = wednesdays("2026-08-24", L2);
+
+  it("calls a week off below, a very big week above and a usual one within, each against its own range", () => {
+    const response = run(history, "2026-11-16", 6);
+    const byStart = Object.fromEntries(response.weeks.map((w) => [w.weekStart, w]));
+    // 2026-10-19 follows eight weeks of exactly 100: the range is 100 to 100 and the week off is below it.
+    expect(byStart["2026-10-19"]).toMatchObject({
+      usualLow: 100,
+      usualHigh: 100,
+      load: 0,
+      verdict: "below",
+    });
+    // 2026-10-26: 100 seven times and 0, mean 87.5, spread 35.36: 52.1 to 122.9; 300 is above it.
+    expect(byStart["2026-10-26"]).toMatchObject({
+      usualLow: 52.1,
+      usualHigh: 122.9,
+      load: 300,
+      verdict: "above",
+    });
+    // 2026-11-02: 100 six times, 0 and 300: mean 112.5, spread 83.45: 29.0 to 196.0; 100 is within.
+    expect(byStart["2026-11-02"]).toMatchObject({
+      usualLow: 29,
+      usualHigh: 196,
+      load: 100,
+      verdict: "within",
+    });
+    expect(byStart["2026-11-16"]).toMatchObject({
+      usualLow: 29,
+      usualHigh: 196,
+      verdict: "none",
+      current: true,
     });
   });
+});
 
-  it("starts counting at the first week with an activity: the weeks before the rider began are not zeros", () => {
-    const four = [
-      act("2026-10-20", 60),
-      act("2026-10-27", 70),
-      act("2026-11-04", 80),
-      act("2026-11-10", 50),
-    ];
-    const response = run(four, "2026-11-18", 2);
-    // Eight weeks back there are four empty ones before 2026-10-19: they are left out, the four after count.
-    expect(response.usual).toEqual({ low: 57.5, median: 65, high: 72.5, basedOnWeeks: 4 });
-  });
-
-  it("flags a week approximate when any activity in it is, and keeps the kinds and names", () => {
-    const watch = act("2026-11-17", 30.2, {
-      kind: "watch",
+describe("activities", () => {
+  it("keeps an activity with no load out of every sum and share, and an approximate load flags its week", () => {
+    const watch = act("2026-11-17", 30, {
+      kind: "activity",
+      sport: "other_workout",
       name: "Synthetic VR session",
       approximate: true,
-      durationSeconds: 2400,
+      at: "18:00:00",
     });
-    const outdoor = act("2026-11-17", 82.4, {
-      kind: "outdoor",
-      name: "Outdoor ride",
-      durationSeconds: 5400,
-      at: "07:00:00",
+    const lifting = act("2026-11-17", null, {
+      kind: "activity",
+      sport: "strength_training",
+      name: "Strength training",
+      at: "19:00:00",
     });
-    const response = run([...HISTORY, watch, outdoor, act("2026-11-18", 10)], "2026-11-18", 2);
-    const tuesday = response.weeks[1]?.days[1];
-    expect(response.weeks[1]?.approximate).toBe(true);
+    const ride = act("2026-11-17", 70, { at: "07:00:00" });
+    const response = run([...HISTORY, watch, lifting, ride], "2026-11-18", 2);
+    const current = response.weeks[1];
+    expect(current?.approximate).toBe(true);
     expect(response.weeks[0]?.approximate).toBe(false);
-    // The outdoor ride started earlier in the day than the VR session (07:00 against 17:00).
-    expect(tuesday?.activities.map((a) => [a.kind, a.name, a.load, a.approximate])).toEqual([
-      ["outdoor", "Outdoor ride", 82.4, false],
-      ["watch", "Synthetic VR session", 30.2, true],
+    // Oldest first within the day by start time: the ride at 07:00, the watch at 18:00, the lifting at 19:00.
+    expect(
+      current?.activities.map((a) => [a.name, a.kind, a.sport, a.load, a.approximate, a.share]),
+    ).toEqual([
+      ["Free ride", "ride", null, 70, false, 0.7],
+      ["Synthetic VR session", "activity", "other_workout", 30, true, 0.3],
+      ["Strength training", "activity", "strength_training", null, false, null],
     ]);
-    expect(tuesday?.load).toBe(112.6);
-    expect(response.weeks[1]?.durationSeconds).toBe(2400 + 5400 + 3600);
+    expect(current?.days[1]?.load).toBe(100);
+    expect(current?.load).toBe(100);
   });
 
-  it("ignores what is outside the weeks it needs: older than the eighth week back and after today", () => {
+  it("ignores what is outside the weeks it needs: older than the weeks and after today", () => {
     const response = run(
-      [...HISTORY, act("2026-09-14", 500), act("2026-11-19", 500)],
+      [...HISTORY, act("2026-05-01", 500), act("2026-11-19", 500)],
       "2026-11-18",
       2,
     );
-    expect(response.usual?.basedOnWeeks).toBe(8);
     expect(response.weeks[1]?.load).toBe(0);
-  });
-
-  it("answers an empty history with empty weeks", () => {
-    const response = run([], "2026-11-18", 2);
-    expect(response.usual).toBeNull();
-    expect(response.weeks.every((w) => w.load === 0 && w.activityCount === 0)).toBe(true);
-    expect(response.thisWeek.verdict).toBe("unknown");
+    expect(response.weeks[0]?.load).toBe(120);
   });
 });
 
@@ -269,16 +340,16 @@ describe("weeks across a month and a year", () => {
       2,
     );
     expect(response.weeks.map((w) => w.weekStart)).toEqual(["2026-12-21", "2026-12-28"]);
-    const current = response.weeks[1];
-    expect(current?.days.map((d) => d.date)).toEqual([
+    expect(response.weeks[1]?.days.map((d) => d.date)).toEqual([
       "2026-12-28",
       "2026-12-29",
       "2026-12-30",
       "2026-12-31",
       "2027-01-01",
       "2027-01-02",
+      "2027-01-03",
     ]);
-    expect(current?.load).toBe(126.5);
+    expect(response.weeks[1]?.load).toBe(126.5);
     expect(response.weeks[0]?.load).toBe(33);
   });
 

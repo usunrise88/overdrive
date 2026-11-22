@@ -1,74 +1,91 @@
-import {
-  POWER_LEVEL_NAMES,
-  POWER_SKILL_DURATIONS,
-  type PowerSkillDuration,
-} from "@overdrive/contracts";
+import type { PowerProfileTable, PowerSkillDuration } from "@overdrive/contracts";
 
 /**
- * The nine levels of the power skills (spec §6.3, ADR 0042): a rough guide to how a power at a duration compares with other riders,
- * in watts per kilogram.
+ * The level scale of the power skills (spec §6.3, ADR 0042, design/companion.md §6.11): a rough guide to how a power at a duration
+ * compares with the published power-profile tables, in watts per kilogram.
  *
- * WHERE THE NUMBERS COME FROM, AND HOW FAR TO TRUST THEM. The scale is our own, built from the published power-profile table of
- * Coggan and Allen (*Training and Racing with a Power Meter*), the widely quoted approximate watts-per-kilogram table for **men**
- * at four durations: 5 s, 1 min, 5 min and 60 min (FTP). The four anchor columns below are rounded approximations of its nine
- * rows (from "untrained" to "world class"), made into equal-looking steps; they are **not** a copy of the book. The twelve
- * durations of the power skills have no published row, so the other eight are **interpolated** between the anchors, linearly in
- * the logarithm of the duration and of the power, and rounded to 0.01 W/kg. The table is not tied to sex or age: for a woman or an
- * older rider the same level means a different standing against peers, so "Level 4 of 9" is a rough guide to how the rider's own
- * numbers move, not a verdict. Nothing here is a physiological law and nothing is fitted to this rider.
+ * THE SCALE. At each duration the table gives two numbers: B, the floor of level 1, and T, the floor of level 9; levels 2 to 8 are
+ * equal steps between. A rider's watts per kilogram W are placed on that scale as a **score**,
  *
- * Level 1 starts at 0: every effort is at least level 1. A power reaches level N at a duration when its watts per kilogram are at
- * least the threshold of level N at that duration. Thresholds rise with the level and fall with the duration: a test checks both.
+ *     score = 1 + 8 * (W - B) / (T - B)
  *
- * Anchors (W/kg at 5 s, 1 min, 5 min, 60 min) of levels 2 to 9:
+ * so a score of 1 is the floor of level 1, 5 is the floor of level 5 and 9 is the floor of level 9; it is rounded to 0.01 and held
+ * between 0 and 9, so that one huge effort cannot dominate a mean and a very weak one cannot drag it below nothing. A duration's level
+ * is the floor of its score (not below 1); a skill's level is the floor of the mean of the scores of its durations that have an
+ * effort (`skillLevelIndex` of the contracts). Scores, not levels, are what the companion draws on its radar.
  *
- *     2: 9.5 / 4.0 / 2.5 / 2.0      6: 17.5 / 8.2 / 5.3 / 4.4
- *     3: 11.5 / 5.0 / 3.2 / 2.6     7: 19.5 / 9.3 / 6.0 / 5.0
- *     4: 13.5 / 6.0 / 3.9 / 3.2     8: 21.5 / 10.4 / 6.8 / 5.7
- *     5: 15.5 / 7.1 / 4.6 / 3.8     9: 24.0 / 11.5 / 7.6 / 6.4
+ * WHERE THE NUMBERS COME FROM, AND HOW FAR TO TRUST THEM. The tables are those of Allen and Coggan (*Training and Racing with a Power
+ * Meter*), the widely quoted watts-per-kilogram power profile at four durations, 5 s, 1 min, 5 min and 60 min (FTP), made for young
+ * adults and applied as they are whatever the rider's age. **They are approximate:** they survey trained riders, indoor power differs
+ * from outdoor, the weight is a 7-day average, and the twelve durations of the skills have no published row, so the other eight are
+ * interpolated between the four anchors, linearly in the logarithm of the duration and of the power, and rounded to 0.01 W/kg. A level
+ * is a rough guide to how the rider's own numbers move, not a verdict, and nothing here is fitted to this rider.
+ *
+ * - **Men** (the default): the floors and tops of design/companion.md §6.11, given as they are.
+ * - **Women**: built the same way from the published women's anchors. The book itself was not at hand, so the anchors were taken from
+ *   two independent transcriptions of its women's chart (the TrainingPeaks power-profile chart read into a table by
+ *   triathlonregimen.com, and the "simplified" table of Allen and Coggan, 2nd edition, on cyclistshub.com) and from the top figures
+ *   Coggan is quoted giving for women (about 19 W/kg at 5 s, 9 at 1 min, 6.5 at 5 min and 5.5 at threshold). The two agree to within
+ *   0.3 W/kg in every cell they share. B is the lowest category boundary of the chart (the floor of "Novice 2"): 8.63, 4.75, 1.97 and
+ *   1.58 W/kg at 5 s, 1 min, 5 min and 60 min. T is the top of the chart, which is one category step above the floor of "World class"
+ *   (17.88, 8.64, 6.06 and 5.10 W/kg): 19.2, 9.19, 6.64 and 5.61. The same procedure applied to the men's chart (floors 10.35, 5.75,
+ *   2.42, 1.93; "World class" from 23.06, 10.68, 6.86, 5.93) lands within a few percent of the design's men's anchors, which is
+ *   the check that it is the design's own method. What this does not prove: the numbers were read from images by third parties.
  */
-export const LEVEL_COUNT: number = POWER_LEVEL_NAMES.length;
 
-/**
- * The least watts per kilogram that reaches each level at each duration: `LEVEL_THRESHOLDS[seconds][level - 1]`, so index 0 (level 1)
- * is always 0 and index 8 (level 9, "Elite") the highest.
- */
-export const LEVEL_THRESHOLDS: Readonly<Record<PowerSkillDuration, readonly number[]>> = {
-  15: [0, 6.48, 7.96, 9.43, 10.98, 12.52, 14.06, 15.6, 17.34],
-  30: [0, 5.09, 6.31, 7.52, 8.83, 10.13, 11.43, 12.74, 14.12],
-  60: [0, 4.0, 5.0, 6.0, 7.1, 8.2, 9.3, 10.4, 11.5],
-  120: [0, 3.27, 4.13, 4.98, 5.89, 6.79, 7.7, 8.66, 9.62],
-  180: [0, 2.9, 3.69, 4.47, 5.28, 6.09, 6.9, 7.78, 8.67],
-  300: [0, 2.5, 3.2, 3.9, 4.6, 5.3, 6.0, 6.8, 7.6],
-  600: [0, 2.35, 3.02, 3.69, 4.36, 5.03, 5.7, 6.47, 7.24],
-  900: [0, 2.27, 2.92, 3.57, 4.23, 4.88, 5.54, 6.29, 7.04],
-  1200: [0, 2.21, 2.85, 3.49, 4.13, 4.78, 5.42, 6.16, 6.91],
-  1800: [0, 2.13, 2.76, 3.38, 4.01, 4.63, 5.26, 5.99, 6.71],
-  2700: [0, 2.05, 2.66, 3.27, 3.88, 4.5, 5.11, 5.82, 6.53],
-  3600: [0, 2.0, 2.6, 3.2, 3.8, 4.4, 5.0, 5.7, 6.4],
-};
-
-export interface LevelReached {
-  /** 1 to 9. */
-  index: number;
-  name: string;
-  /** What the same duration needs for the next level; null at level 9. */
-  nextLevelWattsPerKg: number | null;
+/** B and T at one duration. */
+export interface LevelFloors {
+  /** The floor of level 1, in W/kg. */
+  b: number;
+  /** The floor of level 9, in W/kg. */
+  t: number;
 }
 
-/** The level that `wattsPerKg` reaches at `seconds`: the highest whose threshold it meets. */
-export function levelAt(seconds: PowerSkillDuration, wattsPerKg: number): LevelReached {
-  const thresholds = LEVEL_THRESHOLDS[seconds];
-  let index = 1;
-  for (let level = 2; level <= LEVEL_COUNT; level++) {
-    if (wattsPerKg >= (thresholds[level - 1] as number)) index = level;
-  }
-  return {
-    index,
-    name: POWER_LEVEL_NAMES[index - 1] as string,
-    nextLevelWattsPerKg: index === LEVEL_COUNT ? null : (thresholds[index] as number),
-  };
+const seconds = [15, 30, 60, 120, 180, 300, 600, 900, 1200, 1800, 2700, 3600] as const;
+
+function table(
+  b: readonly number[],
+  t: readonly number[],
+): Readonly<Record<PowerSkillDuration, LevelFloors>> {
+  return Object.fromEntries(
+    seconds.map((s, i) => [s, { b: b[i] as number, t: t[i] as number }]),
+  ) as Record<PowerSkillDuration, LevelFloors>;
 }
 
-/** Every duration the table has a row for, in order (the contract's twelve). */
-export const LEVEL_DURATIONS: readonly PowerSkillDuration[] = POWER_SKILL_DURATIONS;
+/** The floors and tops of the men's table: design/companion.md §6.11, as given. */
+const MEN = table(
+  [8.2, 6.9, 5.6, 4.2, 3.35, 2.3, 2.2, 2.1, 2.1, 2.0, 1.95, 1.9],
+  [18.5, 15.0, 11.5, 9.8, 8.85, 7.6, 7.25, 7.05, 6.95, 6.75, 6.55, 6.4],
+);
+
+/** The women's table: log-log interpolation of the anchors above (see the comment of this file). */
+const WOMEN = table(
+  [6.63, 5.61, 4.75, 3.25, 2.6, 1.97, 1.85, 1.79, 1.74, 1.68, 1.62, 1.58],
+  [13.86, 11.29, 9.19, 7.99, 7.36, 6.64, 6.34, 6.16, 6.04, 5.88, 5.72, 5.61],
+);
+
+export const LEVEL_FLOORS: Readonly<
+  Record<PowerProfileTable, Readonly<Record<PowerSkillDuration, LevelFloors>>>
+> = { men: MEN, women: WOMEN };
+
+/** The four durations the published tables give, in seconds: the anchors of the interpolation. */
+export const ANCHOR_SECONDS = [5, 60, 300, 3600] as const;
+
+/** The women's anchors (B, then T) at {@link ANCHOR_SECONDS}, from which {@link LEVEL_FLOORS}.women is interpolated. */
+export const WOMEN_ANCHORS = {
+  b: [8.63, 4.75, 1.97, 1.58],
+  t: [19.2, 9.19, 6.64, 5.61],
+} as const;
+
+const round2 = (value: number): number => Math.round(value * 100) / 100;
+
+/** The score of `wattsPerKg` at `duration` in `table`: 0 to 9, two decimals (see the comment of this file). */
+export function scoreAt(
+  profileTable: PowerProfileTable,
+  duration: PowerSkillDuration,
+  wattsPerKg: number,
+): number {
+  const { b, t } = LEVEL_FLOORS[profileTable][duration];
+  const score = 1 + (8 * (wattsPerKg - b)) / (t - b);
+  return round2(Math.min(9, Math.max(0, score)));
+}

@@ -1,5 +1,6 @@
 {
   "generatedAt": "2026-11-18T08:00:00Z",
+  "table": "men",
   "window": {
     "from": "2026-09-24",
     "to": "2026-11-18",
@@ -69,7 +70,8 @@
   ],
   "riderWeight": {
     "kg": 78.4,
-    "asOf": "2026-11-17"
+    "date": "2026-11-17",
+    "days": 5
   },
   "skills": [
     {
@@ -108,6 +110,6 @@
       "level": null
     }
   ],
-  "levelsNote": "Levels are a rough guide from a table of watts per kilogram for men; they are not tied to your age or sex, and they need your weight.",
-  "outdoorNote": "Only rides on the tablet count here; outdoor rides and watch workouts are not in the power curve."
+  "levelsNote": "Levels are approximate: your watts per kilogram against published power-profile tables, read as a guide to how your own numbers move.",
+  "outdoorNote": "Only rides on the tablet count here: outdoor rides and workouts from your watch are not in the power curve."
 }
