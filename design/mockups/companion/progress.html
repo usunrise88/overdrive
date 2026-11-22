@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Companion: Progress</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../components.css">
+<link rel="stylesheet" href="companion.css">
+<style>
+  /* Progress (design/companion.md §4.16, §6.13). */
+  .group { display: flex; flex-direction: column; gap: 4px; padding: 8px 4px 0; }
+  .verdict { display: flex; flex-direction: column; gap: 2px; }
+  .entry { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 16px; }
+  .entry .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .note-ann { font-size: 12px; line-height: 16px; color: #c9cdd3; padding: 0 4px; font-style: italic; }
+  .plotcap { font-size: var(--type-caption-size); line-height: 16px; color: var(--color-text-tertiary); margin-bottom: -4px; }
+</style>
+</head>
+<body data-ready="false">
+
+<figure class="shot"><figcaption><b>Progress · 6 months.</b> A pushed screen, reached from the Progress row at the end of Fitness and of Power. Every card: the service's verdict, one line of numbers, the readout and a small chart at rest on the latest point.</figcaption><div class="frame phone tall" id="progress"></div></figure>
+<figure class="shot"><figcaption><b>The way in.</b> The last card of Fitness (and of Power): one row with the service's headline.</figcaption><div class="frame phone" id="progress-entry"></div></figure>
+<figure class="shot"><figcaption><b>States.</b> Too few points for a verdict, no watch data, no weight, offline, nothing at all.</figcaption><div class="frame phone tall" id="progress-states"></div></figure>
+
+<script type="module">
+import { backbar, head, ic, lineChart, niceTicks, range, readout, rng, shell, statusLine, tile } from "./companion.js";
+
+const W = 346;
+const T1 = "var(--color-text-primary)";
+const T2 = "var(--color-text-secondary)";
+const T3 = "var(--color-text-tertiary)";
+const MONTHS = ["Jun", "Jul", "Aug", "Sep", "Oct", "Nov"];
+const NW = 26; // weeks in 6 months, the current one last
+const monthTicksW = [2, 6, 11, 15, 19, 24].map((i, k) => ({ i, text: MONTHS[k] }));
+
+// ---------- Synthetic data ----------
+const r = rng(11);
+const p5 = [305, 312, 318, 322, 330, 326];
+const p20 = [262, 266, 270, 276, 284, 281];
+const p60 = [236, 238, null, 244, 250, 247];
+const hrAt = Array.from({ length: NW }, (_, i) => ([4, 13, 17].includes(i) ? null : Math.round(146 - (7 * i) / (NW - 1) + (r() - 0.5) * 3)));
+const pAt = hrAt.map((h, i) => (h == null ? null : Math.round(172 + (13 * i) / (NW - 1) + (r() - 0.5) * 4)));
+const ef = Array.from({ length: NW }, (_, i) => (i % 2 === 1 || i === 13 ? null : Math.round((1.32 + (0.09 * i) / NW + (r() - 0.5) * 0.04) * 100) / 100));
+const efMean = ef.map((_, i) => {
+  if (ef[i] == null) return null;
+  const prev = ef.slice(0, i + 1).filter((v) => v != null).slice(-5);
+  return Math.round((prev.reduce((a, b) => a + b, 0) / prev.length) * 100) / 100;
+});
+const drift = Array.from({ length: NW }, (_, i) => (i % 3 !== 1 ? null : Math.round((7.4 - (3.4 * i) / NW + (r() - 0.5) * 1.6) * 10) / 10));
+const driftMean = drift.map((_, i) => {
+  if (drift[i] == null) return null;
+  const prev = drift.slice(0, i + 1).filter((v) => v != null).slice(-5);
+  return Math.round((prev.reduce((a, b) => a + b, 0) / prev.length) * 10) / 10;
+});
+const rhr = Array.from({ length: NW }, (_, i) => ([9, 10].includes(i) ? null : Math.round((54.5 - (3.4 * i) / NW + (r() - 0.5) * 1.2) * 10) / 10));
+const kg = Array.from({ length: NW }, (_, i) => ([7, 20].includes(i) ? null : Math.round((73.4 - (1.4 * i) / NW + (r() - 0.5) * 0.4) * 10) / 10));
+const ftpAt = (i) => (i >= 19 ? 250 : i >= 9 ? 244 : 238);
+const wkg = kg.map((k, i) => (k == null ? null : Math.round((ftpAt(i) / k) * 100) / 100));
+const last = (a) => a.findLastIndex((v) => v != null);
+
+// ---------- Pieces ----------
+const card = ({ name, verdict, detail, keys, when, chart, note = "" }) => `
+  <div class="card chart">
+    <div class="between" style="height:24px"><span class="t-label c3">${name}</span><span class="t-label c2">Values</span></div>
+    <div class="verdict"><span class="t-strong">${verdict}</span><span class="t-label c2 num">${detail}</span></div>
+    ${readout(when, keys)}
+    ${chart}
+    ${note ? `<span class="chart-note">${note}</span>` : ""}
+  </div>`;
+
+const monthXs = MONTHS.map((_, k) => (k + 0.5) / 6);
+const powerChart = lineChart({
+  w: W, h: 132, n: 6, xs: monthXs, y: { min: 200, max: 350, ticks: [200, 250, 300, 350] },
+  xTicks: MONTHS.map((m, k) => ({ i: k, text: m })), sel: 5,
+  series: [
+    { v: p60, color: "var(--zone-3)", sw: 2, dots: "all", r: 3 },
+    { v: p20, color: "var(--zone-4)", sw: 2, dots: "all", r: 3 },
+    { v: p5, color: "var(--zone-5)", sw: 2, dots: "all", r: 3 },
+  ],
+});
+
+const weekly = (v, y, color = T1, extra = {}) =>
+  lineChart({ w: W, h: 112, n: NW, y, xTicks: monthTicksW, sel: last(v), series: [{ v, color, sw: 2 }], ...extra });
+
+const progressBody = `
+  ${range(["6 months", "1 year", "All time"], "6 months")}
+  <div class="group"><span class="t-heading">Power</span></div>
+  ${card({
+    name: "Best power",
+    verdict: "Best power is trending up: better",
+    detail: "5 min +21 W · 20 min +19 W · 60 min +11 W since June",
+    when: "Nov · so far",
+    keys: [["line", "var(--zone-5)", "5 min", "326 W"], ["line", "var(--zone-4)", "20 min", "281 W"], ["line", "var(--zone-3)", "60 min", "247 W"]],
+    chart: powerChart,
+    note: "Your best of each month. 3.9 W/kg at 20 min with 72.0 kg.",
+  })}
+  ${card({
+    name: "Weight and watts per kilogram",
+    verdict: "Watts per kilogram are trending up: better",
+    detail: `${wkg[last(wkg)].toFixed(2)} W/kg now, ${wkg[0].toFixed(2)} in June · weight ${kg[last(kg)].toFixed(1)} kg, ${(kg[0] - kg[last(kg)]).toFixed(1)} kg less`,
+    when: "Week of 16 Nov",
+    keys: [["line", T1, "FTP per kg", `${wkg[last(wkg)].toFixed(2)} W/kg`], ["line", T3, "Weight", `${kg[last(kg)]} kg`]],
+    chart: `<span class="plotcap">Watts per kilogram (FTP)</span>${weekly(wkg, { min: 3.1, max: 3.6, ticks: [3.2, 3.4, 3.6], fmt: (v) => v.toFixed(1) }, T1, { h: 96 })}
+      <span class="plotcap">Weight, kg</span>${weekly(kg, { min: 71, max: 74, ticks: [71, 72, 73, 74] }, T3, { h: 96 })}`,
+  })}
+  <div class="group"><span class="t-heading">Heart rate</span>
+    <span class="t-label c2">Heart rate also moves with heat, sleep and caffeine, so trust a trend over several weeks, not one ride.</span></div>
+  ${card({
+    name: "Aerobic efficiency",
+    verdict: "Heart rate at the same power is trending down: fitter",
+    detail: `${hrAt[last(hrAt)]} bpm at 180 W, ${hrAt[0] - hrAt[last(hrAt)]} lower than in June · ${pAt[last(pAt)]} W at 140 bpm, ${pAt[last(pAt)] - pAt[0]} more`,
+    when: "Week of 16 Nov",
+    keys: [["line", T1, "At 180 W", `${hrAt[last(hrAt)]} bpm`], ["line", T2, "At 140 bpm", `${pAt[last(pAt)]} W`]],
+    chart: `<span class="plotcap">Heart rate at 180 W, bpm</span>${weekly(hrAt, niceTicks(136, 150, 3), T1, { h: 96 })}
+      <span class="plotcap">Power at 140 bpm, W</span>${weekly(pAt, niceTicks(166, 190, 3), T2, { h: 96 })}`,
+    note: "From steady stretches of 5 minutes or more in every ride, the median of each week.",
+  })}
+  ${card({
+    name: "Efficiency factor",
+    verdict: "Efficiency factor is trending up: fitter",
+    detail: `${efMean[last(efMean)]} over the last 5 steady rides, ${ef[0]} in June`,
+    when: "Mon 16 Nov · Threshold 2×20",
+    keys: [["dot", T2, "Ride", `${ef[last(ef)]}`], ["line", T1, "Last 5 rides", `${efMean[last(efMean)]}`]],
+    chart: lineChart({
+      w: W, h: 112, n: NW, y: { min: 1.25, max: 1.5, ticks: [1.3, 1.4, 1.5], fmt: (v) => v.toFixed(1) }, xTicks: monthTicksW, sel: last(ef),
+      series: [{ v: efMean, color: T1, sw: 2, connect: true }, { v: ef, color: T2, sw: 0, dots: "all", r: 3, noSelDot: true }],
+    }),
+    note: "Normalised power divided by average heart rate on steady rides. Higher is better.",
+  })}
+  ${card({
+    name: "Aerobic drift",
+    verdict: "Aerobic drift is trending down: better",
+    detail: `${driftMean[last(driftMean)]}% over the last 5 long rides, ${drift[1]}% in June`,
+    when: "Sat 14 Nov · Endurance 90",
+    keys: [["dot", T2, "Ride", `${drift[last(drift)]}%`], ["line", T1, "Last 5 rides", `${driftMean[last(driftMean)]}%`]],
+    chart: lineChart({
+      w: W, h: 112, n: NW, y: { min: 0, max: 10, ticks: [0, 5, 10], fmt: (v) => `${v}%`, base: 0 }, xTicks: monthTicksW, sel: last(drift),
+      bands: [{ lo: 0, hi: 5, fill: "var(--color-surface2)", label: "Steady" }],
+      series: [{ v: driftMean, color: T1, sw: 2, connect: true }, { v: drift, color: T2, sw: 0, dots: "all", r: 3, noSelDot: true }],
+    }),
+    note: "How much heart rate rose against power on steady rides of 40 minutes or more. Lower is better.",
+  })}
+  ${card({
+    name: "Resting heart rate",
+    verdict: "Resting heart rate is trending down: better",
+    detail: `${Math.round(rhr[last(rhr)])} bpm this week, ${Math.round(rhr[0])} in June`,
+    when: "Week of 16 Nov",
+    keys: [["line", T1, "Weekly mean", `${Math.round(rhr[last(rhr)])} bpm`]],
+    chart: weekly(rhr, { min: 48, max: 58, ticks: [50, 54, 58] }),
+    note: "From the watch, the mean of each week's nights.",
+  })}`;
+
+shell("progress", {
+  top: backbar("Progress", "Updated 07:40"),
+  body: progressBody,
+});
+
+// ---------- Entry row ----------
+shell("progress-entry", {
+  tab: "Fitness",
+  body: `${head("Fitness", "Updated 07:40")}
+  <div class="card chart"><div class="between"><span class="t-label c3">Form</span><span class="t-label c2">Values</span></div><span class="t-label c3" style="height:120px">…</span></div>
+  <div class="card"><div class="entry"><div class="grow"><span class="t-strong">Progress</span><span class="t-label c2">Heart rate at the same power is trending down: fitter</span></div><span class="c3">${ic("chevron-right")}</span></div></div>`,
+});
+
+// ---------- States ----------
+const ann = (t) => `<span class="note-ann">${t}</span>`;
+const few = hrAt.map((v, i) => (i < NW - 3 ? null : v));
+shell("progress-states", {
+  top: backbar("Progress", "Updated 07:40"),
+  body: `${ann("Fewer points than a verdict needs (here 3 of 4 weeks)")}
+  ${card({
+    name: "Aerobic efficiency",
+    verdict: "Not enough data yet",
+    detail: "3 of 4 weeks have a figure. Ride steady for 5 minutes or more to add one.",
+    when: "Week of 16 Nov",
+    keys: [["line", T1, "At 180 W", `${hrAt[last(hrAt)]} bpm`]],
+    chart: weekly(few, niceTicks(136, 150, 3), T1, { h: 96 }),
+  })}
+  ${ann("No watch data: the card is one sentence")}
+  <div class="card chart"><span class="t-label c3">Resting heart rate</span><span class="t-body c2">No resting heart rate yet. It comes from the watch through Health Connect.</span></div>
+  ${ann("No weight")}
+  <div class="card chart"><span class="t-label c3">Weight and watts per kilogram</span><span class="t-body c2">No weight yet. Weigh yourself with a scale that writes to Health Connect.</span></div>
+  ${ann("Offline: the status line, the cached cards unchanged")}
+  ${statusLine("Offline · updated 06:10", "No network connection. Pull down to try again.")}
+  ${ann("Nothing at all yet (whole screen)")}
+  <div style="padding:8px 4px" class="stack gap8"><span class="t-heading">No progress to show yet</span><span class="t-body c2">Progress fills in from rides on the tablet and from the watch. Give it a few weeks of riding.</span></div>`,
+});
+void tile;
+
+document.body.dataset.ready = "true";
+</script>
+</body>
+</html>
