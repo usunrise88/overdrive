@@ -80,6 +80,7 @@ import app.overdrive.ride.settings.effectiveSettingsOf
 import app.overdrive.ride.settings.riderPatch
 import app.overdrive.ride.settings.withProfile
 import app.overdrive.ride.ui.AndroidBluetoothController
+import app.overdrive.ride.ui.BleLogShare
 import app.overdrive.ride.ui.BluetoothController
 import app.overdrive.ride.workouts.WorkoutLibrary
 import kotlinx.coroutines.CoroutineScope
@@ -356,6 +357,11 @@ class AppContainer(
     private val bleLogScope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
 
     private val recordBle: () -> Boolean = { settings.value.recordBleSessions }
+
+    // The zip of an earlier share of the Bluetooth logs is deleted at the next launch (ADR 0010).
+    init {
+        bleLogScope.launch { BleLogShare.clearArchives(appContext) }
+    }
 
     private val trainerTransports: GattTransportFactory =
         BleSessionLogger(
