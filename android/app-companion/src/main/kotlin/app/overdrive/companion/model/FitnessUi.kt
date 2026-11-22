@@ -11,7 +11,6 @@ import app.overdrive.uikit.UiFormat
 import app.overdrive.uikit.chart.AxisTick
 import app.overdrive.uikit.chart.BandLayer
 import app.overdrive.uikit.chart.ChartMath
-import app.overdrive.uikit.chart.ColumnSpec
 import app.overdrive.uikit.chart.LineLayer
 import app.overdrive.uikit.chart.PlotSpec
 import app.overdrive.uikit.chart.ReadoutEntry
@@ -49,14 +48,13 @@ class FitnessContent(
     val tiles: List<TileUi>,
     val fitness: LineChartUi,
     val form: LineChartUi,
-    val weekly: ColumnChartUi,
     /** The latest day: where the selection rests. */
     val lastDay: Double,
 )
 
 /**
- * The Fitness screen made from one `GET /v1/metrics` answer (design/companion.md §4.3, §6.1 to §6.3): the three tiles of today,
- * the fitness and fatigue lines, the form line over its "Training hard" band, and the weekly columns. Pure: the screen only draws
+ * The Fitness screen made from one `GET /v1/metrics` answer (design/companion.md §4.3, §6.1, §6.2): the three tiles of today,
+ * the fitness and fatigue lines, and the form line over its "Training hard" band. The weekly columns moved to Effort (design/companion.md §4.15, `EffortUi`). Pure: the screen only draws
  * it, and every word is tested here.
  */
 object FitnessUi {
@@ -111,7 +109,6 @@ object FitnessUi {
             tiles = tiles,
             fitness = fitnessChart(daily, days, ticks, rangeWords, words),
             form = formChart(daily, days, ticks, rangeWords, words),
-            weekly = weeklyChart(response, range, words),
             lastDay = days.last(),
         )
     }
@@ -249,81 +246,6 @@ object FitnessUi {
         )
     }
 
-    private fun weeklyChart(
-        response: MetricsResponse,
-        range: MetricsRange,
-        words: Words,
-    ): ColumnChartUi {
-        val weeks = response.weekly
-        val lastDay = checkNotNull(PlanDates.epochDay(response.to)).toDouble()
-        val starts = DoubleArray(weeks.size) { checkNotNull(PlanDates.epochDay(weeks[it].weekStart)).toDouble() }
-        val values = DoubleArray(weeks.size) { weeks[it].load }
-        val selectXs = DoubleArray(weeks.size) { min(starts[it] + WEEK_DAYS - 1, lastDay) }
-        val axis = ChartMath.niceAxis(0.0, max(values.max(), 1.0), 4, includeZero = true)
-        val spec =
-            ColumnSpec(
-                starts = starts,
-                values = values,
-                selectXs = selectXs,
-                xTicks = DateAxis.weekTicks(range, weeks.map { it.weekStart }, words),
-                yMax = axis.max,
-                yTicks = axis.ticks.map { AxisTick(it, UiFormat.signed(it.roundToInt())) },
-                restX = lastDay,
-                heightDp = 150f,
-                valueLabel = { UiFormat.signed(it.roundToInt()) },
-            )
-        val readoutAt = { x: Double? ->
-            val week = weeks[spec.columnOf(x ?: lastDay)]
-            val partial = checkNotNull(PlanDates.epochDay(week.weekStart)) + WEEK_DAYS - 1 > lastDay
-            val entries =
-                buildList {
-                    add(
-                        ReadoutEntry(
-                            ReadoutKey.Band,
-                            OverdriveColors.textPrimary,
-                            "Load",
-                            week.load.roundToInt().toString(),
-                        ),
-                    )
-                    add(ReadoutEntry(ReadoutKey.None, OverdriveColors.textPrimary, "Rides", week.rides.toString()))
-                    if (week.otherLoad > 0.0) {
-                        add(
-                            ReadoutEntry(
-                                ReadoutKey.None,
-                                OverdriveColors.textPrimary,
-                                "Watch",
-                                week.otherLoad.roundToInt().toString(),
-                            ),
-                        )
-                    }
-                }
-            Readout("Week of ${words.dayShort(week.weekStart)}${if (partial) " · so far" else ""}", entries)
-        }
-        return ColumnChartUi(
-            heading = "Weekly load",
-            spec = spec,
-            readoutAt = readoutAt,
-            table =
-                ValuesTable(
-                    "Weekly load",
-                    "Week of",
-                    listOf("Load", "Rides", "Watch"),
-                    weeks.reversed().map {
-                        ValuesRow(
-                            it.weekStart,
-                            words.dayShort(it.weekStart),
-                            listOf(
-                                it.load.roundToInt().toString(),
-                                it.rides.toString(),
-                                it.otherLoad.roundToInt().toString(),
-                            ),
-                        )
-                    },
-                ),
-            summary = "Weekly load, ${RangeWords.label(range)}",
-        )
-    }
-
     private const val FORM_FLOOR = 30.0
     private const val FORM_BAND_TOP = 10.0
     private const val FORM_CEILING = 10.0
@@ -389,21 +311,4 @@ object DateAxis {
             }
         }
     }
-
-    /**
-     * Ticks of the weekly columns: the value is the column's index. Six weeks label every week start ("9 Nov"); longer ranges
-     * label the week starts that open a month ("Jun").
-     */
-    fun weekTicks(
-        range: MetricsRange,
-        weekStarts: List<String>,
-        words: Words,
-    ): List<AxisTick> =
-        weekStarts.mapIndexedNotNull { index, start ->
-            when {
-                range == MetricsRange.SIX_WEEKS -> AxisTick(index.toDouble(), words.dayShort(start))
-                start.substring(8, 10).toInt() <= 7 && index > 0 -> AxisTick(index.toDouble(), words.monthShort(start))
-                else -> null
-            }
-        }
 }

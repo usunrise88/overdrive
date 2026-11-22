@@ -120,6 +120,21 @@ answer that contradicts itself is refused as an answer that is not the contract'
 * Sync now asks the effort, the eight weeks, all time and a custom window when one is chosen.
 * The models: `PowerSkillsResponse.duration(seconds)`, `.skill(PowerSkillId)`; `EffortResponse.currentWeek`, `EffortWeek.usual`.
 
+### 7. The UI stage (release 0.4.1)
+
+The two cards are built (`design/companion.md` §4.14, §4.15; deviations in §14.1). `ui-kit/chart` gained `RadarChart` and the pure `RadarGeometry`, `LevelBar`, `DayStrip`, and
+`ColumnChart` got the band layer, the "Now" tick and its own TalkBack actions; the app has `PowerSkillsUi`, `RangePicker` and `EffortUi` (pure, tested) with `PowerSkillsCard`,
+`RangePickerSheet` and `EffortCard`. The old Weekly load card and its code are gone (Effort's Values sheet keeps the weekly totals). **The phone computes nothing**: radii are the
+service's scores over nine (or the share of the best ever without a weight), levels and words come from `level`, the week line and the verdict from the service's figures.
+
+* **Refresh**: the Power tab asks `RefreshTarget.Power` and `RefreshTarget.PowerSkills(window)` when it opens and when the window changes; Fitness asks `RefreshTarget.Fitness` (which also
+  refreshes the effort); Sync now is as above. A failure of only the skills or only the effort is the tab's problem line.
+* **`powerProfileTable` is edited in Settings** (group **Power skills**, "Power profile table", Men / Women, one sentence that levels are approximate), through the same profile PATCH
+  and the same debounce as the heart rates (`CompanionContainer.setPowerProfileTable`); once the service has the change the Power skills are asked again. The row is absent until the
+  service has sent a profile. No new editing framework.
+* **Dots in the date sheet** come from the cached newest page of the rides list (50 rides): a range further back than that has no dots. The count in the sheet ("9 rides") is the
+  same list's; the range line's count ("9 rides") is the service's `window.rideCount`.
+
 ## Tests
 
 `contracts`: 10 + 79 power-skills and 15 + 67 effort fixtures (valid and invalid) and the profile's. `server`: the scale (every boundary, the clamps, both

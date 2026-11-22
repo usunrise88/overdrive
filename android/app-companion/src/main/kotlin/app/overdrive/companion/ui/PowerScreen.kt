@@ -29,12 +29,21 @@ import app.overdrive.companion.model.BestEffortUi
 import app.overdrive.companion.model.Body
 import app.overdrive.companion.model.FtpFacts
 import app.overdrive.companion.model.FtpUi
+import app.overdrive.companion.model.PickerState
 import app.overdrive.companion.model.PowerContent
+import app.overdrive.companion.model.PowerSkillsBody
+import app.overdrive.companion.model.PowerSkillsCardUi
+import app.overdrive.companion.model.PowerSkillsUi
 import app.overdrive.companion.model.PowerUi
+import app.overdrive.companion.model.RangePicker
 import app.overdrive.companion.model.RangeWords
 import app.overdrive.companion.model.ScreenUi
 import app.overdrive.companion.model.ValuesTable
+import app.overdrive.companion.model.Words
+import app.overdrive.core.metrics.RideKind
+import app.overdrive.core.powerskills.PowerSkillId
 import app.overdrive.core.remote.MetricsRange
+import app.overdrive.core.remote.PowerSkillsWindow
 import app.overdrive.uikit.BottomSheet
 import app.overdrive.uikit.ButtonVariant
 import app.overdrive.uikit.HorizontalRule
@@ -51,6 +60,34 @@ import app.overdrive.uikit.icons.OverdriveIcons
 import app.overdrive.uikit.plainClickable
 import app.overdrive.uikit.rememberInteractionSource
 import app.overdrive.uikit.tokens.OverdriveColors
+import java.time.LocalDate
+
+/** A sheet over the Power tab: one duration or skill of the Power skills card, or the Custom range's date picker. */
+sealed interface PowerSheet {
+    data class Axis(
+        val index: Int,
+    ) : PowerSheet
+
+    data class Skill(
+        val id: PowerSkillId,
+    ) : PowerSheet
+
+    data class Picker(
+        val state: PickerState,
+    ) : PowerSheet
+}
+
+/**
+ * What the Power skills card needs besides its own state: the days of the tablet rides (for the picker's dots), the phone's today and the
+ * words, and what choosing a window does.
+ */
+class PowerSkillsHost(
+    val ui: PowerSkillsCardUi,
+    val rideDays: List<LocalDate>,
+    val today: LocalDate,
+    val words: Words,
+    val onWindow: (PowerSkillsWindow) -> Unit,
+)
 
 /** What the Power screen can do. */
 class PowerActions(
@@ -72,9 +109,14 @@ fun PowerScreen(
     val state by container.metricsFor(range).state.collectAsStateWithLifecycle()
     val profile by container.profile.state.collectAsStateWithLifecycle()
     val answers by container.ftpAnswers.state.collectAsStateWithLifecycle()
+    val window by container.powerSkillsWindow.collectAsStateWithLifecycle()
+    val skillsResource = remember(window) { container.powerSkillsFor(window) }
+    val skillsState by skillsResource.state.collectAsStateWithLifecycle()
+    val rides by container.rides.view.collectAsStateWithLifecycle()
     val host = remember(settings) { hostOf(settings?.serviceUrl.orEmpty()) }
     LaunchedEffect(range) { container.screenOpened(RefreshTarget.Power) }
-    val ui =
+    LaunchedEffect(window) { container.screenOpened(RefreshTarget.PowerSkills(window)) }
+    val metricsUi =
         remember(
             state,
             profile,
@@ -82,6 +124,28 @@ fun PowerScreen(
             range,
             host,
         ) { PowerUi.of(state, profile, answers, range, container.words, host) }
+    // The Power skills card has its own resource: when only it failed, its cause is the tab's problem line (design/companion.md §3.2).
+    val ui =
+        remember(metricsUi, skillsState, host) {
+            metricsUi.copy(status = metricsUi.status ?: problemOf(skillsState, host, container.words))
+        }
+    val skills =
+        PowerSkillsHost(
+            ui = remember(skillsState, window) { PowerSkillsUi.of(skillsState, window, container.words) },
+            rideDays =
+                remember(rides) {
+                    rides.list.items.filter { it.kind == RideKind.RIDE }.mapNotNull {
+                        runCatching {
+                            LocalDate.parse(
+                                it.date,
+                            )
+                        }.getOrNull()
+                    }
+                },
+            today = LocalDate.parse(container.words.today()),
+            words = container.words,
+            onWindow = container::setPowerSkillsWindow,
+        )
     val listState = rememberLazyListState()
     ScrollToTopOn(container.nav, Tab.Power, listState)
     PowerView(
@@ -100,6 +164,7 @@ fun PowerScreen(
         ),
         modifier,
         listState,
+        skills = skills,
     )
 }
 
@@ -112,12 +177,17 @@ fun PowerView(
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
     curve: ChartSelection = remember(range) { ChartSelection() },
+    skills: PowerSkillsHost? = null,
+    initialSheet: PowerSheet? = null,
+    initialTable: ValuesTable? = null,
 ) {
     // Power's charts have different x axes: each selects on its own (design/companion.md §3.5).
     val history = remember(range) { ChartSelection() }
     val drift = remember(range) { ChartSelection() }
-    var table by remember { mutableStateOf<ValuesTable?>(null) }
+    var table by remember { mutableStateOf(initialTable) }
     var setting by remember { mutableStateOf(false) }
+    var sheet by remember { mutableStateOf(initialSheet) }
+    val radar = (skills?.ui?.body as? PowerSkillsBody.Radar)?.content
     Box(modifier) {
         TabScreen(
             title = "Power",
@@ -127,16 +197,37 @@ fun PowerView(
             onPhoneSettings = actions.range.onPhoneSettings,
             state = listState,
             controls = {
-                item(key = "range") {
-                    RangeSelector(
-                        RangeWords.labels,
-                        MetricsRange.entries.indexOf(range),
-                        { actions.range.onRange(MetricsRange.entries[it]) },
-                    )
-                }
+                // In every state but the content the selector sits where it always did; with content it moves under the Power skills card,
+                // which has its own window (design/companion.md §4.4).
+                if (ui.body !is Body.Content) item(key = "range") { RangeSelectorRow(range, actions) }
             },
         ) { content ->
             item(key = "ftp") { FtpCard(content.ftp, actions, onSetFtp = { setting = true }) }
+            if (skills != null) {
+                item(key = "skills") {
+                    PowerSkillsCard(
+                        skills.ui,
+                        selectedAxis = { (sheet as? PowerSheet.Axis)?.index },
+                        actions =
+                            PowerSkillsActions(
+                                onSegment = { segment ->
+                                    when (segment) {
+                                        0 -> skills.onWindow(PowerSkillsWindow.EightWeeks)
+                                        1 -> skills.onWindow(PowerSkillsWindow.AllTime)
+                                        else -> sheet = PowerSheet.Picker(openPicker(skills))
+                                    }
+                                },
+                                onChange = { sheet = PowerSheet.Picker(openPicker(skills)) },
+                                onClear = { skills.onWindow(PowerSkillsWindow.EightWeeks) },
+                                onValues = { table = skills.ui.table },
+                                onAxis = { sheet = PowerSheet.Axis(it) },
+                                onSkill = { sheet = PowerSheet.Skill(it) },
+                                onOpenRide = actions.onOpenRide,
+                            ),
+                    )
+                }
+            }
+            item(key = "range") { RangeSelectorRow(range, actions) }
             content.curve?.let { chart ->
                 item(key = "curve") { LineChartCard(chart, curve, onValues = { table = chart.table }) }
             }
@@ -163,6 +254,30 @@ fun PowerView(
             }
         }
         ValuesSheetFor(table, onDismiss = { table = null })
+        val openRide: (String) -> Unit = {
+            sheet = null
+            actions.onOpenRide(it)
+        }
+        AxisSheet(radar?.axes?.getOrNull((sheet as? PowerSheet.Axis)?.index ?: -1), { sheet = null }, openRide)
+        SkillSheet(
+            (sheet as? PowerSheet.Skill)?.let { open -> radar?.skills?.firstOrNull { it.id == open.id } },
+            { sheet = null },
+            openRide,
+        )
+        if (skills != null) {
+            RangePickerSheet(
+                (sheet as? PowerSheet.Picker)?.state,
+                skills.today,
+                skills.rideDays,
+                skills.words,
+                onChange = { sheet = PowerSheet.Picker(it) },
+                onShow = { first, last ->
+                    sheet = null
+                    skills.onWindow(PowerSkillsWindow.Custom(first.toString(), last.toString()))
+                },
+                onDismiss = { sheet = null },
+            )
+        }
         SetFtpSheet(
             setting,
             (ui.body as? Body.Content)?.value?.ftp?.estimate,
@@ -173,11 +288,34 @@ fun PowerView(
             setting = false
             actions.onUseFtp(it)
         }
-        BackHandler(enabled = table != null || setting) {
-            table = null
-            setting = false
+        BackHandler(enabled = table != null || setting || sheet != null) {
+            // The sheet over the card closes first and changes nothing (design/companion.md §4.14).
+            if (sheet != null) {
+                sheet = null
+            } else {
+                table = null
+                setting = false
+            }
         }
     }
+}
+
+@Composable
+private fun RangeSelectorRow(
+    range: MetricsRange,
+    actions: PowerActions,
+) {
+    RangeSelector(
+        RangeWords.labels,
+        MetricsRange.entries.indexOf(range),
+        { actions.range.onRange(MetricsRange.entries[it]) },
+    )
+}
+
+/** The picker opens on the month of the current custom end, else this month; it starts with nothing chosen. */
+private fun openPicker(skills: PowerSkillsHost): PickerState {
+    val current = (skills.ui.window as? PowerSkillsWindow.Custom)?.to?.let(LocalDate::parse)
+    return RangePicker.open(skills.today, current)
 }
 
 @Composable

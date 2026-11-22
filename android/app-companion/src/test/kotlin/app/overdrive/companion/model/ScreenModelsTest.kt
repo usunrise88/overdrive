@@ -152,7 +152,6 @@ class ScreenModelsTest {
             val content = FitnessUi.of(fresh(metrics), range, words, host).content()
             assertEquals(metrics.daily.size, content.fitness.spec.snapXs.size)
             assertTrue(content.fitness.spec.snapXs.size <= 366)
-            assertEquals(range.weeks, content.weekly.spec.values.size)
             assertEquals(content.fitness.spec.xMax, content.fitness.spec.restX, 0.0)
         }
     }
@@ -164,21 +163,6 @@ class ScreenModelsTest {
         assertTrue(spec.yMin <= -30.0 && spec.yMax >= 10.0)
         assertEquals("Training hard", spec.bands.single().label)
         assertTrue(content.form.note!!.startsWith("Fitness minus fatigue. Below −10"))
-    }
-
-    @Test
-    fun `the weekly readout says so far for the current week`() {
-        val metrics = Samples.metrics("2026-05-25")
-        val weekly = FitnessUi.of(fresh(metrics), MetricsRange.SIX_MONTHS, words, host).content().weekly
-        val now = weekly.readoutAt(null)
-        assertEquals("Week of 16 Nov · so far", now.x)
-        assertEquals("Load", now.entries[0].name)
-        assertEquals("Rides", now.entries[1].name)
-        val older = weekly.readoutAt(weekly.spec.selectXs[3])
-        assertFalse(older.x.contains("so far"))
-        // A day selected on the line charts selects its week here, and a column selects the week's last day in the range.
-        assertEquals(weekly.spec.values.size - 1, weekly.spec.columnOf(weekly.spec.restX))
-        assertEquals(weekly.spec.restX, weekly.spec.selectXs.last(), 0.0)
     }
 
     @Test
@@ -202,13 +186,6 @@ class ScreenModelsTest {
                 it.label
             },
         )
-    }
-
-    @Test
-    fun `week ticks label every week for six weeks and the weeks that open a month otherwise`() {
-        val weeks = listOf("2026-10-12", "2026-10-19", "2026-10-26", "2026-11-02", "2026-11-09", "2026-11-16")
-        assertEquals(weeks.size, DateAxis.weekTicks(MetricsRange.SIX_WEEKS, weeks, words).size)
-        assertEquals(listOf("Nov"), DateAxis.weekTicks(MetricsRange.SIX_MONTHS, weeks, words).map { it.label })
     }
 
     // region power

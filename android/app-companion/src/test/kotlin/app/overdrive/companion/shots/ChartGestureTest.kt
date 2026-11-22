@@ -21,7 +21,6 @@ import app.overdrive.companion.model.TestClock.fresh
 import app.overdrive.core.remote.MetricsRange
 import app.overdrive.uikit.OverdriveTheme
 import app.overdrive.uikit.chart.ChartSelection
-import app.overdrive.uikit.chart.ColumnChart
 import app.overdrive.uikit.chart.PlotChart
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -35,7 +34,7 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * The charts' touch (design/companion.md §3.5): a tap selects the nearest point, a hold and slide scrubs, TalkBack's two actions move
- * the selection, a column selects its week's last day. Driven on the real charts of the Fitness screen from the synthetic answers.
+ * the selection. Driven on the real charts of the Fitness screen from the synthetic answers.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -56,14 +55,12 @@ class ChartGestureTest {
         ).value
     private val selection = ChartSelection()
     private val chart = hasContentDescription("Fitness and fatigue, 6 months", substring = true)
-    private val weeks = hasContentDescription("Weekly load, 6 months", substring = true)
 
     private fun show() {
         rule.setContent {
             OverdriveTheme {
                 Column(Modifier.padding(16.dp)) {
                     PlotChart(content.fitness.spec, selection, "Fitness and fatigue, 6 months")
-                    ColumnChart(content.weekly.spec, selection, "Weekly load, 6 months")
                 }
             }
         }
@@ -119,14 +116,5 @@ class ChartGestureTest {
         assertEquals(days[days.size - 2], need(selection.x), 0.0)
         customAction("Next point")
         assertEquals(days.last(), need(selection.x), 0.0)
-    }
-
-    @Test
-    fun `a touch on a week's column selects its last day, which the line chart then shows`() {
-        show()
-        rule.onNode(weeks).performTouchInput { click(Offset(width * 0.5f, height / 2f)) }
-        val x = need(selection.x)
-        assertTrue(x in content.weekly.spec.selectXs.toList())
-        assertTrue(x in content.fitness.spec.snapXs.toList())
     }
 }
