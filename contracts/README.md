@@ -35,6 +35,8 @@ src/         @overdrive/contracts: the schema plus a validator for the TypeScrip
 | Repeated sessions (`GET /v1/repeats`) | `schema/repeats-response.schema.json` | §11.7, §8.3, ADR 0026 |
 | One repeated session (`GET /v1/repeats/{hash}`) | `schema/repeat-detail-response.schema.json` | §11.7, §8.3, ADR 0026 |
 | The attempt before a ride (`GET /v1/repeats/{hash}/previous`) | `schema/repeat-previous-response.schema.json` | §11.7, §8.3, ADR 0026 |
+| Power skills (`GET /v1/power-skills?from&to`) | `schema/power-skills-response.schema.json` | §6.3, §8.3, ADR 0042 |
+| Weekly effort (`GET /v1/effort?weeks`) | `schema/effort-response.schema.json` | §6.3, §8.3, ADR 0042 |
 | Outdoor ride import answer (`POST /v1/activities/fit`) | `schema/activity-import-response.schema.json` | §11.8, §8.3, ADR 0026 |
 | Coach notebook (`GET /v1/notebook`) | `schema/notebook-response.schema.json` | §11.6, §12.4, §8.3, ADR 0035 |
 | Plan event (`POST /v1/plan-events` answer; MCP `list_plan_events`) | `schema/plan-event.schema.json` | §12.2, §8.3, ADR 0035 |
@@ -127,6 +129,16 @@ by step) and those that must not. What a schema cannot state (real dates, attemp
 at least 120 counted seconds behind a step's figure, the trend's slope, change and direction agreeing, steps that do not
 overlap) is in each schema's description and checked by `validateRepeatsResponse` & co. here and by `RepeatsApiJson` in Kotlin
 (`RepeatsContractTest`), against the same files.
+
+`fixtures/power-skills/response/` and `fixtures/effort/response/` hold the golden files of release 0.4.1 (ADR 0042), each in `{valid,invalid}`: `power-skills` (`GET /v1/power-skills`:
+`generatedAt`, `table` men or women, the `window` and its `rideCount`, the twelve `durations` each with the window's and the all-time best `{ watts, wattsPerKg, score, date, rideId,
+rideName }` or null, `riderWeight` or null, the five `skills` with a `level` `{ index, name }` or null, and two notes) and `effort` (`GET /v1/effort`: `weeksNeeded` 8, `weeksLogged`,
+and the `weeks`, each with its `load`, `usualLow` and `usualHigh` (null while learning), `weeksLogged`, `verdict`, seven `days` and its `activities`). They are new directories because
+the Kotlin decoders read the older ones strictly. What a schema cannot say (a level that is the floor of the mean of its scores, `wattsPerKg` against the weight, scores present exactly
+with the weight, a week's sums and shares to the decimal, the usual range present exactly after 8 weeks of training, a verdict that follows from the load and the range, Mondays and
+consecutive days, the clock-free dates) is in each schema's description and checked by `validatePowerSkillsResponse` and `validateEffortResponse` here and by `PowerSkillsApiJson` and
+`EffortApiJson` in Kotlin (`PowerSkillsContractTest`, `EffortContractTest`), against the same files. The profile has a new optional key `powerProfileTable` (`men`, `women` or null; written
+only when chosen), in the schema, the patch and `profile/profile/valid/power-profile-table-*.json`, `profile/patch/*/…power-profile-table-*.json`. All the fixtures are synthetic.
 
 `fixtures/outdoor/` holds the golden files of the outdoor-ride import (stage P3-7, ADR 0026): `activity-import-response` (the
 answer of `POST /v1/activities/fit`, which takes the FIT file's bytes as `application/vnd.ant.fit`, up to 16 MiB: `imported` with

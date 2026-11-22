@@ -123,6 +123,8 @@ general 1 to 128 characters from `A-Z a-z 0-9 . _ -`, starting with a letter or 
 | `GET /v1/recovery[?refresh=true]` | none | `200` today's state `ready`, `caution`, `rest`, `learning` or `noData`, the rule that decided, a one-sentence reason, guidance, 3 or 4 facts, `nightsLogged` of `nightsNeeded` (`recovery-response.schema.json`) |
 | `GET /v1/activities/{id}` | none | `200` a workout from the watch, `watch-<record id>`, or an outdoor ride imported from a FIT file, `fit-<16 hex>` (with `distanceMeters` and `elevationGainMeters` when the file says them): summary, heart-rate load (`loadApproximate`, `loadNote`), how dense the samples are, the heart rate in at most 300 points (`activity.schema.json`) · `404 not_found` |
 | `POST /v1/activities/fit` | An outdoor ride's FIT file, `application/vnd.ant.fit`, at most 16 MiB (ADR 0026) | `201` `imported` / `200` `duplicate` with the id of what it duplicates and why (`activity-import-response.schema.json`): the ride's summary and heart-rate load · `422 invalid_fit` (framing, CRC, structure, not an activity file) · `422 unsupported_sport` (not cycling) · `422 empty_activity` · `413` · `415` |
+| `GET /v1/power-skills[?from&to]` | none | `200` the best power at 12 durations over the window (default the last 56 days, at most 1096) and all time, from the tablet's rides only, with watts per kilogram, a score and a level per skill when the weight is known (`power-skills-response.schema.json`, ADR 0042) · `400 invalid_range` naming the parameter |
+| `GET /v1/effort[?weeks]` | none | `200` the last 1 to 52 weeks (12 by default) of training load, per week and day, with each week's usual range (mean ± one standard deviation of the 8 weeks before it), verdict and activities (`effort-response.schema.json`, ADR 0042) · `400 invalid_query` naming `weeks` |
 | `GET /v1/repeats` | none | `200` the workouts ridden more than once, most recently ridden first, each with its latest attempt against the previous (`repeats-response.schema.json`, ADR 0026) |
 | `GET /v1/repeats/{hash}` | none | `200` every attempt at one session side by side: heart rate at the same power per fixed-power step and overall, aerobic drift, compliance, and the trend of each, with the minimum attempts stated (`repeat-detail-response.schema.json`) · `404 not_found` a hash that is not a session ridden twice |
 | `GET /v1/repeats/{hash}/previous[?before=<rideId>]` | none | `200` the attempt before a ride with its step boundaries and per-step heart rate, for the tablet's overlay (`repeat-previous-response.schema.json`); `previous` is null when there is none · `404 ride_not_found` an unknown `before` that does not carry its start · `400 invalid_ride_id` |
@@ -295,6 +297,22 @@ or drift. The forwarder of the watch's workouts (`src/wellness/forward.ts`) send
 Strava). A duplicate is the same bytes, the same start (±60 s) and length (±2%) as any stored ride, imported ride or watch session, or an overlap of half
 of the file or more with a ride, a watch session or another imported ride. Tests write their FIT files with a **test-side encoder**
 (`test/helpers/fit-encoder.ts`); every number in them is invented. Logs and error messages never name a measured value (`test/outdoor-privacy.test.ts`).
+
+## Power skills and weekly effort (ADR 0042)
+
+Two read-only views over what is already stored; no migration. **Power skills** read the rides' stored power curves (`ride_metrics.power_curve`; the 45-minute
+figure is kept beside the 25 of the contract under its own key, `RIDE_METRICS_VERSION` 2) and the rider's 7-day weight; **effort** reads each ride's stored load and
+the watch's and outdoor rides' heart-rate loads exactly as `GET /v1/rides` and `GET /v1/activities` give them. Nothing here works out a load.
+
+| Piece | Where |
+|---|---|
+| The level scale: the men's and women's floors (B) and tops (T) per duration, the score, with their sources and limits | `src/power-skills/levels.ts` (its header says where the numbers come from and how far to trust them; a test recomputes the women's table from its anchors) |
+| Best per duration, window and all time, scores, levels | `src/power-skills/compute.ts` (pure); `src/power-skills/service.ts` (`services.powerSkills`: `resolveWindow`, `powerSkills`); `src/power-skills/routes.ts` |
+| Weeks, days, the usual range (mean ± sample standard deviation of the 8 complete weeks before, from the first week with an activity), the verdict | `src/effort/compute.ts` (pure, its header states the rules); `src/effort/service.ts` (`services.effort.effort(weeks)`); `src/effort/routes.ts` |
+| MCP | `src/mcp/tools/power-skills.ts` (`get_power_skills`), `src/mcp/tools/effort.ts` (`get_effort`); `powerProfileTable` in `get_profile` and `update_profile` |
+
+Tests: `power-skills-compute.test.ts`, `power-skills-api.test.ts`, `effort-compute.test.ts`, `effort-api.test.ts` (rides inserted straight into the table, hand-worked
+figures, the clock changes of 2026 and 2027 in `Europe/Belgrade`). Every number in them is invented.
 
 ## Written insights, alerts and discussion topics (ADR 0025)
 
@@ -517,6 +535,7 @@ Other modules (the MCP tools, Telegram, Google Calendar, Strava) plug in without
 | Profile | `services.profile` (`src/profile/store.ts`) | `get()` the FTP, zones, availability, goals and physics; `update(patch)` (validated, atomic); a change emits `profile-changed` (`{ fields }`) |
 | Rides | `services.rides` (`src/ride-store.ts`), `services.rideWorkouts` | `list`, `getRecord` of the stored rides; the workout a ride was played from, copied when it was stored. `src/ride-stats.ts` has the pure statistics, series and compliance (`rideStatistics`, `rideSeries`, `rideCompliance`) a ride summary for Telegram can reuse |
 | Training metrics | `services.metrics` (`src/metrics/`, ADR 0022) | `metrics(from, to)`, `rideMetrics`, `rideList`, `rideDetail`, `ftpAdvice`, `dismissSuggestion`; `registerLoadSource({ name, entries(untilDate) })` feeds the daily load with other activities (`kind: "other"`: counts for fatigue and form, never for the power curve, eFTP or drift) and `registerActivitySource({ name, list({ beforeMillis, limit }) })` adds them to `GET /v1/rides`. The pure math (`power-curve.ts`, `load.ts`, `ftp.ts`, `drift.ts`, `wbal.ts`) knows nothing of the database. A listener on `ride-stored` computes a ride, one on `profile-changed` keeps the FTP history and marks a suggestion accepted |
+| Power skills, effort | `services.powerSkills`, `services.effort` (`src/power-skills/`, `src/effort/`, ADR 0042) | `powerSkills.resolveWindow(from?, to?)` then `powerSkills.powerSkills(window)`; `effort.effort(weeks)`; both read `services.metrics` and `services.wellness` and store nothing |
 | Repeats | `services.repeats` (`src/repeats/`, ADR 0026) | `list()`, `detail(hash)`, `previous(hash, before)`, `repeatOf(rideId)`, `ensureHashes()`; `ride_workouts.workout_hash` is set when a ride's workout copy is saved |
 | Outdoor rides | `services.outdoor` (`src/outdoor/`, ADR 0026) | `importFit(bytes, device)` → `{ response, created }`, or throws `ImportError` (`invalid_fit`, `unsupported_sport`, `empty_activity`); stores an activity (`source = 'fit'`) and emits `activity-stored` |
 | Wellness | `services.wellness` (`src/wellness/`, ADR 0023) | `upload.ingest(batch, device)`, `wellness(from, to)`, `recovery()`, `activity(id)`, `listActivities(query)`, `otherLoadByDay(from, to)` (the watch's load per local day), `refresh()` (pulls intervals.icu, `null` without a key); the `activity-stored` event queues a forwarding |
