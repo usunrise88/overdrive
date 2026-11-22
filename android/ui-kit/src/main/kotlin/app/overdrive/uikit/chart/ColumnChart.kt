@@ -44,6 +44,8 @@ fun ColumnChart(
     selection: ChartSelection,
     description: String,
     modifier: Modifier = Modifier,
+    previousAction: String = "Previous point",
+    nextAction: String = "Next point",
 ) {
     val measurer = rememberTextMeasurer()
     val haptics = LocalHapticFeedback.current
@@ -65,7 +67,7 @@ fun ColumnChart(
             modifier
                 .fillMaxWidth()
                 .height(spec.heightDp.dp)
-                .chartSemantics(description, spec.selectXs, spec.restX, selection)
+                .chartSemantics(description, spec.selectXs, spec.restX, selection, previousAction, nextAction)
                 .chartGestures(spec, haptics, snap = { px, size -> with(density) { snapColumn(spec, px, size) } }) {
                     selection.select(it)
                 }.drawWithCache(build),
@@ -76,7 +78,7 @@ fun ColumnChart(
 private fun Density.frameOf(
     spec: ColumnSpec,
     size: IntSize,
-) = PlotFrame.of(size, this, PlotSpec.DEFAULT_GUTTER_DP, xAxis = spec.xTicks.isNotEmpty())
+) = PlotFrame.of(size, this, PlotSpec.DEFAULT_GUTTER_DP, xAxis = spec.xTicks.isNotEmpty() || spec.nowLabel != null)
 
 private fun Density.snapColumn(
     spec: ColumnSpec,
@@ -100,7 +102,7 @@ private class ColumnLayout(
             IntSize(size.width.toInt(), size.height.toInt()),
             density,
             PlotSpec.DEFAULT_GUTTER_DP,
-            spec.xTicks.isNotEmpty(),
+            spec.xTicks.isNotEmpty() || spec.nowLabel != null,
         )
     private val yScale = AxisScale(0.0, spec.yMax, frame.bottom, frame.top)
     private val slot = frame.width / spec.values.size
@@ -123,6 +125,7 @@ private class ColumnLayout(
     private val xLabels: List<Pair<Float, TextLayoutResult>> =
         spec.xTicks.map { (frame.left + (it.value + 0.5) * slot).toFloat() to measurer.tick(it.label) }
     private val highest: Int = spec.values.indices.maxByOrNull { spec.values[it] } ?: 0
+    private val nowLabel: TextLayoutResult? = spec.nowLabel?.let { measurer.tick(it) }
     private val valueLabels: Map<Int, TextLayoutResult> =
         spec.values.indices.associateWith { measurer.tick(spec.valueLabel(spec.values[it])) }
 
@@ -169,11 +172,12 @@ private class ColumnLayout(
                 ),
             )
         }
+        drawBand(selected)
         for ((i, path) in columns.withIndex()) {
             if (path != null && i != selected) drawPath(path, OverdriveColors.textTertiary)
         }
         columns.getOrNull(selected)?.let { drawPath(it, OverdriveColors.textPrimary) }
-        for (i in setOfNotNull(selected, highest.takeIf { spec.values[it] > 0.0 })) {
+        for (i in setOfNotNull(selected, highest.takeIf { spec.labelHighest && spec.values[it] > 0.0 })) {
             val label = valueLabels.getValue(i)
             val centre = frame.left + (i + 0.5f) * slot
             val top = yScale.toPx(spec.values[i].coerceAtMost(spec.yMax)) - gap4 - label.size.height
@@ -194,5 +198,18 @@ private class ColumnLayout(
             val left = (x - label.size.width / 2f).coerceIn(0f, size.width - label.size.width)
             drawLabel(label, OverdriveColors.textTertiary, Offset(left, frame.bottom + gap4))
         }
+        nowLabel?.let {
+            drawLabel(it, OverdriveColors.textSecondary, Offset(frame.right - it.size.width, frame.bottom + gap4))
+        }
+    }
+
+    /** The selected column's band, flat and behind the columns, clipped to the axis. */
+    private fun DrawScope.drawBand(selected: Int) {
+        val low = spec.bandLows?.getOrNull(selected) ?: return
+        val high = spec.bandHighs?.getOrNull(selected) ?: return
+        if (low.isNaN() || high.isNaN()) return
+        val top = yScale.toPx(high.coerceIn(0.0, spec.yMax))
+        val bottom = yScale.toPx(low.coerceIn(0.0, spec.yMax))
+        if (bottom > top) drawRect(OverdriveColors.surface3, Offset(frame.left, top), Size(frame.width, bottom - top))
     }
 }

@@ -124,7 +124,8 @@ fun SegmentedControl(
                         },
                     ).semantics { this.selected = selected }
                     .plainClickable(source, role = Role.RadioButton) { onSelect(index) }
-                    .padding(horizontal = 16.dp),
+                    // Equal segments share a width that a large font can outgrow: less padding, and the label never wraps.
+                    .padding(horizontal = if (equalWidth) 6.dp else 16.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 OdText(
@@ -132,6 +133,7 @@ fun SegmentedControl(
                     style = OdType.label,
                     color = if (selected) OverdriveColors.textPrimary else OverdriveColors.textSecondary,
                     maxLines = 1,
+                    softWrap = false,
                 )
             }
         }

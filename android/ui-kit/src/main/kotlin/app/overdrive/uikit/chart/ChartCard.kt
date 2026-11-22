@@ -158,6 +158,8 @@ enum class RestPill(
 ) {
     Today("Today", "Back to today"),
     Latest("Latest", "Back to the latest attempt"),
+    ThisWeek("This week", "Back to this week"),
+    LatestWeek("Latest", "Back to the latest week"),
 }
 
 @Composable
@@ -211,7 +213,7 @@ fun ShowingLine(
 
 /** A 24 dp pill with a 48 dp hit area: the visual is small, the touch target is not. */
 @Composable
-private fun TodayPill(
+fun TodayPill(
     onClick: () -> Unit,
     rest: RestPill = RestPill.Today,
 ) {
@@ -248,7 +250,8 @@ private fun TodayPill(
 /**
  * A chart card (design/companion.md §3.7, system.md §13): a card with padding 16 × 16 × 12 and 8 dp between its parts: the
  * [heading] (label, text 3) with an optional ghost **Values** (label, text 2, a 48 dp hit area), the readout, the plot and an
- * optional [note] (label, text 2), only where the chart's meaning is not obvious from its title.
+ * optional [note] (label, text 2), only where the chart's meaning is not obvious from its title. [spacing] is 8 dp, 12 dp on the Power skills
+ * card, whose window control needs more air (design/companion.md §4.14).
  */
 @Composable
 fun ChartCard(
@@ -256,12 +259,13 @@ fun ChartCard(
     modifier: Modifier = Modifier,
     onValues: (() -> Unit)? = null,
     note: String? = null,
+    spacing: Dp = 8.dp,
     content: @Composable () -> Unit,
 ) {
     OdCard(
         modifier,
         PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 12.dp),
-        Arrangement.spacedBy(8.dp),
+        Arrangement.spacedBy(spacing),
     ) {
         Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
             OdText(
