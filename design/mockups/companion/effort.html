@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Companion: Effort</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../components.css">
+<link rel="stylesheet" href="companion.css">
+<style>
+  /* Effort (design/companion.md §4.15, §6.12). */
+  .verdict { display: flex; flex-direction: column; gap: 2px; }
+  .weekline { display: flex; align-items: center; gap: 8px; min-height: 24px; flex-wrap: wrap; }
+  .weekline .today { margin-left: auto; color: var(--color-text-secondary); display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: var(--radius-full); background: var(--color-surface2); font-size: var(--type-label-size); font-weight: var(--type-label-weight); }
+  .acts { display: grid; grid-template-columns: 1fr auto; column-gap: 0; }
+  .acts > span { min-height: 56px; display: flex; flex-direction: column; justify-content: center; border-top: 1px solid var(--color-border); }
+  .acts > span.r { align-items: flex-end; padding-left: 12px; }
+  .sub-h { display: flex; justify-content: space-between; align-items: center; height: 24px; margin-top: 4px; }
+  .note-ann { font-size: 12px; line-height: 16px; color: #c9cdd3; padding: 0 4px; font-style: italic; }
+</style>
+</head>
+<body data-ready="false">
+
+<figure class="shot"><figcaption><b>Fitness · Effort, Wednesday morning.</b> The current week is selected at rest: one ride so far, so it is below the usual range <i>so far</i>. Effort sits above the range selector with the tiles: it always shows the last 12 weeks.</figcaption><div class="frame phone tall" id="effort"></div></figure>
+<figure class="shot"><figcaption><b>A past week tapped.</b> The verdict, the numbers and the days follow the week; the pill returns to this week. A watch activity is marked approximate.</figcaption><div class="frame phone tall" id="effort-selected"></div></figure>
+<figure class="shot"><figcaption><b>States of the card.</b> Learning (under 8 weeks of history), no load yet, Monday morning with nothing yet, an activity without heart rate.</figcaption><div class="frame phone tall" id="effort-states"></div></figure>
+
+<script type="module">
+import { fitnessData, fmtShort, head, ic, range, shell, tile, weeksOf } from "./companion.js";
+
+const W = 346;
+const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const days = fitnessData();
+const weeks = weeksOf(days);
+// Usual range of a week: mean ± one standard deviation of the 8 complete weeks before it (computed by the service).
+for (let k = 8; k < weeks.length; k++) {
+  const prev = weeks.slice(k - 8, k).map((w) => w.load);
+  const m = prev.reduce((a, b) => a + b, 0) / 8;
+  const sd = Math.sqrt(prev.reduce((a, b) => a + (b - m) ** 2, 0) / 8);
+  weeks[k].lo = Math.max(0, Math.round(m - sd));
+  weeks[k].hi = Math.round(m + sd);
+}
+const last12 = weeks.slice(-12);
+const CUR = 11;
+
+const verdictOf = (w, current) =>
+  w.load > w.hi ? "Above your usual range" : w.load >= w.lo ? "Within your usual range" : current ? "Below your usual range so far" : "Below your usual range";
+
+// ---------- Weekly columns with the usual range as a stepped band ----------
+const effortChart = (o) => {
+  const H = 160;
+  const padL = 32;
+  const padR = 6;
+  const padT = 18;
+  const axisH = 20;
+  const plotB = H - axisH;
+  const n = o.weeks.length;
+  const slot = (W - padL - padR) / n;
+  const bw = Math.min(20, slot - 2);
+  const maxV = Math.max(...o.weeks.map((w) => Math.max(w.load, w.hi ?? 0)));
+  const step = maxV > 400 ? 200 : 100;
+  const yMax = Math.ceil(maxV / step) * step;
+  const y = (v) => padT + (1 - v / yMax) * (plotB - padT);
+  const out = [];
+  // Band: the usual range of the selected week (at rest this week), flat across the plot, surface 3.
+  const bw0 = o.weeks[o.sel];
+  if (!o.noBand && bw0.lo != null) {
+    out.push(`<rect x="${padL}" y="${y(bw0.hi).toFixed(1)}" width="${W - padL - padR}" height="${(y(bw0.lo) - y(bw0.hi)).toFixed(1)}" style="fill:var(--color-surface3)"/>`);
+  }
+  for (let v = step; v <= yMax; v += step) {
+    const yy = Math.round(y(v)) + 0.5;
+    out.push(`<line x1="${padL}" x2="${W - padR}" y1="${yy}" y2="${yy}" style="stroke:var(--color-border);stroke-width:1"/>`, `<text x="${padL - 8}" y="${yy + 4}" text-anchor="end" class="axis">${v}</text>`);
+  }
+  o.weeks.forEach((w, i) => {
+    if (!w.load) return;
+    const cx = padL + slot * i + slot / 2;
+    const x0 = cx - bw / 2;
+    const top = y(w.load);
+    const r = Math.min(4, plotB - top);
+    const on = i === o.sel;
+    out.push(`<path d="M${x0},${plotB}V${top + r}q0,${-r} ${r},${-r}h${bw - 2 * r}q${r},0 ${r},${r}V${plotB}Z" style="fill:var(${on ? "--color-text-primary" : "--color-text-tertiary"})"/>`);
+    if (on) out.push(`<text x="${cx}" y="${top - 5}" text-anchor="middle" class="axis axis-strong">${w.load}</text>`);
+  });
+  out.push(`<line x1="${padL}" x2="${W - padR}" y1="${plotB + 0.5}" y2="${plotB + 0.5}" style="stroke:var(--color-border-strong);stroke-width:1"/>`, `<text x="${padL - 8}" y="${plotB + 4}" text-anchor="end" class="axis">0</text>`);
+  // x ticks: the first, a middle and the current week ("Now").
+  for (const [i, text] of [[0, fmtShort(o.weeks[0].start)], [6, fmtShort(o.weeks[6].start)], [n - 1, "Now"]]) {
+    const cx = padL + slot * i + slot / 2;
+    out.push(`<text x="${cx}" y="${H - 4}" text-anchor="${i === n - 1 ? "end" : "middle"}" class="axis"${i === n - 1 ? ' style="fill:var(--color-text-secondary)"' : ""}>${text}</text>`);
+  }
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible">${out.join("")}</svg>`;
+};
+
+// ---------- Seven days of the selected week ----------
+const dayBars = (loads, todayIdx) => {
+  const H = 64;
+  const plotB = H - 18;
+  const slot = W / 7;
+  const bw = 20;
+  const max = Math.max(...loads.filter((v) => v != null), 1);
+  const out = [`<line x1="0" x2="${W}" y1="${plotB + 0.5}" y2="${plotB + 0.5}" style="stroke:var(--color-border-strong);stroke-width:1"/>`];
+  loads.forEach((v, i) => {
+    const cx = slot * i + slot / 2;
+    if (v) {
+      const top = 4 + (1 - v / max) * (plotB - 4);
+      const r = Math.min(4, plotB - top);
+      out.push(`<path d="M${cx - bw / 2},${plotB}V${top + r}q0,${-r} ${r},${-r}h${bw - 2 * r}q${r},0 ${r},${r}V${plotB}Z" style="fill:var(--color-text-secondary)"/>`);
+    }
+    const future = todayIdx != null && i > todayIdx;
+    out.push(`<text x="${cx}" y="${H - 3}" text-anchor="middle" class="axis" style="${i === todayIdx ? "fill:var(--color-text-primary);font-weight:600" : future ? "opacity:.5" : ""}">${DOW[i]}</text>`);
+  });
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block">${out.join("")}</svg>`;
+};
+
+const NAMES = { 1: "Threshold 2×20", 2: "Endurance 90", 3: "Sweet spot 3×12", 4: "VO2 5×3", 5: "Tempo 3×10", 6: "Free ride", 0: "Recovery spin" };
+const activities = (w) => {
+  const list = [];
+  for (const d of days) {
+    if (d.date < w.start || d.date >= new Date(w.start.getTime() + 7 * 86400000)) continue;
+    const dow = d.date.getUTCDay();
+    if (d.ride) list.push({ name: NAMES[dow] ?? "Free ride", day: d.date, load: d.ride, kind: "ride" });
+    if (d.other) list.push({ name: "Beat Saber", day: d.date, load: d.other, kind: "watch" });
+  }
+  return list;
+};
+const actRows = (w) =>
+  activities(w)
+    .map(
+      (a) => `<span><span class="t-strong">${a.name}</span><span class="t-label c2 num" style="display:flex;align-items:center;gap:4px">${a.kind === "watch" ? `${ic("heart-pulse", "i-16")}Watch · ` : ""}${DOW[(a.day.getUTCDay() + 6) % 7]} ${a.day.getUTCDate()}</span></span>
+      <span class="r"><span class="num t-num-xs">${a.load}</span><span class="t-caption c3 num">${Math.round((100 * a.load) / w.load)}%${a.kind === "watch" ? " · approximate" : ""}</span></span>`,
+    )
+    .join("");
+
+const effortCard = (sel) => {
+  const w = last12[sel];
+  const current = sel === CUR;
+  const dayLoads = DOW.map((_, k) => {
+    const d = days.find((x) => x.date.getTime() === w.start.getTime() + k * 86400000);
+    return d ? d.load : null;
+  });
+  const todayIdx = current ? 2 : null;
+  const approx = activities(w).some((a) => a.kind === "watch");
+  return `<div class="card chart" style="gap:8px">
+    <div class="between" style="height:24px"><span class="t-label c3">Effort</span><span class="t-label c2">Values</span></div>
+    <div class="verdict"><span class="t-heading">${verdictOf(w, current)}</span>
+      <div class="weekline"><span class="t-label c2 num">${current ? "This week" : `Week of ${fmtShort(w.start)}`} · load <b style="color:var(--color-text-primary);font-weight:600">${w.load}</b>${current ? " so far" : ""}${approx ? " (approximate)" : ""}</span><span class="t-label c2 num" style="display:inline-flex;align-items:center;gap:6px"><i class="key-band" style="background:var(--color-surface3)"></i>Usual ${w.lo}–${w.hi}</span>${current ? "" : `<span class="today">This week</span>`}</div></div>
+    ${effortChart({ weeks: last12, sel })}
+    <div class="sub-h"><span class="t-label c3">${current ? "This week" : `Week of ${fmtShort(w.start)}`}, by day</span></div>
+    ${dayBars(dayLoads, todayIdx)}
+    <div class="acts">${actRows(w) || `<span class="t-body c2" style="grid-column:1/-1">No rides or activities yet this week.</span>`}</div>
+  </div>`;
+};
+
+const today = days.at(-1);
+const tiles = `<div class="card tiles" style="grid-template-columns:repeat(3,1fr)">
+  ${tile("Fitness", Math.round(today.ctl), "", "−3 in 4 weeks")}${tile("Fatigue", Math.round(today.atl), "", "−15 in 7 days")}${tile("Form", Math.round(today.tsb), "", "Fresh")}</div>`;
+const after = `${range(["6 weeks", "6 months", "1 year"], "6 months")}
+  <div class="card chart"><div class="between"><span class="t-label c3">Fitness and fatigue</span><span class="t-label c2">Values</span></div><span class="t-label c3">…</span></div>`;
+
+shell("effort", { tab: "Fitness", body: `${head("Fitness", "Updated 07:40")}${tiles}${effortCard(CUR)}${after}` });
+shell("effort-selected", { tab: "Fitness", body: `${head("Fitness", "Updated 07:40")}${effortCard(CUR - 1)}` });
+
+// ---------- States ----------
+const ann = (t) => `<span class="note-ann">${t}</span>`;
+const hd = `<div class="between" style="height:24px"><span class="t-label c3">Effort</span><span class="t-label c2">Values</span></div>`;
+const learnWeeks = last12.slice(-5).map((w) => ({ ...w, lo: null, hi: null }));
+const pad = Array.from({ length: 7 }, (_, k) => ({ start: new Date(last12[0].start.getTime() + k * 7 * 86400000), load: 0 }));
+shell("effort-states", {
+  tab: "Fitness",
+  body: `${ann("Learning: fewer than 8 complete weeks, no band and no verdict")}
+  <div class="card chart">${hd}
+    <div class="verdict"><span class="t-heading">Learning your usual range</span><span class="t-label c2">Your usual range appears after 8 weeks of training. 5 so far.</span></div>
+    ${effortChart({ weeks: [...pad, ...learnWeeks], sel: 11, noBand: true })}
+  </div>
+  ${ann("No load yet")}
+  <div class="card chart">${hd.replace('<span class="t-label c2">Values</span>', "")}<span class="t-heading">No effort yet</span><span class="t-body c2">Weekly effort starts with your first ride on the tablet or your first activity on the watch.</span></div>
+  ${ann("Monday 07:40, nothing yet this week: the verdict waits")}
+  <div class="card chart">${hd}<div class="verdict"><span class="t-heading">Nothing yet this week</span><span class="t-label c2 num">This week · load 0 · usual ${last12[CUR].lo}–${last12[CUR].hi}</span></div></div>
+  ${ann("An activity without heart rate (part of the day list)")}
+  <div class="card chart"><div class="acts">
+    <span><span class="t-strong">Outdoor ride</span><span class="t-label c2 num" style="display:flex;align-items:center;gap:4px">${ic("bike", "i-16")}Outdoor · Sun 15</span><span class="t-label c2">No heart rate in this ride, so it adds no load.</span></span>
+    <span class="r"><span class="num t-num-xs c3">—</span><span class="t-caption c3">no load</span></span>
+  </div></div>`,
+});
+
+document.body.dataset.ready = "true";
+</script>
+</body>
+</html>
