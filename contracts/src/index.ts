@@ -11,6 +11,7 @@ export * from "./outdoor.ts";
 export * from "./plan.ts";
 export * from "./plan-events.ts";
 export * from "./profile.ts";
+export * from "./progress.ts";
 export * from "./repeats.ts";
 export * from "./routes.ts";
 export * from "./sync.ts";

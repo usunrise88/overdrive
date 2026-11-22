@@ -1,0 +1,327 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overdrive progress over time",
+  "description": "The service's answer to GET /v1/progress?from=YYYY-MM-DD&to=YYYY-MM-DD (spec §6.3 'Progress over time', §8.3, ADR 0043): six measures of how the rider's power and heart rate change over months, each with the series a chart draws and a trend with the service's verdict in words. Without from and to: the last six months up to today. The range is at most five years (400 invalid_range otherwise); the phone asks for 6 months, 1 year or all time. generatedAt is when the service computed the answer (UTC); stale is true when the watch's data (Health Connect, intervals.icu) failed at its last read, so resting heart rate and weight may be out of date; range is the days the answer covers, both included. A period (a week, Monday to Sunday, or a calendar month, both in the rider's TIMEZONE) belongs to the range when any of its days does, and is never cut: its figure uses all of its days. A ride belongs when its local day is in the range. headline is the one measure whose verdict the Fitness and Power rows show (the measure with the most informative non-steady trend, ADR 0043), or null when no measure has a verdict. Every trend is the model of the repeat page (ADR 0026): a least-squares line over the points that have a figure, steady when the fitted change is smaller than steadyBand, else improving or worsening by betterWhen, unknown below minPoints; verdictText is the sentence the service says for it, written by code ('fitter' only for heart rate against power); reason says why a verdict is unknown; note is the standing caution of heart-rate measures (heat, sleep and caffeine) or null. Series are oldest first. bestPower: the best 300, 1200 and 3600 s mean-maximal power of each calendar month of the range (every month is listed, one without a ride of that length has null for it), from rides on the tablet only, with the weight used for watts per kilogram; the current month is partial and is not in the trend. aerobicEfficiency: heart rate at a reference power and power at a reference heart rate, per week, from steady stretches of rides; both references are fixed for the whole range and named here. efficiencyFactor: normalised power over average heart rate of the steady parts of a ride of 20 minutes or more, one per ride, with the mean of the last five. decoupling: the aerobic drift of each ride that has one (spec §6.3). restingHeartRate: the weekly mean of the watch's nightly resting heart rate (at least 3 nights). weight: the weekly mean weight (at least 2 weighings) and watts per kilogram (the FTP in force that week over the weight); the trend is of watts per kilogram, weight is reported and never judged. Rules a schema cannot state, checked by every implementation: dates are real; range.from is not after range.to; weekStart is a Monday; months and weeks are consecutive from the first listed; rides are in date order; a trend's direction is unknown exactly when points is below minPoints (then change and difference are null and reason is set; otherwise reason is null); a known direction follows from change, steadyBand and betterWhen; since is set exactly when from is; headline names a block whose direction is the headline's and is not unknown; bestPower's overall direction follows from its three lines (improving when at least two improve and none worsens, worsening the reverse, unknown below two lines with a verdict, else steady).",
+  "type": "object",
+  "required": [
+    "generatedAt",
+    "stale",
+    "range",
+    "headline",
+    "bestPower",
+    "aerobicEfficiency",
+    "efficiencyFactor",
+    "decoupling",
+    "restingHeartRate",
+    "weight"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "generatedAt": { "$ref": "#/$defs/instant" },
+    "stale": { "type": "boolean" },
+    "range": {
+      "type": "object",
+      "required": ["from", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "from": { "$ref": "#/$defs/date" },
+        "to": { "$ref": "#/$defs/date" }
+      }
+    },
+    "headline": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["measure", "direction", "verdictText"],
+          "additionalProperties": false,
+          "properties": {
+            "measure": {
+              "enum": [
+                "bestPower",
+                "aerobicEfficiency",
+                "efficiencyFactor",
+                "decoupling",
+                "restingHeartRate",
+                "weight"
+              ]
+            },
+            "direction": { "enum": ["improving", "worsening", "steady"] },
+            "verdictText": { "$ref": "#/$defs/sentence" }
+          }
+        }
+      ]
+    },
+    "bestPower": {
+      "type": "object",
+      "required": ["months", "trend", "trends"],
+      "additionalProperties": false,
+      "properties": {
+        "months": { "type": "array", "items": { "$ref": "#/$defs/month" } },
+        "trend": { "$ref": "#/$defs/overallTrend" },
+        "trends": {
+          "type": "object",
+          "required": ["d300", "d1200", "d3600"],
+          "additionalProperties": false,
+          "properties": {
+            "d300": { "$ref": "#/$defs/trend" },
+            "d1200": { "$ref": "#/$defs/trend" },
+            "d3600": { "$ref": "#/$defs/trend" }
+          }
+        }
+      }
+    },
+    "aerobicEfficiency": {
+      "type": "object",
+      "required": [
+        "ftpAtStart",
+        "referencePower",
+        "referenceHeartRate",
+        "referenceHeartRateBasis",
+        "weeks",
+        "trend",
+        "powerTrend"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "ftpAtStart": { "type": ["integer", "null"], "minimum": 30, "maximum": 2000 },
+        "referencePower": { "type": ["integer", "null"], "minimum": 5, "maximum": 2000 },
+        "referenceHeartRate": { "type": ["integer", "null"], "minimum": 30, "maximum": 230 },
+        "referenceHeartRateBasis": { "enum": ["threshold", "maximum", null] },
+        "weeks": { "type": "array", "items": { "$ref": "#/$defs/efficiencyWeek" } },
+        "trend": { "$ref": "#/$defs/trend" },
+        "powerTrend": { "$ref": "#/$defs/trend" }
+      }
+    },
+    "efficiencyFactor": {
+      "type": "object",
+      "required": ["rides", "rolling5", "trend"],
+      "additionalProperties": false,
+      "properties": {
+        "rides": { "type": "array", "items": { "$ref": "#/$defs/efficiencyRide" } },
+        "rolling5": { "type": "array", "items": { "$ref": "#/$defs/rolling" } },
+        "trend": { "$ref": "#/$defs/trend" }
+      }
+    },
+    "decoupling": {
+      "type": "object",
+      "required": ["rides", "rolling5", "trend"],
+      "additionalProperties": false,
+      "properties": {
+        "rides": { "type": "array", "items": { "$ref": "#/$defs/driftRide" } },
+        "rolling5": { "type": "array", "items": { "$ref": "#/$defs/rolling" } },
+        "trend": { "$ref": "#/$defs/trend" }
+      }
+    },
+    "restingHeartRate": {
+      "type": "object",
+      "required": ["weeks", "trend"],
+      "additionalProperties": false,
+      "properties": {
+        "weeks": { "type": "array", "items": { "$ref": "#/$defs/restingWeek" } },
+        "trend": { "$ref": "#/$defs/trend" }
+      }
+    },
+    "weight": {
+      "type": "object",
+      "required": ["weeks", "trend", "weightChange"],
+      "additionalProperties": false,
+      "properties": {
+        "weeks": { "type": "array", "items": { "$ref": "#/$defs/weightWeek" } },
+        "trend": { "$ref": "#/$defs/trend" },
+        "weightChange": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["points", "from", "latest", "difference", "since"],
+              "additionalProperties": false,
+              "properties": {
+                "points": { "type": "integer", "minimum": 2 },
+                "from": { "type": "number", "exclusiveMinimum": 0 },
+                "latest": { "type": "number", "exclusiveMinimum": 0 },
+                "difference": { "type": "number" },
+                "since": { "$ref": "#/$defs/date" }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "instant": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    },
+    "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "rideId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "sentence": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "direction": { "enum": ["improving", "worsening", "steady", "unknown"] },
+    "trend": {
+      "type": "object",
+      "required": [
+        "direction",
+        "betterWhen",
+        "unit",
+        "points",
+        "minPoints",
+        "change",
+        "difference",
+        "from",
+        "latest",
+        "since",
+        "steadyBand",
+        "verdictText",
+        "reason",
+        "note"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "direction": { "$ref": "#/$defs/direction" },
+        "betterWhen": { "enum": ["higher", "lower"] },
+        "unit": { "enum": ["W", "bpm", "W/kg", "W/bpm", "%"] },
+        "points": { "type": "integer", "minimum": 0 },
+        "minPoints": { "type": "integer", "minimum": 2 },
+        "change": { "type": ["number", "null"] },
+        "difference": { "type": ["number", "null"] },
+        "from": { "type": ["number", "null"] },
+        "latest": { "type": ["number", "null"] },
+        "since": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/date" }] },
+        "steadyBand": { "type": "number", "exclusiveMinimum": 0 },
+        "verdictText": { "$ref": "#/$defs/sentence" },
+        "reason": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/sentence" }] },
+        "note": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/sentence" }] }
+      }
+    },
+    "overallTrend": {
+      "type": "object",
+      "required": ["direction", "betterWhen", "lines", "verdictText", "reason", "note"],
+      "additionalProperties": false,
+      "properties": {
+        "direction": { "$ref": "#/$defs/direction" },
+        "betterWhen": { "const": "higher" },
+        "lines": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "verdictText": { "$ref": "#/$defs/sentence" },
+        "reason": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/sentence" }] },
+        "note": { "type": "null" }
+      }
+    },
+    "bestEffort": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["watts", "wattsPerKg", "weightKg", "date", "rideId", "rideName"],
+          "additionalProperties": false,
+          "properties": {
+            "watts": { "type": "number", "exclusiveMinimum": 0 },
+            "wattsPerKg": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+            "weightKg": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+            "date": { "$ref": "#/$defs/date" },
+            "rideId": { "$ref": "#/$defs/rideId" },
+            "rideName": { "type": "string", "minLength": 1, "maxLength": 100 }
+          }
+        }
+      ]
+    },
+    "month": {
+      "type": "object",
+      "required": ["month", "partial", "d300", "d1200", "d3600"],
+      "additionalProperties": false,
+      "properties": {
+        "month": { "type": "string", "pattern": "^\\d{4}-(0[1-9]|1[0-2])$" },
+        "partial": { "type": "boolean" },
+        "d300": { "$ref": "#/$defs/bestEffort" },
+        "d1200": { "$ref": "#/$defs/bestEffort" },
+        "d3600": { "$ref": "#/$defs/bestEffort" }
+      }
+    },
+    "stretchCount": {
+      "type": "object",
+      "required": ["stretches", "seconds"],
+      "additionalProperties": false,
+      "properties": {
+        "stretches": { "type": "integer", "minimum": 0 },
+        "seconds": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "efficiencyWeek": {
+      "type": "object",
+      "required": ["weekStart", "heartRateAtPower", "powerAtHeartRate", "atPower", "atHeartRate"],
+      "additionalProperties": false,
+      "properties": {
+        "weekStart": { "$ref": "#/$defs/date" },
+        "heartRateAtPower": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "powerAtHeartRate": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "atPower": { "$ref": "#/$defs/stretchCount" },
+        "atHeartRate": { "$ref": "#/$defs/stretchCount" }
+      }
+    },
+    "efficiencyRide": {
+      "type": "object",
+      "required": [
+        "date",
+        "rideId",
+        "name",
+        "value",
+        "normalizedPower",
+        "averageHeartRate",
+        "seconds"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "date": { "$ref": "#/$defs/date" },
+        "rideId": { "$ref": "#/$defs/rideId" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "value": { "type": "number", "exclusiveMinimum": 0 },
+        "normalizedPower": { "type": "number", "exclusiveMinimum": 0 },
+        "averageHeartRate": { "type": "number", "exclusiveMinimum": 0 },
+        "seconds": { "type": "integer", "minimum": 1200 }
+      }
+    },
+    "driftRide": {
+      "type": "object",
+      "required": ["date", "rideId", "name", "driftPercent"],
+      "additionalProperties": false,
+      "properties": {
+        "date": { "$ref": "#/$defs/date" },
+        "rideId": { "$ref": "#/$defs/rideId" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "driftPercent": { "type": "number" }
+      }
+    },
+    "rolling": {
+      "type": "object",
+      "required": ["date", "rideId", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "date": { "$ref": "#/$defs/date" },
+        "rideId": { "$ref": "#/$defs/rideId" },
+        "value": { "type": "number" }
+      }
+    },
+    "restingWeek": {
+      "type": "object",
+      "required": ["weekStart", "mean", "nights"],
+      "additionalProperties": false,
+      "properties": {
+        "weekStart": { "$ref": "#/$defs/date" },
+        "mean": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "nights": { "type": "integer", "minimum": 0, "maximum": 7 }
+      }
+    },
+    "weightWeek": {
+      "type": "object",
+      "required": ["weekStart", "kg", "weighings", "ftp", "wattsPerKg"],
+      "additionalProperties": false,
+      "properties": {
+        "weekStart": { "$ref": "#/$defs/date" },
+        "kg": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "weighings": { "type": "integer", "minimum": 0, "maximum": 7 },
+        "ftp": { "type": ["integer", "null"], "minimum": 30, "maximum": 2000 },
+        "wattsPerKg": { "type": ["number", "null"], "exclusiveMinimum": 0 }
+      }
+    }
+  }
+}
