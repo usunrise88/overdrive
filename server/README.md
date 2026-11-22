@@ -127,6 +127,7 @@ general 1 to 128 characters from `A-Z a-z 0-9 . _ -`, starting with a letter or 
 | `GET /v1/effort[?weeks]` | none | `200` the last 1 to 52 weeks (12 by default) of training load, per week and day, with each week's usual range (mean ± one standard deviation of the 8 weeks before it), verdict and activities (`effort-response.schema.json`, ADR 0042) · `400 invalid_query` naming `weeks` |
 | `GET /v1/repeats` | none | `200` the workouts ridden more than once, most recently ridden first, each with its latest attempt against the previous (`repeats-response.schema.json`, ADR 0026) |
 | `GET /v1/repeats/{hash}` | none | `200` every attempt at one session side by side: heart rate at the same power per fixed-power step and overall, aerobic drift, compliance, and the trend of each, with the minimum attempts stated (`repeat-detail-response.schema.json`) · `404 not_found` a hash that is not a session ridden twice |
+| `GET /v1/progress[?from=YYYY-MM-DD&to=YYYY-MM-DD]` | none | `200` progress over months, six measures with a series and a trend with the service's verdict each, and the headline (`progress-response.schema.json`, ADR 0043): best power per month, aerobic efficiency per week (heart rate at a reference power, power at a reference heart rate, from steady stretches of rides), efficiency factor per ride, aerobic drift per ride, resting heart rate and weight with watts per kilogram per week. Default the last six months, at most five years, not cached · `400 invalid_range` naming the parameter |
 | `GET /v1/repeats/{hash}/previous[?before=<rideId>]` | none | `200` the attempt before a ride with its step boundaries and per-step heart rate, for the tablet's overlay (`repeat-previous-response.schema.json`); `previous` is null when there is none · `404 ride_not_found` an unknown `before` that does not carry its start · `400 invalid_ride_id` |
 
 | `GET /v1/insights?from=YYYY-MM-DD&to=YYYY-MM-DD` | none | `200` the written notes created on those local days, at most 366, newest first, not cached (`insights-response.schema.json`, ADR 0025): `{ id, kind, createdAt, text, rideId, topic }` with `kind` `morning`, `ride`, `week`, `deviation` or `drift`, and, on a ride note, its discussion topic (`discussion-topic.schema.json`) · `400 invalid_range` |
@@ -286,6 +287,21 @@ worked out once per ride (`ride_repeat_stats`); the comparison and the trend are
 | Overall figure over the compared steps, change of two figures, least-squares trend (at least 3 attempts) | `src/repeats/compare.ts` |
 | Hashes, per-ride figures | `src/repeats/store.ts`; the service `src/repeats/service.ts` (`services.repeats`: `list`, `detail`, `previous`, `repeatOf`); the routes `src/repeats/routes.ts` |
 | MCP | `src/mcp/tools/repeats.ts` (`list_repeats`, `get_repeat`) and `repeatOf` in `get_ride` |
+
+## Progress over time (ADR 0043)
+
+**Progress** (spec §6.8). `GET /v1/progress` and the MCP tool `get_progress` answer the companion's Progress screen: the service computes every figure and every verdict sentence, the phone draws and words.
+
+| Piece | Where |
+|---|---|
+| The steady stretches of a ride (5 minutes or more, after the first 60 s, not paused, 40% of FTP, rolling-mean variation under 8% and within 10%, heart rate in 90% of the seconds) and the efficiency factor of the steady parts (pure; its header states every rule) | `src/progress/steady.ts` |
+| Least-squares trend, steady band, minimum points, the verdict sentences ("fitter" only for heart rate against power), the headline (pure) | `src/progress/trend.ts` |
+| The six measures from the rides, the watch's days and the FTP history; references fixed for the range; weeks Monday to Sunday and calendar months on the rider's local days (pure) | `src/progress/compute.ts` |
+| The range (default six months, at most five years) | `src/progress/range.ts` |
+| Per-ride stretches kept once (`ride_progress_stats`, migration 0013, worked out lazily and in the background at start); the service (`services.progress`: `progress(from, to)`, `rangeFor`) and the route | `src/progress/store.ts`, `src/progress/service.ts`, `src/progress/routes.ts` |
+| MCP | `src/mcp/tools/progress.ts` (`get_progress`) |
+
+Tests: `test/progress-steady.test.ts` (stretches on synthetic rides: a sprint in the middle, heart-rate gaps, pauses, the floor), `test/progress-compute.test.ts` (the trend with every direction and every below-minimum case, the references, the headline, partial month, missing weight and watch data, empty history; every answer also checked against the contract's validator), `test/progress-api.test.ts` (through the API on PGlite, the clock changes of `Europe/Belgrade`, the cache, validation, auth), `test/progress-mcp.test.ts`.
 
 **Outdoor rides** (spec §11.8). `services.outdoor.importFit(bytes, device)` is the one import function: the HTTP route `POST /v1/activities/fit` and
 the Telegram bot's document handler both call it. `src/fit.ts` checks the framing and CRCs, **`src/fit-decode.ts` is our own decoder** (the messages an

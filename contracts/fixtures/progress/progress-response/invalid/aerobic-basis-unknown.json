@@ -1,0 +1,700 @@
+{
+  "generatedAt": "2026-11-22T07:40:00Z",
+  "stale": false,
+  "range": {
+    "from": "2026-09-01",
+    "to": "2026-11-22"
+  },
+  "headline": {
+    "measure": "aerobicEfficiency",
+    "direction": "improving",
+    "verdictText": "Heart rate at the same power is trending down: fitter"
+  },
+  "bestPower": {
+    "months": [
+      {
+        "month": "2026-09",
+        "partial": false,
+        "d300": {
+          "watts": 318,
+          "wattsPerKg": 4.38,
+          "weightKg": 72.6,
+          "date": "2026-09-12",
+          "rideId": "ride-1788000000000",
+          "rideName": "VO2 5x5"
+        },
+        "d1200": {
+          "watts": 276,
+          "wattsPerKg": 3.8,
+          "weightKg": 72.6,
+          "date": "2026-09-20",
+          "rideId": "ride-1788600000000",
+          "rideName": "Threshold 2x20"
+        },
+        "d3600": {
+          "watts": 246,
+          "wattsPerKg": 3.39,
+          "weightKg": 72.6,
+          "date": "2026-09-27",
+          "rideId": "ride-1789200000000",
+          "rideName": "Endurance 90"
+        }
+      },
+      {
+        "month": "2026-10",
+        "partial": false,
+        "d300": {
+          "watts": 324,
+          "wattsPerKg": 4.49,
+          "weightKg": 72.2,
+          "date": "2026-10-10",
+          "rideId": "ride-1790000000000",
+          "rideName": "VO2 5x5"
+        },
+        "d1200": {
+          "watts": 281,
+          "wattsPerKg": 3.89,
+          "weightKg": 72.2,
+          "date": "2026-10-18",
+          "rideId": "ride-1790600000000",
+          "rideName": "Threshold 2x20"
+        },
+        "d3600": {
+          "watts": 247,
+          "wattsPerKg": 3.42,
+          "weightKg": 72.2,
+          "date": "2026-10-25",
+          "rideId": "ride-1791000000000",
+          "rideName": "Endurance 90"
+        }
+      },
+      {
+        "month": "2026-11",
+        "partial": true,
+        "d300": {
+          "watts": 331,
+          "wattsPerKg": 4.6,
+          "weightKg": 72,
+          "date": "2026-11-07",
+          "rideId": "ride-1791500000000",
+          "rideName": "VO2 5x5"
+        },
+        "d1200": {
+          "watts": 284,
+          "wattsPerKg": 3.94,
+          "weightKg": 72,
+          "date": "2026-11-14",
+          "rideId": "ride-1792000000000",
+          "rideName": "Threshold 2x20"
+        },
+        "d3600": {
+          "watts": 250,
+          "wattsPerKg": 3.47,
+          "weightKg": 72,
+          "date": "2026-11-15",
+          "rideId": "ride-1792100000000",
+          "rideName": "Endurance 90"
+        }
+      }
+    ],
+    "trend": {
+      "direction": "improving",
+      "betterWhen": "higher",
+      "lines": 3,
+      "verdictText": "Best power is trending up: better",
+      "reason": null,
+      "note": null
+    },
+    "trends": {
+      "d300": {
+        "direction": "improving",
+        "betterWhen": "higher",
+        "unit": "W",
+        "points": 3,
+        "minPoints": 3,
+        "change": 13,
+        "difference": 13,
+        "from": 318,
+        "latest": 331,
+        "since": "2026-09-12",
+        "steadyBand": 6.4,
+        "verdictText": "Best 5-minute power is trending up: better",
+        "reason": null,
+        "note": null
+      },
+      "d1200": {
+        "direction": "improving",
+        "betterWhen": "higher",
+        "unit": "W",
+        "points": 3,
+        "minPoints": 3,
+        "change": 8,
+        "difference": 8,
+        "from": 276,
+        "latest": 284,
+        "since": "2026-09-20",
+        "steadyBand": 5.5,
+        "verdictText": "Best 20-minute power is trending up: better",
+        "reason": null,
+        "note": null
+      },
+      "d3600": {
+        "direction": "steady",
+        "betterWhen": "higher",
+        "unit": "W",
+        "points": 3,
+        "minPoints": 3,
+        "change": 2,
+        "difference": 4,
+        "from": 246,
+        "latest": 250,
+        "since": "2026-09-27",
+        "steadyBand": 4.9,
+        "verdictText": "Best 60-minute power is steady",
+        "reason": null,
+        "note": null
+      }
+    }
+  },
+  "aerobicEfficiency": {
+    "ftpAtStart": 257,
+    "referencePower": 180,
+    "referenceHeartRate": 135,
+    "referenceHeartRateBasis": "resting",
+    "weeks": [
+      {
+        "weekStart": "2026-08-31",
+        "heartRateAtPower": 145.5,
+        "powerAtHeartRate": 171,
+        "atPower": {
+          "stretches": 2,
+          "seconds": 1260
+        },
+        "atHeartRate": {
+          "stretches": 1,
+          "seconds": 700
+        }
+      },
+      {
+        "weekStart": "2026-09-07",
+        "heartRateAtPower": 145,
+        "powerAtHeartRate": 172,
+        "atPower": {
+          "stretches": 2,
+          "seconds": 1260
+        },
+        "atHeartRate": {
+          "stretches": 1,
+          "seconds": 700
+        }
+      },
+      {
+        "weekStart": "2026-09-14",
+        "heartRateAtPower": null,
+        "powerAtHeartRate": null,
+        "atPower": {
+          "stretches": 0,
+          "seconds": 0
+        },
+        "atHeartRate": {
+          "stretches": 0,
+          "seconds": 0
+        }
+      },
+      {
+        "weekStart": "2026-09-21",
+        "heartRateAtPower": 144,
+        "powerAtHeartRate": 174,
+        "atPower": {
+          "stretches": 2,
+          "seconds": 1260
+        },
+        "atHeartRate": {
+          "stretches": 1,
+          "seconds": 700
+        }
+      },
+      {
+        "weekStart": "2026-09-28",
+        "heartRateAtPower": 143.5,
+        "powerAtHeartRate": 176,
+        "atPower": {
+          "stretches": 2,
+          "seconds": 1260
+        },
+        "atHeartRate": {
+          "stretches": 1,
+          "seconds": 700
+        }
+      },
+      {
+        "weekStart": "2026-10-05",
+        "heartRateAtPower": 142,
+        "powerAtHeartRate": 177,
+        "atPower": {
+          "stretches": 2,
+          "seconds": 1260
+        },
+        "atHeartRate": {
+          "stretches": 1,
+          "seconds": 700
+        }
+      },
+      {
+        "weekStart": "2026-10-12",
+        "heartRateAtPower": 142.5,
+        "powerAtHeartRate": 176,
+        "atPower": {
+          "stretches": 2,
+          "seconds": 1260
+        },
+        "atHeartRate": {
+          "stretches": 1,
+          "seconds": 700
+        }
+      },
+      {
+        "weekStart": "2026-10-19",
+        "heartRateAtPower": null,
+        "powerAtHeartRate": null,
+        "atPower": {
+          "stretches": 0,
+          "seconds": 0
+        },
+        "atHeartRate": {
+          "stretches": 0,
+          "seconds": 0
+        }
+      },
+      {
+        "weekStart": "2026-10-26",
+        "heartRateAtPower": 141,
+        "powerAtHeartRate": 180,
+        "atPower": {
+          "stretches": 2,
+          "seconds": 1260
+        },
+        "atHeartRate": {
+          "stretches": 1,
+          "seconds": 700
+        }
+      },
+      {
+        "weekStart": "2026-11-02",
+        "heartRateAtPower": 140.5,
+        "powerAtHeartRate": 182,
+        "atPower": {
+          "stretches": 2,
+          "seconds": 1260
+        },
+        "atHeartRate": {
+          "stretches": 1,
+          "seconds": 700
+        }
+      },
+      {
+        "weekStart": "2026-11-09",
+        "heartRateAtPower": 140,
+        "powerAtHeartRate": 183,
+        "atPower": {
+          "stretches": 2,
+          "seconds": 1260
+        },
+        "atHeartRate": {
+          "stretches": 1,
+          "seconds": 700
+        }
+      },
+      {
+        "weekStart": "2026-11-16",
+        "heartRateAtPower": 139.5,
+        "powerAtHeartRate": 184,
+        "atPower": {
+          "stretches": 2,
+          "seconds": 1260
+        },
+        "atHeartRate": {
+          "stretches": 1,
+          "seconds": 700
+        }
+      }
+    ],
+    "trend": {
+      "direction": "improving",
+      "betterWhen": "lower",
+      "unit": "bpm",
+      "points": 10,
+      "minPoints": 4,
+      "change": -5.2,
+      "difference": -6,
+      "from": 145.5,
+      "latest": 139.5,
+      "since": "2026-08-31",
+      "steadyBand": 2,
+      "verdictText": "Heart rate at the same power is trending down: fitter",
+      "reason": null,
+      "note": "Heart rate also moves with heat, sleep and caffeine, so trust a trend over several weeks, not one ride."
+    },
+    "powerTrend": {
+      "direction": "improving",
+      "betterWhen": "higher",
+      "unit": "W",
+      "points": 10,
+      "minPoints": 4,
+      "change": 11.1,
+      "difference": 13,
+      "from": 171,
+      "latest": 184,
+      "since": "2026-08-31",
+      "steadyBand": 4,
+      "verdictText": "Power at the same heart rate is trending up: fitter",
+      "reason": null,
+      "note": "Heart rate also moves with heat, sleep and caffeine, so trust a trend over several weeks, not one ride."
+    }
+  },
+  "efficiencyFactor": {
+    "rides": [
+      {
+        "date": "2026-09-03",
+        "rideId": "ride-1788300000000",
+        "name": "Endurance 60",
+        "value": 1.31,
+        "normalizedPower": 168.4,
+        "averageHeartRate": 128.6,
+        "seconds": 2400
+      },
+      {
+        "date": "2026-09-10",
+        "rideId": "ride-1788900000000",
+        "name": "Threshold 2x20",
+        "value": 1.33,
+        "normalizedPower": 241.2,
+        "averageHeartRate": 181.3,
+        "seconds": 2400
+      },
+      {
+        "date": "2026-09-24",
+        "rideId": "ride-1790100000000",
+        "name": "Sweet spot 3x10",
+        "value": 1.35,
+        "normalizedPower": 232,
+        "averageHeartRate": 171.9,
+        "seconds": 1800
+      },
+      {
+        "date": "2026-10-08",
+        "rideId": "ride-1791300000000",
+        "name": "Free ride",
+        "value": 1.36,
+        "normalizedPower": 190.5,
+        "averageHeartRate": 140.1,
+        "seconds": 1320
+      },
+      {
+        "date": "2026-10-22",
+        "rideId": "ride-1792500000000",
+        "name": "Endurance 90",
+        "value": 1.38,
+        "normalizedPower": 175,
+        "averageHeartRate": 126.8,
+        "seconds": 3300
+      },
+      {
+        "date": "2026-11-12",
+        "rideId": "ride-1794300000000",
+        "name": "Threshold 2x20",
+        "value": 1.41,
+        "normalizedPower": 247,
+        "averageHeartRate": 175.2,
+        "seconds": 2400
+      }
+    ],
+    "rolling5": [
+      {
+        "date": "2026-10-22",
+        "rideId": "ride-1792500000000",
+        "value": 1.346
+      },
+      {
+        "date": "2026-11-12",
+        "rideId": "ride-1794300000000",
+        "value": 1.366
+      }
+    ],
+    "trend": {
+      "direction": "improving",
+      "betterWhen": "higher",
+      "unit": "W/bpm",
+      "points": 6,
+      "minPoints": 5,
+      "change": 0.09,
+      "difference": 0.02,
+      "from": 1.346,
+      "latest": 1.366,
+      "since": "2026-09-03",
+      "steadyBand": 0.02,
+      "verdictText": "Efficiency factor is trending up: fitter",
+      "reason": null,
+      "note": "Heart rate also moves with heat, sleep and caffeine, so trust a trend over several weeks, not one ride."
+    }
+  },
+  "decoupling": {
+    "rides": [
+      {
+        "date": "2026-09-05",
+        "rideId": "ride-1788400000000",
+        "name": "Endurance 90",
+        "driftPercent": 7.1
+      },
+      {
+        "date": "2026-09-19",
+        "rideId": "ride-1789700000000",
+        "name": "Endurance 90",
+        "driftPercent": 6.4
+      },
+      {
+        "date": "2026-10-03",
+        "rideId": "ride-1790800000000",
+        "name": "Endurance 120",
+        "driftPercent": 5.9
+      },
+      {
+        "date": "2026-10-17",
+        "rideId": "ride-1792000000001",
+        "name": "Endurance 90",
+        "driftPercent": 5.2
+      },
+      {
+        "date": "2026-10-31",
+        "rideId": "ride-1793200000000",
+        "name": "Free ride",
+        "driftPercent": 4.6
+      },
+      {
+        "date": "2026-11-14",
+        "rideId": "ride-1794400000000",
+        "name": "Endurance 90",
+        "driftPercent": 3.8
+      }
+    ],
+    "rolling5": [
+      {
+        "date": "2026-10-31",
+        "rideId": "ride-1793200000000",
+        "value": 5.84
+      },
+      {
+        "date": "2026-11-14",
+        "rideId": "ride-1794400000000",
+        "value": 5.18
+      }
+    ],
+    "trend": {
+      "direction": "improving",
+      "betterWhen": "lower",
+      "unit": "%",
+      "points": 6,
+      "minPoints": 5,
+      "change": -3.1,
+      "difference": -0.66,
+      "from": 5.84,
+      "latest": 5.18,
+      "since": "2026-09-05",
+      "steadyBand": 1,
+      "verdictText": "Aerobic drift is trending down: better",
+      "reason": null,
+      "note": "Heart rate also moves with heat, sleep and caffeine, so trust a trend over several weeks, not one ride."
+    }
+  },
+  "restingHeartRate": {
+    "weeks": [
+      {
+        "weekStart": "2026-08-31",
+        "mean": 55,
+        "nights": 6
+      },
+      {
+        "weekStart": "2026-09-07",
+        "mean": 54.65,
+        "nights": 6
+      },
+      {
+        "weekStart": "2026-09-14",
+        "mean": 54.3,
+        "nights": 6
+      },
+      {
+        "weekStart": "2026-09-21",
+        "mean": 53.95,
+        "nights": 6
+      },
+      {
+        "weekStart": "2026-09-28",
+        "mean": null,
+        "nights": 2
+      },
+      {
+        "weekStart": "2026-10-05",
+        "mean": 53.25,
+        "nights": 6
+      },
+      {
+        "weekStart": "2026-10-12",
+        "mean": 52.9,
+        "nights": 6
+      },
+      {
+        "weekStart": "2026-10-19",
+        "mean": 52.55,
+        "nights": 6
+      },
+      {
+        "weekStart": "2026-10-26",
+        "mean": 52.2,
+        "nights": 6
+      },
+      {
+        "weekStart": "2026-11-02",
+        "mean": 51.85,
+        "nights": 6
+      },
+      {
+        "weekStart": "2026-11-09",
+        "mean": 51.5,
+        "nights": 6
+      },
+      {
+        "weekStart": "2026-11-16",
+        "mean": 51.15,
+        "nights": 6
+      }
+    ],
+    "trend": {
+      "direction": "improving",
+      "betterWhen": "lower",
+      "unit": "bpm",
+      "points": 11,
+      "minPoints": 4,
+      "change": -3.9,
+      "difference": -3.8,
+      "from": 55,
+      "latest": 51.2,
+      "since": "2026-08-31",
+      "steadyBand": 1,
+      "verdictText": "Resting heart rate is trending down: better",
+      "reason": null,
+      "note": "Heart rate also moves with heat, sleep and caffeine, so trust a trend over several weeks, not one ride."
+    }
+  },
+  "weight": {
+    "weeks": [
+      {
+        "weekStart": "2026-08-31",
+        "kg": 73,
+        "weighings": 5,
+        "ftp": 257,
+        "wattsPerKg": 3.52
+      },
+      {
+        "weekStart": "2026-09-07",
+        "kg": 72.9,
+        "weighings": 5,
+        "ftp": 257,
+        "wattsPerKg": 3.53
+      },
+      {
+        "weekStart": "2026-09-14",
+        "kg": 72.8,
+        "weighings": 5,
+        "ftp": 257,
+        "wattsPerKg": 3.53
+      },
+      {
+        "weekStart": "2026-09-21",
+        "kg": null,
+        "weighings": 1,
+        "ftp": 257,
+        "wattsPerKg": null
+      },
+      {
+        "weekStart": "2026-09-28",
+        "kg": 72.6,
+        "weighings": 5,
+        "ftp": 257,
+        "wattsPerKg": 3.54
+      },
+      {
+        "weekStart": "2026-10-05",
+        "kg": 72.5,
+        "weighings": 5,
+        "ftp": 257,
+        "wattsPerKg": 3.54
+      },
+      {
+        "weekStart": "2026-10-12",
+        "kg": 72.4,
+        "weighings": 5,
+        "ftp": 262,
+        "wattsPerKg": 3.62
+      },
+      {
+        "weekStart": "2026-10-19",
+        "kg": 72.3,
+        "weighings": 5,
+        "ftp": 262,
+        "wattsPerKg": 3.62
+      },
+      {
+        "weekStart": "2026-10-26",
+        "kg": 72.2,
+        "weighings": 5,
+        "ftp": 262,
+        "wattsPerKg": 3.63
+      },
+      {
+        "weekStart": "2026-11-02",
+        "kg": 72.1,
+        "weighings": 5,
+        "ftp": 262,
+        "wattsPerKg": 3.63
+      },
+      {
+        "weekStart": "2026-11-09",
+        "kg": 72,
+        "weighings": 5,
+        "ftp": 262,
+        "wattsPerKg": 3.64
+      },
+      {
+        "weekStart": "2026-11-16",
+        "kg": 71.9,
+        "weighings": 5,
+        "ftp": 262,
+        "wattsPerKg": 3.64
+      }
+    ],
+    "trend": {
+      "direction": "improving",
+      "betterWhen": "higher",
+      "unit": "W/kg",
+      "points": 11,
+      "minPoints": 4,
+      "change": 0.12,
+      "difference": 0.11,
+      "from": 3.52,
+      "latest": 3.63,
+      "since": "2026-08-31",
+      "steadyBand": 0.05,
+      "verdictText": "Watts per kilogram are trending up: better",
+      "reason": null,
+      "note": null
+    },
+    "weightChange": {
+      "points": 11,
+      "from": 73,
+      "latest": 71.9,
+      "difference": -1.1,
+      "since": "2026-08-31"
+    }
+  }
+}

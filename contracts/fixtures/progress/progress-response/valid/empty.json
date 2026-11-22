@@ -1,0 +1,188 @@
+{
+  "generatedAt": "2026-11-22T07:40:00Z",
+  "stale": false,
+  "range": {
+    "from": "2026-05-22",
+    "to": "2026-11-22"
+  },
+  "headline": null,
+  "bestPower": {
+    "months": [],
+    "trend": {
+      "direction": "unknown",
+      "betterWhen": "higher",
+      "lines": 0,
+      "verdictText": "Not enough data yet",
+      "reason": "No line has a verdict yet.",
+      "note": null
+    },
+    "trends": {
+      "d300": {
+        "direction": "unknown",
+        "betterWhen": "higher",
+        "unit": "W",
+        "points": 0,
+        "minPoints": 3,
+        "change": null,
+        "difference": null,
+        "from": null,
+        "latest": null,
+        "since": null,
+        "steadyBand": 1,
+        "verdictText": "Not enough data yet",
+        "reason": "0 of 3 months have a 5-minute ride.",
+        "note": null
+      },
+      "d1200": {
+        "direction": "unknown",
+        "betterWhen": "higher",
+        "unit": "W",
+        "points": 0,
+        "minPoints": 3,
+        "change": null,
+        "difference": null,
+        "from": null,
+        "latest": null,
+        "since": null,
+        "steadyBand": 1,
+        "verdictText": "Not enough data yet",
+        "reason": "0 of 3 months have a 20-minute ride.",
+        "note": null
+      },
+      "d3600": {
+        "direction": "unknown",
+        "betterWhen": "higher",
+        "unit": "W",
+        "points": 0,
+        "minPoints": 3,
+        "change": null,
+        "difference": null,
+        "from": null,
+        "latest": null,
+        "since": null,
+        "steadyBand": 1,
+        "verdictText": "Not enough data yet",
+        "reason": "0 of 3 months have a 60-minute ride.",
+        "note": null
+      }
+    }
+  },
+  "aerobicEfficiency": {
+    "ftpAtStart": null,
+    "referencePower": null,
+    "referenceHeartRate": null,
+    "referenceHeartRateBasis": null,
+    "weeks": [],
+    "trend": {
+      "direction": "unknown",
+      "betterWhen": "lower",
+      "unit": "bpm",
+      "points": 0,
+      "minPoints": 4,
+      "change": null,
+      "difference": null,
+      "from": null,
+      "latest": null,
+      "since": null,
+      "steadyBand": 1,
+      "verdictText": "Not enough data yet",
+      "reason": "There is no FTP to set a reference power from.",
+      "note": "Heart rate also moves with heat, sleep and caffeine, so trust a trend over several weeks, not one ride."
+    },
+    "powerTrend": {
+      "direction": "unknown",
+      "betterWhen": "higher",
+      "unit": "W",
+      "points": 0,
+      "minPoints": 4,
+      "change": null,
+      "difference": null,
+      "from": null,
+      "latest": null,
+      "since": null,
+      "steadyBand": 1,
+      "verdictText": "Not enough data yet",
+      "reason": "There is no threshold or maximum heart rate to set a reference heart rate from.",
+      "note": "Heart rate also moves with heat, sleep and caffeine, so trust a trend over several weeks, not one ride."
+    }
+  },
+  "efficiencyFactor": {
+    "rides": [],
+    "rolling5": [],
+    "trend": {
+      "direction": "unknown",
+      "betterWhen": "higher",
+      "unit": "W/bpm",
+      "points": 0,
+      "minPoints": 5,
+      "change": null,
+      "difference": null,
+      "from": null,
+      "latest": null,
+      "since": null,
+      "steadyBand": 1,
+      "verdictText": "Not enough data yet",
+      "reason": "0 of 5 steady rides so far.",
+      "note": "Heart rate also moves with heat, sleep and caffeine, so trust a trend over several weeks, not one ride."
+    }
+  },
+  "decoupling": {
+    "rides": [],
+    "rolling5": [],
+    "trend": {
+      "direction": "unknown",
+      "betterWhen": "lower",
+      "unit": "%",
+      "points": 0,
+      "minPoints": 5,
+      "change": null,
+      "difference": null,
+      "from": null,
+      "latest": null,
+      "since": null,
+      "steadyBand": 1,
+      "verdictText": "Not enough data yet",
+      "reason": "0 of 5 rides of 40 minutes or more so far.",
+      "note": "Heart rate also moves with heat, sleep and caffeine, so trust a trend over several weeks, not one ride."
+    }
+  },
+  "restingHeartRate": {
+    "weeks": [],
+    "trend": {
+      "direction": "unknown",
+      "betterWhen": "lower",
+      "unit": "bpm",
+      "points": 0,
+      "minPoints": 4,
+      "change": null,
+      "difference": null,
+      "from": null,
+      "latest": null,
+      "since": null,
+      "steadyBand": 1,
+      "verdictText": "Not enough data yet",
+      "reason": "0 of 4 weeks have 3 nights with the watch.",
+      "note": "Heart rate also moves with heat, sleep and caffeine, so trust a trend over several weeks, not one ride."
+    }
+  },
+  "weight": {
+    "weeks": [],
+    "trend": {
+      "direction": "unknown",
+      "betterWhen": "higher",
+      "unit": "W/kg",
+      "points": 0,
+      "minPoints": 4,
+      "change": null,
+      "difference": null,
+      "from": null,
+      "latest": null,
+      "since": null,
+      "steadyBand": 0.05,
+      "verdictText": "Not enough data yet",
+      "reason": "0 of 4 weeks have 2 weighings.",
+      "note": null
+    },
+    "weightChange": null
+  }
+}

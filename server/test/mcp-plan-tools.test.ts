@@ -117,6 +117,7 @@ describe("the tools and what they say about themselves", () => {
       "get_notebook",
       "get_power_skills",
       "get_profile",
+      "get_progress",
       "get_recovery",
       "get_repeat",
       "get_ride",
@@ -146,6 +147,7 @@ describe("the tools and what they say about themselves", () => {
     // Reads and writes are marked, and the delete says it destroys.
     for (const name of [
       "get_profile",
+      "get_progress",
       "list_planned_workouts",
       "list_rides",
       "get_ride",
