@@ -17,6 +17,7 @@ import app.overdrive.companion.share.SharedRead
 import app.overdrive.companion.ui.NavState
 import app.overdrive.companion.work.BackgroundScheduler
 import app.overdrive.companion.work.NoBackgroundWork
+import app.overdrive.core.effort.EffortResponse
 import app.overdrive.core.health.HealthSource
 import app.overdrive.core.health.HealthStatus
 import app.overdrive.core.health.HealthSync
@@ -33,6 +34,7 @@ import app.overdrive.core.outdoor.FitOutcome
 import app.overdrive.core.outdoor.FitStatus
 import app.overdrive.core.plan.PlanApiJson
 import app.overdrive.core.plan.WorkoutsResponse
+import app.overdrive.core.powerskills.PowerSkillsResponse
 import app.overdrive.core.profile.Change
 import app.overdrive.core.profile.ProfileApiJson
 import app.overdrive.core.profile.ProfilePatch
@@ -46,6 +48,8 @@ import app.overdrive.core.remote.InsightsView
 import app.overdrive.core.remote.MetricsRange
 import app.overdrive.core.remote.MetricsRepository
 import app.overdrive.core.remote.Outcome
+import app.overdrive.core.remote.PowerSkillsResources
+import app.overdrive.core.remote.PowerSkillsWindow
 import app.overdrive.core.remote.ProblemKind
 import app.overdrive.core.remote.Refresh
 import app.overdrive.core.remote.RemoteResource
@@ -58,6 +62,7 @@ import app.overdrive.core.remote.ServiceProblem
 import app.overdrive.core.remote.WellnessRange
 import app.overdrive.core.remote.WellnessResources
 import app.overdrive.core.remote.WellnessView
+import app.overdrive.core.remote.effortResource
 import app.overdrive.core.remote.notebookResource
 import app.overdrive.core.remote.recoveryResource
 import app.overdrive.core.remote.repeatsResource
@@ -155,6 +160,14 @@ sealed interface RefreshTarget {
 
     /** The coach notebook, from its page (design/companion.md §4.13). */
     data object Notebook : RefreshTarget
+
+    /** The Power skills card for one window (design/companion.md §4.14, docs/adr/0042). */
+    data class PowerSkills(
+        val window: PowerSkillsWindow,
+    ) : RefreshTarget
+
+    /** The weekly Effort card (design/companion.md §4.15, docs/adr/0042). */
+    data object Effort : RefreshTarget
 
     data class RideDetail(
         val id: String,
@@ -264,6 +277,27 @@ class CompanionContainer(
     val notebook: RemoteResource<NotebookResponse> =
         notebookResource(client, ::config, file("notebook"), wall, elapsedMillis)
 
+    private val skillStores = FileTextStores(File(cache, "power-skills"), SKILL_CACHE_FILES)
+
+    /**
+     * The Power skills radar (`GET /v1/power-skills`, spec §6.3, docs/adr/0042): one cached resource per window, the eight weeks and all
+     * time at once, a custom range on first use. Call [powerSkillsFor] to read one; the screen only draws what it says.
+     */
+    private val powerSkills: PowerSkillsResources =
+        PowerSkillsResources(client, ::config, { clock.today() }, { skillStores.store(it) }, wall, elapsedMillis)
+
+    private val chosenWindow = MutableStateFlow<PowerSkillsWindow>(PowerSkillsWindow.EightWeeks)
+
+    /** The window of the Power skills card, kept while the app lives and not across a restart (design/companion.md §4.14). */
+    val powerSkillsWindow: StateFlow<PowerSkillsWindow> = chosenWindow
+
+    fun setPowerSkillsWindow(window: PowerSkillsWindow) {
+        chosenWindow.value = window
+    }
+
+    /** The weekly Effort chart (`GET /v1/effort?weeks=52`, spec §6.3, docs/adr/0042): the card draws the last 12 weeks, Values all of them. */
+    val effort: RemoteResource<EffortResponse> = effortResource(client, ::config, file("effort"), wall, elapsedMillis)
+
     private val repeatStores = FileTextStores(File(cache, "repeat-details"))
     private val repeatDetails: RepeatDetails =
         RepeatDetails(client, ::config, { repeatStores.store(it) }, wall, elapsedMillis)
@@ -366,6 +400,12 @@ class CompanionContainer(
             if (!resource.state.value.loaded) scope.launch { resource.load() }
         }
 
+    /** The state of the Power skills for [window]: its cache is read as soon as it is first asked for, so a window seen before is there at once. */
+    fun powerSkillsFor(window: PowerSkillsWindow): RemoteResource<PowerSkillsResponse> =
+        powerSkills.resource(window).also { resource ->
+            if (!resource.state.value.loaded) scope.launch { resource.load() }
+        }
+
     /** The Wellness figures for [range]. */
     fun wellnessFor(range: WellnessRange): WellnessView = wellnessResources.view(range)
 
@@ -413,6 +453,8 @@ class CompanionContainer(
             insights.load()
             repeats.load()
             notebook.load()
+            powerSkills.load()
+            effort.load()
             health.load()
             fits.load()
             var first = true
@@ -429,6 +471,8 @@ class CompanionContainer(
                 repeats.settingsChanged()
                 repeatDetails.settingsChanged()
                 notebook.settingsChanged()
+                powerSkills.settingsChanged()
+                effort.settingsChanged()
                 if (!first) delay(settleMillis)
                 val why = if (first) Refresh.START else Refresh.SETTINGS_CHANGED
                 first = false
@@ -578,12 +622,22 @@ class CompanionContainer(
                 launch { notebook.refresh(why) }
             }
 
+            is RefreshTarget.PowerSkills -> {
+                launch { powerSkillsFor(target.window).refresh(why) }
+            }
+
+            RefreshTarget.Effort -> {
+                launch { effort.refresh(why) }
+            }
+
             RefreshTarget.Fitness -> {
                 launch { metrics.resource(settings.value?.fitnessRange ?: MetricsRange.DEFAULT).refresh(why) }
+                launch { effort.refresh(why) }
             }
 
             RefreshTarget.Power -> {
                 launch { metrics.resource(settings.value?.powerRange ?: MetricsRange.DEFAULT).refresh(why) }
+                launch { powerSkillsFor(chosenWindow.value).refresh(why) }
                 launch {
                     profile.refresh(
                         if (why ==
@@ -634,6 +688,17 @@ class CompanionContainer(
                     launch { insights.refresh(Refresh.REQUESTED) }
                     launch { repeats.refresh(Refresh.REQUESTED) }
                     launch { notebook.refresh(Refresh.REQUESTED) }
+                    launch { effort.refresh(Refresh.REQUESTED) }
+                    launch { powerSkillsFor(PowerSkillsWindow.EightWeeks).refresh(Refresh.REQUESTED) }
+                    launch { powerSkillsFor(PowerSkillsWindow.AllTime).refresh(Refresh.REQUESTED) }
+                    // The window the rider chose, when it is a range of their own.
+                    (chosenWindow.value as? PowerSkillsWindow.Custom)?.let {
+                        launch {
+                            powerSkillsFor(
+                                it,
+                            ).refresh(Refresh.REQUESTED)
+                        }
+                    }
                     // The files shared from OnelapFit that wait: the rider asked, so the backoff does not apply (ADR 0028).
                     launch { fits.flush(FitFlushReason.MANUAL) }
                     launch {
@@ -902,6 +967,9 @@ class CompanionContainer(
         private const val EDIT_SETTLE_MILLIS = 700L
 
         private const val NANOS_PER_MILLI = 1_000_000L
+
+        /** The caches of the Power skills windows kept on disk: the two standing ones and the ranges the rider chose last. */
+        private const val SKILL_CACHE_FILES = 10
         private const val DEVICE_CHARS = 64
         private const val PROBE_MAX_BYTES = 65_536
         private const val RESOURCE_COUNT = 5
