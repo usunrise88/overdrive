@@ -47,6 +47,8 @@ import app.overdrive.core.remote.MetricsRange
 import app.overdrive.core.remote.MetricsRepository
 import app.overdrive.core.remote.Outcome
 import app.overdrive.core.remote.ProblemKind
+import app.overdrive.core.remote.ProgressRange
+import app.overdrive.core.remote.ProgressRepository
 import app.overdrive.core.remote.Refresh
 import app.overdrive.core.remote.RemoteResource
 import app.overdrive.core.remote.RepeatDetails
@@ -156,6 +158,11 @@ sealed interface RefreshTarget {
     /** The coach notebook, from its page (design/companion.md §4.13). */
     data object Notebook : RefreshTarget
 
+    /** The Progress screen at one range (design/companion.md §4.16, ADR 0043). */
+    data class Progress(
+        val range: ProgressRange,
+    ) : RefreshTarget
+
     data class RideDetail(
         val id: String,
     ) : RefreshTarget
@@ -259,6 +266,13 @@ class CompanionContainer(
     /** The repeated sessions (`GET /v1/repeats`, spec §11.7): the list of the Rides tab's second view. */
     val repeats: RemoteResource<RepeatsResponse> =
         repeatsResource(client, ::config, file("repeats"), wall, elapsedMillis)
+
+    /**
+     * Progress over time (`GET /v1/progress?from&to`, spec §6.3, ADR 0043): one cached resource per range, shown at once and offline.
+     * The screen reads [progressFor]; the Fitness and Power rows read the default range's headline.
+     */
+    val progress: ProgressRepository =
+        ProgressRepository(client, ::config, { clock.today() }, { file(it) }, wall, elapsedMillis)
 
     /** The coach notebook (`GET /v1/notebook`, spec §11.6): read-only in the companion, its own page (design/companion.md §4.13). */
     val notebook: RemoteResource<NotebookResponse> =
@@ -366,6 +380,9 @@ class CompanionContainer(
             if (!resource.state.value.loaded) scope.launch { resource.load() }
         }
 
+    /** The Progress answer for [range] (its cache is read at start; the screen opens it with `screenOpened(RefreshTarget.Progress(range))`). */
+    fun progressFor(range: ProgressRange) = progress.resource(range)
+
     /** The Wellness figures for [range]. */
     fun wellnessFor(range: WellnessRange): WellnessView = wellnessResources.view(range)
 
@@ -413,6 +430,7 @@ class CompanionContainer(
             insights.load()
             repeats.load()
             notebook.load()
+            progress.load()
             health.load()
             fits.load()
             var first = true
@@ -429,6 +447,7 @@ class CompanionContainer(
                 repeats.settingsChanged()
                 repeatDetails.settingsChanged()
                 notebook.settingsChanged()
+                progress.settingsChanged()
                 if (!first) delay(settleMillis)
                 val why = if (first) Refresh.START else Refresh.SETTINGS_CHANGED
                 first = false
@@ -507,6 +526,8 @@ class CompanionContainer(
             launch { recovery.refresh(why) }
             launch { insights.refresh(why) }
             launch { wellnessResources.refresh(settings.value?.wellnessRange ?: WellnessRange.DEFAULT, why) }
+            // The resting heart rate and the weight behind Progress came from the same watch.
+            launch { progress.resource(ProgressRange.DEFAULT).refresh(why) }
         }
 
     private suspend fun refreshToday(
@@ -578,12 +599,20 @@ class CompanionContainer(
                 launch { notebook.refresh(why) }
             }
 
+            is RefreshTarget.Progress -> {
+                launch { progress.resource(target.range).refresh(why) }
+            }
+
             RefreshTarget.Fitness -> {
                 launch { metrics.resource(settings.value?.fitnessRange ?: MetricsRange.DEFAULT).refresh(why) }
+                // The headline of the Progress row at the end of the page.
+                launch { progress.resource(ProgressRange.DEFAULT).refresh(why) }
             }
 
             RefreshTarget.Power -> {
                 launch { metrics.resource(settings.value?.powerRange ?: MetricsRange.DEFAULT).refresh(why) }
+                // The headline of the Progress row at the end of the page.
+                launch { progress.resource(ProgressRange.DEFAULT).refresh(why) }
                 launch {
                     profile.refresh(
                         if (why ==
@@ -634,6 +663,7 @@ class CompanionContainer(
                     launch { insights.refresh(Refresh.REQUESTED) }
                     launch { repeats.refresh(Refresh.REQUESTED) }
                     launch { notebook.refresh(Refresh.REQUESTED) }
+                    for (range in ProgressRange.entries) launch { progress.resource(range).refresh(Refresh.REQUESTED) }
                     // The files shared from OnelapFit that wait: the rider asked, so the backoff does not apply (ADR 0028).
                     launch { fits.flush(FitFlushReason.MANUAL) }
                     launch {

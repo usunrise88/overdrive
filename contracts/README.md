@@ -35,6 +35,7 @@ src/         @overdrive/contracts: the schema plus a validator for the TypeScrip
 | Repeated sessions (`GET /v1/repeats`) | `schema/repeats-response.schema.json` | §11.7, §8.3, ADR 0026 |
 | One repeated session (`GET /v1/repeats/{hash}`) | `schema/repeat-detail-response.schema.json` | §11.7, §8.3, ADR 0026 |
 | The attempt before a ride (`GET /v1/repeats/{hash}/previous`) | `schema/repeat-previous-response.schema.json` | §11.7, §8.3, ADR 0026 |
+| Progress over time (`GET /v1/progress`) | `schema/progress-response.schema.json` | §6.8, §8.3, ADR 0043 |
 | Outdoor ride import answer (`POST /v1/activities/fit`) | `schema/activity-import-response.schema.json` | §11.8, §8.3, ADR 0026 |
 | Coach notebook (`GET /v1/notebook`) | `schema/notebook-response.schema.json` | §11.6, §12.4, §8.3, ADR 0035 |
 | Plan event (`POST /v1/plan-events` answer; MCP `list_plan_events`) | `schema/plan-event.schema.json` | §12.2, §8.3, ADR 0035 |
@@ -127,6 +128,15 @@ by step) and those that must not. What a schema cannot state (real dates, attemp
 at least 120 counted seconds behind a step's figure, the trend's slope, change and direction agreeing, steps that do not
 overlap) is in each schema's description and checked by `validateRepeatsResponse` & co. here and by `RepeatsApiJson` in Kotlin
 (`RepeatsContractTest`), against the same files.
+
+`fixtures/progress/` holds the golden files of the Progress screen's data (release 0.4.1, ADR 0043): `progress-response` (`GET /v1/progress`:
+six measures, each with the series a chart draws and a trend `{ direction, betterWhen, unit, points, minPoints, change, difference, from,
+latest, since, steadyBand, verdictText, reason, note }`, the headline, the references of aerobic efficiency). The valid files cover every
+direction, an unknown verdict with its reason, a headline of each kind, an empty history, a partial month and a week with no figure; the
+invalid ones (about 85) break one rule each. What a schema cannot state (real dates, consecutive Mondays and months, rides oldest first, a
+direction that follows from `change`, `steadyBand` and `betterWhen`, unknown exactly below the minimum, best power's overall direction from
+its three lines, a headline that names a block with that direction) is checked by `validateProgressResponse` here and by `ProgressApiJson` in
+Kotlin (`ProgressContractTest`), against the same files. The rule constants (`PROGRESS_*`) are exported from `src/progress.ts`.
 
 `fixtures/outdoor/` holds the golden files of the outdoor-ride import (stage P3-7, ADR 0026): `activity-import-response` (the
 answer of `POST /v1/activities/fit`, which takes the FIT file's bytes as `application/vnd.ant.fit`, up to 16 MiB: `imported` with

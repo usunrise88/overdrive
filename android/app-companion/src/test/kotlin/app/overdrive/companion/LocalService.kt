@@ -11,6 +11,8 @@ import app.overdrive.core.metrics.RideItem
 import app.overdrive.core.plan.PlanApiJson
 import app.overdrive.core.profile.Profile
 import app.overdrive.core.profile.ProfileApiJson
+import app.overdrive.core.progress.ProgressApiJson
+import app.overdrive.core.progress.ProgressResponse
 import app.overdrive.core.repeats.RepeatDetailResponse
 import app.overdrive.core.repeats.RepeatsApiJson
 import app.overdrive.core.repeats.RepeatsResponse
@@ -85,6 +87,10 @@ class LocalService(
     var repeats: RepeatsResponse? = null
 
     val repeatDetails = java.util.concurrent.ConcurrentHashMap<String, RepeatDetailResponse>()
+
+    /** What `GET /v1/progress` answers, the same for every range (null is a 404, as a service that has not got the route yet). */
+    @Volatile
+    var progress: ProgressResponse? = null
 
     /** The FIT files `POST /v1/activities/fit` holds, by the id it gave them: idempotent by the file's bytes, as the real one is. */
     val fitFiles = java.util.concurrent.ConcurrentHashMap<String, ByteArray>()
@@ -209,6 +215,10 @@ class LocalService(
                 val from = q.getValue("from")
                 val to = q.getValue("to")
                 200 to WellnessApiJson.encodeWellnessResponse(WatchSamples.wellnessResponse(from, to))
+            }
+
+            method == "GET" && path == "/v1/progress" -> {
+                progress?.let { 200 to ProgressApiJson.encode(it) } ?: (404 to error("not_found", "No such route"))
             }
 
             method == "GET" && path == "/v1/repeats" -> {
