@@ -8,9 +8,11 @@ Mock-ups: `design/mockups/companion/*.html` (open in a browser; they load `../to
 `design/mockups/companion/png/`. All numbers in them are synthetic.
 
 Contents: 1 Frame and rules · 2 Navigation · 3 Shared patterns · 4 Screens · 5 States · 6 Charts · 7 Copy · 8 Accessibility ·
-9 Performance · 10 Components · 11 Data the screens need · 12 Tokens · 13 Mock-up index. Stage P3-4c adds §4.11 (the FIT share target),
+9 Performance · 10 Components · 11 Data the screens need · 12 Tokens · 13 Mock-up index · 14 Implementation note (charts stage). Stage P3-4c adds §4.11 (the FIT share target),
 §4.12 (repeated sessions) and §6.10 (charts over attempts); they have no HTML mock-up, the Compose screenshots of the stage are their
 reference (`app-companion/build/shots/repeat*.png`, `repeats--*.png`, `import--*.png`, `rides--outdoor.png`, `settings--outdoor-*.png`).
+The charts stage adds **Power skills** (§4.14, §6.11) and **Effort** (§4.15, §6.12), with the copy in §7.8, the data in §11 and the
+implementation note in §14; mock-ups `skills.html` and `effort.html`.
 
 ## 1. Frame and rules
 
@@ -40,6 +42,9 @@ Bottom navigation (system.md §7.9): **Today** (`house`), **Fitness** (`activity
 | Today, a fact row in the recovery card | Wellness tab, scrolled to that metric (a tab switch, not a push) |
 | Today / Power, FTP suggestion | Answered in place; nothing is pushed |
 | Power, a best-effort row | Ride detail of that ride |
+| Power, a duration of the Power skills radar or a skill row | A bottom sheet over the tab (§4.14); its ride rows open Ride detail |
+| Power, Power skills **Custom** | The date range sheet (§4.14) |
+| Fitness, an activity row of Effort's week | Ride detail or Activity detail |
 | Notes, an after-ride note | Ride detail |
 | Rides, a row | Ride detail or Activity detail |
 | Rides, Repeats view, a session | Repeat detail (§4.12) |
@@ -163,15 +168,27 @@ are loaded; scrolling to the end loads 30 more.
 
 ### 4.3 Fitness (`fitness--*.png`)
 
-1. Header "Fitness", "Updated 07:40". 2. StatusLine if any. 3. Range selector.
-4. **Tile group** (3 columns, system.md §7.3, padding 12 × 14): **Fitness** 54 with "−3 in 4 weeks", **Fatigue** 43 with
+1. Header "Fitness", "Updated 07:40". 2. StatusLine if any.
+3. **Tile group** (3 columns, system.md §7.3, padding 12 × 14): **Fitness** 54 with "−3 in 4 weeks", **Fatigue** 43 with
    "−15 in 7 days", **Form** 11 with its word ("Fresh", §7.3). Always today; not affected by the range or the selection.
-5. **Fitness and fatigue** chart card (§6.1). 6. **Form** chart card (§6.2) with the note "Fitness minus fatigue. Below −10
-   you are training hard; above 5 you are fresh." 7. **Weekly load** chart card (§6.3).
+4. **Effort** card (§4.15, §6.12): always the last 12 weeks, its own selection.
+5. Range selector. 6. **Fitness and fatigue** chart card (§6.1). 7. **Form** chart card (§6.2) with the note "Fitness minus
+   fatigue. Below −10 you are training hard; above 5 you are fresh."
+
+**Charts stage:** the range selector moves below the tiles and Effort, so that everything above it is "now" and everything under
+it follows it (the rule of §3.4 stays true). The **Weekly load** card (§6.3) is **retired**: Effort draws the same weekly totals
+with the usual range, the verdict and the days, and a second column chart of the same numbers on one tab is noise. The weekly
+totals over 6 months or a year stay readable in the Values sheet of Effort (all weeks the service sends, newest first) and in
+Fitness, their rolling average. §6.3 stays as the reference of the column geometry that Effort reuses.
 
 Watch activities are part of the load (spec §6.7), so they are part of all three charts; the weekly readout names their share.
 
 ### 4.4 Power (`power--*.png`)
+
+**Charts stage order:** 1. Header. 2. StatusLine. 3. FTP card. 4. **Power skills** (§4.14; its own window). 5. Range selector.
+6. Power curve, Best efforts, FTP history, Aerobic drift as below. The range selector moves under the skills card for the reason
+given in §4.3: everything above it is "now" or has its own window, everything under it follows it. The list below keeps its
+earlier numbering.
 
 1. Header "Power", "Updated 07:40". 2. StatusLine. 3. Range selector.
 4. **FTP card** (surface 1, padding 16): "FTP" (label, text 3) over **250 W** (numM, unit W) over "Set 2 Oct" (label, text 2).
@@ -383,6 +400,142 @@ request runs), then the status line when the last refresh failed, then the conte
 The data is `GET /v1/notebook`, a cached resource (`cache/notebook`) asked when the page opens (at most once a minute), on a pull down and on
 **Sync now**. It is not part of Settings' "Last sync". The words are `NotebookUi`, pure and tested in `NotebookModelsTest`.
 
+### 4.14 Power skills (Power tab, charts stage; `skills--*.png`)
+
+**Purpose.** One glance at what kind of rider the power says you are now (sprint, short attacks, climbs, time trials, the long
+hour), against your own best ever, and how each skill sits on a published scale. It answers "where am I strong, where am I
+weak, and am I near my best?". It is not a test and nothing on it is a target.
+
+**Place.** The card after the FTP card and before the range selector (§4.4). It has its own window, so it does not follow the
+range selector; the range selector's charts sit below it.
+
+**Card, top to bottom** (ChartCard: padding 16 × 16 × 12, **12 dp** between parts here, as the window control needs air):
+
+1. **Heading row:** "Power skills" (label, text 3) and the ghost **Values** (§3.6).
+2. **Window control:** a full-width `RangeSelector` with three 44 dp segments **8 weeks · All time · Custom** (default 8 weeks;
+   remembered while the app lives, not across a restart: an old custom range would be a surprise).
+3. **Range line** (only while Custom is on): "2 Nov – 15 Nov 2026 · 9 rides" (label, text 1, tabular), a ghost **Change**
+   button (40 dp, 48 dp hit) and a 48 dp ghost icon button `x` ("Clear custom range" to TalkBack) that returns to 8 weeks.
+   This line is the one place the chosen range is shown; the segment keeps the word "Custom".
+4. **Legend** (the readout row of §3.5, without values): a 12 × 2 line key in text 1 with the window's name ("8 weeks", or the
+   custom range "2 Nov – 15 Nov") and a 12 × 2 key in text 3 "All time". With All time chosen there is one outline and one key.
+5. **The radar** (§6.11), centred.
+6. **Note** (label, text 2): with the weight known, "Rings mark levels 3, 6 and 9. Tap a duration or a skill for its rides.";
+   without, "Each axis is a share of your best ever: the ring is your best, the inner ring 75%, the centre 50%."
+7. **Skill rows**, five, in ring order: **Sprint** 15–30 s, **Attack** 1–3 min, **Climb** 5–10 min, **Time trial**
+   15–30 min, **Endurance** 45–60 min. A row is 72 dp at least, a hairline above, padding 12 dp top and bottom, the whole row
+   one target:
+   - left: a 12 × 4 dp key in the skill's colour (§6.11), the name (bodyStrong, text 1), its span (label, text 3, tabular);
+     under it the level, "Strong · level 5 of 9" (label, text 2);
+   - right: the best watts at the skill's **key duration** (numXS + "W") over "4.4 W/kg · 5 min" (caption, text 3, tabular).
+     Key durations: Sprint 15 s, Attack 1 min, Climb 5 min, Time trial 20 min, Endurance 60 min (the next one of the skill
+     when the key duration has no data);
+   - under both, full width: the **level bar** (§6.11): nine segments, 6 dp high.
+   - **Without weight:** no level line and no bar; the right side shows watts and the duration only.
+   - **No data for the skill in the window:** "No ride of 45 min or longer" (label, text 2) in place of the level, "—" (text 3)
+     at the right, no bar.
+8. **Closing note** (label, text 2), two sentences: the approximation, then the outdoor rule (spec §11.8).
+   - With weight: "Levels are approximate: your watts per kilogram (72.0 kg, 7-day average) against published power-profile
+     tables. Outdoor rides have no power, so only rides from the tablet count."
+   - Without: "Levels need your weight. Weigh yourself with a scale that writes to Health Connect and they appear here. Outdoor
+     rides have no power, so only rides from the tablet count."
+
+**Detail of a duration** (a tap on an axis's wedge or its label; `skills--skills-axis.png`). A bottom sheet (system.md §9 motion,
+grabber, `x` at the right, 70% scrim), with the axis marked on the radar under it (§6.11, selection). Content:
+
+- Title "5 min" (heading) over the skill's name "Climb" (label, text 2).
+- Row **"Last 8 weeks"** (or "2 Nov – 15 Nov" when that is the window): bodyStrong, under it the ride, "Thu 12 Nov · VO2 5×3 ›"
+  (label, text 2; the row is 48 dp+ and opens Ride detail); at the right the watts (numXS + W) over "4.4 W/kg" (caption, text 3;
+  absent without weight).
+- Row **"All time"**, the same. When All time is the window, this is the only value row.
+- Row **"Level, 8 weeks"** with "Approximate, at 72.0 kg" under it, and "Fit · 4 of 9" (bodyStrong) at the right. Absent
+  without weight.
+- A duration with no ride in the window: its row says "No ride of 45 min or longer in these 8 weeks" and the all-time row stays.
+- Close: `x`, Back, a tap on the scrim or a swipe down. The axis mark goes when the sheet closes.
+
+**Detail of a skill** (a tap on a skill row; `skills--skills-skill.png`). The same sheet: title "Climb" over "5–10 min · Fit,
+level 4 of 9 in 8 weeks"; a small table, one row per duration of the skill (5 min, 10 min): the window's watts over its date,
+the all-time watts (text 2) over its date; a tap on a value opens its ride. Then one sentence with the watts per kilogram of each
+duration ("4.4 W/kg for 5 min and 4.0 W/kg for 10 min at 72.0 kg.") and "Tap a value to open its ride."
+
+**Custom range** (`skills--skills-picker.png`). **Custom** (or **Change**) opens a bottom sheet:
+
+- Title "Custom range" (heading) and the choice so far (label, text 2, tabular, a polite live region): "Choose the first day" →
+  "From 2 Nov · choose the last day" → "2 Nov – 15 Nov · 14 days · 9 rides".
+- One month at a time: 48 dp `chevron-left` / `chevron-right` ghost icon buttons around "November 2026" (bodyStrong); the right
+  chevron is off (35%) on the current month. Monday-first grid, day names (caption, text 3), **44 dp day cells** with 2 dp
+  between rows (the grid spans the sheet: 46 dp per column at 360 dp).
+- A day with a tablet ride carries a 4 dp text-2 dot under its number, so empty stretches show before choosing (the dates come
+  from the rides list the app already caches, §4.6). Today has a 1 dp `borderStrong` ring. Days after today are text 3 at 55% and
+  cannot be chosen.
+- Tap a day: it becomes the start (inverted: text-1 fill, onPrimary 600 text, radius 8). Tap a second: the end; the days between
+  take a surface-3 band. A tap before the start makes that day the new start; a tap after a complete range starts again. Start and
+  end may be the same day.
+- "Tap the first day, then the last. A dot marks a day with a ride." (label, text 3).
+- Buttons, full width: **Show 2 Nov – 15 Nov** (primary; off until both ends are chosen) over **Cancel** (ghost).
+- **Cancel**, Back, a tap on the scrim or a swipe down close the sheet and **change nothing**: the window stays what it was
+  (8 weeks, All time or the earlier custom range). Only **Show** applies the range.
+- The sheet opens on the month of the current custom end, else on this month.
+
+**States** (`skills--skills-states.png`; the general rules are §5):
+
+| State | What the card shows |
+|---|---|
+| Loading, nothing cached | Heading, window control, then the spinner line "Loading your power skills…" in a 120 dp block. |
+| Refreshing, offline, out of date | The cached card unchanged; the tab's StatusLine says why (§3.2, §7.5). A window chosen while offline draws from its cache if it was fetched before; else the body says "Not loaded yet. It loads when the service can be reached." (body, text 2). |
+| No rides with power yet | Heading, "No rides yet" (heading) and "Power skills fill in from rides on the tablet. They appear here after the tablet uploads its first ride." No control, no frame. |
+| Fewer than 3 durations with data in the window | No radar, no skill rows. "Ride longer to see the shape: the radar needs at least three durations." (body, text 2) and a table of the durations that have data: duration · watts · date, 48 dp rows that open the ride. |
+| A duration with no data | A gap in the outline at that axis (§6.11); the label is the duration over "—" in text 3; its skill row says "No ride of … or longer" when none of its durations has data, else the level comes from the others. |
+| Custom range with no rides | Range line "2 Aug – 9 Aug 2026 · no rides"; the body is one sentence: "No rides on the tablet between 2 Aug and 9 Aug. Choose another range." No radar. |
+| Weight unknown (none in the last 7 days, spec §12.5) | The share-of-best radar and rows without levels (above). |
+| Very small values | The point stays at least 6 dp from the centre so it never vanishes; the label prints the true watts. |
+| Very large values (above level 9) | The point stops at the plot's edge; the label prints the true watts; the level is "World class · level 9 of 9". |
+
+### 4.15 Effort (Fitness tab, charts stage; `effort--*.png`)
+
+**Purpose.** Answer at a glance "is this week a lot or a little **for me**?", and show the trend of the last three months. The
+number is the week's **load**, the same training load as everywhere in the app (from power for the tablet's rides, from heart
+rate for watch activities and outdoor rides, spec §6.7). The service computes the load, the usual range and the verdict; the
+phone only draws them.
+
+**Place.** Fitness tab, after the tiles and before the range selector (§4.3). Its 12 weeks never follow the range selector and
+its selection is its own (it does not move the Fitness and Form selection, and they do not move it).
+
+**Card, top to bottom** (ChartCard, 8 dp between parts):
+
+1. Heading row: "Effort" (label, text 3) and **Values**.
+2. **Verdict** (heading, text 1), the service's verdict in words (§7.8) for the selected week; at rest this week, e.g. "Below
+   your usual range so far". It is the one thing to read first.
+3. **Week line** (the readout of §3.5; wraps at 1.3×): "This week · load **97** so far" or "Week of 9 Nov · load **395**" (label,
+   text 2; the load text 1 600, tabular), " (approximate)" when the service says so; then a 12 × 8 band key in surface 3 and
+   "Usual 298–510"; then, while a past week is selected, the 24 dp **This week** pill at the right (48 dp hit; to TalkBack "Back
+   to this week").
+4. **The chart** (§6.12): 12 weekly columns over the usual-range band.
+5. Sub-heading "This week, by day" / "Week of 9 Nov, by day" (label, text 3).
+6. **The days:** seven small columns, Mon to Sun (§6.12).
+7. **Activity rows** of the selected week, oldest first, 56 dp, a hairline above each: the name (bodyStrong) over the day ("Mon
+   16", label, text 2; a watch activity starts with a 16 dp `heart-pulse` and "Watch ·", an outdoor ride with `bike` and
+   "Outdoor ·", as on Rides, §4.6); at the right the load (numXS) over its **share of the week** "27%" (caption, text 3), with
+   " · approximate" when its load came from heart rate. A row opens Ride detail or Activity detail. None yet: "No rides or
+   activities yet this week." (body, text 2).
+
+**Interaction.** A tap on a column (or hold and slide, §3.5) selects its week: the verdict, the week line, the band, the days and
+the rows follow. **This week** returns to rest; leaving the tab does too. The days and the rows are not selectable as a chart.
+
+**States** (`effort--effort-states.png`):
+
+| State | What the card shows |
+|---|---|
+| Loading, nothing cached | §5, for the whole tab. |
+| Offline / out of date | The cached card unchanged and the tab's StatusLine. When the cache is from an earlier week, the week line names that week ("Week of 9 Nov") and the verdict is that week's; the phone never relabels a cached week as "This week". |
+| No load ever | "No effort yet" (heading) and "Weekly effort starts with your first ride on the tablet or your first activity on the watch." No chart. |
+| Learning (fewer than 8 complete weeks before the selected one) | Verdict "Learning your usual range" and "Your usual range appears after 8 weeks of training. 5 so far." (label, text 2); the columns without a band; weeks before the first load are empty slots. |
+| Nothing yet this week | Verdict "Nothing yet this week", week line "This week · load 0 · usual 334–511"; the current slot draws nothing; "No rides or activities yet this week." |
+| Activity without heart rate (and so without load) | Its row shows "—" over "no load" (text 3) and "No heart rate in this ride, so it adds no load." (label, text 2) under the day; it is left out of the shares. |
+| Load partly from heart rate | " (approximate)" in the week line and " · approximate" on those rows; the verdict is still given. |
+| A zero week | Nothing in its slot; Values says 0. |
+| A very large week | The y axis grows to it (step 100, or 200 above 400); the band gets thinner but its numbers stay in the week line. |
+
 ## 5. States
 
 Every screen draws from cache first. The table says what each screen shows in each state; §7 has the words.
@@ -434,6 +587,9 @@ colour). Common geometry for this file:
 - **Height** 148 dp.
 
 ### 6.3 Weekly load (columns)
+
+*Charts stage:* retired from the Fitness tab (§4.3); Effort (§6.12) reuses this column geometry.
+
 
 - **Data:** weekly totals, Monday-first weeks: `weekStart`, `load`, `rideLoad`, `otherLoad`, `rides`. The current week is partial.
 - **x:** one column per week: 6, 26 or 52 columns. Column width = min(20, slot − 2) dp, at least 3 dp; 4 dp top radius (less when
@@ -538,6 +694,128 @@ Used by the repeat page (§4.12); the geometry of §6 applies (32 dp gutter, 6 d
 - **One selection for the page:** a tap or a hold selects an attempt in every chart of the page at once.
 - **Values** (every chart card): "Attempt" / the figure, newest first: "#6 · 12 Nov". **Height** 148 dp.
 
+### 6.11 Power skills radar (charts stage)
+
+**Form.** A radar with 12 axes, used here and nowhere else: the durations of one rider's profile, read as a shape (a pointed
+sprint, a full hour). Exact values are on the labels, in the sheets and in Values.
+
+**Axes.** 12 durations clockwise from the top, 30° apart: 15 s (top), 30 s, 1, 2, 3, 5, 10 (bottom), 15, 20, 30, 45, 60 min.
+Angle of axis i (0° at three o'clock, y down): `θᵢ = −90° + 30° × i`.
+
+**Radial scale.** Linear from the centre (0) to the plot's edge (1), one scale for both outlines.
+
+- **Weight known: the level scale.** Each axis places the rider's watts per kilogram on that duration's power-profile scale:
+  `score = 1 + 8 × (W/kg − B) / (T − B)`, where B is the floor of level 1 and T the floor of level 9 at that duration (table
+  below); the radius is `score / 9`, at least 6 dp, at most the edge. The edge is level 9 and **the rings at ⅓ and ⅔ of the radius
+  are levels 3 and 6** (hairline `border`; the edge `borderStrong`; spokes hairline `border`). The shape compares durations fairly
+  (a 900 W sprint and a 250 W hour stand on the same footing), it matches the skill rows, and a ring means the same on every axis.
+- **Weight unknown: share of the best ever.** Each axis is the window's watts as a share of the all-time best at that duration,
+  `r = (share − 0.5) / 0.5`: the centre is 50%, the one inner ring (half the radius) 75%, the edge 100%. The all-time outline is
+  then the edge itself and is not drawn twice. Starting at 50% gives the 5–15% that matter room to show; the note under the
+  radar says it in words.
+- Rejected: watts on one common axis (15 s and 60 min differ about fourfold, so the long half collapses to the centre and every
+  rider looks like a sprinter), and a log scale (nobody reads one on a radar).
+
+**Level table** (W/kg, men's; log-interpolated in duration between the 5 s, 1 min, 5 min and FTP anchors of the published power
+profile tables (Allen and Coggan), rounded). The service owns the table as a data constant and may refine it; the phone never
+holds it. B is the floor of level 1, T the floor of level 9; levels 2–8 are equal steps between.
+
+| | 15 s | 30 s | 1 min | 2 min | 3 min | 5 min | 10 min | 15 min | 20 min | 30 min | 45 min | 60 min |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| B | 8.2 | 6.9 | 5.6 | 4.2 | 3.35 | 2.3 | 2.2 | 2.1 | 2.1 | 2.0 | 1.95 | 1.9 |
+| T | 18.5 | 15.0 | 11.5 | 9.8 | 8.85 | 7.6 | 7.25 | 7.05 | 6.95 | 6.75 | 6.55 | 6.4 |
+
+A women's table is built the same way from the published women's anchors (the API stage checks the anchor values against the
+source); which table applies is a profile setting (§11). Below B the score falls under 1 (drawn there, level 1); above T it is
+level 9 and the point stops at the edge.
+
+**Skill level** (rows and sheets): the mean of the scores of the skill's durations that have data in the window, rounded down,
+clamped to 1–9. **The nine levels**, our own plain words on an ordinal scale, always written with their number ("Strong · level
+5 of 9"):
+
+| Level | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+|---|---|---|---|---|---|---|---|---|---|
+| Word | Starting | Casual | Regular | Fit | Strong | Very strong | Racer | Elite | World class |
+
+They are approximate: the tables survey trained riders, indoor power differs from outdoor, and the weight is a 7-day average. The
+card's closing note and every sheet say "approximate".
+
+**Skill ring and colour.** A 4 dp ring just outside the plot (its centre line 6 dp beyond the edge), split into five arcs, each
+from 15° before its first axis to 15° after its last, with a **2 dp surface-1 gap** between arcs. Each skill takes the power-zone
+colour its best efforts are ridden in: a real zone meaning (the data is power, system.md §2), ordered short to long:
+
+| Skill | Durations | Colour | Why |
+|---|---|---|---|
+| Sprint | 15 s, 30 s | Z7 #EA8DE7 | best 15–30 s efforts sit above 150% of FTP |
+| Attack | 1, 2, 3 min | Z6 #FF7C7C | 121–150% |
+| Climb | 5, 10 min | Z5 #FFA94F | 106–120% |
+| Time trial | 15, 20, 30 min | Z4 #F2DE3C | 91–105% |
+| Endurance | 45, 60 min | Z3 #61DF84 | the long efforts sit at or just under threshold |
+
+Validated with the dataviz skill's validator (`validate_palette.js`, dark, surface #11151A, adjacent pairs including the wrap from
+Endurance back to Sprint): **colour-vision separation passes** (worst pair Z3–Z4, ΔE 8.1 under protanopia). The normal-vision
+floor is 12.9 for Z5–Z6, under the method's 15: the pair system.md §2 already names as the closest zones. The zone colours are fixed
+tokens and the system adds no hue, so colour is **never the only carrier**: every axis prints its duration, every row its name
+and span, the arcs are cut by gaps, and the rows follow the ring's order. Z2 for Endurance was rejected: next to Z7 at the wrap it
+collapses under protanopia (ΔE 4.4). The skill colour appears only on the arcs, the row keys and the level bars, never on text.
+
+**Outlines.**
+
+- Window (8 weeks or custom): 2 dp text 1, round caps, with a 10% text-1 wash inside **only when all 12 axes have data**.
+- All time: 1.5 dp text 3, no wash, drawn under the window's. Not drawn when All time is the window.
+- A duration without data breaks the outline: the two segments that would meet there are not drawn, and there is no wash. An
+  isolated point (both neighbours missing) is a 6 dp dot with a 1.5 dp surface-1 ring.
+- No vertex dots at rest. **Selected axis** (while its sheet is open): the spoke in text 2, the duration label in text 1 and the
+  watts in 700, an 8 dp dot with a 2 dp ring on each outline at that axis.
+
+**Labels.** At each axis, outside the ring, a two-line block: the duration (caption, text 3) over the watts (label 600, text 1,
+tabular: "930 W" with " W" in 500 text 2; "1,010 W" with a thousands comma; "—" in text 3 when missing). The block begins
+`Rp + 14 dp` from the centre; it is centred horizontally when |cos θ| < 0.3, otherwise left-aligned on the right half and
+right-aligned on the left half; vertically its centre moves by `15 × sin θ` dp, so the top label (15 s) sits wholly above the
+top of the ring and the bottom one (10 min) wholly below; their neighbours are 30° away and do not touch them (checked at 360 dp and
+at 1.3×).
+
+**Geometry.** Card inner width w (346 dp on a 412 dp phone, 296 at 360). Label column 54 dp ("1,010 W" at 13 sp is about 50 dp).
+Plot radius `Rp = min(w/2 − 54 − 14, 118)`: 105 dp at 412, 80 dp at 360. Height `2 × (Rp + 14 + 34)`: 306 dp at 412, 256 at 360.
+At **1.3× font scale** the label column is measured (the widest label + 4 dp) instead of fixed and Rp shrinks with it (about 90 dp
+at 412, 66 at 360); the block heights grow with the text. The radar never scales text down.
+
+**Hit targets.** Each axis owns the wedge of ±15° around it, from the centre out to the end of its label block: at a radius of
+92 dp or more that wedge is wider than 48 dp, and the label block itself is 48 dp tall with padding. A tap picks the axis by angle,
+anywhere in the radar's box, and opens its sheet. No hold-and-scrub on the radar: the sheet is its readout.
+
+**Level bar** (skill rows): nine segments across the row's full width, 6 dp high, 2 dp gaps (surface 1), the first segment rounded
+on the left and the last on the right (3 dp). Segments 1 … level take the skill's colour, the rest surface 3. Hidden from
+accessibility; the words say the level.
+
+**Values** (the table twin): "Duration" · the window · "All time" (and "W/kg" with the weight), 12 rows in axis order, "—" for no
+data.
+
+### 6.12 Effort (weekly columns with the usual range)
+
+- **Data:** 12 Monday-first weeks, oldest first, the current one partial: `weekStart`, `load`, `approximate`, `usualLow`,
+  `usualHigh` (null while learning), `verdict`. For the selected week: its seven days' load and its activities.
+- **x:** one slot per week, 12 across the plot; columns as §6.3 (min(20, slot − 2) dp, 4 dp top radius, square at the baseline, a
+  zero week draws nothing). Ticks: the first week's Monday ("31 Aug"), the seventh ("12 Oct"), and **"Now"** under the current
+  week (text 2, right-aligned to the plot's end), which marks it as in progress; the week line says "so far".
+- **y:** 0 to a nice maximum over the loads and the selected week's usual high; step 100 (200 above 400); 32 dp gutter, hairline
+  gridlines, `borderStrong` baseline.
+- **Band:** the **selected week's** usual range (at rest, this week's), one flat surface-3 rectangle across the plot, behind the
+  columns. It moves when another week is selected, so a column is always seen against the range its verdict used. No label inside
+  the plot (it would sit behind columns); the band key in the week line names it ("Usual 298–510"). The service computes it as
+  the mean ± one standard deviation of the 8 complete weeks before that week, like the wellness usual range; a week without 8
+  before it has none.
+- **Marks:** columns text 3; the selected week text 1 with its value (caption, text 2) 5 dp above. No other value labels and no
+  colour for above or below: the position against the band and the verdict in words carry it.
+- **Height** 160 dp (140 plot + 20 axis).
+
+**The days** (under the chart): seven slots across the card's width, 64 dp tall (46 plot + 18 labels), columns 20 dp wide in
+**text 2**, scaled to the week's largest day, no y axis and no numbers (the rows carry them); "Mon" … "Sun" (caption, text 3);
+today in text 1 600; days after today at 50%. Baseline `borderStrong`.
+
+**Values:** "Week" · "Load" · "Usual" · the verdict word ("Above", "Within", "Below", "—"), every week the service sends (up to 52),
+newest first ("16 Nov · so far").
+
 ## 7. Copy
 
 Plain English, sentence case, no exclamation marks, no hype, no diagnosis, no medical words (system.md §11, spec §6.5).
@@ -610,6 +888,35 @@ Units on the repeat page: bpm, W, % (a percent is written close to its number: "
 trending down"), never "you"; no medical words, no verdict beyond the one the spec asks for ("fitter", only for a falling heart rate at the same
 power with the service's three attempts). The import screen says what happened to the file and where it is, in that order, and what to do.
 
+### 7.8 Power skills and Effort
+
+**Power skills.** Heading "Power skills"; segments "8 weeks", "All time", "Custom"; "Change"; "Clear custom range" (TalkBack);
+legend "8 weeks" / "All time" / "2 Nov – 15 Nov"; range line "2 Nov – 15 Nov 2026 · 9 rides" ("1 ride", "no rides"); skills
+"Sprint", "Attack", "Climb", "Time trial", "Endurance"; spans "15–30 s", "1–3 min", "5–10 min", "15–30 min", "45–60 min"; level
+"Strong · level 5 of 9"; the levels Starting, Casual, Regular, Fit, Strong, Very strong, Racer, Elite, World class; "4.4 W/kg ·
+5 min"; "No ride of 45 min or longer"; notes and state sentences exactly as in §4.14. Sheets: "Last 8 weeks", "All time",
+"Level, 8 weeks", "Approximate, at 72.0 kg", "Fit · 4 of 9", "Tap a value to open its ride." Picker: "Custom range", "Choose the
+first day", "From 2 Nov · choose the last day", "2 Nov – 15 Nov · 14 days · 9 rides", "Tap the first day, then the last. A dot
+marks a day with a ride.", "Show 2 Nov – 15 Nov", "Cancel". Durations "15 s", "1 min", "60 min" (never "1 h" here: the set ends at
+60 min). A range within one year omits the year except on the range line.
+
+**Effort.** Heading "Effort". The service sends the verdict as a key; the phone owns the words:
+
+| Key | A past week | This week |
+|---|---|---|
+| `above` | Above your usual range | Above your usual range |
+| `within` | Within your usual range | Within your usual range |
+| `below` | Below your usual range | Below your usual range so far |
+| `none` (nothing this week yet) | — | Nothing yet this week |
+| `learning` | Learning your usual range | Learning your usual range |
+
+In the current week "above" and "within" can only stay or rise, so they are said plainly; "below" says "so far". Week line "This
+week · load 97 so far", "Week of 9 Nov · load 395", " (approximate)", "Usual 298–510"; pill "This week"; "This week, by day",
+"Week of 9 Nov, by day"; rows "27%", "7% · approximate", "no load", "No heart rate in this ride, so it adds no load."; empty "No
+effort yet" / "Weekly effort starts with your first ride on the tablet or your first activity on the watch."; learning "Your usual
+range appears after 8 weeks of training. 5 so far."; "No rides or activities yet this week." Never "good", "bad",
+"overtraining", "too much": the verdict compares the rider with their own weeks and says nothing more.
+
 ## 8. Accessibility
 
 - **Contrast:** all text uses the existing tiers (≥ 4.5:1 on every surface, system.md §2). Chart marks that carry data are text
@@ -626,6 +933,23 @@ power with the service's three attempts). The import screen says what happened t
 - **Font scale:** layouts hold to 1.3×; above that tile groups drop to 2 columns and readouts wrap.
 - **Reduced motion:** the system setting makes the sheet and screen transitions instant (system.md §9).
 
+- **Power skills (TalkBack).** Reading order: heading, window control ("8 weeks, selected, 1 of 3"), range line, the radar, its
+  note, the five skill rows, the closing note. The radar is one focusable node whose description is its text alternative, the
+  values in axis order: "Power skills, last 8 weeks against all time. 15 seconds 930 watts, all time 1,010. 30 seconds 705 watts,
+  all time 760. … 45 minutes, no ride. … Rings mark levels 3, 6 and 9." (without weight: "… 93% of your best"). It has no
+  per-axis actions (twelve would be noise): each duration is reached through its skill row's sheet and through Values. Each skill
+  row is a button: "Climb, 5 to 10 minutes. Fit, level 4 of 9. Best 316 watts, 4.4 watts per kilogram, at 5 minutes. Opens
+  details." The ring and the level bars are hidden. When a sheet opens its title takes focus; its ride rows are buttons ("Thu 12
+  Nov, VO2 5×3, opens the ride").
+- **Date range sheet.** Each day is a button: "Monday 2 November, has a ride, first day"; days after today are disabled ("not
+  available"); the choice line is a polite live region; **Show** is disabled until both ends are chosen; the month chevrons are
+  "Previous month" / "Next month".
+- **Effort (TalkBack).** Reading order: heading, verdict, week line, the chart, the days, the rows. The chart is one node, as the
+  other charts, with the custom actions **Previous week** / **Next week**; its description: "Effort, last 12 weeks. This week so
+  far 97, below your usual range of 334 to 511. Last week 395, within. Highest 579, week of 12 Oct." The verdict and the week line
+  are a polite live region. The days are one node: "Monday 97, Tuesday 0, Wednesday, today, …". Rows are buttons: "Threshold
+  2×20, Monday 16, load 97, 100% of the week, opens the ride".
+- **Colour.** The skill colours never carry meaning alone (names, spans, gaps and order, §6.11); Effort uses no hue at all.
 ## 9. Performance
 
 - **Lists** (`Rides`, `Notes`, Values tables, Settings is short) are `LazyColumn`s with stable keys (ride id, note id, date);
@@ -685,10 +1009,18 @@ computed it, UTC) and `stale` (true when an input source failed), as `GET /v1/wo
 | Import | `POST /v1/activities/fit` (stage P3-4c) | the FIT file as `application/vnd.ant.fit`; the answer's `status` (`imported` / `duplicate`), `reason`, and `summary` (date, duration, distance, average heart rate, load); errors `invalid_fit`, `unsupported_sport`, `empty_activity`, `payload_too_large`, `unsupported_media_type` |
 | Ride detail | `GET /v1/rides/{id}` | `summary` (§8.2 names), `laps` with `targetPower` per lap (from the plan), `series` at 10 s [{`t`, `power`, `heartRate`, `wBal`}], `secondsInZones[7]`, `plan` {`workout` as stored, `stepsRidden`, `stepsPlanned`, `effortRange`, `effortTarget`} or null, `ftp`, `thresholdHr`, `cp`, `wPrime`, `insightId` |
 | Activity detail | same, `kind: activity` | summary (duration, avg/max HR, load, `loadApproximate: true`), `series` [{`t`, `heartRate`}], `thresholdHr` |
+| Power · Power skills (charts stage) | `GET /v1/metrics` → `powerSkills` (or its own `GET /v1/power-skills?from&to`) | for the window (`from`/`to` local days, default the last 56 days) **and** for all time, at the 12 durations of §6.11: [{`durationSec`, `watts` (or null), `date`, `rideId`, `rideName`}]; `rideCount` in the window; tablet rides only (spec §11.8); the weight used, `riderWeight` {`kg`, `date`} or null (from the profile, spec §12.5); per duration `score` (the level score, null without weight) and per skill `level` (1–9, null without weight), so the phone never holds the table; `table` (`men` / `women`) |
+| Power · Power skills, picker dots | `GET /v1/rides` (exists, cached) | the start days of the rides, to dot the calendar; no new field |
+| Profile (charts stage) | `GET/PATCH /v1/profile` | **new optional field** `powerProfileTable`: `men` (default) or `women`, which level table the service uses. Until it exists the service uses `men` and the closing note stays true ("published tables") |
+| Fitness · Effort (charts stage) | `GET /v1/metrics` → `effort` | 12 weeks, oldest first (and up to 52 for Values): [{`weekStart`, `load`, `approximate` (any part from heart rate), `usualLow`, `usualHigh` (null while learning), `verdict` (`above` / `within` / `below` / `none` / `learning`), `current` (true for the partial week)}]; `weeksLogged` and `weeksNeeded` (8) while learning; for each week its `days` [{`date`, `load`}] (7) and `activities` [{`id`, `kind` (`ride` / `activity`), `sport`, `name`, `date`, `load` (or null when there was no heart rate and no power), `approximate`, `share` (0–1 of the week, null when `load` is null)}]. The service computes every number and the verdict (the current week's `below` means "below so far") |
 | Settings · heart rate | `GET/PATCH /v1/profile` | **new profile fields:** `maxHeartRate`, `thresholdHeartRate` (bpm or null) and their estimates from rides (`estimatedMaxHeartRate`, `estimatedThresholdHeartRate`, read-only) |
 | Settings · last sync | local | time of the last successful exchange, waiting record count, last failure cause |
 
 ## 12. Tokens
+
+**Charts stage: still no additions.** Power skills uses the zone colours (as power data, §6.11), text 1/2/3, surface 1/3,
+`border`, `borderStrong`; Effort uses only neutrals. Sizes specific to the two charts (ring 4 dp, level bar 6 dp, label column
+54 dp, chart heights) live in this file and as `ui-kit` constants beside the chart code, as the other chart geometry does.
 
 **No additions to `tokens.json`.** Every colour, size and style above exists already; the companion-only geometry (segment
 44 dp, chart heights, gutters) lives in this file and in `ui-kit` constants next to the chart code. Adding a token would also
@@ -707,6 +1039,60 @@ regenerate `OverdriveTokens.kt`, which belongs to the implementation stage, not 
 | `rides.html` | `rides`, `ride` (detail), `ride-selected`, `activity` |
 | `settings.html` | `settings`, `settings-problems`, `onb-connect`, `onb-health`, `onb-partial`, `onb-background`, `onb-sync` |
 | `states.html` | `loading`, `error`, `stale`, `empty`, `values` |
+| `skills.html` (charts stage) | `skills` (8 weeks, weight known, top of the Power tab), `skills-360` (360 dp wide), `skills-axis` (5 min sheet), `skills-skill` (Climb sheet), `skills-noweight` (share of best, no levels), `skills-custom` (custom range with 45 and 60 min gaps), `skills-picker` (date range sheet), `skills-states` (loading, no rides, list fallback, empty custom range, offline) |
+| `effort.html` (charts stage) | `effort` (Fitness top, this week at rest), `effort-selected` (a past week, approximate watch load), `effort-states` (learning, no load, nothing yet this week, activity without heart rate) |
 
 Render: `NODE_PATH=$(npm root -g) node design/tools/render-mockups.mjs companion/` (set `CHROMIUM_PATH` to use a browser
 binary other than Playwright's own). Shared pieces: `companion.css`, `companion.js` (shell, chart geometry, synthetic data).
+
+## 14. Implementation note (charts stage: Power skills and Effort)
+
+For the implementer of §4.14, §4.15, §6.11 and §6.12. No new token; no new icon (`x`, `chevron-left`, `chevron-right`,
+`heart-pulse`, `bike` exist).
+
+**Reuse as they are.** `ChartCard` (heading + Values; Power skills passes 12 dp spacing through a parameter or wraps its body in
+its own `Column`), `ValuesSheet` (both table twins), `RangeSelector` (the three window segments), `StatusLine`, `LoadingBlock`,
+`EmptyBlock`, `OdButton` (Change, Show, Cancel), `OdIconButton` (`x`, chevrons), `ConfirmSheet` as the base of the detail and
+picker sheets (as the Values sheet does), `HorizontalRule`, `OdText`, `ValueWithUnit`. The weekly columns of Effort are
+`ColumnChart` with two additions: a **flat band layer** behind the columns that reads the selection (the selected week's
+`usualLow`/`usualHigh`, so the band moves in the draw phase like the selection, without recomposition) and the **"Now"** tick.
+`ColumnSpec` already has `starts`, `values`, `selectXs` and `restX`; add the per-week band arrays. The seven-day strip is a small
+`Canvas` (or `ColumnChart` without gutter, ticks or selection; seven fixed slots). Effort's selection is its own `ChartSelection`,
+not the Fitness one.
+
+**New: `RadarChart` in `ui-kit/chart`.** Input: a `RadarSpec` built once per (data, window) by the screen model, compared by
+identity: 12 `labels` (duration, watts text), `main` and `reference` radii as `DoubleArray` (0..1, NaN = no data), `rings`
+(fractions), `segments` (start axis, end axis, colour), `wash` (bool), `heightDp` computed from the width. The screen model, not
+the chart, turns watts into radii (level score or share of best), so the chart knows nothing about power. What it needs:
+
+- **Axis angles:** `θᵢ = −π/2 + i·π/6`; point `(cx + cos θ·r·Rp, cy + sin θ·r·Rp)`; r is clamped to `[6 dp / Rp, 1]`.
+- **Label layout:** measure every label once with `rememberTextMeasurer` inside `drawWithCache`; the label column is the widest
+  label (+4 dp), so 1.3× font scale shrinks Rp instead of clipping. Place each block per §6.11 (horizontal anchor by cos θ, vertical
+  shift 15 dp × sin θ). The top (i = 0) and bottom (i = 6) blocks are the collision risk: they are centred and pushed wholly outside
+  the ring; assert in a test at 296 dp width and 1.3× that no two label rectangles intersect and none leaves the canvas.
+- **Ring arcs:** `drawArc` with `style = Stroke(4.dp)` on the circle of radius `Rp + 6 dp`, start angle `θ(first) − 15°` plus half
+  a 2 dp gap in degrees (`gap° = 2 dp / (Rp + 6 dp) × 180/π / 2`), sweep `30° × axes − gap°`. Butt caps (a round cap would eat the
+  gap).
+- **Outlines:** one `Path` per outline with `moveTo` after a NaN (a gap), closed back to the first point only when both ends have
+  data; the wash `Path` only when no value is NaN. Draw order: rings and spokes, arcs, wash, reference outline, main outline,
+  selection.
+- **Hit testing:** in `pointerInput`, a tap at (x, y): `i = round((atan2(y − cy, x − cx) + π/2) / (π/6)) mod 12`, accepted
+  anywhere in the radar's box; this gives every axis a wedge wider than 48 dp at its label. Call `onAxis(i)`; the selection
+  (`Int?` state) is read in the draw phase, like `ChartSelection`.
+- **Semantics:** one node, `contentDescription` = the text alternative of §8 built by the screen model; no per-axis children.
+
+**Level bar** is a `Row` of nine `Box`es (or one small `Canvas`), weight 1, 6 dp, 2 dp spacing, the end radii of §6.11, cleared
+from semantics. **The date range sheet** is built in the app from `ConfirmSheet`, a `LazyVerticalGrid`-free fixed 7-column layout
+(one month is at most 6 rows, so a plain `Column` of `Row`s), and the cached rides list for the dots. Use `java.time` local dates;
+the window sent to the service is `from`/`to` inclusive local days.
+
+**Performance.** Both charts are drawn once per (data, size): paths, arcs and text layouts live in `drawWithCache`; a tap changes
+one `State` read in the draw phase, so the radar never recomposes on selection and Effort recomposes only its verdict, week line,
+days and rows when the selected week changes. **No continuous animation**: no draw-in of the outline, no morph when the window
+changes (the new shape replaces the old at once, like every value change, system.md §9), the sheets use the standard sheet motion
+and are instant with animations off. Each card is one `LazyColumn` item, so an off-screen radar is not composed. The data is tiny
+(12 + 12 points, 12 weeks, ≤ 7 days, ≤ ~15 activities).
+
+**Testing.** Pure functions in the app's model (`PowerSkillsUi`, `EffortUi`, as the other `*Ui` files): radii from watts in both
+scales, the level words, the 3-durations threshold, gaps, the custom range line, the verdict words for past and current weeks, the
+shares that ignore activities without load, the TalkBack strings. Compose screenshot tests of every frame in §13's new rows.
