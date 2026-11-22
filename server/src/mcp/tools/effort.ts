@@ -4,7 +4,7 @@ import { z } from "zod";
 import { defineTool, type ToolContext } from "../tool.ts";
 
 /**
- * `get_effort` (spec §6.3, §8.4, ADR 0042): the rider's training load per week and per day, their usual range and how this week
+ * `get_effort` (spec §6.3, §8.4, ADR 0042): the rider's training load per week and per day, their usual range and how each week
  * compares with it. Effort is the training load of `get_fitness` (not a second formula), so the two always agree.
  */
 export function registerEffortTools(server: McpServer, ctx: ToolContext): void {
@@ -19,14 +19,15 @@ export function registerEffortTools(server: McpServer, ctx: ToolContext): void {
       kind: "read",
       description:
         "The rider's training load per week, the same load as get_fitness (100 is about one hour at threshold): from power for rides on the tablet, from heart rate for " +
-        "workouts from the watch and outdoor rides, all kinds counted together and a watch session that overlaps a tablet ride counted once. weeks are Monday to Sunday " +
-        "in the rider's time zone, oldest first, the last one in progress (inProgress true, days up to today); each has load, activityCount, durationSeconds, approximate " +
-        "(the load rests on an estimated threshold or a thin heart rate, or a workout's load could not be worked out and counts 0) and days with each day's activities " +
-        "(id, kind ride, watch or outdoor, name, load). usual is the rider's usual week: the median and the interquartile band (low to high) of the previous completed " +
-        "weeks, at most eight, from the first week with any activity, and null with fewer than four. thisWeek says how the week in progress compares with what the same " +
-        "weeks had reached by the same weekday (usualSoFar): verdict below, within or above, or unknown on Monday and Tuesday and without a usual range; verdictText is " +
-        "the sentence the rider's app shows, so quote it rather than rewording the numbers. A rider's load below the usual is not bad news by itself (a rest week, " +
-        "illness, travel): pair it with get_recovery and the plan events before drawing a conclusion. Every number is computed by code: quote it, do not recalculate it. " +
+        "workouts from the watch and outdoor rides (kind activity; sport cycling-outdoor for an outdoor ride), all counted together and a watch session that overlaps a " +
+        "tablet ride counted once. weeks are Monday to Sunday in the rider's time zone, oldest first, the last one in progress (current true). Each week has load, " +
+        "approximate (some of the load is from heart rate), days (seven, each date and load; days after today are 0) and activities (id, kind, sport, name, date, load, " +
+        "approximate, and share of the week; load null when an activity had no heart rate to work it out from, and then it adds nothing). usualLow and usualHigh are the " +
+        "rider's usual range for that week: the mean minus and plus one standard deviation of the 8 complete weeks before it, null while the rider has fewer than 8 weeks " +
+        "of training (learning; weeksLogged of weeksNeeded). verdict compares the week's load with that range: below, within or above; for the week in progress it " +
+        "compares the load so far with the whole range, so below there means below so far, and none means nothing is recorded yet this week; learning means no range yet. " +
+        "A load below the usual is not bad news by itself (a rest week, illness, travel): pair it with get_recovery and the plan events before drawing a conclusion. " +
+        "Every number is computed by code: quote it, do not recalculate it. " +
         `weeks: how many weeks, 1 to ${EFFORT_MAX_WEEKS}; default ${EFFORT_DEFAULT_WEEKS}.`,
       input: {
         weeks: z
