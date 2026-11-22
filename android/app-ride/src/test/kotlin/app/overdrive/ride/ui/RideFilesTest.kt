@@ -123,7 +123,7 @@ class RideFilesTest {
     }
 
     @Test
-    fun theProviderServesTheRidesAndTheBluetoothLogFoldersAndNothingElse() {
+    fun theProviderServesTheRidesTheBluetoothLogsAndTheirZipAndNothingElse() {
         val xml = context.resources.getXml(R.xml.file_paths)
         val paths = mutableListOf<Triple<String, String?, String?>>()
         while (xml.next() != XmlPullParser.END_DOCUMENT) {
@@ -136,6 +136,8 @@ class RideFilesTest {
                 Triple("paths", null, null),
                 Triple("files-path", "rides", "rides/"),
                 Triple("files-path", "ble_logs", "ble-logs/"),
+                // The one zip of a share of the logs (ADR 0010), deleted at the next launch.
+                Triple("cache-path", "ble_log_archives", "ble-log-archives/"),
             ),
             paths,
         )
