@@ -146,6 +146,21 @@ class Words(
     /** "Jun" for a month start on a chart's axis, "Jan" for a quarter start. */
     fun monthShort(date: String): String = format("MMM", LocalDate.parse(date))
 
+    /** "16 November": a day for TalkBack, without its weekday. */
+    fun dayMonthLong(date: String): String = format("d MMMM", LocalDate.parse(date))
+
+    /** "Nov", or "Nov 2025" for a month of another year than the present one: a month in a readout or a table. */
+    fun monthShortYear(date: String): String {
+        val day = LocalDate.parse(date)
+        return format(if (day.year == local(clock.nowMillis()).year) "MMM" else "MMM yyyy", day)
+    }
+
+    /** "16 Nov", or "16 Nov 2025" for a day of another year than the present one: a week or a ride in a table. */
+    fun dayShortYear(date: String): String {
+        val day = LocalDate.parse(date)
+        return format(if (day.year == local(clock.nowMillis()).year) "d MMM" else "d MMM yyyy", day)
+    }
+
     private fun zoned(instant: String) =
         try {
             Instant.parse(instant).atZone(clock.zone)

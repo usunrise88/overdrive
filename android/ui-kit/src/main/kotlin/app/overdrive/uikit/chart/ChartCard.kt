@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import app.overdrive.uikit.BottomSheet
 import app.overdrive.uikit.HorizontalRule
 import app.overdrive.uikit.OdCard
+import app.overdrive.uikit.OdIcon
 import app.overdrive.uikit.OdIconButton
 import app.overdrive.uikit.OdText
 import app.overdrive.uikit.OdType
@@ -106,6 +107,7 @@ fun ChartReadout(
     onToday: () -> Unit,
     modifier: Modifier = Modifier,
     rest: RestPill = RestPill.Today,
+    onOpen: (() -> Unit)? = null,
 ) {
     Row(
         modifier.fillMaxWidth().heightIn(min = 24.dp),
@@ -118,7 +120,11 @@ fun ChartReadout(
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            OdText(x, Modifier.heightIn(min = 24.dp), style = OdType.labelNum, maxLines = 1, softWrap = false)
+            if (onOpen == null) {
+                OdText(x, Modifier.heightIn(min = 24.dp), style = OdType.labelNum, maxLines = 1, softWrap = false)
+            } else {
+                OpenableX(x, onOpen)
+            }
             for (entry in entries) {
                 Row(
                     Modifier.heightIn(min = 24.dp),
@@ -148,6 +154,27 @@ fun ChartReadout(
     }
 }
 
+/** The x of a readout that opens what it names (a ride): the text and a chevron, in a 48 dp hit area around a 24 dp visual. */
+@Composable
+private fun OpenableX(
+    x: String,
+    onOpen: () -> Unit,
+) {
+    val source = rememberInteractionSource()
+    Row(
+        Modifier
+            .reportHeight(24.dp)
+            .heightIn(min = 48.dp)
+            .semantics { contentDescription = "$x, opens the ride" }
+            .plainClickable(source, role = Role.Button, onClick = onOpen),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OdText(x, style = OdType.labelNum, maxLines = 1, softWrap = false)
+        OdIcon(OverdriveIcons.ChevronRight, size = 14.dp, tint = OverdriveColors.textSecondary)
+    }
+}
+
 /**
  * What the pill at the right of a readout says while a past point is selected, and what it is called to TalkBack: **Today** on the charts
  * whose x is a day, **Latest** on the repeat page, whose x is an attempt (design/companion.md §4.12).
@@ -160,6 +187,7 @@ enum class RestPill(
     Latest("Latest", "Back to the latest attempt"),
     ThisWeek("This week", "Back to this week"),
     LatestWeek("Latest", "Back to the latest week"),
+    LatestPoint("Latest", "Back to the latest point"),
 }
 
 @Composable
@@ -267,13 +295,13 @@ fun ChartCard(
         PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 12.dp),
         Arrangement.spacedBy(spacing),
     ) {
-        Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
+        // The heading wraps at a large font (design/companion.md §14.1): "Weight and watts per kilogram" beside Values at 360 dp and 1.3×.
+        Row(Modifier.fillMaxWidth().heightIn(min = 24.dp), verticalAlignment = Alignment.CenterVertically) {
             OdText(
                 heading,
                 Modifier.weight(1f),
                 style = OdType.label,
                 color = OverdriveColors.textTertiary,
-                maxLines = 1,
             )
             if (onValues != null) {
                 val source = rememberInteractionSource()
