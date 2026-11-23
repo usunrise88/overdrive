@@ -11,6 +11,7 @@ import app.overdrive.companion.ui.SyncWords
 import app.overdrive.companion.ui.Tab
 import app.overdrive.core.remote.MetricsRange
 import app.overdrive.core.remote.ProblemKind
+import app.overdrive.core.remote.ProgressRange
 import app.overdrive.core.remote.ServiceProblem
 import app.overdrive.data.settings.SecretText
 import kotlinx.coroutines.CoroutineScope
@@ -74,6 +75,16 @@ class SettingsAndNavTest {
     }
 
     @Test
+    fun `the range of Progress is remembered beside the other ranges, and a hand-edited name is the default`() {
+        assertEquals(ProgressRange.SIX_MONTHS, read().progressRange)
+        runBlocking { repository.update { it.copy(progressRange = ProgressRange.ALL_TIME) } }
+        assertEquals(ProgressRange.ALL_TIME, read().progressRange)
+        assertEquals(MetricsRange.DEFAULT, read().powerRange)
+        runBlocking { store.edit { it[stringPreferencesKey("progress_range")] = "DECADE" } }
+        assertEquals(ProgressRange.DEFAULT, read().progressRange)
+    }
+
+    @Test
     fun `an address that is not one and a token with control characters are cleaned on the way in and out`() {
         runBlocking {
             repository.update {
@@ -97,6 +108,19 @@ class SettingsAndNavTest {
     }
 
     // region navigation
+
+    @Test
+    fun `Progress is pushed from Fitness and from Power and back returns to the tab it came from`() {
+        val nav = NavState()
+        for (tab in listOf(Tab.Fitness, Tab.Power)) {
+            nav.select(tab)
+            nav.push(Route.Progress)
+            assertEquals(Route.Progress, nav.route)
+            assertTrue(nav.back())
+            assertNull(nav.route)
+            assertEquals(tab, nav.tab)
+        }
+    }
 
     @Test
     fun `each tab has its own back stack and system back goes pushed screen, then Today, then out`() {

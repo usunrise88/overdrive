@@ -11,7 +11,6 @@ import app.overdrive.core.remote.MetricsRange
 import app.overdrive.core.remote.ResourceState
 import app.overdrive.uikit.UiFormat
 import app.overdrive.uikit.chart.AxisTick
-import app.overdrive.uikit.chart.BandLayer
 import app.overdrive.uikit.chart.ChartMath
 import app.overdrive.uikit.chart.DotLayer
 import app.overdrive.uikit.chart.LineLayer
@@ -124,11 +123,10 @@ class PowerContent(
     val curve: LineChartUi?,
     val bestEfforts: List<BestEffortUi>,
     val ftpHistory: LineChartUi,
-    val drift: LineChartUi?,
     val rangeWords: String,
 )
 
-/** The Power screen made from one `GET /v1/metrics` answer (design/companion.md §4.4, §6.4 to §6.6). Pure, like [FitnessUi]. */
+/** The Power screen made from one `GET /v1/metrics` answer (design/companion.md §4.4, §6.4, §6.5; the aerobic drift moved to Progress). Pure, like [FitnessUi]. */
 object PowerUi {
     /** The durations the best-efforts table lists, in seconds (design/companion.md §4.4). */
     val BEST_EFFORT_SECONDS: List<Int> = listOf(5, 60, 300, 1200, 3600)
@@ -137,9 +135,6 @@ object PowerUi {
     private const val CURVE_X_MIN = 1.0
     private const val CURVE_X_MAX = 7200.0
     private const val REST_DURATION = 1200
-    private const val DRIFT_STEADY_PERCENT = 5.0
-    private const val DRIFT_MIN_TOP = 10.0
-    private const val ROLLING = 5
 
     fun of(
         state: ResourceState<MetricsResponse>,
@@ -156,7 +151,7 @@ object PowerUi {
             loading = "Loading your power…",
             empty =
                 "No rides yet" to
-                    "The power curve, FTP and aerobic drift fill in from rides on the tablet. They appear here after the tablet uploads its first ride.",
+                    "The power curve and FTP fill in from rides on the tablet. They appear here after the tablet uploads its first ride.",
             isEmpty = { it.firstLoadDate == null && it.powerCurve.allTime.isEmpty() && it.ftp.current == null },
         ) { content(it, profile, answers, range, words) }
 
@@ -180,7 +175,6 @@ object PowerUi {
                     }
                 },
             ftpHistory = ftpHistoryChart(response, ftp.current, rangeWords, words),
-            drift = driftChart(response, words),
             rangeWords = rangeWords,
         )
     }
@@ -370,85 +364,5 @@ object PowerUi {
             days <= MetricsRange.SIX_MONTHS.weeks * 7 + 6 -> MetricsRange.SIX_MONTHS
             else -> MetricsRange.ONE_YEAR
         }
-    }
-
-    /** The rolling mean of the last five rides' drift, at each ride (design/companion.md §6.6). */
-    fun rollingMean(
-        drift: List<Double>,
-        window: Int = ROLLING,
-    ): List<Double> = drift.indices.map { i -> drift.subList(max(0, i - window + 1), i + 1).average() }
-
-    private fun driftChart(
-        response: MetricsResponse,
-        words: Words,
-    ): LineChartUi? {
-        val points = response.drift
-        if (points.isEmpty()) return null
-        // One x per day: two steady rides on a day are separate dots, the selection snaps to the later one.
-        val xs = DoubleArray(points.size) { checkNotNull(PlanDates.epochDay(points[it].date)).toDouble() }
-        val ys = DoubleArray(points.size) { points[it].driftPercent }
-        val mean = rollingMean(ys.toList()).toDoubleArray()
-        val top = max(DRIFT_MIN_TOP, ChartMath.ceilTo(ys.max(), 5.0))
-        val first = checkNotNull(PlanDates.epochDay(response.from)).toDouble()
-        val last = max(checkNotNull(PlanDates.epochDay(response.to)).toDouble(), first + 1)
-        val snap = xs.distinct().toDoubleArray()
-        val spec =
-            PlotSpec(
-                xMin = first,
-                xMax = last,
-                xTicks = DateAxis.ticks(rangeOf(response), response.from, response.to, words),
-                yMin = 0.0,
-                yMax = top,
-                yTicks =
-                    generateSequence(0.0) {
-                        it + 5.0
-                    }.takeWhile { it <= top }.map { AxisTick(it, "${it.roundToInt()}%") }.toList(),
-                lines = listOf(LineLayer(xs, mean, OverdriveColors.textPrimary, 2f, marked = true)),
-                dots = listOf(DotLayer(xs, ys, OverdriveColors.textSecondary, marked = true)),
-                bands = listOf(BandLayer(0.0, DRIFT_STEADY_PERCENT, OverdriveColors.surface2, "Steady")),
-                snapXs = snap,
-                restX = snap.last(),
-                heightDp = 150f,
-            )
-        val readoutAt = { x: Double? ->
-            val i = points.indices.last { xs[it] == (x ?: snap.last()) }
-            Readout(
-                "${words.dayShort(points[i].date)} · ${points[i].name}",
-                listOf(
-                    ReadoutEntry(
-                        ReadoutKey.Dot,
-                        OverdriveColors.textSecondary,
-                        "Drift",
-                        "${UiFormat.decimal(ys[i], 1)}%",
-                    ),
-                    ReadoutEntry(
-                        ReadoutKey.Line,
-                        OverdriveColors.textPrimary,
-                        "Last 5 rides",
-                        "${UiFormat.decimal(mean[i], 1)}%",
-                    ),
-                ),
-            )
-        }
-        return LineChartUi(
-            heading = "Aerobic drift",
-            spec = spec,
-            readoutAt = readoutAt,
-            table =
-                ValuesTable(
-                    "Aerobic drift",
-                    "Ride",
-                    listOf("Drift", "Last 5"),
-                    points.indices.reversed().map { i ->
-                        ValuesRow(
-                            "${points[i].rideId}",
-                            "${words.dayShort(points[i].date)} · ${points[i].name}",
-                            listOf("${UiFormat.decimal(ys[i], 1)}%", "${UiFormat.decimal(mean[i], 1)}%"),
-                        )
-                    },
-                ),
-            summary = "Aerobic drift",
-            note = "How much heart rate rose against power on steady rides of 40 minutes or more. Lower is better.",
-        )
     }
 }

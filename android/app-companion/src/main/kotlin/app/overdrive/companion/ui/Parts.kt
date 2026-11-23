@@ -1,10 +1,15 @@
 package app.overdrive.companion.ui
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
@@ -12,11 +17,16 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.overdrive.companion.model.CardPosition
 import app.overdrive.companion.model.LineChartUi
+import app.overdrive.companion.model.ProgressEntryUi
 import app.overdrive.companion.model.TileUi
 import app.overdrive.companion.model.ValuesTable
+import app.overdrive.uikit.OdIcon
 import app.overdrive.uikit.OdText
 import app.overdrive.uikit.OdType
 import app.overdrive.uikit.StatTile
@@ -26,6 +36,9 @@ import app.overdrive.uikit.chart.ChartReadout
 import app.overdrive.uikit.chart.ChartSelection
 import app.overdrive.uikit.chart.PlotChart
 import app.overdrive.uikit.chart.ValuesSheet
+import app.overdrive.uikit.icons.OverdriveIcons
+import app.overdrive.uikit.plainClickable
+import app.overdrive.uikit.rememberInteractionSource
 import app.overdrive.uikit.tokens.OverdriveColors
 
 /** A line chart card: heading with Values, the readout (the legend) and the plot, on the screen's shared [selection]. */
@@ -41,6 +54,36 @@ fun LineChartCard(
     ChartCard(ui.heading, modifier, onValues = onValues, note = ui.note) {
         ChartReadout(readout.x, readout.entries, away = selection.isAway(ui.spec.restX), onToday = selection::clear)
         PlotChart(ui.spec, selection, "${ui.summary}. ${readout.spoken()}")
+    }
+}
+
+/**
+ * The row that ends Fitness and Power and opens Progress (design/companion.md §4.16): a card of one 64 dp row, "Progress" over the
+ * service's headline (it wraps, never cut) and a chevron. It is one button to TalkBack.
+ */
+@Composable
+fun ProgressEntryRow(
+    entry: ProgressEntryUi,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val source = rememberInteractionSource()
+    Row(
+        modifier
+            .fillMaxWidth()
+            .cardSlice(CardPosition.Only)
+            .semantics(mergeDescendants = true) { contentDescription = entry.description }
+            .plainClickable(source, role = Role.Button, onClick = onClick)
+            .heightIn(min = 64.dp)
+            .padding(start = 16.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            OdText("Progress", style = OdType.bodyStrong, maxLines = 1)
+            OdText(entry.text, style = OdType.label, color = OverdriveColors.textSecondary)
+        }
+        OdIcon(OverdriveIcons.ChevronRight, tint = OverdriveColors.textTertiary)
     }
 }
 

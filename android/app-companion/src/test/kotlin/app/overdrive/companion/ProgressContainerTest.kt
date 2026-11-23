@@ -166,4 +166,14 @@ class ProgressContainerTest {
                 ?.headline,
         )
     }
+
+    @Test
+    fun `the range the rider chooses is remembered and the screen reads that range's own resource`() {
+        val c = world.container()
+        c.configure()
+        assertEquals(ProgressRange.SIX_MONTHS, c.settings.value?.progressRange)
+        c.setProgressRange(ProgressRange.ONE_YEAR)
+        await("the choice is stored") { c.settings.value?.progressRange == ProgressRange.ONE_YEAR }
+        assertEquals(ProgressRange.ONE_YEAR, c.settings.value?.progressRange)
+    }
 }
