@@ -147,3 +147,9 @@ the table; stages merge without a release, the phase ends with `v0.4.0-rc.1` and
 | **A3 Live coach** (§12.1) | Snapshots from the tablet, trigger rules, the LLM line, the owner's TTS, audio and text on the tablet, the cue log | OVD-21 | done (merged): the service ADR 0038 (migration 0012), the tablet ADR 0039; checked once against the owner's real language model and speech service (2 to 3 s from trigger to cue); not heard on a bike |
 | **Release candidate `v0.4.0-rc.1`**, then **`v0.4.0`** | Long checks while the owner rides it | | |
 
+## Release `v0.4.1` (2026-11-22)
+
+After `0.4.0-rc.1` the owner sent Bluetooth logs and notes. Done: the background connect for sleepy devices (ADR 0040), the logs as one
+archive, Power skills and Effort on the companion (ADR 0042), the Progress screen (ADR 0043). The log analysis also settled OVD-24: cadence 0 with
+a spinning flywheel is real (the rider rests), so the auto-pause stays, and the resume after it is fast (owner, 2026-11-22). Out as
+`v0.4.1-rc.1`; the final `v0.4.0` and `v0.4.1` wait for the owner's testing.
