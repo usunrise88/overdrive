@@ -935,6 +935,10 @@ class CompanionContainer(
         scope.launch { settingsRepository.update { it.copy(powerRange = range) } }
     }
 
+    fun setProgressRange(range: ProgressRange) {
+        scope.launch { settingsRepository.update { it.copy(progressRange = range) } }
+    }
+
     fun setWellnessRange(range: WellnessRange) {
         scope.launch { settingsRepository.update { it.copy(wellnessRange = range) } }
     }

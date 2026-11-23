@@ -270,25 +270,10 @@ class ScreenModelsTest {
     }
 
     @Test
-    fun `drift is dots with a rolling mean of the last five rides, and the empty case says why`() {
-        val drift = power(Samples.metrics("2026-05-25")).content().drift!!
-        assertEquals("Steady", drift.spec.bands.single().label)
-        assertEquals(0.0, drift.spec.yMin, 0.0)
-        assertTrue(drift.spec.yMax >= 10.0)
-        assertTrue(drift.note!!.contains("40 minutes"))
-        assertEquals(listOf(2.0, 3.0, 5.0), PowerUi.rollingMean(listOf(2.0, 4.0, 6.0), window = 2))
-        val three = PowerUi.rollingMean(listOf(5.0, 5.0, 8.0, 10.0), window = 3)
-        assertEquals(listOf(5.0, 5.0, 6.0), three.take(3))
-        assertEquals(7.6667, three[3], 1e-4)
-        assertNull(power(Samples.metrics("2026-05-25", withDrift = false)).content().drift)
-    }
-
-    @Test
     fun `a chart with a single point still builds, with one thing to select`() {
         val full = Samples.metrics("2026-05-25")
         val one =
             full.copy(
-                drift = full.drift.take(1),
                 powerCurve =
                     app.overdrive.core.metrics.PowerCurves(
                         full.powerCurve.range.take(1),
@@ -296,10 +281,8 @@ class ScreenModelsTest {
                     ),
             )
         val content = power(one).content()
-        assertEquals(1, content.drift!!.spec.snapXs.size)
         assertEquals(1, content.curve!!.spec.snapXs.size)
         assertEquals("no listed duration was ridden long enough", 0, content.bestEfforts.size)
-        assertEquals(content.drift!!.spec.snapXs[0], content.drift!!.spec.restX, 0.0)
         assertEquals("1 s", content.curve!!.readoutAt(null).x)
     }
 

@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.overdrive.core.remote.MetricsRange
+import app.overdrive.core.remote.ProgressRange
 import app.overdrive.core.remote.WellnessRange
 import app.overdrive.core.sync.SyncConfig
 import app.overdrive.data.settings.SecretText
@@ -30,7 +31,7 @@ enum class OnboardingStep {
 
 /**
  * What the companion remembers (design/companion.md §3.4, §4.9): the service address and token, the range the rider chose on Fitness,
- * Power and Wellness, and the step of the first run. The token is a [SecretText]: it prints as dots and never reaches a log, a cache
+ * Power, Progress and Wellness, and the step of the first run. The token is a [SecretText]: it prints as dots and never reaches a log, a cache
  * or a state dump.
  */
 data class CompanionSettings(
@@ -38,6 +39,7 @@ data class CompanionSettings(
     val token: SecretText = SecretText(),
     val fitnessRange: MetricsRange = MetricsRange.DEFAULT,
     val powerRange: MetricsRange = MetricsRange.DEFAULT,
+    val progressRange: ProgressRange = ProgressRange.DEFAULT,
     val wellnessRange: WellnessRange = WellnessRange.DEFAULT,
     val onboarding: OnboardingStep = OnboardingStep.Health,
 ) {
@@ -74,6 +76,7 @@ class CompanionSettingsRepository(
             if (next.token.isEmpty) prefs.remove(Keys.token) else prefs[Keys.token] = next.token.value
             prefs[Keys.fitnessRange] = next.fitnessRange.name
             prefs[Keys.powerRange] = next.powerRange.name
+            prefs[Keys.progressRange] = next.progressRange.name
             prefs[Keys.wellnessRange] = next.wellnessRange.name
             prefs[Keys.onboarding] = next.onboarding.name
         }
@@ -84,6 +87,7 @@ class CompanionSettingsRepository(
         val token = stringPreferencesKey("service_token")
         val fitnessRange = stringPreferencesKey("fitness_range")
         val powerRange = stringPreferencesKey("power_range")
+        val progressRange = stringPreferencesKey("progress_range")
         val wellnessRange = stringPreferencesKey("wellness_range")
         val onboarding = stringPreferencesKey("onboarding_step")
     }
@@ -94,6 +98,8 @@ class CompanionSettingsRepository(
             token = SecretText(this[Keys.token].orEmpty()),
             fitnessRange = rangeOf(this[Keys.fitnessRange]),
             powerRange = rangeOf(this[Keys.powerRange]),
+            progressRange =
+                ProgressRange.entries.firstOrNull { it.name == this[Keys.progressRange] } ?: ProgressRange.DEFAULT,
             wellnessRange =
                 WellnessRange.entries.firstOrNull { it.name == this[Keys.wellnessRange] } ?: WellnessRange.DEFAULT,
             onboarding =

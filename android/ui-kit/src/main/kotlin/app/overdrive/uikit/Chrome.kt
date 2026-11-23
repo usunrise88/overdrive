@@ -75,16 +75,27 @@ fun OdTopBar(
     }
 }
 
-/** The top bar of Devices and Settings: a back chevron and the title in the heading style. */
+/**
+ * The top bar of Devices and Settings: a back chevron and the title in the heading style. [subtitle] is the line under the title of a
+ * pushed companion screen ("Updated 07:40", design/companion.md §4.16).
+ */
 @Composable
 fun BackTopBar(
     title: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    subtitle: (@Composable () -> Unit)? = null,
 ) {
     OdTopBar(modifier) {
         OdIconButton(OverdriveIcons.ChevronLeft, onBack, "Back", Modifier.offset(x = (-12).dp))
-        OdText(title, Modifier.weight(1f).offset(x = (-12).dp), style = OdType.heading, maxLines = 1)
+        if (subtitle == null) {
+            OdText(title, Modifier.weight(1f).offset(x = (-12).dp), style = OdType.heading, maxLines = 1)
+        } else {
+            Column(Modifier.weight(1f).offset(x = (-12).dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                OdText(title, style = OdType.heading, maxLines = 1)
+                subtitle()
+            }
+        }
     }
 }
 

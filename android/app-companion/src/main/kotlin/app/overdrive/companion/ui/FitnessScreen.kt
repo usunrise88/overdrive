@@ -24,12 +24,15 @@ import app.overdrive.companion.model.FitnessContent
 import app.overdrive.companion.model.FitnessUi
 import app.overdrive.companion.model.ProblemUi
 import app.overdrive.companion.model.ProblemWords
+import app.overdrive.companion.model.ProgressEntryUi
+import app.overdrive.companion.model.ProgressUi
 import app.overdrive.companion.model.RangeWords
 import app.overdrive.companion.model.ScreenUi
 import app.overdrive.companion.model.ValuesTable
 import app.overdrive.companion.model.Words
 import app.overdrive.core.effort.EffortKind
 import app.overdrive.core.remote.MetricsRange
+import app.overdrive.core.remote.ProgressRange
 import app.overdrive.core.remote.ResourceState
 import app.overdrive.uikit.RangeSelector
 import app.overdrive.uikit.chart.ChartSelection
@@ -62,6 +65,9 @@ fun FitnessScreen(
             metricsUi.copy(status = metricsUi.status ?: problemOf(effortState, host, container.words))
         }
     val effort = remember(effortState) { EffortUi.of(effortState, container.words) }
+    // The row at the end of the page reads the default range's headline (ADR 0043).
+    val progressState by container.progressFor(ProgressRange.DEFAULT).state.collectAsStateWithLifecycle()
+    val progress = remember(progressState) { ProgressUi.entry(progressState) }
     val listState = rememberLazyListState()
     ScrollToTopOn(container.nav, Tab.Fitness, listState)
     FitnessView(
@@ -76,6 +82,8 @@ fun FitnessScreen(
         modifier,
         listState,
         effort = effort,
+        progress = progress,
+        onProgress = { container.nav.push(Route.Progress) },
         onOpenRow = { row ->
             container.nav.push(
                 if (row.kind ==
@@ -113,6 +121,8 @@ fun FitnessView(
     effort: EffortCardUi? = null,
     effortSelection: ChartSelection = remember { ChartSelection() },
     onOpenRow: (EffortRowUi) -> Unit = {},
+    progress: ProgressEntryUi? = null,
+    onProgress: () -> Unit = {},
 ) {
     // One selection for the two line charts (design/companion.md §3.5); Effort's is its own and leaving the tab returns it to rest.
     var table by remember { mutableStateOf(initialSheet) }
@@ -142,6 +152,7 @@ fun FitnessView(
                 key = "fitness",
             ) { LineChartCard(content.fitness, selection, onValues = { table = content.fitness.table }) }
             item(key = "form") { LineChartCard(content.form, selection, onValues = { table = content.form.table }) }
+            if (progress != null) item(key = "progress") { ProgressEntryRow(progress, onProgress) }
         }
         ValuesSheetFor(table, onDismiss = { table = null })
         BackHandler(enabled = table != null) { table = null }

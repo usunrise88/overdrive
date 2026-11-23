@@ -35,6 +35,8 @@ import app.overdrive.companion.model.PowerSkillsBody
 import app.overdrive.companion.model.PowerSkillsCardUi
 import app.overdrive.companion.model.PowerSkillsUi
 import app.overdrive.companion.model.PowerUi
+import app.overdrive.companion.model.ProgressEntryUi
+import app.overdrive.companion.model.ProgressUi
 import app.overdrive.companion.model.RangePicker
 import app.overdrive.companion.model.RangeWords
 import app.overdrive.companion.model.ScreenUi
@@ -44,6 +46,7 @@ import app.overdrive.core.metrics.RideKind
 import app.overdrive.core.powerskills.PowerSkillId
 import app.overdrive.core.remote.MetricsRange
 import app.overdrive.core.remote.PowerSkillsWindow
+import app.overdrive.core.remote.ProgressRange
 import app.overdrive.uikit.BottomSheet
 import app.overdrive.uikit.ButtonVariant
 import app.overdrive.uikit.HorizontalRule
@@ -113,6 +116,9 @@ fun PowerScreen(
     val skillsResource = remember(window) { container.powerSkillsFor(window) }
     val skillsState by skillsResource.state.collectAsStateWithLifecycle()
     val rides by container.rides.view.collectAsStateWithLifecycle()
+    // The row at the end of the page reads the default range's headline (ADR 0043).
+    val progressState by container.progressFor(ProgressRange.DEFAULT).state.collectAsStateWithLifecycle()
+    val progress = remember(progressState) { ProgressUi.entry(progressState) }
     val host = remember(settings) { hostOf(settings?.serviceUrl.orEmpty()) }
     LaunchedEffect(range) { container.screenOpened(RefreshTarget.Power) }
     LaunchedEffect(window) { container.screenOpened(RefreshTarget.PowerSkills(window)) }
@@ -165,6 +171,8 @@ fun PowerScreen(
         modifier,
         listState,
         skills = skills,
+        progress = progress,
+        onProgress = { container.nav.push(Route.Progress) },
     )
 }
 
@@ -180,10 +188,11 @@ fun PowerView(
     skills: PowerSkillsHost? = null,
     initialSheet: PowerSheet? = null,
     initialTable: ValuesTable? = null,
+    progress: ProgressEntryUi? = null,
+    onProgress: () -> Unit = {},
 ) {
     // Power's charts have different x axes: each selects on its own (design/companion.md §3.5).
     val history = remember(range) { ChartSelection() }
-    val drift = remember(range) { ChartSelection() }
     var table by remember { mutableStateOf(initialTable) }
     var setting by remember { mutableStateOf(false) }
     var sheet by remember { mutableStateOf(initialSheet) }
@@ -237,21 +246,7 @@ fun PowerView(
             item(key = "history") {
                 LineChartCard(content.ftpHistory, history, onValues = { table = content.ftpHistory.table })
             }
-            item(key = "drift") {
-                val chart = content.drift
-                if (chart != null) {
-                    LineChartCard(chart, drift, onValues = { table = chart.table })
-                } else {
-                    OdCard(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OdText("Aerobic drift", style = OdType.label, color = OverdriveColors.textTertiary)
-                        OdText(
-                            "No steady rides yet. Drift is measured on steady rides of 40 minutes or more with heart rate.",
-                            style = OdType.body,
-                            color = OverdriveColors.textSecondary,
-                        )
-                    }
-                }
-            }
+            if (progress != null) item(key = "progress") { ProgressEntryRow(progress, onProgress) }
         }
         ValuesSheetFor(table, onDismiss = { table = null })
         val openRide: (String) -> Unit = {

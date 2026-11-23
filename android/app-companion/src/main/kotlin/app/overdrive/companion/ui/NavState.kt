@@ -33,6 +33,9 @@ sealed interface Route {
 
     data object Notes : Route
 
+    /** Progress over time, from the row at the end of Fitness and of Power (design/companion.md §4.16, ADR 0043). */
+    data object Progress : Route
+
     /** The coach notebook, read-only, from Settings (design/companion.md §4.13). */
     data object Notebook : Route
 

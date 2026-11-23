@@ -341,12 +341,6 @@ class ScreenShotsTest : ShotTest() {
         }
 
     @Test
-    fun powerNoDrift() =
-        shot(
-            "power--no-drift",
-        ) { PowerView(power(fresh(metrics(withDrift = false))), MetricsRange.SIX_MONTHS, powerActions) }
-
-    @Test
     fun powerEmptyAndError() {
         shot("power--empty") {
             PowerView(

@@ -980,8 +980,8 @@ A technical hint in brackets follows where the ride app gives one ("(UnknownHost
 
 - Today, no plan source: the planned card is absent. No notes ever: the note card is absent.
 - Fitness: "No load yet" / "Fitness and fatigue start with your first ride on the tablet or your first activity on the watch."
-- Power: "No rides yet" / "The power curve, FTP and aerobic drift fill in from rides on the tablet. They appear here after the
-  tablet uploads its first ride."
+- Power: "No rides yet" / "The power curve and FTP fill in from rides on the tablet. They appear here after the
+  tablet uploads its first ride." (The drift moved to Progress, §14.2.)
 - Aerobic drift alone: "No steady rides yet. Drift is measured on steady rides of 40 minutes or more with heart rate."
 - Wellness, no access: "Overdrive cannot read Health Connect yet." + **Allow** (primary).
 - Wellness, a metric with no readings: "No readings in the last 4 weeks. The watch writes them during sleep; check that
@@ -1293,3 +1293,30 @@ beside the PNGs. They match in layout, text and colour. These are the places whe
 - **Segmented control:** equal segments take 6 dp of side padding (was 16) and never wrap, so "8 weeks" holds at 360 dp and 1.3×. The Fitness and Power range selectors are unchanged otherwise.
 - **Settings** gains a **Power skills** group with the **Power profile table** (Men / Women) and one sentence that levels are approximate (§4.9 had no such row; ADR 0042 "The UI stage").
 - **In the states without content** (loading, error, empty) Fitness and Power keep the range selector where it was; it moves under the new cards only when there is content.
+
+### 14.2 Where the built Progress screen differs from the design (release 0.4.1)
+
+The screen of §4.16 was built from this file and the mock-up and rendered with the app's Robolectric shots (`app-companion/build/shots/progress--*.png`) beside
+`progress--*.png`. It matches in layout, order, text and the states. These are the places where the build had to decide something, each with its reason:
+
+- **The tick rules (§6.13) in numbers.** 6 months: every month start. 1 year: every second month of the calendar (January, March, ...). All time is always five years back from today, whatever the history is, so
+  **its axis starts at the card's first point** and the rule follows the span shown: up to 200 days every month, up to a year every second month, up to two years every quarter (January is written as its year), beyond that
+  every year (the year, "2024"). A tick within 3 days of either end is left out. `ProgressAxis` and its test.
+- **Best power's labels sit under their points** (the 15th of the month, the month in progress at most today) and not at the month start, as in the mock-up; the other cards' labels are at month starts.
+- **A week's point is its Monday** ("Week of 16 Nov", as the readout says). A week that stands alone between two gaps has no line, so it is drawn as a dot (the design: "the points that exist are drawn").
+- **The y axes** use the steps of the measure (watts 50/100, heart rate 1/2/5/10, resting 2/4, watts per kilogram 0.05 to 1, kilograms 0.5 to 10, efficiency factor 0.05 to 0.5) with at most 4 ticks (5 for best power) and **at least three**, so a few close figures are not
+  drawn on a two-line axis.
+- **The readout's ride opens the ride** (Efficiency factor, Aerobic drift: a 48 dp target around the name with a chevron, to TalkBack "…, opens the ride"). The design (§2) also said "or in Values"; **Values rows are not tappable** (a 40 dp row would break the 48 dp rule and the
+  sheet is shared), the readout is the way to the ride. Best power has no ride link (three rides in a readout).
+- **Aerobic efficiency's note** adds where the two references come from ("180 W is about 70% of your FTP at the start of the range; 140 bpm about 80% of your threshold heart rate."), because ADR 0043 sends them for that.
+- **"Not loaded yet. It loads when the service can be reached."** is shown only when another range has an answer; with nothing cached at all the error block with **Try again** is (§5), because there is then nothing else on the phone to show.
+- **Numbers lines:** best power puts "since June" once when the three durations start in the same month and on each line when they do not; "this week" (resting heart rate) and "now" (watts per kilogram) are said only when the latest figure is the current week's, else "in the week of 9 Nov". A trend
+  without a verdict shows the service's `reason` in the numbers line, whatever it is.
+- **Card names wrap** beside **Values** at a large font (§14.1 had the same): `ChartCard`'s heading is no longer one line of 24 dp but at least 24 dp; "Weight and watts per kilogram" needs two lines at 360 dp and 1.3x.
+- **The back bar** has the subtitle in it ("Progress" over "Updated 07:40"), as the mock-up draws it: `BackTopBar` takes an optional subtitle.
+- **The pill** that returns a card to rest says **Latest** and, to TalkBack, "Back to the latest point" (`RestPill.LatestPoint`).
+- **The stacked pair is one node** for TalkBack with both series in its description; the second plot is hidden from the accessibility tree and still takes touch, on the same selection.
+- **The Power tab's empty text** (§7.6) no longer says that aerobic drift fills in there: "The power curve and FTP fill in from rides on the tablet. They appear here after the tablet uploads its first ride."
+
+**What the service sends and the design said.** The verdict sentences the service writes are the design's table (§7.9) word for word, and are used as sent. The differences are those of ADR 0043 §3: the reference power rounds to 5 W (the design said 10 W), the steady stretch skips the first 60 s (the
+design said 10 minutes), the best-power entries carry their own weight, and the efficiency factor is of the steady parts of a ride of 20 minutes or more. The screen shows no number the service did not send.
