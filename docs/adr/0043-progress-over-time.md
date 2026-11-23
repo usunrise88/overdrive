@@ -1,6 +1,6 @@
 # ADR 0043: Progress over time
 
-Status: accepted (release 0.4.1, the data of the companion's Progress screen: service, contracts, Kotlin models and repositories; the screen is the next stage, 2026-11-22).
+Status: accepted (release 0.4.1, the data of the companion's Progress screen: service, contracts, Kotlin models and repositories; the screen is the next stage, 2026-11-22). **The screen exists** (release 0.4.1): `ProgressUi`, `ProgressAxis`, `ProgressScreen`, the Progress row on Fitness and Power, `Route.Progress` and `CompanionSettings.progressRange`; where it differs from the design is `design/companion.md` §14.2.
 
 ## Context
 
@@ -89,3 +89,8 @@ Strictly decoded models (`ProgressApiJson.decode`: unknown keys, numbers in quot
 - The Progress screen can be built from `ProgressResponse` alone; it adds no rule and computes nothing. Adding a measure is a contract change first (schema, fixtures, validators, Kotlin) and then the service.
 - Changing a rule of the steady stretch is a new `STRETCH_VERSION` in `server/src/progress/steady.ts`: the rows are worked out again on the next read.
 - Migration `0013` adds one table; nothing existing changed.
+
+## The UI stage (release 0.4.1)
+
+The pushed screen calls exactly what §4 lists: `progressFor(range)`, `screenOpened(RefreshTarget.Progress(range))` on open and on a change of range, `refresh` on a pull down; the Fitness and Power rows read `progressFor(ProgressRange.DEFAULT).state` and show `headline.verdictText`. The range is remembered in
+`CompanionSettings.progressRange`. The phone computes no trend and no verdict, and the strings it shows as verdicts are the service's. The aerobic drift card moved from the Power tab to this screen (the metrics answer still carries `drift`; the phone no longer reads it).

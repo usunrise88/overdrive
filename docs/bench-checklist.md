@@ -1028,6 +1028,32 @@ Robolectric renders cannot settle: how the two charts read in the hand (`design/
 
 ---
 
+## Session 16: Progress on the phone (release 0.4.1)
+
+Needs: the Xiaomi 14 Ultra, the `app-companion` APK of the release, the service with `GET /v1/progress` (ADR 0043), a few months of tablet rides with power and a heart-rate strap,
+and the watch's resting heart rate and a weight in Health Connect. Companion-only. What the JVM tests and the Robolectric renders cannot settle: how the six cards read in the hand
+and whether the verdicts agree with what you know of your own riding (`design/companion.md` §4.16, §6.13; ADR 0043 "Limits and what only real data settles").
+
+- [ ] **16.1 The way in.** The last card of Fitness (after Form) and of Power (after FTP history) is one row, "Progress" over a sentence. Both open the same screen; Back returns to the tab you came from.
+  Is the sentence the verdict you would have picked to lead with? With no verdict anywhere it says "How your power and heart rate change over the months".
+- [ ] **16.2 The page.** Back bar "Progress" over "Updated 07:40"; 6 months · 1 year · All time (the choice stays after a restart); **Power** with Best power and Weight and watts per kilogram; **Heart rate** with the one caution and
+  Aerobic efficiency, Efficiency factor, Aerobic drift, Resting heart rate. The drift card is no longer on the Power tab. Each card: a sentence of verdict, one line of numbers, a readout on the latest point, a chart.
+- [ ] **16.3 The numbers against your own memory.** For each card: does the verdict match what you feel (fitter, no change)? Do "now" and "in June" in the numbers line match the Values table (newest first)? The efficiency references
+  ("Heart rate at 180 W", "Power at 140 bpm") are the ones the note says they are (70% of the FTP at the start of the range, 80% of the threshold heart rate)?
+- [ ] **16.4 Touch.** A tap on a chart selects the nearest point in that card only; a hold and a slide scrubs; a vertical swipe that starts on a chart scrolls the page. **Latest** returns it. The stacked pairs (efficiency, weight) move together.
+  On Efficiency factor and Aerobic drift the ride in the readout (with its chevron) opens the ride. Is the 48 dp target of the pill, of Values and of that name big enough for a thumb?
+- [ ] **16.5 The ranges.** 1 year and All time: the month ticks (every second month; years beyond two years), the charts start where your data starts on All time. Is a weekly line with many gaps readable? A week with no figure is a break, never a zero;
+  a lone week is a dot.
+- [ ] **16.6 States.** Flight mode with a range never opened: "Not loaded yet. It loads when the service can be reached." and the status line; a range opened before draws from its cache. Without the watch: Resting heart rate is one sentence; without a weight:
+  the weight card is one sentence and Best power's note has no W/kg. A card with too few points says "Not enough data yet" with how many there are and what adds one.
+- [ ] **16.7 TalkBack.** Each chart is one item that reads the range and the trend in numbers; a stacked pair is one item with both series; **Previous point** and **Next point** move it; the pill reads "Back to the latest point"; the Progress row reads
+  "Progress. Heart rate at the same power is trending down: fitter. Opens the progress page."
+- [ ] **16.8 Font and width.** Font scale 1.3x and the smallest display size: card names wrap beside Values, readouts wrap, the numbers line wraps, nothing is cut.
+- [ ] **16.9 Frames.** `adb shell dumpsys gfxinfo app.overdrive.companion framestats` while scrolling Progress and scrubbing a chart: dropped frames? Nothing on the page animates.
+- [ ] **16.10 What to send back.** Screenshots of anything that looks wrong (privately), the verdicts that surprised you, the measures that never get a figure (efficiency with no steady stretch at the reference, the efficiency factor with no 20 steady minutes).
+
+---
+
 ## Coverage: what settles what
 
 ### Acceptance criteria (`docs/phase1-acceptance.md`)
