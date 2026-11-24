@@ -1,8 +1,9 @@
 import type { FastifyInstance } from "fastify";
+import type { Accessor } from "../tenancy/context.ts";
 import type { NotebookService } from "./service.ts";
 
 export interface NotebookRoutesOptions {
-  service: NotebookService;
+  service: Accessor<NotebookService>;
 }
 
 /**
@@ -15,10 +16,10 @@ export interface NotebookRoutesOptions {
  * The notebook is private (training, injuries): the answer is not cached, and nothing here logs it.
  */
 export function notebookRoutes(app: FastifyInstance, options: NotebookRoutesOptions): void {
-  const { service } = options;
+  const serviceOf = options.service;
 
-  app.get("/notebook", async (_request, reply) => {
+  app.get("/notebook", async (request, reply) => {
     reply.header("cache-control", "no-store");
-    return service.coachResponse();
+    return serviceOf(request).coachResponse();
   });
 }

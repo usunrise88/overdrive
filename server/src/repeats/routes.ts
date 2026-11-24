@@ -1,10 +1,11 @@
 import { isValidRideId, REPEAT_HASH_PATTERN } from "@overdrive/contracts";
 import type { FastifyInstance } from "fastify";
 import { HttpError } from "../errors.ts";
+import type { Accessor } from "../tenancy/context.ts";
 import type { RepeatsService } from "./service.ts";
 
 export interface RepeatsRoutesOptions {
-  service: RepeatsService;
+  service: Accessor<RepeatsService>;
 }
 
 /**
@@ -20,7 +21,7 @@ export interface RepeatsRoutesOptions {
  *   stored ride and does not carry its start; `400 invalid_ride_id` when it is not a ride id).
  */
 export function repeatsRoutes(app: FastifyInstance, options: RepeatsRoutesOptions): void {
-  const { service } = options;
+  const serviceOf = options.service;
 
   function hashOf(request: { params: { hash: string } }): string {
     const { hash } = request.params;
@@ -30,14 +31,14 @@ export function repeatsRoutes(app: FastifyInstance, options: RepeatsRoutesOption
     return hash;
   }
 
-  app.get("/repeats", async (_request, reply) => {
+  app.get("/repeats", async (request, reply) => {
     reply.header("cache-control", "no-store");
-    return service.list();
+    return serviceOf(request).list();
   });
 
   app.get<{ Params: { hash: string } }>("/repeats/:hash", async (request, reply) => {
     const hash = hashOf(request);
-    const detail = await service.detail(hash);
+    const detail = await serviceOf(request).detail(hash);
     if (detail === null) {
       throw new HttpError("not_found", "There is no repeated session with this hash");
     }
@@ -56,7 +57,7 @@ export function repeatsRoutes(app: FastifyInstance, options: RepeatsRoutesOption
           "before must be a ride id: 1 to 128 characters from A-Z a-z 0-9 . _ -, starting with a letter or digit",
         );
       }
-      const answer = await service.previous(hash, before ?? null);
+      const answer = await serviceOf(request).previous(hash, before ?? null);
       if (answer === "unknown-ride") {
         throw new HttpError("ride_not_found", `Ride ${before} is not stored`);
       }

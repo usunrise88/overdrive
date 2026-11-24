@@ -154,6 +154,11 @@ export interface ServicesOptions {
   sleep?: (ms: number) => Promise<void>;
   /** For the tests: the loops' ticks by hand. */
   timers?: Timers;
+  /**
+   * Whether this graph builds its own Telegram bot (default true). The multi-tenant service passes false: one shared poller
+   * owns the bot token and hands each user's updates to that user's services (stage B2), so no tenant polls on its own.
+   */
+  telegram?: boolean;
 }
 
 export function createServices(options: ServicesOptions): Services {
@@ -404,24 +409,27 @@ export function createServices(options: ServicesOptions): Services {
     sleep: options.sleep,
     timers: options.timers,
   });
-  const telegram = createTelegram({
-    config,
-    db,
-    plan,
-    bus,
-    intervals,
-    refresher,
-    log,
-    timezone,
-    now,
-    fetch: options.fetch,
-    sleep: options.sleep,
-    timers: options.timers,
-    history: planHistory,
-    sources: [insights.notifications, notebook.notifications, planEvents.notifications],
-    outdoor,
-    planEvents,
-  });
+  const telegram =
+    (options.telegram ?? true)
+      ? createTelegram({
+          config,
+          db,
+          plan,
+          bus,
+          intervals,
+          refresher,
+          log,
+          timezone,
+          now,
+          fetch: options.fetch,
+          sleep: options.sleep,
+          timers: options.timers,
+          history: planHistory,
+          sources: [insights.notifications, notebook.notifications, planEvents.notifications],
+          outdoor,
+          planEvents,
+        })
+      : null;
   let strava: StravaUploads | null = null;
   const stravaMode = stravaSettings(config);
   if ("on" in stravaMode) {

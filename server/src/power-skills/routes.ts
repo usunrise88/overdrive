@@ -1,9 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { HttpError } from "../errors.ts";
+import type { Accessor } from "../tenancy/context.ts";
 import { PowerSkillsRangeError, type PowerSkillsService } from "./service.ts";
 
 export interface PowerSkillsRoutesOptions {
-  service: PowerSkillsService;
+  service: Accessor<PowerSkillsService>;
 }
 
 function dateParam(name: string, value: unknown): string | undefined {
@@ -21,7 +22,7 @@ function dateParam(name: string, value: unknown): string | undefined {
  * date, `from` after `to` or a window of more than 1096 days is `400 invalid_range` and the message names the parameter.
  */
 export function powerSkillsRoutes(app: FastifyInstance, options: PowerSkillsRoutesOptions): void {
-  const { service } = options;
+  const serviceOf = options.service;
 
   app.get<{ Querystring: { from?: unknown; to?: unknown } }>(
     "/power-skills",
@@ -30,14 +31,14 @@ export function powerSkillsRoutes(app: FastifyInstance, options: PowerSkillsRout
       const to = dateParam("to", request.query.to);
       let window: { from: string; to: string };
       try {
-        window = service.resolveWindow(from, to);
+        window = serviceOf(request).resolveWindow(from, to);
       } catch (error) {
         if (error instanceof PowerSkillsRangeError)
           throw new HttpError("invalid_range", error.message);
         throw error;
       }
       reply.header("cache-control", "no-store");
-      return service.powerSkills(window);
+      return serviceOf(request).powerSkills(window);
     },
   );
 }

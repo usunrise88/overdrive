@@ -1,9 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { HttpError } from "../errors.ts";
+import type { Accessor } from "../tenancy/context.ts";
 import { ProfilePatchError, type ProfileStore } from "./store.ts";
 
 export interface ProfileRoutesOptions {
-  store: ProfileStore;
+  store: Accessor<ProfileStore>;
 }
 
 /**
@@ -16,7 +17,7 @@ export interface ProfileRoutesOptions {
  *   profile changes nothing and is `422 invalid_profile` with the reasons in the message.
  */
 export function profileRoutes(app: FastifyInstance, options: ProfileRoutesOptions): void {
-  const { store } = options;
+  const storeOf = options.store;
 
   // JSON only: a plain-text body is a mistake to refuse, not a string to validate.
   app.removeContentTypeParser("text/plain");
@@ -32,15 +33,15 @@ export function profileRoutes(app: FastifyInstance, options: ProfileRoutesOption
     },
   );
 
-  app.get("/profile", async (_request, reply) => {
+  app.get("/profile", async (request, reply) => {
     reply.header("cache-control", "no-store");
-    return store.get();
+    return storeOf(request).get();
   });
 
   app.patch("/profile", async (request, reply) => {
     reply.header("cache-control", "no-store");
     try {
-      const { profile, changed } = await store.update(request.body);
+      const { profile, changed } = await storeOf(request).update(request.body);
       request.log.info({ device: request.device, changed }, "profile patched");
       return profile;
     } catch (error) {

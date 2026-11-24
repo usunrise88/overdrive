@@ -1,10 +1,11 @@
 import { EFFORT_DEFAULT_WEEKS, EFFORT_MAX_WEEKS } from "@overdrive/contracts";
 import type { FastifyInstance } from "fastify";
 import { HttpError } from "../errors.ts";
+import type { Accessor } from "../tenancy/context.ts";
 import type { EffortService } from "./service.ts";
 
 export interface EffortRoutesOptions {
-  service: EffortService;
+  service: Accessor<EffortService>;
 }
 
 const WHOLE_NUMBER = /^\d{1,3}$/;
@@ -15,7 +16,7 @@ const WHOLE_NUMBER = /^\d{1,3}$/;
  * compares. A `weeks` that is not a whole number from 1 to 52 is `400 invalid_query` and the message names the parameter.
  */
 export function effortRoutes(app: FastifyInstance, options: EffortRoutesOptions): void {
-  const { service } = options;
+  const serviceOf = options.service;
 
   app.get<{ Querystring: { weeks?: unknown } }>("/effort", async (request, reply) => {
     const { weeks } = request.query;
@@ -35,6 +36,6 @@ export function effortRoutes(app: FastifyInstance, options: EffortRoutesOptions)
       wanted = Number(weeks);
     }
     reply.header("cache-control", "no-store");
-    return service.effort(wanted);
+    return serviceOf(request).effort(wanted);
   });
 }

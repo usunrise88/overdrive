@@ -1,9 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { HttpError } from "../errors.ts";
+import type { Accessor } from "../tenancy/context.ts";
 import type { ProgressService } from "./service.ts";
 
 export interface ProgressRoutesOptions {
-  service: ProgressService;
+  service: Accessor<ProgressService>;
 }
 
 /**
@@ -15,7 +16,7 @@ export interface ProgressRoutesOptions {
  *   value that is not a calendar day, a range that is reversed, in the future or longer than five years.
  */
 export function progressRoutes(app: FastifyInstance, options: ProgressRoutesOptions): void {
-  const { service } = options;
+  const serviceOf = options.service;
 
   app.get<{ Querystring: { from?: unknown; to?: unknown } }>(
     "/progress",
@@ -29,10 +30,13 @@ export function progressRoutes(app: FastifyInstance, options: ProgressRoutesOpti
           throw new HttpError("invalid_range", `${name} must be a calendar date, YYYY-MM-DD`);
         }
       }
-      const range = service.rangeFor(from as string | undefined, to as string | undefined);
+      const range = serviceOf(request).rangeFor(
+        from as string | undefined,
+        to as string | undefined,
+      );
       if (!range.ok) throw new HttpError("invalid_range", range.message);
       reply.header("cache-control", "no-store");
-      return service.progress(range.from, range.to);
+      return serviceOf(request).progress(range.from, range.to);
     },
   );
 }

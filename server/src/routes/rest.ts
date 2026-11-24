@@ -1,10 +1,11 @@
 import { isValidRouteId, type Route } from "@overdrive/contracts";
 import type { FastifyInstance } from "fastify";
 import { HttpError } from "../errors.ts";
+import type { Accessor } from "../tenancy/context.ts";
 import type { RoutesService } from "./service.ts";
 
 export interface RoutesRestOptions {
-  service: RoutesService;
+  service: Accessor<RoutesService>;
 }
 
 /**
@@ -17,16 +18,16 @@ export interface RoutesRestOptions {
  * The service sends no grade: the tablet computes it from the points.
  */
 export function routesRest(app: FastifyInstance, options: RoutesRestOptions): void {
-  const { service } = options;
+  const serviceOf = options.service;
 
-  app.get("/routes", async (_request, reply) => {
+  app.get("/routes", async (request, reply) => {
     reply.header("cache-control", "no-store");
-    return service.listResponse();
+    return serviceOf(request).listResponse();
   });
 
   app.get<{ Params: { id: string } }>("/routes/:id", async (request, reply) => {
     const { id } = request.params;
-    const route: Route | null = isValidRouteId(id) ? await service.get(id) : null;
+    const route: Route | null = isValidRouteId(id) ? await serviceOf(request).get(id) : null;
     if (route === null) throw new HttpError("not_found", "No such route");
     reply.header("cache-control", "private, max-age=300");
     return route;
