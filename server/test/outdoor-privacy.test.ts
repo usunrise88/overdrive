@@ -127,7 +127,7 @@ describe("what the import says about a ride", () => {
     expect(answer.statusCode).toBe(201);
     expect(answer.body).not.toMatch(/lat|lon|position/i);
     const columns = await db.query<{ column_name: string }>(
-      "SELECT column_name FROM information_schema.columns WHERE table_name = 'activities'",
+      "SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'activities'",
     );
     expect(columns.rows.map((c) => c.column_name).filter((c) => /lat|lon|pos/i.test(c))).toEqual(
       [],

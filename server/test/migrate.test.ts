@@ -23,7 +23,7 @@ beforeEach(async () => {
 
 async function tables(): Promise<string[]> {
   const result = await db.query<{ table_name: string }>(
-    "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY 1",
+    "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() ORDER BY 1",
   );
   return result.rows.map((r) => r.table_name);
 }

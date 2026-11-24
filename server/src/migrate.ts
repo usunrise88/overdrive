@@ -5,6 +5,9 @@ import type { Db } from "./db.ts";
 /** Where the numbered SQL files live, next to `src/` (and `dist/`, in the image). */
 export const MIGRATIONS_DIR: URL = new URL("../migrations/", import.meta.url);
 
+/** Where the migrations of the `shared` schema live. */
+export const SHARED_MIGRATIONS_DIR: URL = new URL("../migrations/shared/", import.meta.url);
+
 /** Held while migrations run, so two instances starting together take turns. */
 const LOCK_ID = 727_001;
 
@@ -46,10 +49,14 @@ export async function readMigrations(dir: URL = MIGRATIONS_DIR): Promise<Migrati
  * Applies the migrations that have not run yet, each in its own transaction, and records them in
  * `schema_migrations`. Safe to run on every start: what has run is skipped, and a migration whose
  * file changed after it ran is an error (a change to the schema is a new file). Returns the
- * versions applied by this call.
+ * versions applied by this call. `source` is a directory of migration files (default: the tenant migrations) or an
+ * already read list. `schema_migrations` is unqualified: it lives in the schema the connection's `search_path` names.
  */
-export async function migrate(db: Db, migrations?: Migration[]): Promise<number[]> {
-  const all = migrations ?? (await readMigrations());
+export async function migrate(
+  db: Db,
+  source: Migration[] | URL = MIGRATIONS_DIR,
+): Promise<number[]> {
+  const all = Array.isArray(source) ? source : await readMigrations(source);
   await db.transaction(async (tx) => {
     await tx.query("SELECT pg_advisory_xact_lock($1)", [LOCK_ID]);
     await tx.exec(`
