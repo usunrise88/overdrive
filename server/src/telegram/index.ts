@@ -20,7 +20,7 @@ import type { PlanEventsService } from "../plan-events/service.ts";
 import type { Timers } from "../timers.ts";
 import { type Clock, parseClock } from "../zoned.ts";
 import { createTelegramBot, type TelegramBot } from "./bot.ts";
-import { createTelegramClient } from "./client.ts";
+import { createTelegramClient, type TelegramClient } from "./client.ts";
 import { type Commands, createCommands } from "./commands.ts";
 import type { BotContext } from "./context.ts";
 import { createPlanHistory, type PlanHistory } from "./history.ts";
@@ -56,9 +56,20 @@ export interface TelegramDeps {
   outdoor?: OutdoorService | undefined;
   /** Where `/ill` and `/travel` declare illness or travel (spec §12.2, ADR 0035); without it the bot says it cannot. */
   planEvents?: PlanEventsService | undefined;
+  /** Where `bot_state` lives (the `shared` schema); defaults to `db`. */
+  stateDb?: Db | undefined;
+  /**
+   * false: this bot never polls; the shared poller (`poller.ts`) gives it the updates of its chat, and it only sends
+   * (replies, reminders, summaries). Default true.
+   */
+  poll?: boolean | undefined;
+  /** The client of the shared bot, when several users' bots use one (it also downloads their files). Otherwise one is made. */
+  client?: TelegramClient | undefined;
+  /** The one chat this bot answers and writes to, instead of `TELEGRAM_OWNER_CHAT_ID` (a user's `telegram_chat_id`). */
+  chatId?: string | undefined;
 }
 
-const COMMANDS = [
+export const COMMANDS = [
   { command: "today", description: "Today's workout" },
   { command: "week", description: "The next 7 days" },
   { command: "skip", description: "Skip the next workout" },
@@ -79,7 +90,7 @@ const clockOf = (text: string | undefined, fallback: string): Clock =>
 export function createTelegram(deps: TelegramDeps): TelegramBot | null {
   const { config, log } = deps;
   const token = config.TELEGRAM_BOT_TOKEN;
-  if (token === undefined) {
+  if (token === undefined && deps.client === undefined) {
     if (config.TELEGRAM_OWNER_CHAT_ID !== undefined) {
       log.warn({}, "Telegram is off: TELEGRAM_OWNER_CHAT_ID is set but TELEGRAM_BOT_TOKEN is not");
     } else {
@@ -90,16 +101,18 @@ export function createTelegram(deps: TelegramDeps): TelegramBot | null {
     }
     return null;
   }
-  const ownerChatId = config.TELEGRAM_OWNER_CHAT_ID;
+  const ownerChatId = deps.chatId ?? config.TELEGRAM_OWNER_CHAT_ID;
   const now = deps.now ?? (() => new Date());
 
-  const client = createTelegramClient({
-    baseUrl: config.TELEGRAM_BASE_URL ?? DEFAULT_TELEGRAM_BASE_URL,
-    token,
-    log,
-    ...(deps.fetch === undefined ? {} : { fetch: deps.fetch }),
-    ...(deps.sleep === undefined ? {} : { sleep: deps.sleep }),
-  });
+  const client =
+    deps.client ??
+    createTelegramClient({
+      baseUrl: config.TELEGRAM_BASE_URL ?? DEFAULT_TELEGRAM_BASE_URL,
+      token: token as string,
+      log,
+      ...(deps.fetch === undefined ? {} : { fetch: deps.fetch }),
+      ...(deps.sleep === undefined ? {} : { sleep: deps.sleep }),
+    });
 
   let commands: Commands | null = null;
   let notifier: Notifier | null = null;
@@ -148,6 +161,8 @@ export function createTelegram(deps: TelegramDeps): TelegramBot | null {
   return createTelegramBot({
     client,
     db: deps.db,
+    ...(deps.stateDb === undefined ? {} : { stateDb: deps.stateDb }),
+    ...(deps.poll === undefined ? {} : { poll: deps.poll }),
     log,
     ownerChatId,
     commands,

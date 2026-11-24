@@ -6,7 +6,14 @@ import { effortRoutes } from "./effort/routes.ts";
 import { installErrorHandling, sendError } from "./errors.ts";
 import { insightsRoutes } from "./insights/routes.ts";
 import { liveRoutes } from "./live-coach/routes.ts";
-import { type McpConfig, type McpTestOptions, mcpModule, mcpSettings } from "./mcp/index.ts";
+import {
+  type McpConfig,
+  type McpTenancy,
+  type McpTestOptions,
+  mcpModule,
+  mcpSettings,
+  singleTenancy,
+} from "./mcp/index.ts";
 import { metricsRoutes } from "./metrics/routes.ts";
 import { notebookRoutes } from "./notebook/routes.ts";
 import { outdoorRoutes } from "./outdoor/routes.ts";
@@ -44,6 +51,10 @@ export interface AppOptions {
   services?: Services;
   /** For the tests: the clock and the limits of the OAuth server (ADR 0018). */
   mcp?: McpTestOptions;
+  /** The Db of the `shared` schema (the OAuth tables) for the one-user path; without it the OAuth server uses `db`. */
+  sharedDb?: Db;
+  /** The users of the MCP endpoint and the OAuth server when there are several: the `shared` Db, the directory and each user's services. */
+  mcpTenancy?: McpTenancy;
 }
 
 /**
@@ -122,10 +133,19 @@ export function buildApp(options: AppOptions): FastifyInstance {
   if ("off" in mcp) {
     app.log.info(`MCP server is off: ${mcp.off} (see docs/deploy.md to turn it on)`);
   } else {
+    // Several users: the caller passes the directory, the services of each user and the `shared` Db. Otherwise the one
+    // owner is a tenant made from `services`; the OAuth tables are in `sharedDb` (the tenant's own `db` when unset).
+    const tenancy =
+      options.mcpTenancy ??
+      singleTenancy({
+        shared: options.sharedDb ?? db,
+        services,
+        staticTokens: mcp.on.staticTokens,
+        passphraseHash: config.OWNER_PASSPHRASE_HASH,
+      });
     app.register(mcpModule, {
       settings: mcp.on,
-      services,
-      db,
+      tenancy,
       log: app.log,
       ...(options.mcp === undefined ? {} : { test: options.mcp }),
     });

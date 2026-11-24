@@ -8,6 +8,7 @@ import { expect, vi } from "vitest";
 import type { Db } from "../../src/db.ts";
 import type { ServicesConfig } from "../../src/services.ts";
 import { asRide, bearer, COMPANION, expectUpload, putFit, putRecord } from "./app.ts";
+import { sharedDbOf } from "./db.ts";
 import type { FakeIntervals } from "./fake-intervals.ts";
 import type { FakeLlm } from "./fake-llm.ts";
 import { FAKE_LLM_KEY, FAKE_LLM_MODEL } from "./fake-llm.ts";
@@ -32,11 +33,12 @@ export interface InsightsEnv {
 export async function clearAll(db: Db): Promise<void> {
   await db.exec(
     `TRUNCATE insights, discussion_topics, alert_streaks RESTART IDENTITY;
-     TRUNCATE calendar_events, plan_history, bot_notifications, bot_state;
+     TRUNCATE calendar_events, plan_history, bot_notifications;
      TRUNCATE planned_workouts, plan_sync_state;
      TRUNCATE wellness_records, wellness_daily, wellness_sync_state, activities, activity_destinations, ride_heart_rate;
      TRUNCATE ride_destinations, rides, ride_metrics, ride_workouts, ftp_suggestions, ftp_history;`,
   );
+  await sharedDbOf(db).exec("TRUNCATE bot_state");
 }
 
 export interface BootOptions {

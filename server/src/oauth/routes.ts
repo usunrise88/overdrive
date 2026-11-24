@@ -3,6 +3,12 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { sha256Hex } from "../hash.ts";
 import type { Logger } from "../log.ts";
 import { authorizePage, messagePage } from "./pages.ts";
+import {
+  DUMMY_PASSPHRASE_HASH,
+  type PassphraseHash,
+  type PassphraseVerifier,
+  parsePassphraseHash,
+} from "./passphrase.ts";
 import { isLoopbackHost, redirectUriMatches, redirectUriProblem } from "./redirect.ts";
 import {
   type ClientAuthMethod,
@@ -11,7 +17,8 @@ import {
   type OAuthStore,
   TooManyClientsError,
 } from "./store.ts";
-import type { LoginLockout, RateLimiter } from "./throttle.ts";
+import type { HandleLockouts, RateLimiter } from "./throttle.ts";
+import { type LoginUsers, normalizeHandle } from "./users.ts";
 
 /** The scope every MCP session has: everything the MCP tools can do for the rider's coach agent. */
 export const MCP_SCOPE = "mcp";
@@ -35,9 +42,12 @@ export interface OAuthRoutesOptions {
   /** `https://overdrive.llmto.day`: the issuer, with no trailing slash. */
   baseUrl: string;
   store: OAuthStore;
-  /** Whether a typed passphrase is the owner's; one at a time (see `serialVerifier`). */
-  verifyPassphrase: (passphrase: string) => Promise<boolean>;
-  lockout: LoginLockout;
+  /** Who can sign in (by handle), with the stored hash of each. */
+  users: LoginUsers;
+  /** Whether a typed passphrase matches a hash; one at a time (see `serialVerifier`). */
+  verifyPassphrase: PassphraseVerifier;
+  /** Lockout per handle, with a cap on the failures of all (single-user: the handle is always the empty text). */
+  lockout: HandleLockouts;
   registrations: RateLimiter;
   now: () => Date;
   log: Logger;
@@ -68,7 +78,8 @@ export function s256Challenge(verifier: string): string {
  * refresh tokens that rotate) and revocation (RFC 7009).
  */
 export function oauthRoutes(app: FastifyInstance, options: OAuthRoutesOptions): void {
-  const { baseUrl, store, lockout, log } = options;
+  const { baseUrl, store, lockout, log, users } = options;
+  const dummyHash = parsePassphraseHash(DUMMY_PASSPHRASE_HASH);
   const resource = mcpResourceOf(baseUrl);
 
   // The token endpoint and the authorization page take forms.
@@ -378,7 +389,12 @@ export function oauthRoutes(app: FastifyInstance, options: OAuthRoutesOptions): 
       );
 
   /** The form again, with everything the request carried, and a line about what went wrong. */
-  const formPage = (approval: Approval, params: Params, problem?: string): string => {
+  const formPage = (
+    approval: Approval,
+    params: Params,
+    problem?: string,
+    handle?: string | null,
+  ): string => {
     const redirect = new URL(approval.redirectUri);
     const hidden: Record<string, string> = {
       client_id: approval.client.clientId,
@@ -397,6 +413,7 @@ export function oauthRoutes(app: FastifyInstance, options: OAuthRoutesOptions): 
       redirectIsLocal: redirect.protocol === "http:" && isLoopbackHost(redirect.hostname),
       hidden,
       ...(problem === undefined ? {} : { problem }),
+      ...(users.asksHandle ? { askHandle: true, handle: handle ?? "" } : {}),
       ...(approval.scope.split(" ").includes(GAME_MASTER_SCOPE) ? { gameMaster: true } : {}),
     });
   };
@@ -408,7 +425,7 @@ export function oauthRoutes(app: FastifyInstance, options: OAuthRoutesOptions): 
       if ("redirect" in parsed) return reply.redirect(parsed.redirect);
       return pageHeaders(reply).code(400).send(parsed.page);
     }
-    const state = lockout.state(options.now());
+    const state = lockout.state("", options.now());
     const problem = state.locked ? lockedMessage(state.retryAfterSeconds) : undefined;
     return pageHeaders(reply).send(formPage(parsed.request, params, problem));
   });
@@ -443,21 +460,41 @@ export function oauthRoutes(app: FastifyInstance, options: OAuthRoutesOptions): 
     }
 
     const now = options.now();
-    const before = lockout.state(now);
+    // Single-user: the handle is not asked for and the one owner is meant. Several users: the typed handle, lower-cased.
+    const handle = users.asksHandle ? normalizeHandle(params.get("handle")) : null;
+    const key = handle ?? "";
+    const before = lockout.state(key, now);
     if (before.locked) {
       reply.header("retry-after", String(before.retryAfterSeconds));
       return pageHeaders(reply)
         .code(429)
-        .send(formPage(approval, params, lockedMessage(before.retryAfterSeconds)));
+        .send(formPage(approval, params, lockedMessage(before.retryAfterSeconds), handle));
+    }
+    if (users.asksHandle && handle === null) {
+      return pageHeaders(reply)
+        .code(400)
+        .send(formPage(approval, params, "Type your handle.", handle));
     }
     const passphrase = params.get("passphrase") ?? "";
     if (passphrase === "") {
       return pageHeaders(reply)
         .code(400)
-        .send(formPage(approval, params, "Type your passphrase."));
+        .send(formPage(approval, params, "Type your passphrase.", handle));
     }
-    if (!(await options.verifyPassphrase(passphrase))) {
-      const after = lockout.failed(options.now());
+    // One scrypt run whatever the handle: a handle nobody has (or a user with no passphrase yet) is checked against a
+    // fixed dummy hash, and answered like a wrong passphrase, so neither the answer nor its time tells who exists.
+    const user = await users.find(handle);
+    let stored: PassphraseHash = dummyHash;
+    if (user?.passphraseHash !== null && user?.passphraseHash !== undefined) {
+      try {
+        stored = parsePassphraseHash(user.passphraseHash);
+      } catch (error) {
+        log.error({ userId: user.userId, err: error }, "a stored passphrase hash cannot be read");
+      }
+    }
+    const matched = await options.verifyPassphrase(passphrase, stored);
+    if (user === null || stored === dummyHash || !matched) {
+      const after = lockout.failed(key, options.now());
       log.warn({ clientId: approval.client.clientId, locked: after.locked }, "wrong passphrase");
       const problem = after.locked
         ? lockedMessage(after.retryAfterSeconds)
@@ -465,14 +502,15 @@ export function oauthRoutes(app: FastifyInstance, options: OAuthRoutesOptions): 
       if (after.locked) reply.header("retry-after", String(after.retryAfterSeconds));
       return pageHeaders(reply)
         .code(after.locked ? 429 : 401)
-        .send(formPage(approval, params, problem));
+        .send(formPage(approval, params, problem, handle));
     }
 
-    lockout.succeeded();
+    lockout.succeeded(key);
     const issuedAt = options.now();
     await store.markAuthorized(approval.client.clientId, issuedAt);
     const code = await store.createCode(
       {
+        userId: user.userId,
         clientId: approval.client.clientId,
         redirectUri: approval.redirectUri,
         codeChallenge: approval.codeChallenge,
@@ -482,8 +520,12 @@ export function oauthRoutes(app: FastifyInstance, options: OAuthRoutesOptions): 
       issuedAt,
     );
     log.info(
-      { clientId: approval.client.clientId, clientName: approval.client.clientName },
-      "oauth authorization approved by the owner",
+      {
+        clientId: approval.client.clientId,
+        clientName: approval.client.clientName,
+        userId: user.userId,
+      },
+      "oauth authorization approved by the user",
     );
     void store.purge(issuedAt).catch((err: unknown) => log.error({ err }, "oauth purge failed"));
     return reply.redirect(

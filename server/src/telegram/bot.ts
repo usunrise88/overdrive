@@ -17,6 +17,13 @@ import type { Notifier } from "./notifier.ts";
 export interface BotLoopOptions {
   client: TelegramClient;
   db: Db;
+  /** Where `bot_state` is (the `shared` schema); defaults to `db`. */
+  stateDb?: Db;
+  /**
+   * false: this bot does not poll. A shared poller (`poller.ts`) hands it the updates of its owner's chat through
+   * `handleUpdate`, and `start()` runs only the scheduled messages. Default true.
+   */
+  poll?: boolean;
   log: Logger;
   /** The one chat id the bot answers; undefined: setup mode. */
   ownerChatId: string | undefined;
@@ -40,10 +47,10 @@ export interface TelegramBot {
   idle(): Promise<void>;
 }
 
-const OFFSET_KEY = "telegram.offset";
+export const OFFSET_KEY = "telegram.offset";
 
 /** 1, 2, 4 … seconds up to a minute; a refused token or a second poller waits longer. */
-function pause(error: unknown, failures: number): number {
+export function pause(error: unknown, failures: number): number {
   if (error instanceof TelegramError && error.kind === "unauthorized") return 5 * 60_000;
   if (error instanceof TelegramError && error.kind === "conflict") return 30_000;
   return Math.min(1000 * 2 ** Math.max(0, failures - 1), 60_000);
@@ -51,6 +58,8 @@ function pause(error: unknown, failures: number): number {
 
 export function createTelegramBot(options: BotLoopOptions): TelegramBot {
   const { client, db, log, ownerChatId, commands, notifier } = options;
+  const stateDb = options.stateDb ?? db;
+  const poll = options.poll ?? true;
   const pollSeconds = options.pollSeconds ?? 25;
   const sleep =
     options.sleep ??
@@ -140,15 +149,16 @@ export function createTelegramBot(options: BotLoopOptions): TelegramBot {
   }
 
   async function loadOffset(): Promise<number> {
-    const result = await db.query<{ value: string }>("SELECT value FROM bot_state WHERE key = $1", [
-      OFFSET_KEY,
-    ]);
+    const result = await stateDb.query<{ value: string }>(
+      "SELECT value FROM bot_state WHERE key = $1",
+      [OFFSET_KEY],
+    );
     const value = Number(result.rows[0]?.value);
     return Number.isInteger(value) && value > 0 ? value : 0;
   }
 
   async function saveOffset(offset: number): Promise<void> {
-    await db.query(
+    await stateDb.query(
       `INSERT INTO bot_state (key, value) VALUES ($1, $2)
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
       [OFFSET_KEY, String(offset)],
@@ -225,6 +235,7 @@ export function createTelegramBot(options: BotLoopOptions): TelegramBot {
       stopped = false;
       abort = new AbortController();
       notifier?.start();
+      if (!poll) return;
       loop = run(abort.signal).catch((error: unknown) => {
         log.error({ err: error }, "the Telegram loop stopped unexpectedly");
       });

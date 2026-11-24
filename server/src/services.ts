@@ -154,6 +154,10 @@ export interface ServicesOptions {
   sleep?: (ms: number) => Promise<void>;
   /** For the tests: the loops' ticks by hand. */
   timers?: Timers;
+  /** The `shared` Db, where the bot keeps its offset (`bot_state`); `db` when unset. */
+  sharedDb?: Db;
+  /** false: the bot does not poll (a shared poller feeds it, multi-tenancy). Default true. */
+  telegramPoll?: boolean;
 }
 
 export function createServices(options: ServicesOptions): Services {
@@ -418,6 +422,8 @@ export function createServices(options: ServicesOptions): Services {
     sleep: options.sleep,
     timers: options.timers,
     history: planHistory,
+    stateDb: options.sharedDb,
+    poll: options.telegramPoll,
     sources: [insights.notifications, notebook.notifications, planEvents.notifications],
     outdoor,
     planEvents,

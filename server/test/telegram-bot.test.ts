@@ -4,7 +4,7 @@ import { createEventBus } from "../src/events.ts";
 import { createPlanStore } from "../src/plan/store.ts";
 import { createTelegram } from "../src/telegram/index.ts";
 import { asRide, putFit, putRecord, rideFixture } from "./helpers/app.ts";
-import { clearPlan, openMigratedTestDb } from "./helpers/db.ts";
+import { clearPlan, openMigratedTestDb, sharedDbOf } from "./helpers/db.ts";
 import { type FakeGoogle, startFakeGoogle } from "./helpers/fake-google.ts";
 import { type FakeIntervals, startFakeIntervals } from "./helpers/fake-intervals.ts";
 import {
@@ -189,7 +189,7 @@ describe("polling", () => {
     await until(() => expect(telegram.offsets.at(-1)).toBe(2));
     // The first run confirmed update 1; the second asks for what comes after it.
     expect(said()).toHaveLength(1);
-    const stored = await db.query<{ value: string }>(
+    const stored = await sharedDbOf(db).query<{ value: string }>(
       "SELECT value FROM bot_state WHERE key = 'telegram.offset'",
     );
     expect(stored.rows[0]?.value).toBe("2");
@@ -204,6 +204,7 @@ describe("polling", () => {
         TELEGRAM_BASE_URL: telegram.url,
       },
       db,
+      stateDb: sharedDbOf(db),
       plan: createPlanStore(db, createEventBus()),
       bus: createEventBus(),
       intervals: null,
@@ -245,6 +246,7 @@ describe("polling", () => {
         TELEGRAM_BASE_URL: telegram.url,
       },
       db,
+      stateDb: sharedDbOf(db),
       plan: createPlanStore(db, createEventBus()),
       bus: createEventBus(),
       intervals: null,
@@ -585,7 +587,7 @@ describe("secrets", () => {
     expect(log).not.toContain(secret);
     const stored = JSON.stringify(
       (await db.query("SELECT * FROM bot_notifications")).rows.concat(
-        (await db.query("SELECT * FROM bot_state")).rows,
+        (await sharedDbOf(db).query("SELECT * FROM bot_state")).rows,
       ),
     );
     expect(stored).not.toContain(secret);

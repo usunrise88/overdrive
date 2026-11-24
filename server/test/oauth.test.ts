@@ -5,7 +5,7 @@ import { InvalidGrantError } from "@modelcontextprotocol/sdk/server/auth/errors.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "../src/db.ts";
 import { MAX_PENDING_CLIENTS } from "../src/oauth/store.ts";
-import { openMigratedTestDb } from "./helpers/db.ts";
+import { openMigratedTestDb, sharedDbOf } from "./helpers/db.ts";
 import { type FakeIntervals, startFakeIntervals } from "./helpers/fake-intervals.ts";
 import {
   authorizeQuery,
@@ -26,11 +26,13 @@ import {
 } from "./helpers/mcp.ts";
 
 let db: Db;
+let shared: Db;
 let fake: FakeIntervals;
 let h: McpHarness;
 
 beforeAll(async () => {
   db = await openMigratedTestDb();
+  shared = sharedDbOf(db);
   fake = await startFakeIntervals();
 });
 
@@ -40,7 +42,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  await db.exec("TRUNCATE oauth_tokens, oauth_codes, oauth_clients");
+  await shared.exec("TRUNCATE oauth_tokens, oauth_codes, oauth_clients, oauth_families");
   h = await startMcpHarness(db, fake);
   return async () => {
     await h.close();
@@ -152,7 +154,7 @@ describe("dynamic client registration", () => {
     const { body } = await register(h.baseUrl, {
       token_endpoint_auth_method: "client_secret_post",
     });
-    const stored = await db.query<{ client_secret_sha256: string }>(
+    const stored = await shared.query<{ client_secret_sha256: string }>(
       "SELECT client_secret_sha256 FROM oauth_clients WHERE client_id = $1",
       [body.client_id],
     );
@@ -241,7 +243,7 @@ describe("dynamic client registration", () => {
   });
 
   it("refuses more than a hundred clients that nobody has used, and forgets them after a day", async () => {
-    await db.query(
+    await shared.query(
       `INSERT INTO oauth_clients (client_id, client_name, redirect_uris, token_endpoint_auth_method, created_at)
        SELECT 'odc_filler' || n, 'filler', '["https://a.example/cb"]'::jsonb, 'none', $1::timestamptz
          FROM generate_series(1, $2::int) AS n`,
@@ -251,7 +253,7 @@ describe("dynamic client registration", () => {
     expect(refused.status).toBe(429);
     h.clock.advance(days(1) + minutes(1));
     expect((await register(h.baseUrl)).status).toBe(201);
-    const left = await db.query<{ n: string }>("SELECT count(*)::text AS n FROM oauth_clients");
+    const left = await shared.query<{ n: string }>("SELECT count(*)::text AS n FROM oauth_clients");
     expect(left.rows[0]?.n).toBe("1");
   });
 });
@@ -404,7 +406,7 @@ describe("the authorization page", () => {
     expect(state).toBe("state-7");
     expect(iss).toBe(h.baseUrl);
     // Only a digest of the code is kept.
-    const stored = await db.query("SELECT code_sha256 FROM oauth_codes");
+    const stored = await shared.query("SELECT code_sha256 FROM oauth_codes");
     expect(JSON.stringify(stored.rows)).not.toContain(code);
   });
 
@@ -419,7 +421,7 @@ describe("the authorization page", () => {
     // The form is back, and the passphrase that was typed is not.
     expect(html).toContain('type="password"');
     expect(html).not.toContain("zzz-guess-77");
-    expect((await db.query("SELECT 1 FROM oauth_codes")).rows).toHaveLength(0);
+    expect((await shared.query("SELECT 1 FROM oauth_codes")).rows).toHaveLength(0);
   });
 
   it("asks for a passphrase when none was typed", async () => {
@@ -464,7 +466,7 @@ describe("the authorization page", () => {
     expect(locked.headers.get("location")).toBeNull();
     const page = await fetch(`${h.baseUrl}/oauth/authorize?${query}`);
     expect(await page.text()).toContain("Too many wrong passphrases");
-    expect((await db.query("SELECT 1 FROM oauth_codes")).rows).toHaveLength(0);
+    expect((await shared.query("SELECT 1 FROM oauth_codes")).rows).toHaveLength(0);
 
     // The lock ends with time, and a right passphrase clears the count.
     h.clock.advance(minutes(15) + 1000);
@@ -560,7 +562,7 @@ describe("the token endpoint", () => {
     expect(String(res.body.access_token)).toMatch(/^odat_[A-Za-z0-9_-]{43}$/);
     expect(String(res.body.refresh_token)).toMatch(/^odrt_[A-Za-z0-9_-]{43}$/);
     // Only digests are stored.
-    const stored = await db.query<{ token_sha256: string }>(
+    const stored = await shared.query<{ token_sha256: string }>(
       "SELECT token_sha256 FROM oauth_tokens",
     );
     expect(stored.rows).toHaveLength(2);
@@ -578,7 +580,7 @@ describe("the token endpoint", () => {
     const right = await exchange(a);
     expect(right.status).toBe(400);
     expect(right.body.error).toBe("invalid_grant");
-    expect((await db.query("SELECT 1 FROM oauth_tokens")).rows).toHaveLength(0);
+    expect((await shared.query("SELECT 1 FROM oauth_tokens")).rows).toHaveLength(0);
   });
 
   it.each([
@@ -913,9 +915,13 @@ describe("the token endpoint", () => {
 describe("what /mcp accepts", () => {
   it("refuses a token issued for another resource, or without the scope", async () => {
     const { clientId } = await obtainTokens(h.baseUrl);
+    // The family the tokens below belong to: the owner's.
+    await shared.query(
+      "INSERT INTO oauth_families (family_id, user_id) SELECT 'f', id FROM users WHERE handle = 'owner' ON CONFLICT DO NOTHING",
+    );
     const insert = async (resource: string, scope: string) => {
       const token = `odat_${randomBytes(32).toString("base64url")}`;
-      await db.query(
+      await shared.query(
         `INSERT INTO oauth_tokens (token_sha256, kind, family_id, client_id, scope, resource, expires_at, created_at)
          VALUES ($1, 'access', 'f', $2, $3, $4, $5::timestamptz, $5::timestamptz)`,
         [
@@ -1061,7 +1067,7 @@ describe("a real MCP client, the SDK's, from nothing to a tool call", () => {
     );
     await first.finishAuth(code);
     // The owner revokes everything (any refresh token of the family ends the family).
-    await db.exec("UPDATE oauth_tokens SET revoked_at = now()");
+    await shared.exec("UPDATE oauth_tokens SET revoked_at = now()");
     // The SDK's client lets the application decide what to do with a refresh token that is refused.
     await expect(
       newClient().connect(new StreamableHTTPClientTransport(h.mcpUrl, { authProvider: provider })),

@@ -1,24 +1,33 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { DeviceToken } from "../config.ts";
+import { sha256Hex } from "../hash.ts";
+import type { Logger } from "../log.ts";
 import { MCP_SCOPE, mcpResourceOf, resourceMetadataUrlOf } from "../oauth/routes.ts";
 import type { OAuthStore } from "../oauth/store.ts";
+import type { Services } from "../services.ts";
+import type { TenantDirectory } from "../tenancy/directory.ts";
 import { createMcpServer } from "./server.ts";
-import type { ToolContext } from "./tool.ts";
 
 export interface McpRoutesOptions {
   /** `https://overdrive.llmto.day`: where the discovery documents and `/mcp` are. */
   baseUrl: string;
   store: OAuthStore;
-  /** Fixed tokens for clients that cannot do OAuth (`MCP_STATIC_TOKENS`). */
-  staticTokens: readonly DeviceToken[];
-  tools: ToolContext;
+  /** Finds the user of a static token (kind `mcp`, `MCP_STATIC_TOKENS`) and of an OAuth family. */
+  directory: TenantDirectory;
+  /** The running services of a user; null when there are none. Each request builds its tools from them. */
+  servicesOf: (userId: number) => Services | null;
+  now: () => Date;
+  log: Logger;
 }
 
-const digest = (secret: string): Buffer => createHash("sha256").update(secret).digest();
+/** Who a request is, once its token is known: carried to the handler in the SDK's `AuthInfo.extra`. */
+interface Identity {
+  userId: number;
+  clientId: string;
+  scopes: string[];
+}
 
 const OAUTH_ACCESS_TOKEN = /^odat_[A-Za-z0-9_-]{43}$/;
 
@@ -39,10 +48,9 @@ const jsonRpcError = (code: number, message: string) => ({
  * answer 405: there is no session and the server starts no stream of its own.
  */
 export function mcpRoutes(app: FastifyInstance, options: McpRoutesOptions): void {
-  const { baseUrl, store, tools } = options;
+  const { baseUrl, store, directory, servicesOf, now, log } = options;
   const resource = mcpResourceOf(baseUrl);
   const challenge = `Bearer resource_metadata="${resourceMetadataUrlOf(baseUrl)}", scope="${MCP_SCOPE}"`;
-  const staticTokens = options.staticTokens.map((t) => ({ name: t.name, digest: digest(t.token) }));
 
   // The body is read as text and parsed in the handler, so a body that is not JSON is answered in
   // JSON-RPC's own words.
@@ -54,19 +62,25 @@ export function mcpRoutes(app: FastifyInstance, options: McpRoutesOptions): void
   );
 
   /** Who the token belongs to, or null when it is none of ours or not for this endpoint. */
-  async function identify(token: string): Promise<{ clientId: string; scopes: string[] } | null> {
-    const presented = digest(token);
-    let named: string | null = null;
-    for (const entry of staticTokens) {
-      if (timingSafeEqual(entry.digest, presented)) named = entry.name;
+  async function identify(token: string): Promise<Identity | null> {
+    // A static token belongs to a user's `user_tokens` (kind `mcp`), found by its digest like a device token.
+    const named = await directory.byToken(sha256Hex(token), "mcp");
+    if (named !== null) {
+      return {
+        userId: named.tenant.userId,
+        clientId: `static:${named.tokenName}`,
+        scopes: [MCP_SCOPE],
+      };
     }
-    if (named !== null) return { clientId: `static:${named}`, scopes: [MCP_SCOPE] };
     if (!OAUTH_ACCESS_TOKEN.test(token)) return null;
-    const grant = await store.findAccessToken(token, tools.now());
+    const grant = await store.findAccessToken(token, now());
     // The token must have been issued for this endpoint and carry its scope (RFC 8707, MCP authorization).
     if (grant === null || grant.resource !== resource) return null;
     const scopes = grant.scope.split(" ");
-    return scopes.includes(MCP_SCOPE) ? { clientId: grant.clientId, scopes } : null;
+    if (!scopes.includes(MCP_SCOPE)) return null;
+    // The family's user must still exist and be enabled.
+    if ((await directory.byUserId(grant.userId)) === null) return null;
+    return { userId: grant.userId, clientId: grant.clientId, scopes };
   }
 
   app.addHook("onRequest", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -89,7 +103,12 @@ export function mcpRoutes(app: FastifyInstance, options: McpRoutesOptions): void
         });
       return reply;
     }
-    const auth: AuthInfo = { token: "", clientId: who.clientId, scopes: who.scopes };
+    const auth: AuthInfo = {
+      token: "",
+      clientId: who.clientId,
+      scopes: who.scopes,
+      extra: { userId: who.userId },
+    };
     (request.raw as IncomingMessage & { auth?: AuthInfo }).auth = auth;
     return undefined;
   });
@@ -103,9 +122,17 @@ export function mcpRoutes(app: FastifyInstance, options: McpRoutesOptions): void
     }
     // The tools are built for this token's scopes (the game master's notebook exists only for one that carries its scope).
     const auth = (request.raw as IncomingMessage & { auth?: AuthInfo }).auth;
+    const userId = auth?.extra?.userId;
+    const services = typeof userId === "number" ? servicesOf(userId) : null;
+    if (auth === undefined || services === null) {
+      return reply
+        .code(503)
+        .send(jsonRpcError(-32000, "This user's service is not running; try again shortly"));
+    }
+    // Each request gets the tools of its own user: the services (and so the database schema) are that user's.
     const server = createMcpServer(
-      tools,
-      auth === undefined ? undefined : { clientId: auth.clientId, scopes: auth.scopes },
+      { services, now, log },
+      { clientId: auth.clientId, scopes: auth.scopes },
     );
     // No session id generator means no session: every request stands alone.
     const transport = new StreamableHTTPServerTransport({ enableJsonResponse: true });

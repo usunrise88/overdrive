@@ -27,8 +27,9 @@ p{margin:0 0 16px;color:#a1a1a6}
 strong{color:#ededed;font-weight:600}
 .host{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#ededed}
 label{display:block;margin:0 0 6px;font-size:14px;color:#a1a1a6}
-input[type=password]{width:100%;box-sizing:border-box;padding:12px;border-radius:8px;border:1px solid #2a2a2e;background:#0b0b0c;color:inherit;font:inherit}
-input[type=password]:focus{outline:2px solid #ededed;outline-offset:1px}
+input[type=password],input[type=text]{width:100%;box-sizing:border-box;padding:12px;border-radius:8px;border:1px solid #2a2a2e;background:#0b0b0c;color:inherit;font:inherit}
+input[type=text]{margin-bottom:12px}
+input[type=password]:focus,input[type=text]:focus{outline:2px solid #ededed;outline-offset:1px}
 .row{display:flex;gap:12px;margin-top:16px}
 button{flex:1;padding:12px;border-radius:8px;border:1px solid #2a2a2e;background:transparent;color:#ededed;font:inherit;cursor:pointer}
 button.primary{background:#ededed;color:#0b0b0c;border-color:#ededed;font-weight:600}
@@ -62,6 +63,9 @@ export interface AuthorizePage {
   problem?: string;
   /** The client also asks for the game master's notebook, which the rider's apps and the coach agent never see. */
   gameMaster?: boolean;
+  /** Ask for the user's handle too (more than one user); the typed one is kept across a wrong try. */
+  askHandle?: boolean;
+  handle?: string;
 }
 
 /** Where the owner types the passphrase and approves or refuses the client. */
@@ -86,8 +90,14 @@ export function authorizePage(page: AuthorizePage): string {
     }
 <p>After you decide, your browser goes back to ${where}.</p>
 <form method="post" action="/oauth/authorize">${hidden}
-<label for="passphrase">Passphrase</label>
-<input id="passphrase" type="password" name="passphrase" autocomplete="current-password" autofocus>
+${
+  page.askHandle === true
+    ? `<label for="handle">Handle</label>
+<input id="handle" type="text" name="handle" value="${escapeHtml(page.handle ?? "")}" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="64"${page.handle === undefined || page.handle === "" ? " autofocus" : ""}>
+`
+    : ""
+}<label for="passphrase">Passphrase</label>
+<input id="passphrase" type="password" name="passphrase" autocomplete="current-password"${page.askHandle === true && (page.handle === undefined || page.handle === "") ? "" : " autofocus"}>
 ${page.problem === undefined ? "" : `<p class="error" role="alert">${escapeHtml(page.problem)}</p>`}
 <div class="row"><button type="submit" name="decision" value="deny">Deny</button><button class="primary" type="submit" name="decision" value="approve">Approve</button></div>
 </form>`,

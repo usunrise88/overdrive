@@ -15,6 +15,7 @@ import type { McpTestOptions } from "../../src/mcp/index.ts";
 import { hashPassphrase } from "../../src/oauth/passphrase.ts";
 import { createServices, type Services, type ServicesConfig } from "../../src/services.ts";
 import { COMPANION, TABLET } from "./app.ts";
+import { sharedDbOf } from "./db.ts";
 import type { FakeIntervals } from "./fake-intervals.ts";
 import { FAKE_API_KEY, FAKE_ATHLETE_ID } from "./fake-intervals.ts";
 import { collectingLogger, recordedSleep, type TestClock, testClock } from "./support.ts";
@@ -88,6 +89,7 @@ export async function startMcpHarness(
       ...options.config,
     },
     db,
+    sharedDb: sharedDbOf(db),
     log: logging.log,
     now: clock.now,
     sleep: recordedSleep().sleep,
@@ -107,6 +109,7 @@ export async function startMcpHarness(
           }),
     },
     db,
+    sharedDb: sharedDbOf(db),
     services,
     mcp: { ...options.mcp, now: clock.now },
   });

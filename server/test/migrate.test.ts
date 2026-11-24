@@ -119,8 +119,8 @@ describe("the real migrations", () => {
     expect(results.flat()).toEqual(await versions());
   });
 
-  it("give the profile one row and the OAuth tables their constraints (0003)", async () => {
-    await migrate(db);
+  it("give the profile one row and the OAuth tables their constraints (0003, up to the migration that moves them to shared)", async () => {
+    await migrate(db, (await readMigrations()).slice(0, 13));
     const profile = (id: boolean, data: string) =>
       db.query("INSERT INTO profile (id, data, updated_at) VALUES ($1, $2::jsonb, now())", [
         id,

@@ -8,7 +8,12 @@ import {
   verifyPassphrase,
 } from "../src/oauth/passphrase.ts";
 import { redirectUriMatches, redirectUriProblem } from "../src/oauth/redirect.ts";
-import { createLoginLockout, createRateLimiter, DEFAULT_LOCKOUT } from "../src/oauth/throttle.ts";
+import {
+  createHandleLockouts,
+  createLoginLockout,
+  createRateLimiter,
+  DEFAULT_LOCKOUT,
+} from "../src/oauth/throttle.ts";
 
 const CHEAP = { N: 1024, r: 8, p: 1 };
 
@@ -82,11 +87,11 @@ describe("the passphrase hash", () => {
 
   it("verifies one passphrase at a time and still answers each correctly", async () => {
     const stored = parsePassphraseHash(await hashPassphrase("the right words", CHEAP));
-    const verify = serialVerifier(stored);
+    const verify = serialVerifier();
     const answers = await Promise.all([
-      verify("the right words"),
-      verify("the wrong words"),
-      verify("the right words"),
+      verify("the right words", stored),
+      verify("the wrong words", stored),
+      verify("the right words", stored),
     ]);
     expect(answers).toEqual([true, false, true]);
   });
@@ -199,6 +204,38 @@ describe("the passphrase lockout", () => {
       firstLockMs: 15 * 60_000,
       maxLockMs: 24 * 3_600_000,
     });
+  });
+});
+
+describe("the lockout per handle", () => {
+  const at = (minutes: number) => new Date(Date.UTC(2026, 10, 18, 8, 0) + minutes * 60_000);
+
+  it("locks one handle and leaves the others alone", () => {
+    const lockouts = createHandleLockouts();
+    for (let i = 0; i < 5; i++) lockouts.failed("alice", at(0));
+    expect(lockouts.state("alice", at(1))).toMatchObject({ locked: true });
+    expect(lockouts.state("bob", at(1))).toEqual({ locked: false, failuresLeft: 5 });
+    lockouts.succeeded("alice");
+    expect(lockouts.state("alice", at(1))).toEqual({ locked: false, failuresLeft: 5 });
+  });
+
+  it("closes the page for everyone only when failures over all handles pass the cap, and reopens as they age", () => {
+    const lockouts = createHandleLockouts(DEFAULT_LOCKOUT, { limit: 6, windowMs: 60 * 60_000 });
+    // Six handles with one wrong passphrase each: no handle is near its own lock.
+    for (let i = 0; i < 5; i++) lockouts.failed(`h${i}`, at(i));
+    expect(lockouts.state("fresh", at(5))).toEqual({ locked: false, failuresLeft: 5 });
+    lockouts.failed("h5", at(5));
+    expect(lockouts.state("fresh", at(6))).toMatchObject({ locked: true });
+    // The oldest failure leaves the window an hour after it happened.
+    expect(lockouts.state("fresh", at(61))).toEqual({ locked: false, failuresLeft: 5 });
+  });
+
+  it("one handle cannot fill the cap by itself: a locked handle is not tried again", () => {
+    const lockouts = createHandleLockouts(DEFAULT_LOCKOUT, { limit: 10, windowMs: 60 * 60_000 });
+    for (let i = 0; i < 5; i++) lockouts.failed("alice", at(0));
+    // Retrying a locked handle: the page does not try it, so nothing more is counted.
+    expect(lockouts.state("alice", at(10))).toMatchObject({ locked: true });
+    expect(lockouts.state("bob", at(10))).toEqual({ locked: false, failuresLeft: 5 });
   });
 });
 

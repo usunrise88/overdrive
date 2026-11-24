@@ -3,8 +3,8 @@ import type { Db, Queryable } from "../db.ts";
 import { sha256Hex } from "../hash.ts";
 
 /**
- * The OAuth server's storage (ADR 0018, migration 0003): registered clients, authorization codes and
- * tokens in PostgreSQL. Codes, tokens and client secrets are 256-bit random values, kept only as
+ * The OAuth server's storage (ADR 0018): registered clients, authorization codes and tokens in PostgreSQL,
+ * in the `shared` schema (the store takes the `shared` Db). `oauth_families` says which user a family belongs to. Codes, tokens and client secrets are 256-bit random values, kept only as
  * SHA-256 digests; the plain value exists once, in the answer that issues it. Every comparison with
  * time takes `now` from the caller, so the tests move the clock instead of waiting.
  */
@@ -44,6 +44,8 @@ export interface TokenRecord {
   scope: string;
   resource: string;
   expired: boolean;
+  /** The user the token's family belongs to (an enabled one: the lookup joins `oauth_families` and `users`). */
+  userId: number;
   /** The refresh token has been exchanged for the next pair. */
   used: boolean;
   /** It was exchanged only moments ago: a second request racing the first, not a replay. */
@@ -64,6 +66,8 @@ export interface IssuedTokens {
 
 /** What the access token means to the MCP endpoint. */
 export interface AccessGrant {
+  /** The user the grant was approved by. */
+  userId: number;
   clientId: string;
   scope: string;
   resource: string;
@@ -128,9 +132,10 @@ export interface OAuthStore {
   ): Promise<{ client: OAuthClient; clientSecret: string | null }>;
   getClient(clientId: string): Promise<OAuthClient | null>;
   markAuthorized(clientId: string, now: Date): Promise<void>;
-  /** Makes a single-use code for an authorisation the owner just approved. */
+  /** Makes a single-use code for an authorisation the user just approved; its family belongs to that user. */
   createCode(
     input: {
+      userId: number;
       clientId: string;
       redirectUri: string;
       codeChallenge: string;
@@ -260,21 +265,28 @@ export function createOAuthStore(db: Db, lifetimes: Lifetimes = DEFAULT_LIFETIME
 
     async createCode(input, now) {
       const code = random("odcode_");
-      await db.query(
-        `INSERT INTO oauth_codes
-           (code_sha256, client_id, redirect_uri, code_challenge, scope, resource, family_id, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz)`,
-        [
-          sha256Hex(code),
-          input.clientId,
-          input.redirectUri,
-          input.codeChallenge,
-          input.scope,
-          input.resource,
-          randomBytes(16).toString("hex"),
-          later(now, lifetimes.codeSeconds),
-        ],
-      );
+      const familyId = randomBytes(16).toString("hex");
+      await db.transaction(async (tx) => {
+        await tx.query("INSERT INTO oauth_families (family_id, user_id) VALUES ($1, $2)", [
+          familyId,
+          input.userId,
+        ]);
+        await tx.query(
+          `INSERT INTO oauth_codes
+             (code_sha256, client_id, redirect_uri, code_challenge, scope, resource, family_id, expires_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz)`,
+          [
+            sha256Hex(code),
+            input.clientId,
+            input.redirectUri,
+            input.codeChallenge,
+            input.scope,
+            input.resource,
+            familyId,
+            later(now, lifetimes.codeSeconds),
+          ],
+        );
+      });
       return code;
     },
 
@@ -381,7 +393,12 @@ export function createOAuthStore(db: Db, lifetimes: Lifetimes = DEFAULT_LIFETIME
     async findAccessToken(token, now) {
       const found = await findToken(db, token, "access", now, 0);
       if (found === null || found.expired || found.revoked) return null;
-      return { clientId: found.clientId, scope: found.scope, resource: found.resource };
+      return {
+        userId: found.userId,
+        clientId: found.clientId,
+        scope: found.scope,
+        resource: found.resource,
+      };
     },
 
     revokeFamily,
@@ -413,6 +430,12 @@ export function createOAuthStore(db: Db, lifetimes: Lifetimes = DEFAULT_LIFETIME
       await db.query("DELETE FROM oauth_tokens WHERE expires_at < $1::timestamptz", [
         later(now, -7 * 24 * 3600),
       ]);
+      // A family nothing refers to any more is forgotten with its last code or token.
+      await db.query(
+        `DELETE FROM oauth_families f
+          WHERE NOT EXISTS (SELECT 1 FROM oauth_codes c WHERE c.family_id = f.family_id)
+            AND NOT EXISTS (SELECT 1 FROM oauth_tokens t WHERE t.family_id = f.family_id)`,
+      );
     },
   };
 }
@@ -426,6 +449,7 @@ async function findToken(
 ): Promise<TokenRecord | null> {
   const result = await db.query<{
     family_id: string;
+    user_id: string;
     client_id: string;
     scope: string;
     resource: string;
@@ -434,11 +458,15 @@ async function findToken(
     just_now: boolean;
     revoked: boolean;
   }>(
-    `SELECT family_id, client_id, scope, resource,
-            (expires_at <= $3::timestamptz) AS expired, (used_at IS NOT NULL) AS used,
-            (used_at IS NOT NULL AND used_at > $4::timestamptz) AS just_now,
-            (revoked_at IS NOT NULL) AS revoked
-       FROM oauth_tokens WHERE token_sha256 = $1 AND kind = $2`,
+    // The family's user must exist and be enabled: a disabled user's grants stop working at once.
+    `SELECT t.family_id, f.user_id::text AS user_id, t.client_id, t.scope, t.resource,
+            (t.expires_at <= $3::timestamptz) AS expired, (t.used_at IS NOT NULL) AS used,
+            (t.used_at IS NOT NULL AND t.used_at > $4::timestamptz) AS just_now,
+            (t.revoked_at IS NOT NULL) AS revoked
+       FROM oauth_tokens t
+       JOIN oauth_families f ON f.family_id = t.family_id
+       JOIN users u ON u.id = f.user_id AND u.disabled_at IS NULL
+      WHERE t.token_sha256 = $1 AND t.kind = $2`,
     [sha256Hex(token), kind, iso(now), later(now, -graceSeconds)],
   );
   const row = result.rows[0];
@@ -447,6 +475,7 @@ async function findToken(
     : {
         kind,
         familyId: row.family_id,
+        userId: Number(row.user_id),
         clientId: row.client_id,
         scope: row.scope,
         resource: row.resource,

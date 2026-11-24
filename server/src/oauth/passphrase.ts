@@ -90,13 +90,23 @@ export async function verifyPassphrase(
 }
 
 /**
- * Runs one verification at a time. Each costs tens of megabytes, and the page that asks for the
- * passphrase is open to the internet.
+ * What a login attempt for a handle nobody has is checked against, so that it costs one scrypt run like any other and the
+ * answer does not come sooner (nobody knows what this hash was made from, so it never matches). Default cost.
  */
-export function serialVerifier(stored: PassphraseHash): (passphrase: string) => Promise<boolean> {
+export const DUMMY_PASSPHRASE_HASH =
+  "scrypt:32768:8:1:AAAAAAAAAAAAAAAAAAAAAA:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+/** Tells whether a passphrase is the one `stored` was made from. */
+export type PassphraseVerifier = (passphrase: string, stored: PassphraseHash) => Promise<boolean>;
+
+/**
+ * Runs one verification at a time, against whichever hash the call brings. Each costs tens of megabytes, and the
+ * page that asks for the passphrase is open to the internet.
+ */
+export function serialVerifier(verify: PassphraseVerifier = verifyPassphrase): PassphraseVerifier {
   let tail: Promise<unknown> = Promise.resolve();
-  return (passphrase) => {
-    const run = tail.then(() => verifyPassphrase(passphrase, stored));
+  return (passphrase, stored) => {
+    const run = tail.then(() => verify(passphrase, stored));
     tail = run.catch(() => {});
     return run;
   };

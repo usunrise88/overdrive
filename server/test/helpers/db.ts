@@ -6,7 +6,7 @@ import {
   type Db,
   type Queryable,
 } from "../../src/db.ts";
-import { migrate } from "../../src/migrate.ts";
+import { migrate, readMigrations, SHARED_MIGRATIONS_DIR } from "../../src/migrate.ts";
 
 function adapt(runner: PGlite | { query: PGlite["query"]; exec: PGlite["exec"] }): Queryable {
   return {
@@ -95,24 +95,64 @@ export async function resetSchema(db: Db): Promise<void> {
 /** The schema the single-user tests' tables live in. */
 export const TEST_SCHEMA = "t_test";
 
-/** A database with the real migrations applied, in schema `t_test` (the connection's `search_path` names it). */
+/** The `shared` Db that belongs to a database made by {@link openMigratedTestDb} (see {@link sharedDbOf}). */
+const sharedDbs = new WeakMap<Db, Db>();
+
+/**
+ * The `shared` schema's Db next to a database from {@link openMigratedTestDb}: the OAuth tables, `bot_state` and `users`
+ * are there, and the one-user code (`buildApp`'s `sharedDb`, `createServices`' `sharedDb`) is given it.
+ */
+export function sharedDbOf(db: Db): Db {
+  const shared = sharedDbs.get(db);
+  if (shared === undefined) throw new Error("this Db was not made by openMigratedTestDb");
+  return shared;
+}
+
+/** Applies the migrations of the `shared` schema to `shared` (its schema must exist). */
+export async function migrateShared(shared: Db): Promise<void> {
+  await migrate(shared, await readMigrations(SHARED_MIGRATIONS_DIR));
+}
+
+/**
+ * A database with the real migrations applied, in schema `t_test` (the connection's `search_path` names it). The
+ * `shared` schema exists too, with its migrations ({@link sharedDbOf}).
+ */
 export async function openMigratedTestDb(): Promise<Db> {
   const url = process.env.TEST_DATABASE_URL;
   let db: Db;
+  let shared: Db;
   if (url === undefined || url === "") {
-    db = await createPgliteDb();
+    const pglite = await PGlite.create();
+    db = {
+      ...adapt(pglite),
+      transaction: (work) => pglite.transaction((tx) => work(adapt(tx))),
+      close: () => pglite.close(),
+    };
+    shared = createPgliteSchemaDb(pglite, "shared");
     // One PGlite session owned by one test: a session-level SET is safe here.
-    await db.exec(`CREATE SCHEMA ${TEST_SCHEMA}; SET search_path TO ${TEST_SCHEMA}`);
+    await db.exec(
+      `CREATE SCHEMA shared; CREATE SCHEMA ${TEST_SCHEMA}; SET search_path TO ${TEST_SCHEMA}`,
+    );
   } else {
     const plain = createPgDb(url);
     await resetSchema(plain);
-    await plain.exec(`CREATE SCHEMA ${TEST_SCHEMA}`);
+    await plain.exec(`CREATE SCHEMA shared; CREATE SCHEMA ${TEST_SCHEMA}`);
     await plain.close();
     const scoped = new URL(url);
     scoped.searchParams.set("options", `-c search_path=${TEST_SCHEMA}`);
-    db = createPgDb(scoped.toString());
+    const tenant = createPgDb(scoped.toString());
+    const sharedPool = createPgSchemaDb(url, "shared");
+    shared = sharedPool;
+    db = {
+      ...tenant,
+      close: async () => {
+        await Promise.all([tenant.close(), sharedPool.close()]);
+      },
+    };
   }
   await migrate(db);
+  await migrateShared(shared);
+  sharedDbs.set(db, shared);
   return db;
 }
 

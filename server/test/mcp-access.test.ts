@@ -51,17 +51,13 @@ describe("the MCP server is off unless it is configured", () => {
   }
 
   it.each([
-    ["nothing is set", {}, "PUBLIC_BASE_URL and OWNER_PASSPHRASE_HASH are not set"],
-    [
-      "only the address is set",
-      { PUBLIC_BASE_URL: "https://overdrive.example.com" },
-      "OWNER_PASSPHRASE_HASH is not set",
-    ],
+    ["nothing is set", {}, "PUBLIC_BASE_URL is not set"],
+    // The passphrase is each user's own now (shared.users): it no longer decides whether the endpoint is on.
     ["only the hash is set", { OWNER_PASSPHRASE_HASH: "set-later" }, "PUBLIC_BASE_URL is not set"],
     [
       "only static tokens are set",
       { MCP_STATIC_TOKENS: [{ name: "claude", token: STATIC_TOKEN }] },
-      "PUBLIC_BASE_URL and OWNER_PASSPHRASE_HASH are not set",
+      "PUBLIC_BASE_URL is not set",
     ],
   ] as [string, Record<string, unknown>, string][])(
     "has no routes and says so in the log when %s",
@@ -90,7 +86,7 @@ describe("the MCP server is off unless it is configured", () => {
     },
   );
 
-  it("says it is on, where, and how many static tokens it has", async () => {
+  it("is on with the address alone (the passphrase is per user), and says where and how many static tokens it has", async () => {
     const { app, logs } = await appWith({
       PUBLIC_BASE_URL: "https://overdrive.example.com",
       OWNER_PASSPHRASE_HASH: await OWNER_HASH,

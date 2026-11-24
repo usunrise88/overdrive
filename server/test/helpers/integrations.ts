@@ -3,6 +3,7 @@ import { buildApp } from "../../src/app.ts";
 import type { Db } from "../../src/db.ts";
 import { createServices, type Services, type ServicesConfig } from "../../src/services.ts";
 import { COMPANION, TABLET } from "./app.ts";
+import { sharedDbOf } from "./db.ts";
 import {
   FAKE_CALENDAR_ID,
   FAKE_CLIENT_ID,
@@ -56,7 +57,8 @@ export function planWorkout(fake: FakeIntervals, date: string, name = "Sweet spo
 
 /** Empties what the calendar mirror and the bot keep, leaving the schema. */
 export async function clearIntegrations(db: Db): Promise<void> {
-  await db.exec("TRUNCATE calendar_events, plan_history, bot_notifications, bot_state");
+  await db.exec("TRUNCATE calendar_events, plan_history, bot_notifications");
+  await sharedDbOf(db).exec("TRUNCATE bot_state");
 }
 
 /**
@@ -105,6 +107,7 @@ export function startIntegrationHarness(
   const services = createServices({
     config,
     db,
+    sharedDb: sharedDbOf(db),
     log: logging.log,
     now: clock.now,
     sleep: sleeping.sleep,

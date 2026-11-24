@@ -3,7 +3,7 @@ import { validateNotebookResponse } from "@overdrive/contracts";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "../src/db.ts";
 import { bearer, COMPANION, expectError, TABLET } from "./helpers/app.ts";
-import { openMigratedTestDb } from "./helpers/db.ts";
+import { openMigratedTestDb, sharedDbOf } from "./helpers/db.ts";
 import { type FakeIntervals, startFakeIntervals } from "./helpers/fake-intervals.ts";
 import {
   authorizeQuery,
@@ -513,7 +513,7 @@ describe("the game master's notebook", () => {
   let master: Client;
 
   beforeAll(async () => {
-    await db.exec("TRUNCATE oauth_tokens, oauth_codes, oauth_clients");
+    await sharedDbOf(db).exec("TRUNCATE oauth_tokens, oauth_codes, oauth_clients, oauth_families");
     const { token, granted } = await tokenWithScope("mcp game-master");
     expect(granted).toBe("mcp game-master");
     master = await connectWithToken(h.mcpUrl, token);

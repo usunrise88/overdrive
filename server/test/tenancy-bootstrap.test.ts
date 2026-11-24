@@ -231,7 +231,7 @@ describe("the legacy cutover (T1)", () => {
 
     expect(report.layout).toBe("legacy");
     expect(report.owner).toEqual({ id: 1, handle: "rider" });
-    expect(report.migrations).toEqual({ shared: [1] });
+    expect(report.migrations).toEqual({ shared: [1], t_1: [14] });
     expect(report.before).not.toBeNull();
     expect(report.after).toEqual(report.before);
     expect(Object.keys(report.after?.tables ?? {})).toHaveLength(EXPECTED_TABLES.length + 1);
@@ -243,8 +243,8 @@ describe("the legacy cutover (T1)", () => {
     const text = JSON.stringify(report);
     for (const secret of setup.secrets) expect(text).not.toContain(secret);
 
-    // The same content, in the new places.
-    for (const table of tables) {
+    // The same content, in the new places (`schema_migrations` gains the row of 0014, checked below).
+    for (const table of tables.filter((t) => t !== "schema_migrations")) {
       const after = await independentHash(db, `${newHome(table)}.${table}`);
       expect(after, table).toBe(before[table]);
     }
@@ -337,11 +337,11 @@ describe("the legacy cutover (T1)", () => {
     expect(sha256Hex(settings.STRAVA_REFRESH_TOKEN as string)).toBe(strava.rows[0]?.seed_sha256);
     expect(strava.rows[0]?.refresh_token).toBe(setup.strava.stravaRotated);
 
-    // t_1 has the tables and the 13 migration rows; shared has its own bookkeeping.
+    // t_1 has the tables and the 14 migration rows; shared has its own bookkeeping.
     const rows = await db.query<{ version: number }>(
       "SELECT version FROM t_1.schema_migrations ORDER BY 1",
     );
-    expect(rows.rows.map((r) => r.version)).toEqual(Array.from({ length: 13 }, (_, i) => i + 1));
+    expect(rows.rows.map((r) => r.version)).toEqual(Array.from({ length: 14 }, (_, i) => i + 1));
     expect(
       (await db.query<{ version: number }>("SELECT version FROM shared.schema_migrations")).rows,
     ).toEqual([{ version: 1 }]);
@@ -561,10 +561,12 @@ describe("a fresh database", () => {
     expect(report.owner).toEqual({ id: 1, handle: "rider" });
     expect(report.before).toBeNull();
     expect(report.migrations.shared).toEqual([1]);
-    expect(report.migrations.t_1).toEqual(Array.from({ length: 13 }, (_, i) => i + 1));
+    expect(report.migrations.t_1).toEqual(Array.from({ length: 14 }, (_, i) => i + 1));
     expect(await schemasNow()).toEqual(["shared", "t_1"]);
     expect(await publicTables()).toEqual([]);
-    expect(await listTables(db, "t_1")).toEqual([...EXPECTED_TABLES, "schema_migrations"].sort());
+    expect(await listTables(db, "t_1")).toEqual(
+      [...EXPECTED_TABLES.filter((t) => !MOVED_TO_SHARED.includes(t)), "schema_migrations"].sort(),
+    );
     const users = await db.query<{ id: string; handle: string }>(
       "SELECT id::text AS id, handle FROM shared.users",
     );
@@ -611,7 +613,7 @@ describe("a database already in the new layout", () => {
     expect(report).toMatchObject({ layout: "multi", owner: null, importedKeys: [] });
     expect(report.migrations.shared).toEqual([1]);
     expect(report.migrations.t_1).toEqual([13]);
-    expect(report.migrations.t_2).toEqual(Array.from({ length: 13 }, (_, i) => i + 1));
+    expect(report.migrations.t_2).toEqual(Array.from({ length: 14 }, (_, i) => i + 1));
     expect((await db.query("SELECT * FROM shared.users ORDER BY id")).rows).toEqual(
       usersBefore.rows,
     );

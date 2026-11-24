@@ -11,7 +11,7 @@ import {
   createPgSchemaDb,
   type Db,
 } from "../src/db.ts";
-import { migrate, SHARED_MIGRATIONS_DIR } from "../src/migrate.ts";
+import { migrate, readMigrations, SHARED_MIGRATIONS_DIR } from "../src/migrate.ts";
 import { resetSchema } from "./helpers/db.ts";
 
 let pglite: PGlite;
@@ -175,9 +175,22 @@ describe("migrations into schemas", () => {
     }
   });
 
-  it("keep the shared copies of the OAuth and bot tables identical to the tenant migrations'", async () => {
-    const tenant = createPgliteSchemaDb(pglite, "t_3");
+  it("drop the tenant copies of the OAuth and bot tables at 0014, and leave the other tables", async () => {
+    const tenant = createPgliteSchemaDb(pglite, "t_4");
+    await pglite.exec("CREATE SCHEMA t_4");
     await migrate(tenant);
+    const present = await names(tenant, "t_4");
+    for (const table of ["oauth_clients", "oauth_codes", "oauth_tokens", "bot_state"]) {
+      expect(present).not.toContain(table);
+    }
+    expect(present).toEqual(expect.arrayContaining(["rides", "profile", "bot_notifications"]));
+    expect(await migrate(tenant)).toEqual([]);
+  });
+
+  it("keep the shared copies of the OAuth and bot tables identical to the tenant migrations' (0003, 0004)", async () => {
+    const tenant = createPgliteSchemaDb(pglite, "t_3");
+    // Up to 0013: the layout in which the tenant schema still has the tables 0014 drops.
+    await migrate(tenant, (await readMigrations()).slice(0, 13));
     const tables = ["oauth_clients", "oauth_codes", "oauth_tokens", "bot_state"];
     const strip = (text: string, schema: string) => text.split(`${schema}.`).join("");
     const describeIn = async (schema: string) => {
