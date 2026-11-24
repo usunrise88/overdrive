@@ -1,5 +1,11 @@
 import { PGlite } from "@electric-sql/pglite";
-import { createPgDb, type Db, type Queryable } from "../../src/db.ts";
+import {
+  createPgDb,
+  createPgliteSchemaDb,
+  createPgSchemaDb,
+  type Db,
+  type Queryable,
+} from "../../src/db.ts";
 import { migrate } from "../../src/migrate.ts";
 
 function adapt(runner: PGlite | { query: PGlite["query"]; exec: PGlite["exec"] }): Queryable {
@@ -34,6 +40,47 @@ export async function openTestDb(): Promise<Db> {
   const db = createPgDb(url);
   await resetSchema(db);
   return db;
+}
+
+export interface TenancyTestDb {
+  /** A root connection with the default `search_path` (the legacy tables are in `public`). */
+  db: Db;
+  /** A `Db` whose `search_path` is `schema` alone: PGlite's per-transaction one, or a real pool with `options`. */
+  schemaDb: (schema: string) => Db;
+  /** Closes the pools it made (and the PGlite). */
+  close: () => Promise<void>;
+}
+
+/** Like {@link openTestDb}, with a factory for the per-schema `Db`s the multi-tenant code uses. Empty database. */
+export async function openTenancyTestDb(): Promise<TenancyTestDb> {
+  const url = process.env.TEST_DATABASE_URL;
+  if (url === undefined || url === "") {
+    const pglite = await PGlite.create();
+    const db: Db = {
+      ...adapt(pglite),
+      transaction: (work) => pglite.transaction((tx) => work(adapt(tx))),
+      close: async () => {},
+    };
+    return {
+      db,
+      schemaDb: (schema) => createPgliteSchemaDb(pglite, schema),
+      close: () => pglite.close(),
+    };
+  }
+  const db = createPgDb(url);
+  await resetSchema(db);
+  const made: Db[] = [db];
+  return {
+    db,
+    schemaDb: (schema) => {
+      const scoped = createPgSchemaDb(url, schema);
+      made.push(scoped);
+      return scoped;
+    },
+    close: async () => {
+      await Promise.all(made.map((d) => d.close()));
+    },
+  };
 }
 
 /** Drops every table, so a test starts from a database nothing has touched: `public`, `shared` and every `t_%` schema. */
