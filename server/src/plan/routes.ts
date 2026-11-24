@@ -6,19 +6,20 @@ import {
 } from "@overdrive/contracts";
 import type { FastifyInstance } from "fastify";
 import { HttpError } from "../errors.ts";
+import type { Accessor } from "../tenancy/context.ts";
 import { resolveHeartRateTargets } from "./heart-rate.ts";
 import { PLAN_SOURCE, type PlanRefresher } from "./refresher.ts";
 import type { PlanStore } from "./store.ts";
 
 export interface PlanRoutesOptions {
-  store: PlanStore;
+  store: Accessor<PlanStore>;
   /** null when no plan source is configured. */
-  refresher: PlanRefresher | null;
+  refresher: Accessor<PlanRefresher | null>;
   /**
    * The rider's threshold heart rate in bpm (the profile's, else its estimate), or null when none is known: a heart-rate step
    * that gives its target as a fraction of it is served with the beats worked out (spec §11.2, docs/adr/0033).
    */
-  thresholdHeartRate?: () => Promise<number | null>;
+  thresholdHeartRate?: Accessor<Promise<number | null>>;
 }
 
 interface Query {
@@ -46,9 +47,9 @@ function dateParam(name: string, value: unknown): string {
  *   the beats worked out from the profile's threshold (docs/adr/0033). Every workout carries its `structureHash` (docs/adr/0034).
  */
 export function planRoutes(app: FastifyInstance, options: PlanRoutesOptions): void {
-  const { store, refresher, thresholdHeartRate } = options;
-
   app.get<Query>("/workouts", async (request, reply) => {
+    const store = options.store(request);
+    const refresher = options.refresher(request);
     const from = dateParam("from", request.query.from);
     const to = dateParam("to", request.query.to);
     const days = rangeDays(from, to);
@@ -91,7 +92,8 @@ export function planRoutes(app: FastifyInstance, options: PlanRoutesOptions): vo
     const state = await store.syncState(PLAN_SOURCE);
     const planned = await store.list({ from, to });
     // The tablet holds a number of beats: a target that is a fraction of the threshold is resolved here, on the way out.
-    const threshold = thresholdHeartRate === undefined ? null : await thresholdHeartRate();
+    const threshold =
+      options.thresholdHeartRate === undefined ? null : await options.thresholdHeartRate(request);
     // Each carries its structure hash, worked out from the workout as it is served (docs/adr/0034): the tablet asks for the previous
     // attempt with it and never computes a hash itself.
     const workouts = planned.map((entry) => {

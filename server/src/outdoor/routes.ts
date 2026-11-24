@@ -2,11 +2,12 @@ import { ACTIVITY_FIT_MAX_BYTES } from "@overdrive/contracts";
 import type { FastifyInstance } from "fastify";
 import { HttpError } from "../errors.ts";
 import { FIT_CONTENT_TYPE } from "../rides.ts";
+import type { Accessor } from "../tenancy/context.ts";
 import { ImportError } from "./fit-ride.ts";
 import type { OutdoorService } from "./service.ts";
 
 export interface OutdoorRoutesOptions {
-  service: OutdoorService;
+  service: Accessor<OutdoorService>;
   /** The largest FIT file in bytes (default 16 MiB). For the tests. */
   maxBytes?: number;
 }
@@ -22,7 +23,7 @@ export interface OutdoorRoutesOptions {
  * The body is read as bytes and is never parsed as text or logged. Authentication and the error body are the caller's.
  */
 export function outdoorRoutes(app: FastifyInstance, options: OutdoorRoutesOptions): void {
-  const { service } = options;
+  const serviceOf = options.service;
   const maxBytes = options.maxBytes ?? ACTIVITY_FIT_MAX_BYTES;
 
   app.register(async (scope) => {
@@ -37,7 +38,10 @@ export function outdoorRoutes(app: FastifyInstance, options: OutdoorRoutesOption
         throw new HttpError("invalid_fit", "The body must be the FIT file's bytes");
       }
       try {
-        const { response, created } = await service.importFit(body, request.device ?? "unknown");
+        const { response, created } = await serviceOf(request).importFit(
+          body,
+          request.device ?? "unknown",
+        );
         reply.header("cache-control", "no-store");
         return reply.code(created ? 201 : 200).send(response);
       } catch (error) {

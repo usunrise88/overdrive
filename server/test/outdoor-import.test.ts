@@ -232,7 +232,7 @@ describe("POST /v1/activities/fit", () => {
       installErrorHandling(small);
       small.register(
         async (v1) => {
-          v1.register(outdoorRoutes, { service: h.services.outdoor, maxBytes: 600 });
+          v1.register(outdoorRoutes, { service: () => h.services.outdoor, maxBytes: 600 });
         },
         { prefix: "/v1" },
       );

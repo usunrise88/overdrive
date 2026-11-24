@@ -1,10 +1,11 @@
 import { validatePlanEventDeclaration } from "@overdrive/contracts";
 import type { FastifyInstance } from "fastify";
 import { HttpError } from "../errors.ts";
+import type { Accessor } from "../tenancy/context.ts";
 import { PlanEventError, type PlanEventsService } from "./service.ts";
 
 export interface PlanEventsRoutesOptions {
-  service: PlanEventsService;
+  service: Accessor<PlanEventsService>;
 }
 
 /**
@@ -16,7 +17,7 @@ export interface PlanEventsRoutesOptions {
  *   service and cannot be declared.
  */
 export function planEventsRoutes(app: FastifyInstance, options: PlanEventsRoutesOptions): void {
-  const { service } = options;
+  const serviceOf = options.service;
 
   app.post("/plan-events", async (request, reply) => {
     reply.header("cache-control", "no-store");
@@ -28,7 +29,7 @@ export function planEventsRoutes(app: FastifyInstance, options: PlanEventsRoutes
       );
     }
     try {
-      const { event, created } = await service.declare(
+      const { event, created } = await serviceOf(request).declare(
         checked.value.kind,
         checked.value.until ?? null,
       );
