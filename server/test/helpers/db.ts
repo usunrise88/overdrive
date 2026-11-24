@@ -36,14 +36,35 @@ export async function openTestDb(): Promise<Db> {
   return db;
 }
 
-/** Drops every table, so a test starts from a database nothing has touched. */
+/** Drops every table, so a test starts from a database nothing has touched: `public`, `shared` and every `t_%` schema. */
 export async function resetSchema(db: Db): Promise<void> {
-  await db.exec("DROP SCHEMA public CASCADE; CREATE SCHEMA public");
+  const others = await db.query<{ schema_name: string }>(
+    "SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'shared' OR schema_name LIKE 't\\_%'",
+  );
+  const drops = others.rows.map((r) => `DROP SCHEMA "${r.schema_name}" CASCADE;`).join(" ");
+  await db.exec(`DROP SCHEMA public CASCADE; CREATE SCHEMA public; ${drops}`);
 }
 
-/** A database with the real migrations applied. */
+/** The schema the single-user tests' tables live in. */
+export const TEST_SCHEMA = "t_test";
+
+/** A database with the real migrations applied, in schema `t_test` (the connection's `search_path` names it). */
 export async function openMigratedTestDb(): Promise<Db> {
-  const db = await openTestDb();
+  const url = process.env.TEST_DATABASE_URL;
+  let db: Db;
+  if (url === undefined || url === "") {
+    db = await createPgliteDb();
+    // One PGlite session owned by one test: a session-level SET is safe here.
+    await db.exec(`CREATE SCHEMA ${TEST_SCHEMA}; SET search_path TO ${TEST_SCHEMA}`);
+  } else {
+    const plain = createPgDb(url);
+    await resetSchema(plain);
+    await plain.exec(`CREATE SCHEMA ${TEST_SCHEMA}`);
+    await plain.close();
+    const scoped = new URL(url);
+    scoped.searchParams.set("options", `-c search_path=${TEST_SCHEMA}`);
+    db = createPgDb(scoped.toString());
+  }
   await migrate(db);
   return db;
 }

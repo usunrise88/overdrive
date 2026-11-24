@@ -757,7 +757,7 @@ describe("the tools tell a model how to use the live coach", () => {
 describe("the migration", () => {
   it("makes the cue log and refuses lines with no fingerprint and a brief over 1000 characters", async () => {
     const cols = await db.query<{ column_name: string }>(
-      "SELECT column_name FROM information_schema.columns WHERE table_name = 'live_cues' ORDER BY ordinal_position",
+      "SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'live_cues' ORDER BY ordinal_position",
     );
     expect(cols.rows.map((r) => r.column_name)).toEqual([
       "id",
