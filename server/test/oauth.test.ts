@@ -41,8 +41,26 @@ afterAll(async () => {
   await db.close();
 });
 
+/**
+ * Empties the OAuth tables. The previous test's approval started `store.purge` in the background (the route does not wait for it),
+ * and it can still be running: its last statement reads codes and tokens while holding rows of `oauth_families`, whereas TRUNCATE
+ * takes the tables in the order listed, so PostgreSQL may report a deadlock (40P01). Nothing in the service TRUNCATEs, so the
+ * test waits a moment and tries again.
+ */
+async function emptyOAuthTables(): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await shared.exec("TRUNCATE oauth_tokens, oauth_codes, oauth_clients, oauth_families");
+      return;
+    } catch (error) {
+      if (attempt >= 5 || !/deadlock detected/.test(String(error))) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
+    }
+  }
+}
+
 beforeEach(async () => {
-  await shared.exec("TRUNCATE oauth_tokens, oauth_codes, oauth_clients, oauth_families");
+  await emptyOAuthTables();
   h = await startMcpHarness(db, fake);
   return async () => {
     await h.close();

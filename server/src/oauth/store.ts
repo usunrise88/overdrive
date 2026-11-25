@@ -162,6 +162,7 @@ export interface OAuthStore {
 }
 
 export function createOAuthStore(db: Db, lifetimes: Lifetimes = DEFAULT_LIFETIMES): OAuthStore {
+  let purging = false;
   async function insertTokens(
     tx: Queryable,
     grant: { clientId: string; scope: string; resource: string; familyId: string },
@@ -422,22 +423,33 @@ export function createOAuthStore(db: Db, lifetimes: Lifetimes = DEFAULT_LIFETIME
     },
 
     async purge(now) {
-      await db.query("DELETE FROM oauth_codes WHERE expires_at < $1::timestamptz", [
-        later(now, -3600),
-      ]);
-      // A week after it expired a token tells nothing more (a used refresh token is kept until then
-      // so that its reuse is still noticed).
-      await db.query("DELETE FROM oauth_tokens WHERE expires_at < $1::timestamptz", [
-        later(now, -7 * 24 * 3600),
-      ]);
-      // A family nothing refers to any more is forgotten with its last code or token.
-      await db.query(
-        `DELETE FROM oauth_families f
-          WHERE NOT EXISTS (SELECT 1 FROM oauth_codes c WHERE c.family_id = f.family_id)
-            AND NOT EXISTS (SELECT 1 FROM oauth_tokens t WHERE t.family_id = f.family_id)`,
-      );
+      // One at a time: a second approval while a purge runs has nothing more to add.
+      if (purging) return;
+      purging = true;
+      try {
+        await purgeNow(now);
+      } finally {
+        purging = false;
+      }
     },
   };
+
+  async function purgeNow(now: Date): Promise<void> {
+    await db.query("DELETE FROM oauth_codes WHERE expires_at < $1::timestamptz", [
+      later(now, -3600),
+    ]);
+    // A week after it expired a token tells nothing more (a used refresh token is kept until then
+    // so that its reuse is still noticed).
+    await db.query("DELETE FROM oauth_tokens WHERE expires_at < $1::timestamptz", [
+      later(now, -7 * 24 * 3600),
+    ]);
+    // A family nothing refers to any more is forgotten with its last code or token.
+    await db.query(
+      `DELETE FROM oauth_families f
+          WHERE NOT EXISTS (SELECT 1 FROM oauth_codes c WHERE c.family_id = f.family_id)
+            AND NOT EXISTS (SELECT 1 FROM oauth_tokens t WHERE t.family_id = f.family_id)`,
+    );
+  }
 }
 
 async function findToken(
