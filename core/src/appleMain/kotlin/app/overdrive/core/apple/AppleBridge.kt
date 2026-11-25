@@ -37,7 +37,6 @@ import app.overdrive.core.device.HeartRateDevice
 import app.overdrive.core.device.SimulatedBike
 import app.overdrive.core.device.SimulatedDevice
 import app.overdrive.core.device.SimulationParameters
-import app.overdrive.core.device.TrainerCommandException
 import app.overdrive.core.device.TrainerDevice
 import app.overdrive.core.device.TrainerReading
 import app.overdrive.core.fit.FitOptions
@@ -306,15 +305,15 @@ private class UnpairedTrainerDevice : TrainerDevice {
     override val data: Flow<TrainerReading> = emptyFlow()
 
     override suspend fun requestControl() {
-        throw TrainerCommandException("No trainer paired")
+        error("No trainer paired")
     }
 
     override suspend fun setTargetPower(watts: Int) {
-        throw TrainerCommandException("No trainer paired")
+        error("No trainer paired")
     }
 
     override suspend fun setSimulation(parameters: SimulationParameters) {
-        throw TrainerCommandException("No trainer paired")
+        error("No trainer paired")
     }
 }
 
