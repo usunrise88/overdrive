@@ -6,6 +6,7 @@ import {
 } from "@overdrive/contracts";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { HttpError, sendError } from "../errors.ts";
+import type { Accessor } from "../tenancy/context.ts";
 import type { LiveCoachService } from "./service.ts";
 import type { Listener, StreamEvent } from "./session.ts";
 
@@ -25,7 +26,9 @@ import type { Listener, StreamEvent } from "./session.ts";
  */
 
 export interface LiveRoutesOptions {
-  service: LiveCoachService;
+  service: Accessor<LiveCoachService>;
+  /** Ends every live session of every tenant, before the server waits for its connections (see below). */
+  stopAll: () => Promise<void>;
 }
 
 /** A snapshot is about 400 bytes; nothing here is larger than this. */
@@ -74,11 +77,11 @@ function badBody(what: string, errors: readonly string[]): HttpError {
 }
 
 export function liveRoutes(app: FastifyInstance, options: LiveRoutesOptions): void {
-  const { service } = options;
+  const serviceOf = options.service;
 
   // An event stream keeps the HTTP server from closing: end the session (and so tell and close every listener) before the server waits for
   // its connections, not after (the service's own stop runs once the server is closed, which would never come).
-  app.addHook("preClose", () => service.stop());
+  app.addHook("preClose", () => options.stopAll());
 
   // Inside this scope an empty body is fine (the end of a session has none to give) and anything else must be JSON.
   app.removeContentTypeParser("application/json");
@@ -105,7 +108,7 @@ export function liveRoutes(app: FastifyInstance, options: LiveRoutesOptions): vo
   app.post("/live/sessions", { bodyLimit: BODY_LIMIT }, async (request, reply) => {
     const checked = validateLiveSessionStart(request.body ?? null);
     if (!checked.ok) throw badBody("a live session start", checked.errors);
-    const answer = await service.startSession(checked.value);
+    const answer = await serviceOf(request).startSession(checked.value);
     return reply.code(201).header("cache-control", "no-store").send(answer);
   });
 
@@ -117,7 +120,7 @@ export function liveRoutes(app: FastifyInstance, options: LiveRoutesOptions): vo
       const checked = validateLiveSnapshot(request.body ?? null);
       if (!checked.ok) throw badBody("a live snapshot", checked.errors);
       // A repeat or an older snapshot is ignored without a word: the app does not need to know.
-      if (service.snapshot(id, checked.value) === "unknown") throw unknownSession();
+      if (serviceOf(request).snapshot(id, checked.value) === "unknown") throw unknownSession();
       return reply.code(204).send();
     },
   );
@@ -155,7 +158,11 @@ export function liveRoutes(app: FastifyInstance, options: LiveRoutesOptions): vo
       closed = true;
       if (!raw.destroyed && !raw.writableEnded) raw.end();
     }
-    const stop = service.listen(id, listener, lastEventIdOf(request.headers["last-event-id"]));
+    const stop = serviceOf(request).listen(
+      id,
+      listener,
+      lastEventIdOf(request.headers["last-event-id"]),
+    );
     if (stop === null) return sendError(reply, "not_found", unknownSession().message);
 
     reply.hijack();
@@ -185,7 +192,7 @@ export function liveRoutes(app: FastifyInstance, options: LiveRoutesOptions): vo
       const id = sessionIdOf(request);
       const checked = validateLiveSessionEnd(request.body ?? {});
       if (!checked.ok) throw badBody("the end of a live session", checked.errors);
-      const answer = service.endSession(id, checked.value);
+      const answer = serviceOf(request).endSession(id, checked.value);
       if (answer === null) throw unknownSession();
       return reply.code(200).header("cache-control", "no-store").send(answer);
     },
@@ -200,7 +207,7 @@ export function liveRoutes(app: FastifyInstance, options: LiveRoutesOptions): vo
       if (!CUE_ID.test(cueId)) throw new HttpError("not_found", "There is no such cue");
       const checked = validateLiveCuePlayed(request.body ?? null);
       if (!checked.ok) throw badBody("a live cue report", checked.errors);
-      if (!(await service.played(id, Number(cueId), checked.value.played))) {
+      if (!(await serviceOf(request).played(id, Number(cueId), checked.value.played))) {
         throw new HttpError("not_found", "There is no such cue in this session");
       }
       return reply.code(204).send();

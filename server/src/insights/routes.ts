@@ -1,10 +1,11 @@
 import { MAX_INSIGHTS_RANGE_DAYS, rangeDays } from "@overdrive/contracts";
 import type { FastifyInstance } from "fastify";
 import { HttpError } from "../errors.ts";
+import type { Accessor } from "../tenancy/context.ts";
 import type { InsightsService } from "./service.ts";
 
 export interface InsightsRoutesOptions {
-  insights: InsightsService;
+  insights: Accessor<InsightsService>;
 }
 
 interface RangeQuery {
@@ -27,7 +28,7 @@ function dateParam(name: string, value: unknown): string {
  * The notes are health data: the answer is not cached, and nothing here logs it.
  */
 export function insightsRoutes(app: FastifyInstance, options: InsightsRoutesOptions): void {
-  const { insights } = options;
+  const insightsOf = options.insights;
 
   app.get<RangeQuery>("/insights", async (request, reply) => {
     const from = dateParam("from", request.query.from);
@@ -44,6 +45,6 @@ export function insightsRoutes(app: FastifyInstance, options: InsightsRoutesOpti
       );
     }
     reply.header("cache-control", "no-store");
-    return insights.list(from, to);
+    return insightsOf(request).list(from, to);
   });
 }

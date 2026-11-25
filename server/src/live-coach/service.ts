@@ -86,6 +86,8 @@ export interface LiveCoachService {
   played(sessionId: string, cueId: number, played: boolean): Promise<boolean>;
   /** The cues the coach made in a ride, in order, with whether the tablet said they were played. */
   cuesOfRide(rideId: string): Promise<LiveCueRow[]>;
+  /** Whether a session is live now: the multi-tenant registry will not rebuild a user's services under it. */
+  hasLiveSession(): boolean;
   start(): void;
   stop(): Promise<void>;
   /** Resolves when no cue is being made or logged. For the tests. */
@@ -392,6 +394,8 @@ export function createLiveCoach(deps: LiveCoachDeps): LiveCoachService {
   return {
     limits,
     availability,
+
+    hasLiveSession: () => active !== null,
 
     startSession(body) {
       const run = queue.then(() => begin(body));

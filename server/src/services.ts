@@ -155,6 +155,11 @@ export interface ServicesOptions {
   sleep?: (ms: number) => Promise<void>;
   /** For the tests: the loops' ticks by hand. */
   timers?: Timers;
+  /**
+   * Whether this graph builds its own Telegram bot (default true). `false`: no bot at all. To give a user a bot that
+   * does not poll (one shared poller feeds it, `telegram/poller.ts`), leave this true and set `telegramPoll: false`.
+   */
+  telegram?: boolean;
   /** The `shared` Db, where the bot keeps its offset (`bot_state`); `db` when unset. */
   sharedDb?: Db;
   /** false: the bot does not poll (a shared poller feeds it, multi-tenancy). Default true. */
@@ -411,27 +416,30 @@ export function createServices(options: ServicesOptions): Services {
     sleep: options.sleep,
     timers: options.timers,
   });
-  const telegram = createTelegram({
-    config,
-    db,
-    plan,
-    bus,
-    intervals,
-    refresher,
-    log,
-    timezone,
-    now,
-    fetch: options.fetch,
-    sleep: options.sleep,
-    timers: options.timers,
-    history: planHistory,
-    stateDb: options.sharedDb,
-    poll: options.telegramPoll,
-    client: options.telegramClient,
-    sources: [insights.notifications, notebook.notifications, planEvents.notifications],
-    outdoor,
-    planEvents,
-  });
+  const telegram =
+    (options.telegram ?? true)
+      ? createTelegram({
+          config,
+          db,
+          plan,
+          bus,
+          intervals,
+          refresher,
+          log,
+          timezone,
+          now,
+          fetch: options.fetch,
+          sleep: options.sleep,
+          timers: options.timers,
+          history: planHistory,
+          stateDb: options.sharedDb,
+          poll: options.telegramPoll,
+          client: options.telegramClient,
+          sources: [insights.notifications, notebook.notifications, planEvents.notifications],
+          outdoor,
+          planEvents,
+        })
+      : null;
   let strava: StravaUploads | null = null;
   const stravaMode = stravaSettings(config);
   if ("on" in stravaMode) {

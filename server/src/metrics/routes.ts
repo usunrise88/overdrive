@@ -9,10 +9,11 @@ import {
 } from "@overdrive/contracts";
 import type { FastifyInstance } from "fastify";
 import { HttpError } from "../errors.ts";
+import type { Accessor } from "../tenancy/context.ts";
 import type { MetricsService } from "./service.ts";
 
 export interface MetricsRoutesOptions {
-  metrics: MetricsService;
+  metrics: Accessor<MetricsService>;
 }
 
 interface MetricsQuery {
@@ -88,7 +89,7 @@ function rideIdOf(request: { params: { rideId: string } }): string {
  * A malformed query parameter is `400 invalid_query`, an unknown ride `404 ride_not_found`.
  */
 export function metricsRoutes(app: FastifyInstance, options: MetricsRoutesOptions): void {
-  const { metrics } = options;
+  const metricsOf = options.metrics;
 
   app.get<MetricsQuery>("/metrics", async (request, reply) => {
     const from = dateParam("from", request.query.from);
@@ -105,7 +106,7 @@ export function metricsRoutes(app: FastifyInstance, options: MetricsRoutesOption
       );
     }
     reply.header("cache-control", "no-store");
-    return metrics.metrics(from, to);
+    return metricsOf(request).metrics(from, to);
   });
 
   app.get<RidesQuery>("/rides", async (request, reply) => {
@@ -136,13 +137,13 @@ export function metricsRoutes(app: FastifyInstance, options: MetricsRoutesOption
       wanted = Number(limit);
     }
     reply.header("cache-control", "no-store");
-    return metrics.rideList({ beforeMillis, limit: wanted });
+    return metricsOf(request).rideList({ beforeMillis, limit: wanted });
   });
 
   app.get<RideDetailQuery>("/rides/:rideId", async (request, reply) => {
     const rideId = rideIdOf(request);
     const series = flagParam("series", request.query.series);
-    const detail = await metrics.rideDetail(rideId, { series });
+    const detail = await metricsOf(request).rideDetail(rideId, { series });
     if (detail === null) throw new HttpError("ride_not_found", `Ride ${rideId} is not stored`);
     reply.header("cache-control", "no-store");
     return detail;
@@ -158,7 +159,7 @@ export function metricsRoutes(app: FastifyInstance, options: MetricsRoutesOption
     if ((cp !== undefined || wPrimeKj !== undefined) && !wbal) {
       throw new HttpError("invalid_query", "cp and wPrimeKj need wbal=true");
     }
-    const response = await metrics.rideMetrics(rideId, {
+    const response = await metricsOf(request).rideMetrics(rideId, {
       wbal,
       series,
       ...(cp === undefined ? {} : { cp }),
@@ -177,7 +178,7 @@ export function metricsRoutes(app: FastifyInstance, options: MetricsRoutesOption
         `The body must be {"suggestionId": number}: ${body.errors.slice(0, 3).join("; ")}`,
       );
     }
-    const status = await metrics.dismissSuggestion(body.value.suggestionId);
+    const status = await metricsOf(request).dismissSuggestion(body.value.suggestionId);
     if (status === null) {
       throw new HttpError("not_found", `There is no FTP suggestion ${body.value.suggestionId}`);
     }

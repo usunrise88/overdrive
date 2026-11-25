@@ -11,6 +11,7 @@ import { HttpError } from "./errors.ts";
 import type { EventBus } from "./events.ts";
 import { checkFit } from "./fit.ts";
 import { canonicalJson, sha256Hex } from "./hash.ts";
+import type { Accessor } from "./tenancy/context.ts";
 
 /** The content type of the FIT upload. */
 export const FIT_CONTENT_TYPE = "application/vnd.ant.fit";
@@ -25,15 +26,15 @@ export interface Limits {
 export const DEFAULT_LIMITS: Limits = { recordBytes: 16 * 1024 * 1024, fitBytes: 8 * 1024 * 1024 };
 
 export interface RidesOptions {
-  db: Db;
+  db: Accessor<Db>;
   limits: Limits;
   /** Told when a ride is complete (record and FIT stored), after the transaction committed. */
-  events: EventBus;
+  events: Accessor<EventBus>;
   /**
    * The destinations (ADR 0014 section 5, `ride_destinations.destination`) a ride is queued for in
    * the transaction that stores its FIT. The workers that drain the queue live elsewhere.
    */
-  destinations: readonly string[];
+  destinations: Accessor<readonly string[]>;
 }
 
 interface RideParams {
@@ -78,7 +79,7 @@ function answer(reply: FastifyReply, rideId: string, status: UploadStatus): Fast
  * Authentication, body limits and the error body are the caller's (`app.ts`, `errors.ts`).
  */
 export function ridesRoutes(app: FastifyInstance, options: RidesOptions): void {
-  const { db, limits, events, destinations } = options;
+  const { limits } = options;
 
   // The record: JSON only.
   app.register(async (scope) => {
@@ -101,7 +102,7 @@ export function ridesRoutes(app: FastifyInstance, options: RidesOptions): void {
             `The path says ${rideId}, the record says ${record.ride.id}`,
           );
         }
-        const status = await storeRecord(db, record, request.device ?? "unknown");
+        const status = await storeRecord(options.db(request), record, request.device ?? "unknown");
         request.log.info({ device: request.device, rideId, status }, "ride record");
         return answer(reply, rideId, status);
       },
@@ -126,7 +127,12 @@ export function ridesRoutes(app: FastifyInstance, options: RidesOptions): void {
         }
         const check = checkFit(body);
         if (!check.ok) throw new HttpError("invalid_fit", check.reason);
-        const stored = await storeFit(db, rideId, body, destinations);
+        const stored = await storeFit(
+          options.db(request),
+          rideId,
+          body,
+          options.destinations(request),
+        );
         request.log.info(
           { device: request.device, rideId, status: stored.status, bytes: body.length },
           "ride fit file",
@@ -134,7 +140,9 @@ export function ridesRoutes(app: FastifyInstance, options: RidesOptions): void {
         // The ride is complete now. Listeners (the upload worker, later the bot) are not waited for
         // and cannot fail this request.
         if (stored.startEpochMillis !== undefined) {
-          events.emit("ride-stored", { rideId, startEpochMillis: stored.startEpochMillis });
+          options
+            .events(request)
+            .emit("ride-stored", { rideId, startEpochMillis: stored.startEpochMillis });
         }
         return answer(reply, rideId, stored.status);
       },

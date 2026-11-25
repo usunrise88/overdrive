@@ -8,10 +8,11 @@ import {
 } from "@overdrive/contracts";
 import type { FastifyInstance } from "fastify";
 import { HttpError } from "../errors.ts";
+import type { Accessor } from "../tenancy/context.ts";
 import type { WellnessService } from "./service.ts";
 
 export interface WellnessRoutesOptions {
-  service: WellnessService;
+  service: Accessor<WellnessService>;
   /** The largest request body in bytes (default 4 MiB). For the tests. */
   maxBytes?: number;
 }
@@ -69,7 +70,7 @@ async function refreshFirst(service: WellnessService, query: unknown): Promise<v
  * nothing the routes log names a value.
  */
 export function wellnessRoutes(app: FastifyInstance, options: WellnessRoutesOptions): void {
-  const { service } = options;
+  const serviceOf = options.service;
   const maxBytes = options.maxBytes ?? WELLNESS_MAX_BYTES;
 
   // The upload: JSON only, read as text and parsed by hand (the default parser's message quotes the body).
@@ -101,7 +102,7 @@ export function wellnessRoutes(app: FastifyInstance, options: WellnessRoutesOpti
       const checked = validateWellnessUpload(body);
       if (!checked.ok) throw new HttpError("invalid_record", summarize(checked.errors));
       const device = request.device ?? "unknown";
-      const answer = await service.upload.ingest(checked.value, device);
+      const answer = await serviceOf(request).upload.ingest(checked.value, device);
       // Counts and the device's name: never a value.
       request.log.info(
         {
@@ -133,19 +134,19 @@ export function wellnessRoutes(app: FastifyInstance, options: WellnessRoutesOpti
       );
     }
     reply.header("cache-control", "no-store");
-    await refreshFirst(service, request.query.refresh);
-    return service.wellness(from, to);
+    await refreshFirst(serviceOf(request), request.query.refresh);
+    return serviceOf(request).wellness(from, to);
   });
 
   app.get<{ Querystring: { refresh?: unknown } }>("/recovery", async (request, reply) => {
     reply.header("cache-control", "no-store");
-    await refreshFirst(service, request.query.refresh);
-    return service.recovery();
+    await refreshFirst(serviceOf(request), request.query.refresh);
+    return serviceOf(request).recovery();
   });
 
   app.get<{ Params: { id: string } }>("/activities/:id", async (request, reply) => {
     const { id } = request.params;
-    const activity = ACTIVITY_ID.test(id) ? await service.activity(id) : null;
+    const activity = ACTIVITY_ID.test(id) ? await serviceOf(request).activity(id) : null;
     if (activity === null) throw new HttpError("not_found", "There is no such activity");
     reply.header("cache-control", "no-store");
     return activity;
