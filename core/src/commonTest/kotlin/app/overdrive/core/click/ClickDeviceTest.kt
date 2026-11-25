@@ -43,7 +43,7 @@ class ClickDeviceTest {
     // region set-up
 
     @Test
-    fun `set-up order is the notes' 3-1, from discovery to the optional steps, as the real puck answers it`() =
+    fun `set-up order is the notes' 3-1 from discovery to the optional steps as the real puck answers it`() =
         runTest {
             val rig = BleRig(this)
             val fake = rig.withClick()
@@ -83,7 +83,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `the handshake is written without response, then FF 04 00, and the reply tail is ignored`() =
+    fun `the handshake is written without response then FF 04 00 and the reply tail is ignored`() =
         runTest {
             val rig = BleRig(this)
             val fake = rig.withClick(FakeClickOptions.byNotes(replyTailLength = 64))
@@ -102,7 +102,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `the firmware and the battery are read once, and a battery frame updates it`() =
+    fun `the firmware and the battery are read once and a battery frame updates it`() =
         runTest {
             val rig = BleRig(this)
             rig.withClick(FakeClickOptions.byNotes(batteryPercent = 87))
@@ -121,7 +121,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `an MTU of 128 is asked for, so a reply with a 64 byte key fits, and a refusal only shows in the events`() =
+    fun `an MTU of 128 is asked for so a reply with a 64 byte key fits and a refusal only shows in the events`() =
         runTest {
             val rig = BleRig(this)
             rig.withClick()
@@ -152,7 +152,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `a controller that needs FF 04 00 is silent without it and delivers with it (bench question 6)`() =
+    fun `a controller that needs FF 04 00 is silent without it and delivers with it bench question 6`() =
         runTest {
             // The silence rule is what tells the two apart, so it is on here; the fake sends frames once it delivers.
             val needing = FakeClickOptions.byNotes(needsPostHandshake = true)
@@ -180,7 +180,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `the strict reply check refuses another version, naming the bytes, and any-RideOn accepts it`() =
+    fun `the strict reply check refuses another version naming the bytes and any-RideOn accepts it`() =
         runTest {
             val odd = FakeClickOptions(replyVersion = 0x0103)
             val rig = BleRig(this)
@@ -205,7 +205,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `a bare RideOn passes the default check, RideOn 02 03 too, and any other version does not`() =
+    fun `a bare RideOn passes the default check RideOn 02 03 too and any other version does not`() =
         runTest {
             fun state(options: FakeClickOptions): ClickState {
                 val rig = BleRig(this)
@@ -228,7 +228,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `no reply within the timeout fails the set-up, and not waiting for one connects anyway`() =
+    fun `no reply within the timeout fails the set-up and not waiting for one connects anyway`() =
         runTest {
             val mute = FakeClickOptions(answersHandshake = false)
             val rig = BleRig(this)
@@ -268,7 +268,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `the older service is used when it is what the controller offers, and not when it is switched off`() =
+    fun `the older service is used when it is what the controller offers and not when it is switched off`() =
         runTest {
             val legacy = FakeClickOptions(service = ClickService.LEGACY)
             val rig = BleRig(this)
@@ -284,7 +284,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `a keep-alive is written at its interval, and there is none by default`() =
+    fun `a keep-alive is written at its interval and there is none by default`() =
         runTest {
             val rig = BleRig(this)
             val fake = rig.withClick()
@@ -347,7 +347,7 @@ class ClickDeviceTest {
     // region what the UI can explain (spec §4.7)
 
     @Test
-    fun `connecting, then active as soon as the handshake is answered, with no frame at all`() =
+    fun `connecting then active as soon as the handshake is answered with no frame at all`() =
         runTest {
             val rig = BleRig(this)
             rig.withClick()
@@ -359,7 +359,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `with the silence rule on it waits for the first frame, a press makes it active`() =
+    fun `with the silence rule on it waits for the first frame a press makes it active`() =
         runTest {
             val rig = BleRig(this)
             val fake = rig.withClick()
@@ -377,7 +377,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `with the silence rule on, silence after the handshake needs unlocking after the no-event time`() =
+    fun `with the silence rule on silence after the handshake needs unlocking after the no-event time`() =
         runTest {
             val rig = BleRig(this)
             val fake = rig.withClick(lock = FakeClickLock.SILENT)
@@ -401,7 +401,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `the silence rule is off by default, and its time is an option when it is on`() =
+    fun `the silence rule is off by default and its time is an option when it is on`() =
         runTest {
             assertFalse(ClickOptions().silentMeansLocked, "bench report 1: a healthy Click is silent until a press")
             val rig = BleRig(this)
@@ -421,7 +421,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `any frame at all counts as delivering, a heartbeat or a type nobody knows`() =
+    fun `any frame at all counts as delivering a heartbeat or a type nobody knows`() =
         runTest {
             val quiet = FakeClickOptions(heartbeatInterval = null, batteryPercent = null)
             val rig = BleRig(this)
@@ -459,7 +459,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `unrecognised frames and the disconnect notice are events, not errors`() =
+    fun `unrecognised frames and the disconnect notice are events not errors`() =
         runTest {
             val rig = BleRig(this)
             val fake = rig.withClick()
@@ -475,7 +475,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `a hidden service is the unlock notice, retried with backoff until it shows`() =
+    fun `a hidden service is the unlock notice retried with backoff until it shows`() =
         runTest {
             val rig = BleRig(this)
             val fake = rig.withClick(lock = FakeClickLock.HIDDEN)
@@ -514,7 +514,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `a controller that is not there is not found, and so is one that took too long`() =
+    fun `a controller that is not there is not found and so is one that took too long`() =
         runTest {
             val rig = BleRig(this)
             val fake = rig.withClick()
@@ -534,7 +534,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `a link that drops is not found with wasConnected, and the click comes back by itself`() =
+    fun `a link that drops is not found with wasConnected and the click comes back by itself`() =
         runTest {
             val rig = BleRig(this)
             val fake = rig.withClick()
@@ -550,7 +550,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `bluetooth off is its own state, and the click connects the moment it is back`() =
+    fun `bluetooth off is its own state and the click connects the moment it is back`() =
         runTest {
             val rig = BleRig(this)
             rig.withClick()
@@ -600,7 +600,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `close stops it, and it is stopped again if started never`() =
+    fun `close stops it and it is stopped again if started never`() =
         runTest {
             val rig = BleRig(this)
             rig.withClick()
@@ -619,7 +619,7 @@ class ClickDeviceTest {
     // region buttons
 
     @Test
-    fun `presses and releases arrive as edges with the whole state, and repeated frames are ignored`() =
+    fun `presses and releases arrive as edges with the whole state and repeated frames are ignored`() =
         runTest {
             val rig = BleRig(this)
             val fake = rig.withClick()
@@ -645,7 +645,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `all five buttons at once, then all released`() =
+    fun `all five buttons at once then all released`() =
         runTest {
             val rig = BleRig(this)
             val fake = rig.withClick()
@@ -660,7 +660,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `a drop with a button held releases it with a synthetic change, and a reconnect starts from nothing`() =
+    fun `a drop with a button held releases it with a synthetic change and a reconnect starts from nothing`() =
         runTest {
             val rig = BleRig(this)
             val fake = rig.withClick()
@@ -725,7 +725,7 @@ class ClickDeviceTest {
     // region the defaults of the first bench (docs/bench-reports/2026-11-18-first-ride.md)
 
     @Test
-    fun `a bare RideOn goes connecting to active with no frame at all, and stays active for ten minutes`() =
+    fun `a bare RideOn goes connecting to active with no frame at all and stays active for ten minutes`() =
         runTest {
             val rig = BleRig(this)
             val fake = rig.withClick(FakeClickOptions.realPuck(announces = false))
@@ -758,7 +758,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `RideOn 01 03, a seven byte reply and other bytes fail the default check, with the bytes in the event`() =
+    fun `RideOn 01 03 a seven byte reply and other bytes fail the default check with the bytes in the event`() =
         runTest {
             val cases =
                 listOf(
@@ -785,7 +785,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `a hidden service is still the unlock notice with the defaults, on the real puck's table`() =
+    fun `a hidden service is still the unlock notice with the defaults on the real puck's table`() =
         runTest {
             val rig = BleRig(this)
             rig.withClick(FakeClickOptions.realPuck(), lock = FakeClickLock.HIDDEN)
@@ -797,7 +797,7 @@ class ClickDeviceTest {
         }
 
     @Test
-    fun `the battery is read once at set-up, 0x64 is 100 percent, and no battery frame is needed`() =
+    fun `the battery is read once at set-up 0x64 is 100 percent and no battery frame is needed`() =
         runTest {
             val rig = BleRig(this)
             rig.withClick()
@@ -912,7 +912,7 @@ class ClickDeviceTest {
     // region recording (privacy)
 
     @Test
-    fun `a recorded Click session keeps no key, no firmware and no address, and the length of the reply`() =
+    fun `a recorded Click session keeps no key no firmware and no address and the length of the reply`() =
         runTest {
             val rig = BleRig(this)
             rig.withClick(FakeClickOptions.byNotes(replyTailLength = 64))

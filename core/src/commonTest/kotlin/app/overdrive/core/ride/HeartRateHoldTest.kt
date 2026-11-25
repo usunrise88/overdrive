@@ -55,7 +55,7 @@ class HeartRateHoldTest {
     }
 
     @Test
-    fun `the ramp is a setting, in length and in where it ends`() {
+    fun `the ramp is a setting in length and in where it ends`() {
         val hold = HeartRateHold(STEP, HeartRateHoldSettings(startRampSeconds = 60, startRampFraction = 0.5))
         repeat(60) { hold.tick(130) }
         assertEquals(150, hold.watts, "halfway through the range, after one minute")
@@ -78,7 +78,7 @@ class HeartRateHoldTest {
     // region settling on a lag model
 
     @Test
-    fun `it settles inside the band and does not oscillate beyond a stated amplitude, across riders`() {
+    fun `it settles inside the band and does not oscillate beyond a stated amplitude across riders`() {
         val band = 5
         for (steadyFraction in listOf(0.2, 0.5, 0.9)) {
             for (gain in listOf(0.2, 0.45, 0.7)) {
@@ -116,7 +116,7 @@ class HeartRateHoldTest {
     }
 
     @Test
-    fun `power never leaves the limits, however far the heart rate is from the target`() {
+    fun `power never leaves the limits however far the heart rate is from the target`() {
         val tooLow = run(HeartRateHold(HeartRateTarget(200, 5, 80, 220)), LagRider(0.3, 40.0), 2000)
         assertTrue(tooLow.watts.all { it in 80..220 })
         assertEquals(220, tooLow.watts.last(), "a target the rider cannot reach at power_max: held at power_max")
@@ -182,7 +182,7 @@ class HeartRateHoldTest {
     }
 
     @Test
-    fun `a strap that drops out holds the last power for 15 s, and after 60 s drops to power_min`() {
+    fun `a strap that drops out holds the last power for 15 s and after 60 s drops to power_min`() {
         val hold = holdAtSteadyState()
         val before = hold.watts
         repeat(14) { hold.tick(null) }
@@ -236,7 +236,7 @@ class HeartRateHoldTest {
     // region the target, the band, the gear buttons
 
     @Test
-    fun `the gear buttons move the target by 2 bpm, within a limit`() {
+    fun `the gear buttons move the target by 2 bpm within a limit`() {
         val hold = HeartRateHold(STEP)
         assertEquals(130, hold.targetBpm)
         assertTrue(hold.adjustTarget(+1))
@@ -269,7 +269,7 @@ class HeartRateHoldTest {
     }
 
     @Test
-    fun `in band is within the band either side of the target, edges included`() {
+    fun `in band is within the band either side of the target edges included`() {
         val hold = HeartRateHold(HeartRateTarget(130, 4, 80, 220))
         assertNull(hold.inBand, "no reading yet")
         hold.tick(134)

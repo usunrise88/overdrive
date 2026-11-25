@@ -33,7 +33,7 @@ class NotebookRepositoriesTest {
     private val body = NotebookSamples.json(NotebookSamples.filled())
 
     @Test
-    fun `the notebook is asked from its route, shown, and kept in the cache in the services own words`() =
+    fun `the notebook is asked from its route shown and kept in the cache in the services own words`() =
         runTest {
             val store = MemoryTextStore()
             val transport = ScriptedTransport(ok(body))
@@ -76,7 +76,7 @@ class NotebookRepositoriesTest {
         }
 
     @Test
-    fun `an empty notebook is an answer, not an error`() =
+    fun `an empty notebook is an answer not an error`() =
         runTest {
             val resource = notebook(ScriptedTransport(ok(NotebookSamples.json(NotebookSamples.empty()))))
             resource.load()
@@ -87,7 +87,7 @@ class NotebookRepositoriesTest {
         }
 
     @Test
-    fun `a service without the route says so, and an answer that is not the contract's is not the service`() =
+    fun `a service without the route says so and an answer that is not the contract's is not the service`() =
         runTest {
             val missing = notebook(ScriptedTransport(error(404, "not_found")))
             missing.load()
@@ -103,7 +103,7 @@ class NotebookRepositoriesTest {
         }
 
     @Test
-    fun `a cache written for another address is no cache, and a damaged one reads as none`() =
+    fun `a cache written for another address is no cache and a damaged one reads as none`() =
         runTest {
             val store = MemoryTextStore()
             notebook(ScriptedTransport(ok(body)), store).also {

@@ -73,7 +73,7 @@ public struct ReadyView: View {
                         ForEach(container.localWorkouts, id: \.id) { item in
                             selectableRow(
                                 title: item.workout.name,
-                                subtitle: item.workout.description_ ?? "\(UiFormat.durationWords(Int(WorkoutPlayer.Companion.shared.totalDurationSeconds(workout: item.workout))))",
+                                subtitle: item.workout.description_ ?? "\(UiFormat.durationWords(Int(AppleCoreFactories.shared.workoutDurationSeconds(workout: item.workout))))",
                                 selected: container.choice == .local(id: item.id, workout: item.workout)
                             ) {
                                 container.selectChoice(.local(id: item.id, workout: item.workout))
@@ -376,14 +376,14 @@ public struct ReadyView: View {
     }
 
     private func workoutDetail(_ workout: Workout) -> some View {
-        let flat = FlatStepKt.flatSteps(workout)
+        let flat = AppleCoreFactories.shared.workoutFlatSteps(workout: workout)
         let totalSec = flat.reduce(0) { $0 + Int($1.durationSeconds) }
-        let maxPct = flat.compactMap { $0.endTargetFraction?.doubleValue ?? $0.startTargetFraction?.doubleValue }.max() ?? 0
+        let maxPct = flat.compactMap { $0.targetTo?.doubleValue ?? $0.targetFrom?.doubleValue }.max() ?? 0
         let profileSteps = flat.map { step -> ProfileStepData in
-            let s = step.startTargetFraction?.doubleValue ?? 0.5
-            let e = step.endTargetFraction?.doubleValue ?? s
+            let s = step.targetFrom?.doubleValue ?? 0.5
+            let e = step.targetTo?.doubleValue ?? s
             let z = Int(PowerZone.Companion.shared.of(powerWatts: Int32(((s + e) * 0.5 * Double(container.effectiveFtp)).rounded()), ftp: Int32(container.effectiveFtp)).number)
-            return ProfileStepData(durationSeconds: Int(step.durationSeconds), startPctFtp: s, endPctFtp: e, isFreeRide: step.isFreeRide, isHeartRate: step.isHeartRate, zone: z)
+            return ProfileStepData(durationSeconds: Int(step.durationSeconds), startPctFtp: s, endPctFtp: e, isFreeRide: step.mode == .simulation, isHeartRate: step.heartRate != nil, zone: z)
         }
 
         return VStack(alignment: .leading, spacing: OverdriveDimens.spaceS4) {
@@ -408,14 +408,14 @@ public struct ReadyView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(flat.enumerated()), id: \.offset) { idx, step in
                         if idx > 0 { OdDivider() }
-                        let targetPct = step.startTargetFraction?.doubleValue
+                        let targetPct = step.targetFrom?.doubleValue
                         let watts = targetPct.map { Int(($0 * Double(container.effectiveFtp)).rounded()) }
                         let zone = watts.map { Int(PowerZone.Companion.shared.of(powerWatts: Int32($0), ftp: Int32(container.effectiveFtp)).number) }
                         HStack(spacing: OverdriveDimens.spaceS3) {
                             if let zone {
                                 OdZoneChip(zone: zone)
                             } else {
-                                Text(step.isHeartRate ? "HR" : "Free")
+                                Text(step.heartRate != nil ? "HR" : "Free")
                                     .odStyle(OverdriveTypography.caption, color: OverdriveColors.textSecondary)
                                     .frame(width: 28)
                             }

@@ -83,7 +83,7 @@ class ClickCodecTest {
     }
 
     @Test
-    fun `CK-V10 to CK-V12 heartbeat, the unknown type and the disconnect notice`() {
+    fun `CK-V10 to CK-V12 heartbeat the unknown type and the disconnect notice`() {
         assertEquals(ClickMessage.Heartbeat, ClickCodec.parse(hex("15")).ok())
         assertEquals(ClickMessage.DisconnectNotice, ClickCodec.parse(hex("FE")).ok())
         val unknown = assertIs<ClickMessage.Unrecognised>(ClickCodec.parse(hex("3C 01 02")).ok())
@@ -109,7 +109,7 @@ class ClickCodecTest {
     // region unknown types are not errors
 
     @Test
-    fun `every type this code does not know is reported as unrecognised, never as an error`() {
+    fun `every type this code does not know is reported as unrecognised never as an error`() {
         for (type in 0..255) {
             if (type in setOf(0x23, 0x15, 0x19, 0xFE)) continue
             val message = ClickCodec.parse(byteArrayOf(type.toByte(), 1, 2, 3)).ok()
@@ -130,7 +130,7 @@ class ClickCodecTest {
     // region protobuf structure
 
     @Test
-    fun `fields in another order, repeated fields and unknown fields are skipped, the last bitmap wins`() {
+    fun `fields in another order repeated fields and unknown fields are skipped the last bitmap wins`() {
         // field 3 (analog paddles, §4) length-delimited before field 1.
         assertEquals(ClickBits.A, state("23 1A 02 01 02 08 EF FF FF FF 0F").pressed)
         // field 3 as a varint, then field 1, then a 32-bit and a 64-bit field.
@@ -147,7 +147,7 @@ class ClickCodecTest {
     }
 
     @Test
-    fun `a ten byte varint keeps the low 32 bits, a longer one is malformed`() {
+    fun `a ten byte varint keeps the low 32 bits a longer one is malformed`() {
         // The negative int32 encoding of -17 (0xFFFFFFEF): ten bytes.
         assertEquals(ClickBits.A, state("23 08 EF FF FF FF FF FF FF FF FF 01").pressed)
         assertEquals(
@@ -157,7 +157,7 @@ class ClickCodecTest {
     }
 
     @Test
-    fun `a button frame without the bitmap, or with unusable wire types, is malformed`() {
+    fun `a button frame without the bitmap or with unusable wire types is malformed`() {
         assertEquals(DecodeErrorKind.TRUNCATED, ClickCodec.parse(hex("23")).malformed().kind, "no body")
         assertEquals(DecodeErrorKind.TRUNCATED, ClickCodec.parse(hex("23 1A 00")).malformed().kind, "field 3 only")
         // Wire type 3 (start group) and 7 (reserved) are not part of this message.
@@ -168,7 +168,7 @@ class ClickCodecTest {
     }
 
     @Test
-    fun `battery frames, with and without the percentage`() {
+    fun `battery frames with and without the percentage`() {
         assertEquals(ClickMessage.Battery(100), ClickCodec.parse(hex("19 10 64")).ok())
         assertEquals(ClickMessage.Battery(0), ClickCodec.parse(hex("19 10 00")).ok())
         assertEquals(ClickMessage.Battery(128), ClickCodec.parse(hex("19 10 80 01")).ok(), "a two byte varint")
@@ -186,7 +186,7 @@ class ClickCodecTest {
     // region handshake reply
 
     @Test
-    fun `CK-V14 the reply the notes expect, with and without a public key`() {
+    fun `CK-V14 the reply the notes expect with and without a public key`() {
         assertEquals(HandshakeReply(0x0203, 0), ClickCodec.parseHandshakeReply(hex("52 69 64 65 4F 6E 02 03")).ok())
         val withKey = ClickEncoder.handshakeReply(0x0203, 64)
         assertEquals(72, withKey.size)
@@ -196,7 +196,7 @@ class ClickCodecTest {
     }
 
     @Test
-    fun `a bare RideOn has no version, a seventh byte is half a version, other bytes are not a reply`() {
+    fun `a bare RideOn has no version a seventh byte is half a version other bytes are not a reply`() {
         assertEquals(HandshakeReply(null, 0), ClickCodec.parseHandshakeReply(hex("52 69 64 65 4F 6E")).ok())
         assertNull(HandshakeReply(null, 0).versionText)
         assertEquals(
@@ -250,7 +250,7 @@ class ClickCodecTest {
     }
 
     @Test
-    fun `every proper prefix of a button frame is a typed error or a shorter valid frame, never partly used`() {
+    fun `every proper prefix of a button frame is a typed error or a shorter valid frame never partly used`() {
         val vectors =
             listOf(
                 "23 08 FF FF FF FF 0F",

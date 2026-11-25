@@ -32,14 +32,14 @@ class FlatPhysicsSpeedModelTest {
     }
 
     @Test
-    fun `200 W at 80 kg, CdA 0,35 and Crr 0,004 is about 33,4 km per hour`() {
+    fun `200 W at 80 kg CdA 0 35 and Crr 0 004 is about 33 4 km per hour`() {
         val speed = FlatPhysicsSpeedModel(PhysicsSettings(systemMassKg = 80.0, cdA = 0.35, crr = 0.004)).speedKmh(200.0)
         assertEquals(bisectedSpeedKmh(200.0, 80.0, 0.35, 0.004), speed, 1e-9)
         assertTrue(speed in 33.0..34.0, "got $speed")
     }
 
     @Test
-    fun `at 10 m per second the power is rolling plus drag, worked out by hand`() {
+    fun `at 10 m per second the power is rolling plus drag worked out by hand`() {
         // Rolling: 0.004 * 80 kg * 9.80665 m/s² * 10 m/s = 31.38128 W.
         // Drag:    0.5 * 1.225 kg/m³ * 0.35 m² * (10 m/s)³ = 214.375 W.
         val watts = 31.38128 + 214.375
@@ -111,7 +111,7 @@ class FlatPhysicsSpeedModelTest {
     }
 
     @Test
-    fun `heavier and draggier riders are slower, and the settings are what the trainer is told`() {
+    fun `heavier and draggier riders are slower and the settings are what the trainer is told`() {
         val base = FlatPhysicsSpeedModel().speedKmh(250.0)
         assertTrue(FlatPhysicsSpeedModel(PhysicsSettings(systemMassKg = 100.0)).speedKmh(250.0) < base)
         assertTrue(FlatPhysicsSpeedModel(PhysicsSettings(cdA = 0.45)).speedKmh(250.0) < base)

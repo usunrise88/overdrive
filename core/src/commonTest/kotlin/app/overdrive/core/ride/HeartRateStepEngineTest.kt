@@ -49,7 +49,7 @@ class HeartRateStepEngineTest {
         rig.commands.filterIsInstance<TrainerCommand.TargetPower>().map { it.watts }
 
     @Test
-    fun `a heart-rate step is ERG, and starts at power_min with the start ramp running`() =
+    fun `a heart-rate step is ERG and starts at power_min with the start ramp running`() =
         runTest {
             val rig = ride(this)
             assertEquals(TrainerMode.ERG, rig.now.mode)
@@ -85,7 +85,7 @@ class HeartRateStepEngineTest {
         }
 
     @Test
-    fun `it settles inside the band, within the limits, and the record has the judged seconds`() =
+    fun `it settles inside the band within the limits and the record has the judged seconds`() =
         runTest {
             val rig = ride(this)
             val rider = LagRider(gain = 0.45, tau = 50.0, noiseBpm = 2)
@@ -134,7 +134,7 @@ class HeartRateStepEngineTest {
         }
 
     @Test
-    fun `the adjustment stays for the next heart-rate step, and a power step has the intensity again`() =
+    fun `the adjustment stays for the next heart-rate step and a power step has the intensity again`() =
         runTest {
             val short = ZONE_2.copy(duration = 20)
             val workout = Workout(1, "w", "W", steps = listOf(short, SteadyStep(30, 0.5), short))
@@ -156,7 +156,7 @@ class HeartRateStepEngineTest {
     // region strap loss
 
     @Test
-    fun `a lost strap holds the last power for 15 s, and after 60 s drops to power_min and says so`() =
+    fun `a lost strap holds the last power for 15 s and after 60 s drops to power_min and says so`() =
         runTest {
             val rig = ride(this)
             val rider = LagRider(gain = 0.45, tau = 50.0, noiseBpm = 0)
@@ -190,7 +190,7 @@ class HeartRateStepEngineTest {
     // region pause, skipping, the guard
 
     @Test
-    fun `a pause holds the controller's power, and after it the target ramps in to it`() =
+    fun `a pause holds the controller's power and after it the target ramps in to it`() =
         runTest {
             val rig = ride(this)
             val rider = LagRider(gain = 0.45, tau = 50.0, noiseBpm = 0)
@@ -211,7 +211,7 @@ class HeartRateStepEngineTest {
         }
 
     @Test
-    fun `skipping back restarts the step with its start ramp, and skipping on leaves it`() =
+    fun `skipping back restarts the step with its start ramp and skipping on leaves it`() =
         runTest {
             val rig = ride(this, hrWorkout(FreeStep(600)))
             val rider = LagRider(gain = 0.45, tau = 50.0, noiseBpm = 0)
@@ -249,7 +249,7 @@ class HeartRateStepEngineTest {
     // endregion
 
     @Test
-    fun `flattening gives the step its heart rate, and an unresolved threshold fraction is a free step`() {
+    fun `flattening gives the step its heart rate and an unresolved threshold fraction is a free step`() {
         val byBpm = hrWorkout().flatSteps().single()
         assertEquals(HeartRateTarget(130, 5, 80, 220), byBpm.heartRate)
         assertEquals(TrainerMode.ERG, byBpm.mode)

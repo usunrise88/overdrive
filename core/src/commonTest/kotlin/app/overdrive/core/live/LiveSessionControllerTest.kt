@@ -68,7 +68,7 @@ class LiveSessionControllerTest {
     // ---- Starting ----------------------------------------------------------------------------------
 
     @Test
-    fun `nothing is asked before the ride is live, and the start is asked once, when it is`() {
+    fun `nothing is asked before the ride is live and the start is asked once when it is`() {
         val rig = Rig(plan)
         assertEquals(emptyList(), rig.ride(0, state = RideState.IDLE))
         assertEquals(emptyList(), rig.ride(0, state = RideState.READY))
@@ -95,7 +95,7 @@ class LiveSessionControllerTest {
     }
 
     @Test
-    fun `a ride that starts paused counts as live, and the easier version is said`() {
+    fun `a ride that starts paused counts as live and the easier version is said`() {
         val rig = Rig(plan.copy(variantRidden = true, structureHash = "69140a858e5fc8af"))
         val start = assertIs<LiveEffect.StartSession>(rig.ride(1, state = RideState.PAUSED).single())
         assertEquals(true, start.request.variantRidden)
@@ -103,7 +103,7 @@ class LiveSessionControllerTest {
     }
 
     @Test
-    fun `a session is on once it answers, with the stream opened and the first snapshot at once`() {
+    fun `a session is on once it answers with the stream opened and the first snapshot at once`() {
         val rig = Rig(plan)
         rig.at(1_000).ride(1)
         val effects = rig.at(1_400).started("ls-9")
@@ -119,7 +119,7 @@ class LiveSessionControllerTest {
     // ---- When the coach is off -----------------------------------------------------------------------
 
     @Test
-    fun `the coach off says unavailable once for every reason but no-live-coach, and stops`() {
+    fun `the coach off says unavailable once for every reason but no-live-coach and stops`() {
         for (reason in LiveCoachOffReason.entries) {
             val rig = Rig(plan)
             rig.at(0).ride(1)
@@ -160,7 +160,7 @@ class LiveSessionControllerTest {
     // ---- Offline --------------------------------------------------------------------------------------
 
     @Test
-    fun `no answer says nothing, and the start is tried again every thirty seconds while the ride lasts`() {
+    fun `no answer says nothing and the start is tried again every thirty seconds while the ride lasts`() {
         val rig = Rig(plan)
         rig.at(0).ride(1)
         assertEquals(emptyList(), rig.at(2_000).take(rig.controller.onStartAnswer(2_000, LiveStartAnswer.Failed)))
@@ -217,7 +217,7 @@ class LiveSessionControllerTest {
     private var answers = 0
 
     @Test
-    fun `a snapshot goes out every five seconds, numbered from zero, the first at once`() {
+    fun `a snapshot goes out every five seconds numbered from zero the first at once`() {
         val rig = Rig(plan)
         rig.runWithSession(21_000)
         val snapshots = rig.snapshots()
@@ -239,7 +239,7 @@ class LiveSessionControllerTest {
     }
 
     @Test
-    fun `the next wake-up is the next snapshot, and none while one is on its way`() {
+    fun `the next wake-up is the next snapshot and none while one is on its way`() {
         val rig = Rig(plan)
         rig.at(0).ride(1)
         rig.at(0).started()
@@ -253,7 +253,7 @@ class LiveSessionControllerTest {
     }
 
     @Test
-    fun `one snapshot is in flight at a time, so a slow network skips instead of piling up`() {
+    fun `one snapshot is in flight at a time so a slow network skips instead of piling up`() {
         val rig = Rig(plan)
         rig.at(0).ride(1)
         rig.at(0).started()
@@ -277,7 +277,7 @@ class LiveSessionControllerTest {
     }
 
     @Test
-    fun `a paused ride goes on sending, and says so`() {
+    fun `a paused ride goes on sending and says so`() {
         val rig = Rig(plan)
         rig.at(0).ride(1)
         rig.at(0).started()
@@ -293,7 +293,7 @@ class LiveSessionControllerTest {
     // ---- A session that is gone ----------------------------------------------------------------------
 
     @Test
-    fun `a snapshot's 404 starts a new session, no sooner than thirty seconds after the last start`() {
+    fun `a snapshot's 404 starts a new session no sooner than thirty seconds after the last start`() {
         val rig = Rig(plan)
         rig.at(0).ride(1)
         rig.at(0).started("ls-1")
@@ -380,7 +380,7 @@ class LiveSessionControllerTest {
     }
 
     @Test
-    fun `shutdown starts a new session, no sooner than thirty seconds after the last start`() {
+    fun `shutdown starts a new session no sooner than thirty seconds after the last start`() {
         val rig = Rig(plan)
         rig.at(0).ride(1)
         rig.at(0).started("ls-1")
@@ -427,7 +427,7 @@ class LiveSessionControllerTest {
     // ---- Mute ----------------------------------------------------------------------------------------
 
     @Test
-    fun `mute is for the rest of the ride, and the next snapshot says so at once, and so does every one after`() {
+    fun `mute is for the rest of the ride and the next snapshot says so at once and so does every one after`() {
         val rig = Rig(plan)
         rig.at(0).ride(1)
         rig.at(0).started("ls-1")
@@ -457,7 +457,7 @@ class LiveSessionControllerTest {
     }
 
     @Test
-    fun `mute before there is a session is kept, and the first snapshot carries it`() {
+    fun `mute before there is a session is kept and the first snapshot carries it`() {
         val rig = Rig(plan)
         rig.at(0).ride(1)
         assertEquals(emptyList(), rig.take(rig.controller.mute(100)))
@@ -481,7 +481,7 @@ class LiveSessionControllerTest {
     // ---- The end of the ride ---------------------------------------------------------------------------
 
     @Test
-    fun `a workout that ran to its end ends the session as finished, and one the rider stopped as stopped`() {
+    fun `a workout that ran to its end ends the session as finished and one the rider stopped as stopped`() {
         for ((remaining, reason) in listOf(0 to LiveSessionEndReason.FINISHED, 300 to LiveSessionEndReason.STOPPED)) {
             val rig = Rig(plan)
             rig.at(0).ride(1)
@@ -509,7 +509,7 @@ class LiveSessionControllerTest {
     }
 
     @Test
-    fun `closing the controller ends the session, and a start answered after that is ended at once`() {
+    fun `closing the controller ends the session and a start answered after that is ended at once`() {
         val rig = Rig(plan)
         rig.at(0).ride(1)
         rig.at(0).started("ls-1")
@@ -548,7 +548,7 @@ class LiveSessionControllerTest {
         Outcome.Failed(ServiceProblem.of(TransportException(failure)))
 
     @Test
-    fun `what the service says to a start is read into an answer, and what is not the contract's is not a session`() {
+    fun `what the service says to a start is read into an answer and what is not the contract's is not a session`() {
         val on =
             """{"sessionId":"ls-3f9a2c41d0b84e6a","coach":{"on":true,"reason":null},""" +
                 """"serverTime":1795000000456,"snapshotEverySeconds":5}"""

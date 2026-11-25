@@ -39,7 +39,7 @@ class RideRecordBuilderTest {
     }
 
     @Test
-    fun `going back to an earlier step starts a new lap, and a skipped step has none`() {
+    fun `going back to an earlier step starts a new lap and a skipped step has none`() {
         val builder = RideRecordBuilder(header)
         listOf(0, 0, 1, 1, 1, 3, 3, 2, 2).forEachIndexed {
             index,
@@ -118,7 +118,7 @@ class RideRecordBuilderTest {
     }
 
     @Test
-    fun `the end time comes from the builder call, else from the header`() {
+    fun `the end time comes from the builder call else from the header`() {
         val builder = RideRecordBuilder(header)
         assertNull(builder.build().ride.endEpochMillis)
         assertEquals(9_000, builder.build(endEpochMillis = 9_000).ride.endEpochMillis)

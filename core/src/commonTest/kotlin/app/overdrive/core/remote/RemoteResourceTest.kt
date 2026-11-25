@@ -66,7 +66,7 @@ class RemoteResourceTest {
         }
 
     @Test
-    fun `nothing cached and nothing asked yet is loading, not empty`() =
+    fun `nothing cached and nothing asked yet is loading not empty`() =
         runTest {
             val resource = resource(ScriptedTransport(answer))
             assertTrue(resource.state.value.isLoading)
@@ -88,7 +88,7 @@ class RemoteResourceTest {
         }
 
     @Test
-    fun `after a restart the cache is shown with no network, and the failure is said next to it`() =
+    fun `after a restart the cache is shown with no network and the failure is said next to it`() =
         runTest {
             val store = MemoryTextStore()
             resource(ScriptedTransport(answer), store).refresh(Refresh.START)
@@ -174,7 +174,7 @@ class RemoteResourceTest {
         }
 
     @Test
-    fun `opening a screen asks at most once a minute, pulling down always asks`() =
+    fun `opening a screen asks at most once a minute pulling down always asks`() =
         runTest {
             val transport = ScriptedTransport(answer)
             val resource = resource(transport)
@@ -190,7 +190,7 @@ class RemoteResourceTest {
         }
 
     @Test
-    fun `a rejected token is asked once, then not again until the rider asks or the settings change`() =
+    fun `a rejected token is asked once then not again until the rider asks or the settings change`() =
         runTest {
             val transport = ScriptedTransport(error(401, "unauthorized"), answer)
             val client = ServiceClient({ config }, transport)
@@ -244,7 +244,7 @@ class RemoteResourceTest {
         }
 
     @Test
-    fun `a damaged, torn or foreign cache reads as no cache, never as an exception`() =
+    fun `a damaged torn or foreign cache reads as no cache never as an exception`() =
         runTest {
             val good = MemoryTextStore().also { resource(ScriptedTransport(answer), it).refresh(Refresh.START) }.text!!
             val body = good.substringAfter('\n')
@@ -296,7 +296,7 @@ class RemoteResourceTest {
         }
 
     @Test
-    fun `the rider's request during a request waits its turn and asks once more, however often it is pressed`() =
+    fun `the rider's request during a request waits its turn and asks once more however often it is pressed`() =
         runTest {
             val gate = CompletableDeferred<Unit>()
             val transport = ScriptedTransport(answer)

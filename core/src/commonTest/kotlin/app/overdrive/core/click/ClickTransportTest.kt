@@ -54,7 +54,7 @@ class ClickTransportTest {
         }
 
     @Test
-    fun `a write without response to a characteristic that does not offer it fails with a status, not a violation`() =
+    fun `a write without response to a characteristic that does not offer it fails with a status not a violation`() =
         runTest {
             val rig = BleRig(this)
             rig.addClick()
@@ -122,7 +122,7 @@ class ClickTransportTest {
         }
 
     @Test
-    fun `a scan hears the Click with its manufacturer data, and the service filter hides the other devices`() =
+    fun `a scan hears the Click with its manufacturer data and the service filter hides the other devices`() =
         runTest {
             val rig = BleRig(this)
             rig.addClick()

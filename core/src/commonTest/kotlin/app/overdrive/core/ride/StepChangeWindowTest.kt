@@ -103,7 +103,7 @@ class StepChangeWindowTest {
     }
 
     @Test
-    fun `a step of 20 s or less is expanded from its first second to its last, with no gap`() {
+    fun `a step of 20 s or less is expanded from its first second to its last with no gap`() {
         val short = workout(60 to 0.5, 20 to 0.9, 60 to 0.5)
         for (second in 0 until 20) assertTrue(open(at(short, 1, second)), "20 s step, second $second")
         val shorter = workout(60 to 0.5, 12 to 0.9, 60 to 0.5)
@@ -142,7 +142,7 @@ class StepChangeWindowTest {
     }
 
     @Test
-    fun `a skip to the next step is a step change, a skip back to the first step is not`() {
+    fun `a skip to the next step is a step change a skip back to the first step is not`() {
         val p = at(three, 1, 30)
         assertFalse(open(p))
         p.nextInterval()
@@ -159,7 +159,7 @@ class StepChangeWindowTest {
     }
 
     @Test
-    fun `a pause freezes the progress, so the window it was in stays open and one that was closed stays closed`() {
+    fun `a pause freezes the progress so the window it was in stays open and one that was closed stays closed`() {
         assertTrue(open(at(three, 0, 55), state = RideState.PAUSED))
         assertFalse(open(at(three, 0, 20), state = RideState.PAUSED))
     }
@@ -186,7 +186,7 @@ class StepChangeWindowTest {
     }
 
     @Test
-    fun `the ends of the window can be moved, and not below zero`() {
+    fun `the ends of the window can be moved and not below zero`() {
         val p = at(three, 0, 40)
         assertFalse(StepChangeWindow.isOpen(snapshot(p), leadSeconds = 10))
         assertTrue(StepChangeWindow.isOpen(snapshot(p), leadSeconds = 20))
@@ -197,7 +197,7 @@ class StepChangeWindowTest {
     // ---- The rider's choice ----------------------------------------------------------------------------------------------
 
     @Test
-    fun `what is shown follows the choice, the window and a dismissal`() {
+    fun `what is shown follows the choice the window and a dismissal`() {
         val compact = ModeChoice(detailed = false)
         val detailed = ModeChoice(detailed = true)
         val dismissed = ModeChoice(detailed = false, dismissed = true)
@@ -237,7 +237,7 @@ class StepChangeWindowTest {
     }
 
     @Test
-    fun `after collapsing, a second tap inside the same window chooses detailed and the return does nothing`() {
+    fun `after collapsing a second tap inside the same window chooses detailed and the return does nothing`() {
         var choice = StepChangeWindow.tap(ModeChoice(detailed = false), windowOpen = true)
         choice = StepChangeWindow.tap(choice, windowOpen = true)
         assertEquals(ModeChoice(detailed = true, dismissed = true), choice)
@@ -271,7 +271,7 @@ class StepChangeWindowTest {
     }
 
     @Test
-    fun `a dismissal also covers the second window of a step shorter than 20 s, whose two windows touch`() {
+    fun `a dismissal also covers the second window of a step shorter than 20 s whose two windows touch`() {
         val w = workout(60 to 0.5, 12 to 0.9, 60 to 0.5)
         var choice = ModeChoice(detailed = false)
         val shown = mutableListOf<Boolean>()

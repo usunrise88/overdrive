@@ -37,7 +37,7 @@ class SimulatedDevicesTest {
         }
 
     @Test
-    fun `a trainer wants control before a target, like FTMS`() =
+    fun `a trainer wants control before a target like FTMS`() =
         runTest {
             val trainer = SimulatedTrainerDevice(clock = { testScheduler.currentTime })
             trainer.connect()
@@ -76,7 +76,7 @@ class SimulatedDevicesTest {
         }
 
     @Test
-    fun `a disconnect drops control and targets, and a reconnect starts over`() =
+    fun `a disconnect drops control and targets and a reconnect starts over`() =
         runTest {
             val trainer = SimulatedTrainerDevice()
             trainer.connect()

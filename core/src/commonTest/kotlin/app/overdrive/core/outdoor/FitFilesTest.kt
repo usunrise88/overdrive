@@ -23,7 +23,7 @@ import kotlin.test.assertTrue
 /** What is said of a shared file by its name and bytes, and the client's way of sending bytes (ADR 0028). */
 class FitFilesTest {
     @Test
-    fun `a FIT type is a FIT file whatever its name, a generic type needs the extension`() {
+    fun `a FIT type is a FIT file whatever its name a generic type needs the extension`() {
         assertTrue(FitFileCheck.looksLikeFit("ride", "application/vnd.ant.fit"))
         assertTrue(FitFileCheck.looksLikeFit(null, "application/x-fit"))
         assertTrue(FitFileCheck.looksLikeFit("ride", "Application/VND.ANT.FIT; charset=binary"))
@@ -39,7 +39,7 @@ class FitFilesTest {
     }
 
     @Test
-    fun `the header of the file is what says it is FIT, the longer header too`() {
+    fun `the header of the file is what says it is FIT the longer header too`() {
         assertNull(FitFileCheck.refusalOf(FitSamples.bytes()))
         val long = FitSamples.bytes(1, 80).also { it[0] = 14 }
         assertNull(FitFileCheck.refusalOf(long))
@@ -65,7 +65,7 @@ class FitFilesTest {
     ) = ServiceClient({ config }, ScriptedTransport(), null, transport)
 
     @Test
-    fun `bytes go to the path under the address with the token and the type, and a 2xx is the answer`() =
+    fun `bytes go to the path under the address with the token and the type and a 2xx is the answer`() =
         runTest {
             val transport = ScriptedFitTransport(HttpAnswer(201, "{}"))
             val outcome = client(transport).postBytes("/v1/activities/fit", FIT_CONTENT_TYPE, file, 1000)
@@ -84,7 +84,7 @@ class FitFilesTest {
         }
 
     @Test
-    fun `a refusal carries the services error code, a failure of the network carries none`() =
+    fun `a refusal carries the services error code a failure of the network carries none`() =
         runTest {
             val refused = ScriptedFitTransport(FitSamples.error(422, "unsupported_sport"))
             val failed =
@@ -104,7 +104,7 @@ class FitFilesTest {
         }
 
     @Test
-    fun `nothing set up asks nothing, no byte transport is not the service, and a refused token is not sent twice`() =
+    fun `nothing set up asks nothing no byte transport is not the service and a refused token is not sent twice`() =
         runTest {
             val transport = ScriptedFitTransport(HttpAnswer(201, "{}"))
             assertEquals(

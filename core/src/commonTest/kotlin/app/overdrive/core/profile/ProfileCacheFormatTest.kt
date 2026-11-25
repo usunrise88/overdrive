@@ -30,7 +30,7 @@ class ProfileCacheFormatTest {
     }
 
     @Test
-    fun `a profile is written as a header and two lines, and read back the same`() {
+    fun `a profile is written as a header and two lines and read back the same`() {
         val text = ProfileCacheFormat.encode(cached())
         val lines = text.split('\n')
         assertEquals(3, lines.size)
@@ -91,7 +91,7 @@ class ProfileCacheFormatTest {
     }
 
     @Test
-    fun `the file holds the profile and a checksum of the address, and no address and no token`() {
+    fun `the file holds the profile and a checksum of the address and no address and no token`() {
         val text = ProfileCacheFormat.encode(cached(edit))
         assertFalse("overdrive.example.org" in text)
         assertFalse("https://" in text)

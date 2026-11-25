@@ -48,7 +48,7 @@ class PreviousAttemptFetchTest {
     ) = previousAttemptOf(ServiceClient({ config }, transport), askedHash)
 
     @Test
-    fun `asks the repeats route for the session's previous attempt, with the token in the header and no ride id`() =
+    fun `asks the repeats route for the session's previous attempt with the token in the header and no ride id`() =
         runTest {
             val transport = ScriptedTransport(ok(body(attempt)))
             val got = fetch(transport)
@@ -82,7 +82,7 @@ class PreviousAttemptFetchTest {
         }
 
     @Test
-    fun `no network, a down service, a 404, a refused token and a bad body are all no line and none throws`() =
+    fun `no network a down service a 404 a refused token and a bad body are all no line and none throws`() =
         runTest {
             val failures =
                 listOf<Any>(

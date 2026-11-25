@@ -24,7 +24,7 @@ class StallGuardTest {
     // region trigger, hold, release, ramp back
 
     @Test
-    fun `cadence below the floor for 3 s takes hold, on the third tick`() {
+    fun `cadence below the floor for 3 s takes hold on the third tick`() {
         val guard = armed()
         assertEquals(emptyList(), guard.ride(2, cadence = 50))
         assertFalse(guard.active)
@@ -52,14 +52,14 @@ class StallGuardTest {
     }
 
     @Test
-    fun `it holds while cadence stays low, and does not take hold again`() {
+    fun `it holds while cadence stays low and does not take hold again`() {
         val guard = armed()
         assertEquals(listOf(3), guard.ride(20, cadence = 40), "one activation, not one a second")
         assertEquals(0.7, guard.factor)
     }
 
     @Test
-    fun `it lets go after cadence above floor plus 10 for 5 s, then climbs back over 5 s`() {
+    fun `it lets go after cadence above floor plus 10 for 5 s then climbs back over 5 s`() {
         val guard = armed()
         guard.ride(3, cadence = 40)
         // Above 55 but not above 65 does not release.
@@ -162,7 +162,7 @@ class StallGuardTest {
     }
 
     @Test
-    fun `the wait for the first good cadence is bounded, so a rider who never gets going is still protected`() {
+    fun `the wait for the first good cadence is bounded so a rider who never gets going is still protected`() {
         val guard = StallGuard(StallGuardSettings(armTimeoutSeconds = 30), zeroCadenceIsAStop = true)
         val fired = guard.ride(40, cadence = 30)
         // Armed at the 30th second; the third low second after that is the 32nd tick (the 30th counts as the first).
@@ -170,7 +170,7 @@ class StallGuardTest {
     }
 
     @Test
-    fun `just after a resume nothing is judged, and then it is`() {
+    fun `just after a resume nothing is judged and then it is`() {
         val guard = armed()
         // The ticks right after a resume carry 1, 2, 3, 4 seconds since the resume: inside the 5 s grace.
         var fired = false
@@ -183,7 +183,7 @@ class StallGuardTest {
     }
 
     @Test
-    fun `the grace is a setting, and 0 turns it off`() {
+    fun `the grace is a setting and 0 turns it off`() {
         val guard = armed(StallGuardSettings(resumeGraceSeconds = 0))
         assertEquals(listOf(3), guard.ride(3, cadence = 20, sinceResume = 1))
     }
@@ -212,14 +212,14 @@ class StallGuardTest {
     // region the auto-pause at 0 rpm
 
     @Test
-    fun `at 0 rpm the auto-pause wins, a stop is not a stall`() {
+    fun `at 0 rpm the auto-pause wins a stop is not a stall`() {
         val guard = armed()
         assertEquals(emptyList(), guard.ride(30, cadence = 0))
         assertFalse(guard.active)
     }
 
     @Test
-    fun `a stop breaks the run of low seconds, it does not complete it`() {
+    fun `a stop breaks the run of low seconds it does not complete it`() {
         val guard = armed()
         guard.ride(2, cadence = 40)
         guard.tick(0, null)
@@ -256,7 +256,7 @@ class StallGuardTest {
     }
 
     @Test
-    fun `a custom floor, trigger and release are used`() {
+    fun `a custom floor trigger and release are used`() {
         val guard =
             StallGuard(
                 StallGuardSettings(

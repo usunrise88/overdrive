@@ -53,7 +53,7 @@ class ResumeSignalsTest {
     private val EngineRig.paused get() = now.state == RideState.PAUSED
 
     @Test
-    fun `a cadence above 0 ends the pause on the notification, and the trainer is told in the same instant`() =
+    fun `a cadence above 0 ends the pause on the notification and the trainer is told in the same instant`() =
         runTest {
             val rig = pausedRig()
             assertEquals(TrainerCommand.TargetPower(25), rig.commands.last())
@@ -68,7 +68,7 @@ class ResumeSignalsTest {
         }
 
     @Test
-    fun `zero and missing cadence show nothing, and neither does a little power`() =
+    fun `zero and missing cadence show nothing and neither does a little power`() =
         runTest {
             val rig = pausedRig()
             rig.notify(cadence = 0, power = 0)
@@ -80,7 +80,7 @@ class ResumeSignalsTest {
         }
 
     @Test
-    fun `power at the threshold ends the pause, one watt less does not`() =
+    fun `power at the threshold ends the pause one watt less does not`() =
         runTest {
             val rig = pausedRig()
             rig.notify(power = 9)
@@ -119,7 +119,7 @@ class ResumeSignalsTest {
         }
 
     @Test
-    fun `a flywheel that falls, or the first reading with a speed, is no sign`() =
+    fun `a flywheel that falls or the first reading with a speed is no sign`() =
         runTest {
             val rig = pausedRig()
             rig.notify(speed = 10.0)
@@ -150,7 +150,7 @@ class ResumeSignalsTest {
         }
 
     @Test
-    fun `power does not end the pause while the flywheel is winding down, and does once it is not`() =
+    fun `power does not end the pause while the flywheel is winding down and does once it is not`() =
         runTest {
             val rig = pausedRig() // the flywheel fell from 24 to 22.5 km/h on the way in
             rig.notify(power = 25, speed = 22.0)

@@ -8,7 +8,7 @@ class FlywheelWatchTest {
     private fun watch(step: Double = 0.5) = FlywheelWatch(step)
 
     @Test
-    fun `a rise of a step between two consecutive readings is an acceleration, a smaller one is not`() {
+    fun `a rise of a step between two consecutive readings is an acceleration a smaller one is not`() {
         val watch = watch()
         watch.offer(10.0)
         assertFalse(watch.accelerated, "there is nothing to compare the first reading with")
@@ -33,7 +33,7 @@ class FlywheelWatchTest {
     }
 
     @Test
-    fun `a slow coast is seen across readings, and a repeated value does not end it`() {
+    fun `a slow coast is seen across readings and a repeated value does not end it`() {
         val watch = watch()
         watch.offer(20.0)
         assertFalse(watch.coasting, "no history")

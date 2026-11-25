@@ -43,7 +43,7 @@ class ChartsRepositoriesTest {
     private val body = ChartSamples.json(ChartSamples.skills("2026-09-24", "2026-11-18"))
 
     @Test
-    fun `the three windows are three routes over the phone's local days, and a window is a file-name-safe word`() {
+    fun `the three windows are three routes over the phone's local days and a window is a file-name-safe word`() {
         assertEquals("2026-09-24" to "2026-11-18", PowerSkillsWindow.EightWeeks.days("2026-11-18"))
         assertEquals("2023-11-19" to "2026-11-18", PowerSkillsWindow.AllTime.days("2026-11-18"))
         assertEquals(
@@ -61,7 +61,7 @@ class ChartsRepositoriesTest {
     }
 
     @Test
-    fun `a custom range is real days, not reversed and at most three years`() {
+    fun `a custom range is real days not reversed and at most three years`() {
         PowerSkillsWindow.Custom("2026-11-15", "2026-11-15")
         PowerSkillsWindow.Custom("2023-11-19", "2026-11-18")
         assertFailsWith<IllegalArgumentException> { PowerSkillsWindow.Custom("2026-11-16", "2026-11-15") }
@@ -71,7 +71,7 @@ class ChartsRepositoriesTest {
     }
 
     @Test
-    fun `the eight weeks are asked from the route, shown, and kept in the cache as the service wrote it`() =
+    fun `the eight weeks are asked from the route shown and kept in the cache as the service wrote it`() =
         runTest {
             val stores = mutableMapOf<String, MemoryTextStore>()
             val transport = ScriptedTransport(ok(body))
@@ -88,7 +88,7 @@ class ChartsRepositoriesTest {
         }
 
     @Test
-    fun `each window has its own cache, so a window fetched before is there at once, and offline after a restart`() =
+    fun `each window has its own cache so a window fetched before is there at once and offline after a restart`() =
         runTest {
             val stores = mutableMapOf<String, MemoryTextStore>()
             val all = ChartSamples.json(ChartSamples.skills("2023-11-19", "2026-11-18", rideCount = 120))
@@ -120,7 +120,7 @@ class ChartsRepositoriesTest {
         }
 
     @Test
-    fun `a window never fetched shows nothing, not another window's answer`() =
+    fun `a window never fetched shows nothing not another window's answer`() =
         runTest {
             val stores = mutableMapOf<String, MemoryTextStore>()
             val resources = skills(ScriptedTransport(ok(body)), stores)
@@ -132,7 +132,7 @@ class ChartsRepositoriesTest {
         }
 
     @Test
-    fun `a custom window is one resource, made once, and only the most recent are kept in memory`() {
+    fun `a custom window is one resource made once and only the most recent are kept in memory`() {
         val resources = skills(ScriptedTransport(ok(body)), keep = 2)
         val a = PowerSkillsWindow.Custom("2026-11-01", "2026-11-02")
         val first = resources.resource(a)
@@ -166,7 +166,7 @@ class ChartsRepositoriesTest {
         }
 
     @Test
-    fun `a service without the route says so, and an answer that is not the contract's is not the service`() =
+    fun `a service without the route says so and an answer that is not the contract's is not the service`() =
         runTest {
             val missing = skills(ScriptedTransport(error(404, "not_found"))).resource(eightWeeks)
             missing.refresh(Refresh.START)
@@ -180,7 +180,7 @@ class ChartsRepositoriesTest {
         }
 
     @Test
-    fun `a cache written for another address, or damaged, is no cache`() =
+    fun `a cache written for another address or damaged is no cache`() =
         runTest {
             val stores = mutableMapOf<String, MemoryTextStore>()
             skills(ScriptedTransport(ok(body)), stores).resource(eightWeeks).refresh(Refresh.REQUESTED)
@@ -214,7 +214,7 @@ class ChartsRepositoriesTest {
     private val effortBody = ChartSamples.json(ChartSamples.effort("2026-11-16"))
 
     @Test
-    fun `the effort is asked for a year of weeks, shown, and kept in the cache in the services own words`() =
+    fun `the effort is asked for a year of weeks shown and kept in the cache in the services own words`() =
         runTest {
             val store = MemoryTextStore()
             val transport = ScriptedTransport(ok(effortBody))
@@ -260,7 +260,7 @@ class ChartsRepositoriesTest {
     }
 
     @Test
-    fun `a service without the route, a portal's page and a damaged cache are each told apart`() =
+    fun `a service without the route a portal's page and a damaged cache are each told apart`() =
         runTest {
             val missing = effort(ScriptedTransport(error(404, "not_found")))
             missing.refresh(Refresh.START)

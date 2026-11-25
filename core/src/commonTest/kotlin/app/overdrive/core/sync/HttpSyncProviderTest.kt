@@ -100,7 +100,7 @@ class HttpSyncProviderTest {
     // region what is sent
 
     @Test
-    fun `sends the record, then the FIT, to the ride's own paths with the token and the right types`() =
+    fun `sends the record then the FIT to the ride's own paths with the token and the right types`() =
         runTest {
             val transport = ScriptedTransport(answer(201, stored()), answer(201, stored()))
             assertEquals(SyncResult.Acknowledged, provider(transport).upload(entry))
@@ -133,7 +133,7 @@ class HttpSyncProviderTest {
         }
 
     @Test
-    fun `the ride's own id decides the path, not the outbox's file name`() =
+    fun `the ride's own id decides the path not the outbox's file name`() =
         runTest {
             val transport = ScriptedTransport(answer(201, stored("real.id-1")), answer(201, stored("real.id-1")))
             val rides = FakeRides(payload("real.id-1"))
@@ -209,7 +209,7 @@ class HttpSyncProviderTest {
         }
 
     @Test
-    fun `a changed address is a new question too, and so is the riders's send now`() =
+    fun `a changed address is a new question too and so is the riders's send now`() =
         runTest {
             var config = SyncConfig("https://one.example.org", token)
             val transport =
@@ -246,7 +246,7 @@ class HttpSyncProviderTest {
     // region retry later
 
     @Test
-    fun `5xx, 408 and 429 are a retry with a plain reason`() =
+    fun `5xx 408 and 429 are a retry with a plain reason`() =
         runTest {
             val expected =
                 mapOf(
@@ -265,7 +265,7 @@ class HttpSyncProviderTest {
         }
 
     @Test
-    fun `no answer is a retry whatever the failure, with its own words`() =
+    fun `no answer is a retry whatever the failure with its own words`() =
         runTest {
             val expected =
                 mapOf(
@@ -288,7 +288,7 @@ class HttpSyncProviderTest {
         }
 
     @Test
-    fun `the technical hint follows the words in brackets, for the owner to read`() =
+    fun `the technical hint follows the words in brackets for the owner to read`() =
         runTest {
             val blocked = TransportException(TransportFailure.NetworkBlocked, hint = "SocketException · EACCES")
             assertEquals(
@@ -303,7 +303,7 @@ class HttpSyncProviderTest {
         }
 
     @Test
-    fun `a failure on the FIT after the record is a retry, and the retry sends both again and succeeds`() =
+    fun `a failure on the FIT after the record is a retry and the retry sends both again and succeeds`() =
         runTest {
             val transport =
                 ScriptedTransport(
@@ -324,7 +324,7 @@ class HttpSyncProviderTest {
         }
 
     @Test
-    fun `a 404 for the FIT of a record the service has just stored is a retry, not a refusal`() =
+    fun `a 404 for the FIT of a record the service has just stored is a retry not a refusal`() =
         runTest {
             val transport =
                 ScriptedTransport(answer(201, stored()), answer(404, error("ride_not_found", "Ride is not stored yet")))
@@ -358,7 +358,7 @@ class HttpSyncProviderTest {
         }
 
     @Test
-    fun `a redirect is a retry, because a PUT cannot follow it and the ride is not at fault`() =
+    fun `a redirect is a retry because a PUT cannot follow it and the ride is not at fault`() =
         runTest {
             for (status in listOf(301, 302, 307, 308)) {
                 val transport = ScriptedTransport(answer(status))
@@ -476,7 +476,7 @@ class HttpSyncProviderTest {
     // region the token stays secret
 
     @Test
-    fun `the token is in the Authorization header only, never in a result, a reason, a message or a string`() =
+    fun `the token is in the Authorization header only never in a result a reason a message or a string`() =
         runTest {
             val everything = mutableListOf<String>()
             val scripts: List<List<Any>> =

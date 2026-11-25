@@ -54,7 +54,7 @@ class RideRoutesTest {
     }
 
     @Test
-    fun `a route that is not downloaded is a flat step, and the first route is the first that is there`() {
+    fun `a route that is not downloaded is a flat step and the first route is the first that is there`() {
         val onlyB = RideRoutes(byId = mapOf("route-b" to b))
         assertEquals(listOf(null, null, null, null, null, b, null), steps.indices.map { onlyB.routeOf(steps, it) })
         assertSame(b, onlyB.firstRoute(steps))
@@ -69,7 +69,7 @@ class RideRoutesTest {
     }
 
     @Test
-    fun `the routes of the FIT file are the same ones, by step`() {
+    fun `the routes of the FIT file are the same ones by step`() {
         val routes = RideRoutes(byId = mapOf("route-a" to a))
         val fit = routes.forFit(steps)
         assertSame(a, fit.routeFor(1))

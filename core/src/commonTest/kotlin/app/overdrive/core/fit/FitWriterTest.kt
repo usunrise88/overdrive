@@ -95,7 +95,7 @@ class FitWriterTest {
     }
 
     @Test
-    fun `every second is a record with its readings, gaps as invalid values`() {
+    fun `every second is a record with its readings gaps as invalid values`() {
         val records = file.messages("record")
         assertEquals(300, records.size)
         for ((index, fit) in records.withIndex()) {
@@ -125,7 +125,7 @@ class FitWriterTest {
     }
 
     @Test
-    fun `paused seconds are records too, as sampled`() {
+    fun `paused seconds are records too as sampled`() {
         val paused = record.samples.filter { it.paused }
         assertTrue(paused.isNotEmpty())
         val records = file.messages("record")
@@ -137,7 +137,7 @@ class FitWriterTest {
     }
 
     @Test
-    fun `there is one lap per workout step, covering exactly its seconds`() {
+    fun `there is one lap per workout step covering exactly its seconds`() {
         val laps = file.messages("lap")
         assertEquals(listOf(0, 1, 2, 3), record.laps.map { it.stepIndex })
         assertEquals(record.laps.size, laps.size)
@@ -164,7 +164,7 @@ class FitWriterTest {
     }
 
     @Test
-    fun `the session is cycling, virtual activity, with the summary and the load`() {
+    fun `the session is cycling virtual activity with the summary and the load`() {
         val session = file.messages("session").single()
         val summary = record.summary
         assertEquals(2, session.raw("sport"))
@@ -300,7 +300,7 @@ class FitWriterTest {
     }
 
     @Test
-    fun `a short ride has no load fields, a longer one has them`() {
+    fun `a short ride has no load fields a longer one has them`() {
         val short = RideRecordBuilder.recover(SyntheticRide.header, SyntheticRide.samples().take(20))
         assertFalse(parseFit(FitWriter().write(short)).messages("session").single().has("normalized_power"))
         assertNotNull(file.messages("session").single().raw("normalized_power"))
@@ -316,7 +316,7 @@ class FitWriterTest {
     }
 
     @Test
-    fun `values beyond what a field holds are held at its largest, never the invalid value`() {
+    fun `values beyond what a field holds are held at its largest never the invalid value`() {
         val sample =
             RideSample(1, power = 70_000, heartRate = 300, cadence = 999, speedKmh = 900.0, distanceMeters = 5.0e7)
         val fit = parseFit(FitWriter().write(RideRecordBuilder.recover(SyntheticRide.header, listOf(sample))))
@@ -330,7 +330,7 @@ class FitWriterTest {
     }
 
     @Test
-    fun `RR intervals the field cannot hold are invalid, and a crowd of them is split`() {
+    fun `RR intervals the field cannot hold are invalid and a crowd of them is split`() {
         val samples = SyntheticRide.samples().take(3)
         val intervals = listOf(RrInterval(2, 70_000)) + List(250) { RrInterval(3, 800 + it) } + RrInterval(9, 640)
         val fit = parseFit(FitWriter().write(RideRecordBuilder.recover(SyntheticRide.header, samples, intervals)))
@@ -343,7 +343,7 @@ class FitWriterTest {
     }
 
     @Test
-    fun `an empty ride, or one that FIT cannot date, is refused`() {
+    fun `an empty ride or one that FIT cannot date is refused`() {
         assertFailsWith<IllegalArgumentException> {
             FitWriter().write(RideRecordBuilder.recover(SyntheticRide.header, emptyList()))
         }

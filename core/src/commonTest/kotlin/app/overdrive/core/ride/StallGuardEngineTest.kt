@@ -65,7 +65,7 @@ class StallGuardEngineTest {
         }
 
     @Test
-    fun `it holds while the cadence stays low, and the plan in the record is not the guard's`() =
+    fun `it holds while the cadence stays low and the plan in the record is not the guard's`() =
         runTest {
             val rig = ride(this)
             rig.pedal(10, GOOD)
@@ -76,7 +76,7 @@ class StallGuardEngineTest {
         }
 
     @Test
-    fun `it lets go after 5 s above the floor plus 10, then the target climbs back over 5 s`() =
+    fun `it lets go after 5 s above the floor plus 10 then the target climbs back over 5 s`() =
         runTest {
             val rig = ride(this)
             rig.pedal(10, GOOD)
@@ -184,7 +184,7 @@ class StallGuardEngineTest {
         }
 
     @Test
-    fun `after a manual resume the first seconds are not judged, even for a rider who was up to speed`() =
+    fun `after a manual resume the first seconds are not judged even for a rider who was up to speed`() =
         runTest {
             val rig = ride(this)
             rig.pedal(10, GOOD)
@@ -203,7 +203,7 @@ class StallGuardEngineTest {
         }
 
     @Test
-    fun `a pause forgets a guard that had hold, and the ramp-in goes to the full target`() =
+    fun `a pause forgets a guard that had hold and the ramp-in goes to the full target`() =
         runTest {
             val rig = ride(this)
             rig.pedal(10, GOOD)

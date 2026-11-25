@@ -102,7 +102,7 @@ class WatchRepositoriesTest {
         )
 
     @Test
-    fun `four weeks are one request, shown with the answer's own days and cached`() =
+    fun `four weeks are one request shown with the answer's own days and cached`() =
         runTest(UnconfinedTestDispatcher()) {
             val body = WellnessApiJson.encodeWellnessResponse(wellnessResponse("2026-10-22", "2026-11-18"))
             val transport = ScriptedTransport(ok(body))
@@ -199,7 +199,7 @@ class WatchRepositoriesTest {
     ) = ok(InsightsApiJson.encodeResponse(InsightsResponse(from, to, "${to}T07:40:00Z", false, notes.toList())))
 
     @Test
-    fun `notes are 30 days at a time, older windows are appended, and a new newest drops them`() =
+    fun `notes are 30 days at a time older windows are appended and a new newest drops them`() =
         runTest(UnconfinedTestDispatcher()) {
             val newest = insight(3, "2026-11-18T07:30:00Z")
             val earlier = insight(2, "2026-11-10T07:30:00Z")

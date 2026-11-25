@@ -259,7 +259,7 @@ public final class MacRideStore: NSObject, RidePayloads {
     }
 
     /// Saves the ride record JSON and FIT file atomically, removing the `.ridelog` only after both succeed.
-    public func save(record: RideRecord, title: String, routes: FitRoutes = FitRoutesCompanion.shared.None) throws -> StoredRideMeta {
+    public func save(record: RideRecord, title: String, routes: FitRoutes = AppleCoreFactories.shared.noneFitRoutes()) throws -> StoredRideMeta {
         try fm.createDirectory(at: directory, withIntermediateDirectories: true)
         let rideId = record.ride.id
         let jsonText = AppleCoreFactories.shared.encodeRideRecord(record: record)

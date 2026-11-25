@@ -179,7 +179,7 @@ class WorkoutPlayerTest {
     }
 
     @Test
-    fun `the ramp-in follows the target and the intensity, and a ramp-in of zero seconds is off`() {
+    fun `the ramp-in follows the target and the intensity and a ramp-in of zero seconds is off`() {
         val player = player()
         player.advance(10) // the steady step, 160 W
         player.intensityUp() // 105%: 168 W
@@ -212,7 +212,7 @@ class WorkoutPlayerTest {
     }
 
     @Test
-    fun `the first step of the ramp-in can be brought forward, and then the ramp is a second shorter`() {
+    fun `the first step of the ramp-in can be brought forward and then the ramp is a second shorter`() {
         val player = player()
         player.advance(10)
         player.beginRampIn(fromWatts = 25)
@@ -233,7 +233,7 @@ class WorkoutPlayerTest {
     }
 
     @Test
-    fun `there is no ramp-in at the start, nor in a free-ride step`() {
+    fun `there is no ramp-in at the start nor in a free-ride step`() {
         val player = player()
         assertEquals(100, player.erg().watts)
         player.advance(30)

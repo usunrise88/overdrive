@@ -75,7 +75,7 @@ class PlanRepositoryTest {
         }
 
     @Test
-    fun `the range crosses a month, a year and a leap day`() =
+    fun `the range crosses a month a year and a leap day`() =
         runTest {
             for ((first, last) in listOf(
                 "2026-12-25" to "2027-01-07",
@@ -104,7 +104,7 @@ class PlanRepositoryTest {
     // region fresh, stale, offline
 
     @Test
-    fun `a fresh answer is the list, is kept on disk and is not stale`() =
+    fun `a fresh answer is the list is kept on disk and is not stale`() =
         runTest {
             val cache = MemoryPlanCache()
             val repository = repository(ScriptedGetTransport(fortnight(listOf(today1, friday))), cache)
@@ -227,7 +227,7 @@ class PlanRepositoryTest {
     // region a damaged or foreign cache
 
     @Test
-    fun `a corrupt cache is ignored, not shown and not fatal`() =
+    fun `a corrupt cache is ignored not shown and not fatal`() =
         runTest {
             val good =
                 PlanCacheFormat.encode(
@@ -318,7 +318,7 @@ class PlanRepositoryTest {
     // region 401 and other statuses
 
     @Test
-    fun `a rejected token is said in the sync settings' words, keeps the list and is not asked again`() =
+    fun `a rejected token is said in the sync settings' words keeps the list and is not asked again`() =
         runTest {
             val transport = ScriptedGetTransport(fortnight(listOf(today1)))
             val repository = repository(transport)
@@ -433,7 +433,7 @@ class PlanRepositoryTest {
         }
 
     @Test
-    fun `the technical hint is part of the problem line, and a cause's message is not`() =
+    fun `the technical hint is part of the problem line and a cause's message is not`() =
         runTest {
             val cause = IllegalStateException("failed to connect to 203.0.113.7 with $token")
             val exception =
@@ -453,7 +453,7 @@ class PlanRepositoryTest {
     // region when
 
     @Test
-    fun `opening the screen asks at most once a minute, start and the rider always ask`() =
+    fun `opening the screen asks at most once a minute start and the rider always ask`() =
         runTest {
             val transport = ScriptedGetTransport(fortnight())
             val repository = repository(transport)
@@ -488,7 +488,7 @@ class PlanRepositoryTest {
         }
 
     @Test
-    fun `one request at a time, and a settings change during one asks again afterwards`() =
+    fun `one request at a time and a settings change during one asks again afterwards`() =
         runTest {
             val transport = ScriptedGetTransport(fortnight(listOf(today1)))
             val release = CompletableDeferred<Unit>()
@@ -521,7 +521,7 @@ class PlanRepositoryTest {
         }
 
     @Test
-    fun `a settings change for the address and token the last request used asks nothing, and keeps its problem`() =
+    fun `a settings change for the address and token the last request used asks nothing and keeps its problem`() =
         runTest {
             val transport = ScriptedGetTransport(TransportException(TransportFailure.Unreachable))
             val repository = repository(transport)
@@ -566,7 +566,7 @@ class PlanRepositoryTest {
         }
 
     @Test
-    fun `settings changes from many threads are never lost, whatever instant they arrive at`() =
+    fun `settings changes from many threads are never lost whatever instant they arrive at`() =
         runTest {
             repeat(300) { round ->
                 val settings = MutableStateFlow(SyncConfig(address, "tok-$round-0-0123456789abcdef0123456789"))

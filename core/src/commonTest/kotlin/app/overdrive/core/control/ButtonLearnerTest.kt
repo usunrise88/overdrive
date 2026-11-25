@@ -16,7 +16,7 @@ class ButtonLearnerTest {
     private fun asking(state: LearnState) = assertIs<LearnState.Asking>(state)
 
     @Test
-    fun `one press and release per role, in order, builds the mapping`() {
+    fun `one press and release per role in order builds the mapping`() {
         val learner = ButtonLearner()
         val first = asking(learner.state)
         assertEquals(HandlebarButton.PLUS, first.button)
@@ -47,7 +47,7 @@ class ButtonLearnerTest {
     }
 
     @Test
-    fun `a press counts when it is released, not when it goes down`() {
+    fun `a press counts when it is released not when it goes down`() {
         val learner = ButtonLearner()
         assertEquals(
             HandlebarButton.PLUS,
@@ -59,7 +59,7 @@ class ButtonLearnerTest {
     }
 
     @Test
-    fun `a button that is another role's is a duplicate, naming it, and the same role is asked again`() {
+    fun `a button that is another role's is a duplicate naming it and the same role is asked again`() {
         val learner = ButtonLearner()
         learner.press(ClickBits.A)
         val rejected = assertIs<LearnState.Rejected>(learner.press(ClickBits.A))
@@ -81,7 +81,7 @@ class ButtonLearnerTest {
     }
 
     @Test
-    fun `a second button joining a press is a combo, whichever is released first`() {
+    fun `a second button joining a press is a combo whichever is released first`() {
         for (releaseOrder in listOf(listOf(ClickBits.A, ClickBits.B), listOf(ClickBits.B, ClickBits.A))) {
             val learner = ButtonLearner()
             learner.feed(ClickBits.A)
@@ -93,14 +93,14 @@ class ButtonLearnerTest {
     }
 
     @Test
-    fun `a button released a moment before another one pressed is two presses, not a combo`() {
+    fun `a button released a moment before another one pressed is two presses not a combo`() {
         val learner = ButtonLearner()
         assertEquals(HandlebarButton.BUTTON_2, asking(learner.press(ClickBits.A)).button)
         assertEquals(HandlebarButton.BUTTON_3, asking(learner.press(ClickBits.B)).button)
     }
 
     @Test
-    fun `a button that sets several bits at once can be allowed, a bit that joins later is still a combo`() {
+    fun `a button that sets several bits at once can be allowed a bit that joins later is still a combo`() {
         val strict = ButtonLearner()
         assertEquals(
             LearnRejection.COMBO,
@@ -121,7 +121,7 @@ class ButtonLearnerTest {
     }
 
     @Test
-    fun `ignored bits are never looked at, so a stuck bit cannot block the learning`() {
+    fun `ignored bits are never looked at so a stuck bit cannot block the learning`() {
         val learner = ButtonLearner(ignoredBits = ClickBits.PLUS_SHIFT_DOWN)
         learner.feed(ClickBits.PLUS_SHIFT_DOWN) // reads as pressed all the time
         assertEquals(HandlebarButton.PLUS, asking(learner.feed(ClickBits.PLUS_SHIFT_DOWN)).button, "no press yet")
@@ -132,7 +132,7 @@ class ButtonLearnerTest {
     }
 
     @Test
-    fun `a dropped link, a feed of nothing, abandons the press`() {
+    fun `a dropped link a feed of nothing abandons the press`() {
         val learner = ButtonLearner()
         learner.feed(ClickBits.A)
         assertEquals(
@@ -169,7 +169,7 @@ class ButtonLearnerTest {
     }
 
     @Test
-    fun `whatever is fed, the learner never throws and a finished mapping is always valid`() {
+    fun `whatever is fed the learner never throws and a finished mapping is always valid`() {
         val random = Random(31)
         repeat(500) {
             val learner = ButtonLearner(allowMultiBitButtons = random.nextBoolean())

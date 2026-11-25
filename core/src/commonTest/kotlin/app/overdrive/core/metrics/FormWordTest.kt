@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 
 class FormWordTest {
     @Test
-    fun `the words follow the thresholds of the design, to the tenth`() {
+    fun `the words follow the thresholds of the design to the tenth`() {
         assertEquals(FormWord.FRESH, FormWord.of(11.0))
         assertEquals(FormWord.FRESH, FormWord.of(5.1))
         assertEquals(FormWord.NEUTRAL, FormWord.of(5.0))

@@ -116,7 +116,7 @@ class ActionRouterTest {
     }
 
     @Test
-    fun `the pause toggle pauses while riding, resumes while paused and does nothing otherwise`() {
+    fun `the pause toggle pauses while riding resumes while paused and does nothing otherwise`() {
         val session = RecordingSession(snapshot())
         val router = ActionRouter(session, RecordingMedia())
         router.dispatch(ClickAction.TOGGLE_RIDE_PAUSE)
@@ -167,7 +167,7 @@ class ActionRouterTest {
     }
 
     @Test
-    fun `the session is read at every action, because the ride app's session changes from ride to ride`() {
+    fun `the session is read at every action because the ride app's session changes from ride to ride`() {
         val first = RecordingSession(snapshot())
         val second = RecordingSession(snapshot())
         var current: RideSession? = first

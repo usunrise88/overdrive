@@ -22,7 +22,7 @@ class ButtonMappingTest {
     }
 
     @Test
-    fun `a role is down while any of its bits is down, and bits nobody owns are ignored`() {
+    fun `a role is down while any of its bits is down and bits nobody owns are ignored`() {
         val mapping = ButtonMapping.DEFAULT
         assertEquals(emptySet(), mapping.rolesDown(0))
         assertEquals(setOf(HandlebarButton.PLUS), mapping.rolesDown(ClickBits.PLUS))
@@ -68,7 +68,7 @@ class ButtonMappingTest {
     }
 
     @Test
-    fun `with changes one role and keeps the rest, and mappings compare by value`() {
+    fun `with changes one role and keeps the rest and mappings compare by value`() {
         val swapped = assertNotNull(ButtonMapping.DEFAULT.with(HandlebarButton.PLUS, ClickBits.MINUS))
         assertEquals(ClickBits.MINUS, swapped.maskOf(HandlebarButton.PLUS))
         assertEquals(ClickBits.B, swapped.maskOf(HandlebarButton.BUTTON_2))
@@ -81,7 +81,7 @@ class ButtonMappingTest {
     }
 
     @Test
-    fun `a mapping survives its text form, so the setting can be stored`() {
+    fun `a mapping survives its text form so the setting can be stored`() {
         assertEquals(
             "PLUS=00001000;BUTTON_2=00000020;BUTTON_3=00000040;BUTTON_4=00000010;BUTTON_5=00000080",
             ButtonMapping.DEFAULT.serialize(),
@@ -118,7 +118,8 @@ class ButtonMappingTest {
         }
         val random = Random(8)
         repeat(5_000) {
-            ButtonMapping.parse(String(CharArray(random.nextInt(0, 90)) { random.nextInt(32, 127).toChar() }))
+            val raw = CharArray(random.nextInt(0, 90)) { random.nextInt(32, 127).toChar() }.concatToString()
+            ButtonMapping.parse(raw)
         }
         // A truncated good text is also not a mapping.
         for (length in good.indices) assertNull(ButtonMapping.parse(good.take(length)), "cut to $length")

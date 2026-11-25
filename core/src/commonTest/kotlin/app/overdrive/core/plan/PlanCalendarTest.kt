@@ -7,7 +7,7 @@ import kotlin.test.assertFailsWith
 /** The date arithmetic the plan needs, without a platform calendar. */
 class PlanCalendarTest {
     @Test
-    fun `adds days across months, years and leap days`() {
+    fun `adds days across months years and leap days`() {
         assertEquals("2026-11-19", PlanCalendar.addDays("2026-11-18", 1))
         assertEquals("2026-12-01", PlanCalendar.addDays("2026-11-18", 13))
         assertEquals("2027-01-01", PlanCalendar.addDays("2026-12-31", 1))
@@ -20,7 +20,7 @@ class PlanCalendarTest {
     }
 
     @Test
-    fun `names the weekday, Monday 1 to Sunday 7`() {
+    fun `names the weekday Monday 1 to Sunday 7`() {
         assertEquals(3, PlanCalendar.dayOfWeek("2026-11-18"), "a Wednesday")
         assertEquals(1, PlanCalendar.dayOfWeek("2026-11-16"))
         assertEquals(7, PlanCalendar.dayOfWeek("2026-11-22"))

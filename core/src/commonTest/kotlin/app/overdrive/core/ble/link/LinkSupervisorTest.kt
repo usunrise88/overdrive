@@ -69,7 +69,7 @@ class LinkSupervisorTest {
         }
 
     @Test
-    fun `it connects, publishes the session, and reports connecting then connected`() =
+    fun `it connects publishes the session and reports connecting then connected`() =
         runTest {
             val rig = BleRig(this)
             val (supervisor, _) = rig.supervisor()
@@ -91,7 +91,7 @@ class LinkSupervisorTest {
         }
 
     @Test
-    fun `a dropped link is retried after one second, with a fresh transport and the old one closed`() =
+    fun `a dropped link is retried after one second with a fresh transport and the old one closed`() =
         runTest {
             val rig = BleRig(this)
             val (supervisor, sessions) = rig.supervisor()
@@ -119,7 +119,7 @@ class LinkSupervisorTest {
         }
 
     @Test
-    fun `repeated failures wait one, two, four, eight, sixteen and then thirty seconds`() =
+    fun `repeated failures wait one two four eight sixteen and then thirty seconds`() =
         runTest {
             val rig = BleRig(this)
             rig.fakeTrainer.faults.failNextConnects(8)
@@ -201,7 +201,7 @@ class LinkSupervisorTest {
         }
 
     @Test
-    fun `a link that held for thirty seconds restarts the backoff, one that did not keeps growing`() =
+    fun `a link that held for thirty seconds restarts the backoff one that did not keeps growing`() =
         runTest {
             val rig = BleRig(this)
             val (supervisor, _) = rig.supervisor()
@@ -232,7 +232,7 @@ class LinkSupervisorTest {
         }
 
     @Test
-    fun `Bluetooth off is its own state, nothing is tried, and it connects the moment it is back`() =
+    fun `Bluetooth off is its own state nothing is tried and it connects the moment it is back`() =
         runTest {
             val rig = BleRig(this)
             rig.ble.setAvailability(BleAvailability.BLUETOOTH_OFF)
@@ -251,7 +251,7 @@ class LinkSupervisorTest {
         }
 
     @Test
-    fun `a revoked permission mid-ride drops the link, says why, and resumes without backoff`() =
+    fun `a revoked permission mid-ride drops the link says why and resumes without backoff`() =
         runTest {
             val rig = BleRig(this)
             val (supervisor, sessions) = rig.supervisor()

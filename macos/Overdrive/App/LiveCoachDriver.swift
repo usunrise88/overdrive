@@ -39,7 +39,7 @@ public final class LiveCoachDriver: ObservableObject {
         }
         guard enabledProvider(),
               let workout,
-              workout.liveCoach == true,
+              workout.liveCoach?.boolValue == true,
               client.isConfigured else {
             return
         }
@@ -51,22 +51,21 @@ public final class LiveCoachDriver: ObservableObject {
                 structureHash: structureHash,
                 variantRidden: variantRidden
             )
-            controller = LiveSessionController(
+            controller = AppleCoreFactories.shared.createLiveSessionController(
                 plan: plan,
-                nowMillis: { Self.monotonicMillis() },
-                wallMillis: { Self.wallMillis() }
+                wallClockMillis: { KotlinLong(longLong: Self.wallMillis()) }
             )
         }
 
         guard let controller else { return }
-        let effects = controller.onSnapshot(snapshot: snapshot)
+        let effects = controller.onRide(nowMillis: Self.monotonicMillis(), snapshot: snapshot)
         apply(effects: effects, controller: controller)
     }
 
     public func mute() {
         guard let controller else { return }
         playback?.mute()
-        let effects = controller.mute()
+        let effects = controller.mute(nowMillis: Self.monotonicMillis())
         apply(effects: effects, controller: controller)
     }
 
@@ -95,7 +94,7 @@ public final class LiveCoachDriver: ObservableObject {
                     guard let self else { return }
                     let answer = try? await self.client.start(request: start.request)
                     guard let answer, self.controller === controller else { return }
-                    let next = controller.onStartAnswer(answer: answer)
+                    let next = controller.onStartAnswer(nowMillis: Self.monotonicMillis(), answer: answer)
                     self.apply(effects: next, controller: controller)
                 }
             } else if let send = effect as? LiveEffectSendSnapshot {
@@ -103,7 +102,7 @@ public final class LiveCoachDriver: ObservableObject {
                     guard let self else { return }
                     let answer = try? await self.client.snapshot(sessionId: send.sessionId, snapshot: send.snapshot)
                     guard let answer, self.controller === controller else { return }
-                    let next = controller.onSnapshotAnswer(answer: answer)
+                    let next = controller.onSnapshotAnswer(nowMillis: Self.monotonicMillis(), session: send.sessionId, answer: answer)
                     self.apply(effects: next, controller: controller)
                 }
             } else if let open = effect as? LiveEffectOpenStream {
@@ -114,19 +113,25 @@ public final class LiveCoachDriver: ObservableObject {
                 playback?.close()
                 playback = nil
             } else if let end = effect as? LiveEffectEndSession {
+                let body = LiveSessionEnd(reason: end.reason, clock: KotlinLong(longLong: Self.wallMillis()))
                 Task { [weak self] in
-                    try? await self?.client.end(sessionId: end.sessionId, end: end.body)
-                }
-            } else if let wake = effect as? LiveEffectScheduleWake {
-                wakeTask?.cancel()
-                let delayMs = max(50, wake.atMillis - Self.monotonicMillis())
-                wakeTask = Task { [weak self] in
-                    try? await Task.sleep(nanoseconds: UInt64(delayMs) * 1_000_000)
-                    guard !Task.isCancelled, let self, self.controller === controller else { return }
-                    let next = controller.onWake()
-                    self.apply(effects: next, controller: controller)
+                    try? await self?.client.end(sessionId: end.sessionId, end: body)
                 }
             }
+        }
+        scheduleWake(for: controller)
+    }
+
+    private func scheduleWake(for controller: LiveSessionController) {
+        wakeTask?.cancel()
+        wakeTask = nil
+        guard let nextWake = controller.nextWakeMillis()?.int64Value else { return }
+        let delayMs = max(50, nextWake - Self.monotonicMillis())
+        wakeTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(delayMs) * 1_000_000)
+            guard !Task.isCancelled, let self, self.controller === controller else { return }
+            let next = controller.onTime(nowMillis: Self.monotonicMillis())
+            self.apply(effects: next, controller: controller)
         }
     }
 
@@ -138,13 +143,13 @@ public final class LiveCoachDriver: ObservableObject {
         let pb = AppleCoreFactories.shared.createCuePlayback(
             scope: scope,
             player: player,
-            nowMillis: { Self.monotonicMillis() },
+            nowMillis: { KotlinLong(longLong: Self.monotonicMillis()) },
             report: { [weak self] cueId, played in
                 guard let self, let sid = self.activeSessionId else { return }
                 Task {
                     try? await self.client.played(
                         sessionId: sid,
-                        cueId: cueId,
+                        cueId: cueId.int32Value,
                         played: LiveCuePlayed(played: played.boolValue, clock: KotlinLong(longLong: Self.wallMillis()))
                     )
                 }
@@ -161,19 +166,14 @@ public final class LiveCoachDriver: ObservableObject {
         playback = pb
 
         let source = client.cues(sessionId: sessionId)
-        let stream = CueStream(
-            source: source,
-            onCue: { cue in pb.offer(cue: cue) },
-            onEnd: { [weak self] reason in
-                Task { @MainActor in
-                    guard let self, self.controller === controller else { return }
-                    let next = controller.onStreamEnded(reason: reason)
-                    self.apply(effects: next, controller: controller)
-                }
+        let stream = AppleCoreFactories.shared.createCueStream(source: source, onCue: { cue in pb.offer(cue: cue) })
+        streamTask = Task { [weak self] in
+            guard let end = try? await stream.run() else { return }
+            await MainActor.run {
+                guard let self, self.controller === controller else { return }
+                let next = controller.onStreamEnd(nowMillis: Self.monotonicMillis(), session: sessionId, end: end)
+                self.apply(effects: next, controller: controller)
             }
-        )
-        streamTask = Task {
-            try? await stream.run()
         }
     }
 

@@ -61,7 +61,7 @@ class CompanionRepositoriesTest {
     }
 
     @Test
-    fun `each range asks for its own days, caches under its own name, and the answers can be told apart`() =
+    fun `each range asks for its own days caches under its own name and the answers can be told apart`() =
         runTest {
             val transport = ScriptedTransport(ok(json(metrics("2026-10-12", "2026-11-18"))))
             val stores = mutableMapOf<String, MemoryTextStore>()
@@ -127,7 +127,7 @@ class CompanionRepositoriesTest {
         }
 
     @Test
-    fun `a page asked for while one is on its way is not fetched twice, and the next one is asked once it is shown`() =
+    fun `a page asked for while one is on its way is not fetched twice and the next one is asked once it is shown`() =
         runTest {
             val first = ridesPage("2026-11-18", count = 3, hasMore = true, limit = 3)
             val second = ridesPage("2026-11-15", count = 3, hasMore = true, before = first.nextBefore, limit = 3)

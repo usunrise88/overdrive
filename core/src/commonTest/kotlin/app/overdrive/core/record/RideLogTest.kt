@@ -110,7 +110,7 @@ class RideLogTest {
     }
 
     @Test
-    fun `an interrupted ride is recovered up to its last whole second, with an estimated end`() {
+    fun `an interrupted ride is recovered up to its last whole second with an estimated end`() {
         val store = InMemoryByteStore()
         record(store, finish = false)
         val recovered = assertNotNull(RideLog.recover(store))
@@ -133,7 +133,7 @@ class RideLogTest {
     }
 
     @Test
-    fun `nothing to recover is null, whatever the bytes`() {
+    fun `nothing to recover is null whatever the bytes`() {
         assertNull(RideLog.recover(ByteArray(0)))
         assertNull(RideLog.recover("garbage without a newline".encodeToByteArray()))
         assertNull(RideLog.recover("garbage\nmore garbage\n".encodeToByteArray()))
@@ -195,7 +195,7 @@ class RideLogTest {
     }
 
     @Test
-    fun `text with quotes, unicode and line breaks does not break the framing`() {
+    fun `text with quotes unicode and line breaks does not break the framing`() {
         val odd =
             RideHeader(
                 id = "ride \"1\"\n",
@@ -224,7 +224,7 @@ class RideLogTest {
     }
 
     @Test
-    fun `the recorder syncs after the header, every few samples and at the end, then closes`() {
+    fun `the recorder syncs after the header every few samples and at the end then closes`() {
         val sink = ScriptedSink()
         val recorder = RideLogRecorder(sink, syncEverySamples = 3)
         recorder.onRideStarted(header)
@@ -239,7 +239,7 @@ class RideLogTest {
     }
 
     @Test
-    fun `calls out of order are programming errors, as in the in-memory recorder`() {
+    fun `calls out of order are programming errors as in the in-memory recorder`() {
         val recorder = RideLogRecorder(InMemoryByteStore())
         assertFailsWith<IllegalStateException> { recorder.onSample(first) }
         assertFailsWith<IllegalStateException> { recorder.onRrIntervals(emptyList()) }
@@ -275,7 +275,7 @@ class RideLogTest {
     }
 
     @Test
-    fun `a failing sync or close is kept, not thrown`() {
+    fun `a failing sync or close is kept not thrown`() {
         val syncFails = ScriptedSink(failOnSync = 1)
         val recorder = RideLogRecorder(syncFails)
         recorder.onRideStarted(header)
@@ -320,7 +320,7 @@ class RideLogTest {
     }
 
     @Test
-    fun `the whole synthetic ride survives the log, bit for bit`() {
+    fun `the whole synthetic ride survives the log bit for bit`() {
         val live = SyntheticRide.record()
         val store = InMemoryByteStore()
         val memory = InMemoryRideRecorder()

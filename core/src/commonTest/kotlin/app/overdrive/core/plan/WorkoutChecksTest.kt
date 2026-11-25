@@ -28,7 +28,7 @@ class WorkoutChecksTest {
     }
 
     @Test
-    fun `twelve hours is the longest, to the second`() {
+    fun `twelve hours is the longest to the second`() {
         assertEquals(Playability.Runnable, workout(FreeStep(duration = 12 * 3600)).playability())
         val over = workout(FreeStep(duration = 12 * 3600 + 1)).playability()
         assertEquals("Longer than 12 hours", assertIs<Playability.Unrunnable>(over).reason)
@@ -38,7 +38,7 @@ class WorkoutChecksTest {
     }
 
     @Test
-    fun `two thousand steps is the most, once the repeats are expanded`() {
+    fun `two thousand steps is the most once the repeats are expanded`() {
         val round = listOf(SteadyStep(duration = 10, target = 0.9), SteadyStep(duration = 10, target = 0.5))
         assertEquals(Playability.Runnable, workout(RepeatStep(count = 1000, steps = round)).playability())
         val over = workout(RepeatStep(count = 1000, steps = round), FreeStep(duration = 10)).playability()
@@ -46,7 +46,7 @@ class WorkoutChecksTest {
     }
 
     @Test
-    fun `a repeat of billions is refused by arithmetic, not by trying to expand it`() {
+    fun `a repeat of billions is refused by arithmetic not by trying to expand it`() {
         val huge =
             workout(
                 RepeatStep(
@@ -79,7 +79,7 @@ class WorkoutChecksTest {
     }
 
     @Test
-    fun `a ramp is its mean in the fourth-power sense, above its plain mean`() {
+    fun `a ramp is its mean in the fourth-power sense above its plain mean`() {
         val factor = assertNotNull(workout(RampStep(duration = 600, from = 0.5, to = 1.0)).intensityFactor())
         assertTrue(factor > 0.75 && factor < 0.80, "got $factor")
     }
@@ -99,7 +99,7 @@ class WorkoutChecksTest {
     }
 
     @Test
-    fun `the planned load is IF squared times hours times a hundred, and an hour at FTP is 100`() {
+    fun `the planned load is IF squared times hours times a hundred and an hour at FTP is 100`() {
         assertNear(100.0, workout(SteadyStep(duration = 3600, target = 1.0)).plannedLoad(), 0.01)
         assertNear(56.25, workout(SteadyStep(duration = 3600, target = 0.75)).plannedLoad(), 0.01)
         assertNear(25.0, workout(SteadyStep(duration = 1800, target = 0.7071067811865476)).plannedLoad(), 0.01)

@@ -79,7 +79,7 @@ class HealthSyncTest {
     private fun HealthSync.status() = status.value
 
     @Test
-    fun `the first read takes the last 60 days newest window first, in pages, and sends everything once`() =
+    fun `the first read takes the last 60 days newest window first in pages and sends everything once`() =
         runTest {
             val rig = Rig()
             rig.source.pageSize = 2
@@ -176,7 +176,7 @@ class HealthSyncTest {
         }
 
     @Test
-    fun `a declined read reads nothing and sends nothing, and says so`() =
+    fun `a declined read reads nothing and sends nothing and says so`() =
         runTest {
             val rig = Rig()
             rig.sixtyDays()
@@ -213,7 +213,7 @@ class HealthSyncTest {
         }
 
     @Test
-    fun `a type allowed later is read for 60 days and covered by a new token, the others are not read again`() =
+    fun `a type allowed later is read for 60 days and covered by a new token the others are not read again`() =
         runTest {
             val rig = Rig()
             rig.sixtyDays()
@@ -238,7 +238,7 @@ class HealthSyncTest {
         }
 
     @Test
-    fun `after the first read only what is new or edited is read and sent, and an edit replaces`() =
+    fun `after the first read only what is new or edited is read and sent and an edit replaces`() =
         runTest {
             val rig = Rig()
             rig.sixtyDays()
@@ -312,7 +312,7 @@ class HealthSyncTest {
         }
 
     @Test
-    fun `a failing upload keeps every batch in order and is retried after a backoff, never lost`() =
+    fun `a failing upload keeps every batch in order and is retried after a backoff never lost`() =
         runTest {
             val rig = Rig()
             rig.sixtyDays()
@@ -351,7 +351,7 @@ class HealthSyncTest {
         }
 
     @Test
-    fun `the rider asking sends at once, inside the backoff`() =
+    fun `the rider asking sends at once inside the backoff`() =
         runTest {
             val rig = Rig()
             rig.source.add(HealthSamples.resting("rhr-1", NOW - HOUR))
@@ -403,7 +403,7 @@ class HealthSyncTest {
         }
 
     @Test
-    fun `a rejected token stops the run and keeps the batches, a refusal for good parks that batch and goes on`() =
+    fun `a rejected token stops the run and keeps the batches a refusal for good parks that batch and goes on`() =
         runTest {
             val rig = Rig()
             for (d in 0 until 6) rig.source.add(HealthSamples.resting("rhr-$d", NOW - d * DAY - HOUR))
@@ -435,7 +435,7 @@ class HealthSyncTest {
         }
 
     @Test
-    fun `a revoked permission, a missing background permission and an unavailable Health Connect are plain states`() =
+    fun `a revoked permission a missing background permission and an unavailable Health Connect are plain states`() =
         runTest {
             val rig = Rig()
             rig.source.add(HealthSamples.resting("rhr-1", NOW - HOUR))
@@ -539,7 +539,7 @@ class HealthSyncTest {
         }
 
     @Test
-    fun `nothing of a reading is in the saved state, the status or a failure`() =
+    fun `nothing of a reading is in the saved state the status or a failure`() =
         runTest {
             val rig = Rig()
             rig.sixtyDays()
@@ -570,7 +570,7 @@ class HealthSyncTest {
         }
 
     @Test
-    fun `a state file this version cannot read is a fresh start, which the service takes as duplicates`() =
+    fun `a state file this version cannot read is a fresh start which the service takes as duplicates`() =
         runTest {
             val rig = Rig(state = MemoryTextStore("not json"))
             rig.source.add(HealthSamples.resting("rhr-1", NOW - HOUR))

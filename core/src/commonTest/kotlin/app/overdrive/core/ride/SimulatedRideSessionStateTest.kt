@@ -407,7 +407,7 @@ class SimulatedRideSessionStateTest {
         }
 
     @Test
-    fun `previous interval restarts the step when more than 3 s into it, else goes back`() =
+    fun `previous interval restarts the step when more than 3 s into it else goes back`() =
         runTest {
             val session = newSession(workout = abcWorkout)
             ride(session, 70) // 10 s into step B

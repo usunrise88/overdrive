@@ -33,7 +33,7 @@ class SimulatedBikeTest {
     private val flat = SimulationParameters(0.0, 0.004, 0.2144)
 
     @Test
-    fun `nothing happens until it is started, then it connects and ticks once a second`() =
+    fun `nothing happens until it is started then it connects and ticks once a second`() =
         runTest {
             val bike = bike()
             val readings = collectAll(bike.trainer.data)
@@ -82,7 +82,7 @@ class SimulatedBikeTest {
         }
 
     @Test
-    fun `the trainer's own speed follows cadence, not power`() =
+    fun `the trainer's own speed follows cadence not power`() =
         runTest {
             val bike = bike()
             val readings = collectAll(bike.trainer.data)
@@ -146,7 +146,7 @@ class SimulatedBikeTest {
     }
 
     @Test
-    fun `a trainer disconnect drops the link, the commands and the readings, and it reconnects by itself`() =
+    fun `a trainer disconnect drops the link the commands and the readings and it reconnects by itself`() =
         runTest {
             val bike =
                 bike(events = listOf(DeviceDisconnect(SimulatedDevice.TRAINER, startSecond = 5, durationSeconds = 3)))
@@ -226,7 +226,7 @@ class SimulatedBikeTest {
         }
 
     @Test
-    fun `a rider who stops pedalling reads 0 rpm and 0 W, by event or by hand`() =
+    fun `a rider who stops pedalling reads 0 rpm and 0 W by event or by hand`() =
         runTest {
             val bike = bike(events = listOf(RiderStop(startSecond = 20, durationSeconds = 10)))
             val readings = collectAll(bike.trainer.data)

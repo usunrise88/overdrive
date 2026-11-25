@@ -97,7 +97,7 @@ class LiveSnapshotBuilderTest {
     }
 
     @Test
-    fun `the share is a whole percent, halves up, and none before the first judged second`() {
+    fun `the share is a whole percent halves up and none before the first judged second`() {
         val table =
             listOf(
                 Triple(0, 0, null),
@@ -173,7 +173,7 @@ class LiveSnapshotBuilderTest {
     }
 
     @Test
-    fun `a free step has no share, whatever the ride did before`() {
+    fun `a free step has no share whatever the ride did before`() {
         val b = LiveSnapshotBuilder()
         b.accept(LiveRides.ride(second = 1, step = 1, elapsedInStep = 10))
         b.accept(LiveRides.ride(second = 2, step = 3, elapsedInStep = 5, target = null))
@@ -187,7 +187,7 @@ class LiveSnapshotBuilderTest {
     // ---- The means ---------------------------------------------------------------------------------
 
     @Test
-    fun `power, heart rate and cadence are the means of the last five seconds, in whole numbers`() {
+    fun `power heart rate and cadence are the means of the last five seconds in whole numbers`() {
         val b = LiveSnapshotBuilder()
         // Seconds 1 to 8: the window at second 8 is 4 to 8.
         val power = listOf(100, 110, 120, 200, 210, 220, 230, 240)
@@ -233,7 +233,7 @@ class LiveSnapshotBuilderTest {
     // ---- The step ----------------------------------------------------------------------------------
 
     @Test
-    fun `the step is the one the record flattens, with its time left and its target`() {
+    fun `the step is the one the record flattens with its time left and its target`() {
         val b = builder(LiveRides.ride(second = 205, step = 1, elapsedInStep = 205, target = 238))
         val snapshot = b.snapshot()
         assertEquals(LiveSnapshotStep(1, LiveStepType.STEADY, "Threshold", 600, 395, 238, null), snapshot.step)
@@ -244,7 +244,7 @@ class LiveSnapshotBuilderTest {
     }
 
     @Test
-    fun `a ramp is a ramp, a heart-rate step holds a heart rate, and neither holds both`() {
+    fun `a ramp is a ramp a heart-rate step holds a heart rate and neither holds both`() {
         val ramp = builder(LiveRides.ride(second = 10, step = 0, elapsedInStep = 10, target = 130)).snapshot()
         assertEquals(LiveStepType.RAMP, ramp.step.type)
         assertEquals(130, ramp.step.targetWatts)
@@ -279,7 +279,7 @@ class LiveSnapshotBuilderTest {
     }
 
     @Test
-    fun `paused and muted are what they are, and a free ride has no snapshot`() {
+    fun `paused and muted are what they are and a free ride has no snapshot`() {
         val paused = builder(LiveRides.ride(second = 50, state = RideState.PAUSED)).snapshot(muted = true)
         assertTrue(paused.paused)
         assertTrue(paused.muted)
@@ -315,7 +315,7 @@ class LiveSnapshotBuilderTest {
     // ---- Events ------------------------------------------------------------------------------------
 
     @Test
-    fun `the stall guard, a pause and a resume are events, newest first, with how long ago`() {
+    fun `the stall guard a pause and a resume are events newest first with how long ago`() {
         val b = LiveSnapshotBuilder()
         b.accept(LiveRides.ride(second = 100))
         b.accept(LiveRides.ride(second = 110, guard = true, power = 150))
@@ -357,7 +357,7 @@ class LiveSnapshotBuilderTest {
     }
 
     @Test
-    fun `a strap that was there and is gone for fifteen seconds is lost once, and a strap never seen is not`() {
+    fun `a strap that was there and is gone for fifteen seconds is lost once and a strap never seen is not`() {
         val b = LiveSnapshotBuilder()
         b.accept(LiveRides.ride(second = 1))
         for (i in 2..15) b.accept(LiveRides.ride(second = i, heartRate = null))

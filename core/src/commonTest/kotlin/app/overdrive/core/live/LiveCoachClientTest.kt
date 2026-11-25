@@ -60,7 +60,7 @@ class LiveCoachClientTest {
             """"serverTime":1795000000456,"snapshotEverySeconds":5}"""
 
     @Test
-    fun `a start is posted to the sessions with the contract's body and the token, and the answer is read`() =
+    fun `a start is posted to the sessions with the contract's body and the token and the answer is read`() =
         runTest {
             posts.reply = { HttpAnswer(201, on) }
             val start = LiveSessionStart("ride-1795000000000", "icu-6001", "833a9d4d7f4ebf35", false, 1_795_000_000_000)
@@ -72,7 +72,7 @@ class LiveCoachClientTest {
         }
 
     @Test
-    fun `a snapshot goes to its session, a 404 is a session that is gone, and a failure is the next one's problem`() =
+    fun `a snapshot goes to its session a 404 is a session that is gone and a failure is the next one's problem`() =
         runTest {
             val snapshot =
                 LiveSnapshot(
@@ -98,7 +98,7 @@ class LiveCoachClientTest {
         }
 
     @Test
-    fun `an end and a played report are posted to their own paths, and never fail the caller`() =
+    fun `an end and a played report are posted to their own paths and never fail the caller`() =
         runTest {
             posts.reply = { HttpAnswer(200, """{"sessionId":"ls-1","status":"ended","cues":2}""") }
             client.end("ls-1", LiveSessionEnd(LiveSessionEndReason.FINISHED, 1_795_000_900_000))
@@ -123,7 +123,7 @@ class LiveCoachClientTest {
         }
 
     @Test
-    fun `the cue stream is the session's own, with the last event id`() =
+    fun `the cue stream is the session's own with the last event id`() =
         runTest {
             val chunks = mutableListOf<String>()
             val outcome = client.cues("ls-1").open("41") { chunks += it }

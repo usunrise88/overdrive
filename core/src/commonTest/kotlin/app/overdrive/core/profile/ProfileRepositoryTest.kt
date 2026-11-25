@@ -51,7 +51,7 @@ class ProfileRepositoryTest {
     // region what is asked
 
     @Test
-    fun `asks for the profile with the token in the header, once`() =
+    fun `asks for the profile with the token in the header once`() =
         runTest {
             val reader = ScriptedGetTransport(HttpAnswer(200, json(rider())))
             repository(reader = reader).refresh(ProfileRefresh.START)
@@ -118,7 +118,7 @@ class ProfileRepositoryTest {
         }
 
     @Test
-    fun `a profile with no ftp is a profile in force with no ftp, which is the tablet's to fill`() =
+    fun `a profile with no ftp is a profile in force with no ftp which is the tablet's to fill`() =
         runTest {
             service.profile = Profile.default()
             val repository = repository()
@@ -128,7 +128,7 @@ class ProfileRepositoryTest {
         }
 
     @Test
-    fun `the cache is the profile after a restart with no service, and the failed request says so`() =
+    fun `the cache is the profile after a restart with no service and the failed request says so`() =
         runTest {
             val cache = MemoryProfileCache()
             repository(cache).refresh(ProfileRefresh.START)
@@ -181,7 +181,7 @@ class ProfileRepositoryTest {
         }
 
     @Test
-    fun `a damaged cache reads as no cache, every way it can be damaged, and the next answer makes a good one`() =
+    fun `a damaged cache reads as no cache every way it can be damaged and the next answer makes a good one`() =
         runTest {
             val good = checkNotNull(MemoryProfileCache().also { repository(it).refresh(ProfileRefresh.START) }.text)
             val damaged =
@@ -207,7 +207,7 @@ class ProfileRepositoryTest {
         }
 
     @Test
-    fun `a cache that cannot be read is no cache, and a disk that refuses writes costs only the cache`() =
+    fun `a cache that cannot be read is no cache and a disk that refuses writes costs only the cache`() =
         runTest {
             val broken =
                 object : ProfileCache {
@@ -234,7 +234,7 @@ class ProfileRepositoryTest {
     // region every answer
 
     @Test
-    fun `a token the service rejects is said, kept apart, and asked again only when the rider or the settings ask`() =
+    fun `a token the service rejects is said kept apart and asked again only when the rider or the settings ask`() =
         runTest {
             val cache = MemoryProfileCache()
             repository(cache).refresh(ProfileRefresh.START)
@@ -331,7 +331,7 @@ class ProfileRepositoryTest {
         }
 
     @Test
-    fun `every kind of no answer says what broke, with the hint`() =
+    fun `every kind of no answer says what broke with the hint`() =
         runTest {
             val cases =
                 listOf(
@@ -357,7 +357,7 @@ class ProfileRepositoryTest {
     // region when
 
     @Test
-    fun `the start and the rider always ask, the screen opening asks once a minute, a failed request counts`() =
+    fun `the start and the rider always ask the screen opening asks once a minute a failed request counts`() =
         runTest {
             val repository = repository()
             repository.refresh(ProfileRefresh.START)
@@ -381,7 +381,7 @@ class ProfileRepositoryTest {
         }
 
     @Test
-    fun `one request at a time, and a settings change during one asks again afterwards`() =
+    fun `one request at a time and a settings change during one asks again afterwards`() =
         runTest {
             val release = CompletableDeferred<Unit>()
             val started = CompletableDeferred<Unit>()
@@ -458,7 +458,7 @@ class ProfileRepositoryTest {
     // region edits
 
     @Test
-    fun `an edit is in force at once and is sent as a patch, and the answer is the profile`() =
+    fun `an edit is in force at once and is sent as a patch and the answer is the profile`() =
         runTest {
             val cache = MemoryProfileCache()
             val repository = repository(cache)
@@ -513,7 +513,7 @@ class ProfileRepositoryTest {
         }
 
     @Test
-    fun `an edit made offline stays in force, is on disk, survives a restart and is sent first at the next start`() =
+    fun `an edit made offline stays in force is on disk survives a restart and is sent first at the next start`() =
         runTest {
             val cache = MemoryProfileCache()
             val repository = repository(cache)
@@ -552,7 +552,7 @@ class ProfileRepositoryTest {
         }
 
     @Test
-    fun `edits made offline are one patch, the last write winning, and the retry is the next refresh`() =
+    fun `edits made offline are one patch the last write winning and the retry is the next refresh`() =
         runTest {
             val repository = repository()
             repository.refresh(ProfileRefresh.START)
@@ -581,7 +581,7 @@ class ProfileRepositoryTest {
         }
 
     @Test
-    fun `a service that fails for a moment keeps the edit, and says why`() =
+    fun `a service that fails for a moment keeps the edit and says why`() =
         runTest {
             val repository = repository()
             repository.refresh(ProfileRefresh.START)
@@ -628,7 +628,7 @@ class ProfileRepositoryTest {
         }
 
     @Test
-    fun `a service that refuses the edit loses it, and the profile in force goes back to the service's`() =
+    fun `a service that refuses the edit loses it and the profile in force goes back to the service's`() =
         runTest {
             val cache = MemoryProfileCache()
             val repository = repository(cache)
@@ -646,7 +646,7 @@ class ProfileRepositoryTest {
         }
 
     @Test
-    fun `an edit made while a send is under way is sent after it, the newest winning`() =
+    fun `an edit made while a send is under way is sent after it the newest winning`() =
         runTest {
             val repository = repository()
             repository.refresh(ProfileRefresh.START)
@@ -676,7 +676,7 @@ class ProfileRepositoryTest {
         }
 
     @Test
-    fun `an edit made while the profile is being read stays, and is sent`() =
+    fun `an edit made while the profile is being read stays and is sent`() =
         runTest {
             val release = CompletableDeferred<Unit>()
             val started = CompletableDeferred<Unit>()

@@ -50,7 +50,7 @@ class RideEngineTrainerTest {
         }
 
     @Test
-    fun `gears change the simulated grade by one percent each, from flat at the neutral gear`() =
+    fun `gears change the simulated grade by one percent each from flat at the neutral gear`() =
         runTest {
             val rig = EngineRig(this)
             rig.start()
@@ -203,7 +203,7 @@ class RideEngineTrainerTest {
         }
 
     @Test
-    fun `an ERG workout is commanded step by step, and a pause drops the target to 0 W`() =
+    fun `an ERG workout is commanded step by step and a pause drops the target to 0 W`() =
         runTest {
             val rig = EngineRig(this, workout = abcWorkout) // A 50%, B 80%, free: at FTP 200
             assertEquals(
@@ -397,7 +397,7 @@ class RideEngineTrainerTest {
         }
 
     @Test
-    fun `a command that fails is retried after a second, starting over with control`() =
+    fun `a command that fails is retried after a second starting over with control`() =
         runTest {
             val rig = EngineRig(this, connectTrainer = false)
             rig.trainer.failNextCommands(2)
@@ -415,7 +415,7 @@ class RideEngineTrainerTest {
         }
 
     @Test
-    fun `finishing leaves the trainer on the flat, not holding the last target`() =
+    fun `finishing leaves the trainer on the flat not holding the last target`() =
         runTest {
             val rig = EngineRig(this, workout = abcWorkout)
             rig.start()

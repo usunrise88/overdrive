@@ -44,7 +44,7 @@ class CodecFuzzTest {
     }
 
     @Test
-    fun `random flags with enough random bytes parse or fail cleanly, never partially`() {
+    fun `random flags with enough random bytes parse or fail cleanly never partially`() {
         val random = Random(7)
         repeat(20_000) {
             val bytes = random.nextBytes(32)
@@ -74,7 +74,7 @@ class CodecFuzzTest {
     }
 
     @Test
-    fun `every proper prefix of an Indoor Bike Data vector is truncated, never partly used`() {
+    fun `every proper prefix of an Indoor Bike Data vector is truncated never partly used`() {
         for (vector in vectorsIbd) {
             val full = hex(vector)
             assertTrue(IndoorBikeDataCodec.parse(full) is DecodeResult.Ok, vector)
@@ -87,7 +87,7 @@ class CodecFuzzTest {
     }
 
     @Test
-    fun `heart rate prefixes are truncated until the announced fields are whole, then the RR list is just shorter`() {
+    fun `heart rate prefixes are truncated until the announced fields are whole then the RR list is just shorter`() {
         // HR7: 16-bit bpm and two RR intervals. Needs flags + 2 bytes of bpm.
         val hr7 = hex("17 96 00 84 03 00 04")
         assertEquals(DecodeErrorKind.TRUNCATED, HeartRateCodec.parse(hr7.copyOf(1)).malformed().kind)
@@ -102,7 +102,7 @@ class CodecFuzzTest {
     }
 
     @Test
-    fun `short control point responses, status and feature payloads are typed errors`() {
+    fun `short control point responses status and feature payloads are typed errors`() {
         assertEquals(DecodeErrorKind.TRUNCATED, ControlPointCodec.parseResponse(hex("80 00")).malformed().kind)
         assertEquals(
             DecodeErrorKind.UNEXPECTED_MARKER,

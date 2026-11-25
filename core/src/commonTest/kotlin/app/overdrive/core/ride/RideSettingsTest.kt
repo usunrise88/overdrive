@@ -26,7 +26,7 @@ class RideSettingsTest {
     }
 
     @Test
-    fun `the resume power is within 0 and the limit, and 0 is off`() {
+    fun `the resume power is within 0 and the limit and 0 is off`() {
         RideSettings(autoResumePowerWatts = 0)
         RideSettings(autoResumePowerWatts = 1500)
         assertFailsWith<IllegalArgumentException> { RideSettings(autoResumePowerWatts = -1) }
@@ -34,7 +34,7 @@ class RideSettingsTest {
     }
 
     @Test
-    fun `the flywheel step is a finite number of km-h from 0, and 0 is off`() {
+    fun `the flywheel step is a finite number of km-h from 0 and 0 is off`() {
         RideSettings(autoResumeFlywheelStepKmh = 0.0)
         RideSettings(autoResumeFlywheelStepKmh = 12.5)
         assertFailsWith<IllegalArgumentException> { RideSettings(autoResumeFlywheelStepKmh = -0.1) }

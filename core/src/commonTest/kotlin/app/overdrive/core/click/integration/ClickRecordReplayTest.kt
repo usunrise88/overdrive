@@ -47,7 +47,7 @@ class ClickRecordReplayTest {
     }
 
     @Test
-    fun `the notes' Click (02 03, heartbeat, battery frame) shows buttons, a notice, an unknown frame`() {
+    fun `the notes' Click 02 03 heartbeat battery frame shows buttons a notice an unknown frame`() {
         val recorded = live(SyntheticClick.BUTTONS)
         val observation = recorded.observation
         assertEquals(
@@ -74,7 +74,7 @@ class ClickRecordReplayTest {
     }
 
     @Test
-    fun `a drop with Plus held releases it with a synthetic change, the reconnect works`() {
+    fun `a drop with Plus held releases it with a synthetic change the reconnect works`() {
         val observation = live(SyntheticClick.DROPOUT).observation
         assertEquals(listOf(ClickBits.PLUS, 0, ClickBits.B, 0), observation.changes.map { it.held })
         assertEquals(listOf(false, true, false, false), observation.changes.map { it.synthetic })
@@ -124,7 +124,7 @@ class ClickRecordReplayTest {
     }
 
     @Test
-    fun `a model of the real puck is active at once, says nothing until a press, and decodes the bits the bench saw`() {
+    fun `a model of the real puck is active at once says nothing until a press and decodes the bits the bench saw`() {
         val recorded = live(SyntheticClick.REAL_PUCK)
         val observation = recorded.observation
         assertEquals(

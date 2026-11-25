@@ -46,7 +46,7 @@ class ReplayPeripheralTest {
         """.trimIndent()
 
     @Test
-    fun `the n-th connect plays the n-th segment, with the drop the recording ended in`() =
+    fun `the n-th connect plays the n-th segment with the drop the recording ended in`() =
         runTest {
             val rig = BleRig(this)
             val replay = ReplayPeripheral(BleSessionFormat.parse(strapSession))
@@ -79,7 +79,7 @@ class ReplayPeripheralTest {
         }
 
     @Test
-    fun `reads and write acknowledgements come from the recording, in order`() =
+    fun `reads and write acknowledgements come from the recording in order`() =
         runTest {
             val text =
                 """
@@ -161,7 +161,7 @@ class ReplayPeripheralTest {
     }
 
     @Test
-    fun `an empty or unusable session is an idle peripheral, not a crash`() =
+    fun `an empty or unusable session is an idle peripheral not a crash`() =
         runTest {
             val rig = BleRig(this)
             val replay = ReplayPeripheral(BleSessionFormat.parse("garbage\n\n# comment\n"))

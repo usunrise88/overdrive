@@ -13,7 +13,7 @@ class ButtonEdgesTest {
     private fun pressedBitmap(vararg bits: Int): Int = ClickBits.bitmapOf(bits.fold(0) { all, bit -> all or bit })
 
     @Test
-    fun `nothing pressed is no change, however often it repeats`() {
+    fun `nothing pressed is no change however often it repeats`() {
         val edges = ButtonEdges()
         assertNull(edges.update(released, 1))
         assertNull(edges.update(released, 2))
@@ -21,7 +21,7 @@ class ButtonEdgesTest {
     }
 
     @Test
-    fun `a press and its release are two changes, and a repeated frame in between is none`() {
+    fun `a press and its release are two changes and a repeated frame in between is none`() {
         val edges = ButtonEdges()
         val press = edges.update(pressedBitmap(ClickBits.A), 10)
         assertEquals(ButtonChange(pressed = ClickBits.A, released = 0, held = ClickBits.A, timestampNanos = 10), press)
@@ -75,7 +75,7 @@ class ButtonEdgesTest {
     }
 
     @Test
-    fun `releaseAll after a drop is synthetic, once, and the next frame starts from nothing`() {
+    fun `releaseAll after a drop is synthetic once and the next frame starts from nothing`() {
         val edges = ButtonEdges()
         assertNull(edges.releaseAll(1), "nothing was held")
         edges.update(pressedBitmap(ClickBits.A, ClickBits.Z), 10)

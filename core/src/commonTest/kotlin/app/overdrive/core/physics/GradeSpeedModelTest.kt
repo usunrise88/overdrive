@@ -44,7 +44,7 @@ class GradeSpeedModelTest {
     private fun cappedKmh(metersPerSecond: Double) = minOf(metersPerSecond * 3.6, FlatPhysicsSpeedModel.MAX_SPEED_KMH)
 
     @Test
-    fun `on the flat it is the model it always was, to the last bit`() {
+    fun `on the flat it is the model it always was to the last bit`() {
         // The values of the old flat-only model, which this reproduces: the bracket at grade 0 is the rolling resistance alone.
         for (watts in listOf(50.0, 150.0, 250.0, 400.0, 1000.0)) {
             assertEquals(model.speedKmh(watts), model.speedKmh(watts, 0.0))
@@ -117,7 +117,7 @@ class GradeSpeedModelTest {
     }
 
     @Test
-    fun `agrees with the bisection for random riders, bikes and roads`() {
+    fun `agrees with the bisection for random riders bikes and roads`() {
         val random = Random(20261119)
         repeat(3000) {
             val settings =

@@ -21,7 +21,7 @@ class PlanAgendaTest {
         )
 
     @Test
-    fun `today first, then the next six days by date, nothing earlier or later`() {
+    fun `today first then the next six days by date nothing earlier or later`() {
         val agenda = PlanAgenda.of(workouts, "2026-11-18")
         assertEquals(listOf("icu-1", "icu-2"), agenda.today.map { it.id })
         assertEquals(listOf("2026-11-19", "2026-11-22", "2026-11-24"), agenda.thisWeek.map { it.date })

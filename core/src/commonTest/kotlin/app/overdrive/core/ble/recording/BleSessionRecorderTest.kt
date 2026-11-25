@@ -120,7 +120,7 @@ class BleSessionRecorderTest {
         }
 
     @Test
-    fun `times are relative to the start of the recording, not the clock of the device`() =
+    fun `times are relative to the start of the recording not the clock of the device`() =
         runTest {
             val lines = mutableListOf<String>()
             var now = 5_000_000_000_000L
@@ -150,7 +150,7 @@ class BleSessionRecorderTest {
         }
 
     @Test
-    fun `the decorator records subscriptions, writes, indications and notifications, and passes everything through`() =
+    fun `the decorator records subscriptions writes indications and notifications and passes everything through`() =
         runTest {
             val rig = BleRig(this)
             val lines = mutableListOf<String>()

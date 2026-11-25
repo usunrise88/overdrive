@@ -12,7 +12,7 @@ class CacheTextTest {
         CachedBody(CacheText.sourceOf("https://overdrive.example.org"), 1_700_000_000_000L, "{\"a\":1}\n{\"b\":2}")
 
     @Test
-    fun `a body round-trips exactly, newlines included`() {
+    fun `a body round-trips exactly newlines included`() {
         val text = CacheText.encode("metrics-26w", cached)
         val back = assertNotNull(CacheText.decode("metrics-26w", text))
         assertEquals(cached.body, back.body)
@@ -28,7 +28,7 @@ class CacheTextTest {
     }
 
     @Test
-    fun `another kind, another version, a changed body and a damaged header are all nothing`() {
+    fun `another kind another version a changed body and a damaged header are all nothing`() {
         val text = CacheText.encode("rides", cached)
         assertNull(CacheText.decode("metrics-26w", text))
         assertNull(CacheText.decode("rides", text.replace("overdrive-cache 1", "overdrive-cache 9")))

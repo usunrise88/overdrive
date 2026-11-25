@@ -45,7 +45,7 @@ class FitImporterTest {
     // region the share
 
     @Test
-    fun `a file is kept before it is sent, sent as FIT bytes, and removed on the contract's answer`() =
+    fun `a file is kept before it is sent sent as FIT bytes and removed on the contract's answer`() =
         runTest {
             val transport = ScriptedFitTransport(HttpAnswer(201, FitSamples.imported()))
             var keptWhileSending = -1
@@ -77,7 +77,7 @@ class FitImporterTest {
     // region offline
 
     @Test
-    fun `no network keeps the file, says why, and the next try is after a backoff that doubles`() =
+    fun `no network keeps the file says why and the next try is after a backoff that doubles`() =
         runTest {
             val transport = ScriptedFitTransport(TransportException(TransportFailure.NoNetwork))
             val importer = importer(transport)
@@ -105,7 +105,7 @@ class FitImporterTest {
         }
 
     @Test
-    fun `a service that comes back gets the file, and a lost answer is only a duplicate the second time`() =
+    fun `a service that comes back gets the file and a lost answer is only a duplicate the second time`() =
         runTest {
             val transport =
                 ScriptedFitTransport(
@@ -124,7 +124,7 @@ class FitImporterTest {
         }
 
     @Test
-    fun `a restart finds what waits, and sends it without the share screen`() =
+    fun `a restart finds what waits and sends it without the share screen`() =
         runTest {
             val offline = ScriptedFitTransport(TransportException(TransportFailure.Unreachable))
             val before = importer(offline)
@@ -161,7 +161,7 @@ class FitImporterTest {
         }
 
     @Test
-    fun `a server error, a busy service, a timeout and a service without the route keep the file`() =
+    fun `a server error a busy service a timeout and a service without the route keep the file`() =
         runTest {
             for (
             answer in
@@ -194,7 +194,7 @@ class FitImporterTest {
         }
 
     @Test
-    fun `a refused token keeps the file, is not asked again until the rider asks, and then goes through`() =
+    fun `a refused token keeps the file is not asked again until the rider asks and then goes through`() =
         runTest {
             val transport = ScriptedFitTransport(FitSamples.error(401, "unauthorized"))
             val importer = importer(transport)
@@ -211,7 +211,7 @@ class FitImporterTest {
         }
 
     @Test
-    fun `with no address or token the file is kept and nothing is sent, and that is not a failure`() =
+    fun `with no address or token the file is kept and nothing is sent and that is not a failure`() =
         runTest {
             val transport = ScriptedFitTransport(HttpAnswer(201, FitSamples.imported()))
             config = SyncConfig("", "")
@@ -228,7 +228,7 @@ class FitImporterTest {
     // region refusals
 
     @Test
-    fun `each reason the service gives parks the file with that reason, and is not tried again`() =
+    fun `each reason the service gives parks the file with that reason and is not tried again`() =
         runTest {
             val cases =
                 listOf(
@@ -339,7 +339,7 @@ class FitImporterTest {
         }
 
     @Test
-    fun `only so many files wait, and the next is refused with the reason`() =
+    fun `only so many files wait and the next is refused with the reason`() =
         runTest {
             val transport = ScriptedFitTransport(TransportException(TransportFailure.NoNetwork))
             val importer = importer(transport, maxWaiting = 3)
@@ -377,7 +377,7 @@ class FitImporterTest {
     // region one at a time
 
     @Test
-    fun `a second run while one is sending does nothing, and a file shared meanwhile is sent once`() =
+    fun `a second run while one is sending does nothing and a file shared meanwhile is sent once`() =
         runTest(UnconfinedTestDispatcher()) {
             val gate = CompletableDeferred<Unit>()
             val entered = CompletableDeferred<Unit>()
@@ -408,7 +408,7 @@ class FitImporterTest {
     // region privacy
 
     @Test
-    fun `no outcome, status or request line holds the token or a byte of the file`() =
+    fun `no outcome status or request line holds the token or a byte of the file`() =
         runTest {
             val transport = ScriptedFitTransport(TransportException(TransportFailure.NoNetwork))
             val importer = importer(transport)

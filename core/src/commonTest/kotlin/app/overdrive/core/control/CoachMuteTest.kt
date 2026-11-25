@@ -36,7 +36,7 @@ class CoachMuteTest {
     }
 
     @Test
-    fun `a button for the coach is any bit no role has, and it is written and read back`() {
+    fun `a button for the coach is any bit no role has and it is written and read back`() {
         val mapping = assertNotNull(ButtonMapping.DEFAULT.withCoachMute(ClickBits.MINUS))
         assertEquals(ClickBits.MINUS, mapping.coachMuteMask)
         assertTrue(mapping.coachMuteDown(ClickBits.MINUS))
@@ -54,7 +54,7 @@ class CoachMuteTest {
     }
 
     @Test
-    fun `a button a role has cannot be the coach's, and a role cannot take the coach's`() {
+    fun `a button a role has cannot be the coach's and a role cannot take the coach's`() {
         assertNull(ButtonMapping.DEFAULT.withCoachMute(ClickBits.A))
         assertNull(ButtonMapping.DEFAULT.withCoachMute(ClickBits.PLUS or ClickBits.MINUS))
         val mapping = assertNotNull(ButtonMapping.DEFAULT.withCoachMute(ClickBits.MINUS))
@@ -97,7 +97,7 @@ class CoachMuteTest {
     }
 
     @Test
-    fun `two buttons are a combination and a role's button is taken, and the same question is asked again`() {
+    fun `two buttons are a combination and a role's button is taken and the same question is asked again`() {
         val learner = CoachButtonLearner(ButtonMapping.DEFAULT)
         learner.feed(ClickBits.MINUS or ClickBits.NAV_UP)
         assertEquals(CoachLearnState.Rejected(CoachLearnRejection.COMBO, null), learner.feed(0))
@@ -176,7 +176,7 @@ class CoachMuteTest {
     }
 
     @Test
-    fun `the coach's button mutes it on the press, once, with nothing on the release or the hold`() =
+    fun `the coach's button mutes it on the press once with nothing on the release or the hold`() =
         runTest {
             val rig = Rig(this, assertNotNull(ButtonMapping.DEFAULT.withCoachMute(ClickBits.MINUS)))
             rig.frame(ClickBits.MINUS)
@@ -190,7 +190,7 @@ class CoachMuteTest {
         }
 
     @Test
-    fun `a button that is nobody's does nothing, and the five roles are as they were`() =
+    fun `a button that is nobody's does nothing and the five roles are as they were`() =
         runTest {
             val rig = Rig(this, ButtonMapping.DEFAULT)
             rig.frame(ClickBits.MINUS)
@@ -207,7 +207,7 @@ class CoachMuteTest {
         }
 
     @Test
-    fun `holding the coach's button while pressing a role fires both, each by its own rule`() =
+    fun `holding the coach's button while pressing a role fires both each by its own rule`() =
         runTest {
             val rig = Rig(this, assertNotNull(ButtonMapping.DEFAULT.withCoachMute(ClickBits.MINUS)))
             rig.frame(ClickBits.MINUS)
@@ -243,7 +243,7 @@ class CoachMuteTest {
     // ---- The router ---------------------------------------------------------------------------------------
 
     @Test
-    fun `the router mutes the coach, with a ride or without one, and does nothing with no coach`() {
+    fun `the router mutes the coach with a ride or without one and does nothing with no coach`() {
         var muted = 0
         val router = ActionRouter({ null }, NoMedia, CoachControl { muted++ })
         router.dispatch(ClickAction.MUTE_COACH)

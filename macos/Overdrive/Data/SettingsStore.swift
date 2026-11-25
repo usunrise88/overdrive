@@ -155,58 +155,26 @@ public struct MacAppSettings: Codable, Equatable, Sendable {
     }
 
     public func toRideSettings(effectiveFtp: Int, effectivePhysics: PhysicsSettings) -> RideSettings {
-        let neutralGear = Int32((gearCount + 1) / 2)
-        let gears = GearSettings(
-            count: Int32(gearCount),
-            neutralGear: neutralGear,
-            gradePercentPerGear: gradeStepPercent,
-            maxGradePercent: 15.0
-        )
-        let stall = StallGuardSettings(
-            enabled: cadenceGuardEnabled,
-            cadenceFloorRpm: Int32(cadenceFloorRpm),
-            triggerSeconds: StallGuardSettings.Companion.shared.DEFAULT_TRIGGER_SECONDS,
-            recoveryCadenceMarginRpm: StallGuardSettings.Companion.shared.DEFAULT_RECOVERY_MARGIN_RPM,
-            reducedFactor: StallGuardSettings.Companion.shared.DEFAULT_REDUCED_FACTOR,
-            releaseRampSeconds: StallGuardSettings.Companion.shared.DEFAULT_RELEASE_RAMP_SECONDS,
-            resumeGraceSeconds: StallGuardSettings.Companion.shared.DEFAULT_RESUME_GRACE_SECONDS
-        )
-        return RideSettings(
+        AppleCoreFactories.shared.createRideSettings(
             ftp: Int32(effectiveFtp),
             physics: effectivePhysics,
-            gears: gears,
-            autoPause: true,
-            autoPauseAfterSeconds: RideSettings.Companion.shared.DEFAULT_AUTO_PAUSE_SECONDS,
-            rampInSeconds: WorkoutPlayer.Companion.shared.DEFAULT_RAMP_IN_SECONDS,
-            pausedTargetWatts: 0,
-            maxTargetWatts: RideSettings.Companion.shared.DEFAULT_MAX_TARGET_WATTS,
-            trainerTimeoutSeconds: RideSettings.Companion.shared.DEFAULT_TRAINER_TIMEOUT_SECONDS,
-            heartRateTimeoutSeconds: RideSettings.Companion.shared.DEFAULT_HEART_RATE_TIMEOUT_SECONDS,
-            autoResumePowerWatts: RideSettings.Companion.shared.DEFAULT_AUTO_RESUME_POWER_WATTS,
-            autoResumeFlywheelStepKmh: RideSettings.Companion.shared.DEFAULT_AUTO_RESUME_FLYWHEEL_STEP_KMH,
-            autoPauseTargetWatts: RideSettings.Companion.shared.DEFAULT_AUTO_PAUSE_TARGET_WATTS,
-            stallGuard: stall,
-            heartRateHold: HeartRateHoldSettings()
+            gearCount: Int32(gearCount),
+            gradeStepPercent: gradeStepPercent,
+            cadenceGuardEnabled: cadenceGuardEnabled,
+            cadenceFloorRpm: Int32(cadenceFloorRpm)
         )
     }
 
     public func toClickOptions() -> ClickOptions {
-        ClickOptions(
-            sendSetupCommand: true,
-            handshakeWithResponse: false,
-            strictHandshakeReply: false,
-            keepAliveInterval: ClickOptions.Companion.shared.DEFAULT_KEEP_ALIVE,
+        AppleCoreFactories.shared.createClickOptions(
             silentMeansLocked: clickSilenceMeansLocked,
-            noEventTimeout: ClickOptions.Companion.shared.DEFAULT_NO_EVENT_TIMEOUT,
-            requestMtu: ClickOptions.Companion.shared.DEFAULT_MTU,
-            requireServiceInAdvertisement: true,
             acceptEitherPuck: clickEitherPuck
         )
     }
 
     public func toButtonMapping() -> ButtonMapping {
         if !buttonMappingSerialized.isEmpty,
-           let parsed = ButtonMapping.Companion.shared.deserialize(text: buttonMappingSerialized) {
+           let parsed = ButtonMapping.Companion.shared.parse(text: buttonMappingSerialized) {
             return parsed
         }
         return ButtonMapping.Companion.shared.DEFAULT

@@ -24,7 +24,7 @@ class BleRideTest {
     // region a full workout in ERG
 
     @Test
-    fun `a workout in ERG, the trainer is told each target and its power follows`() =
+    fun `a workout in ERG the trainer is told each target and its power follows`() =
         runTest {
             val ride = BleRide(this, workout = bleWorkout)
             assertEquals(RideState.READY, ride.now.state, "connected, set up, control taken")
@@ -130,7 +130,7 @@ class BleRideTest {
     // region dropouts (spec §4.1, §4.2)
 
     @Test
-    fun `the trainer's link drops mid-ride, the ride pauses, records the seconds as gaps, and resumes by itself`() =
+    fun `the trainer's link drops mid-ride the ride pauses records the seconds as gaps and resumes by itself`() =
         runTest {
             val ride = BleRide(this, workout = steadyWorkout(40, 0.8))
             ride.rig.fakeTrainer.absentFailsAfter = 2.seconds
@@ -200,7 +200,7 @@ class BleRideTest {
         }
 
     @Test
-    fun `the strap drops mid-ride, a gap in the heart rate and nothing else`() =
+    fun `the strap drops mid-ride a gap in the heart rate and nothing else`() =
         runTest {
             val ride = BleRide(this, workout = steadyWorkout(60, 0.8))
             ride.rig.fakeStrap.absentFailsAfter = 2.seconds
@@ -223,7 +223,7 @@ class BleRideTest {
         }
 
     @Test
-    fun `a strap taken off the chest is a gap, put back on it returns`() =
+    fun `a strap taken off the chest is a gap put back on it returns`() =
         runTest {
             val ride = BleRide(this, workout = steadyWorkout(40, 0.8))
             ride.start()
@@ -309,7 +309,7 @@ class BleRideTest {
     // region RR intervals (spec §4.1, §4.8)
 
     @Test
-    fun `RR intervals from the strap reach the ride record in milliseconds, with the domain rounding`() =
+    fun `RR intervals from the strap reach the ride record in milliseconds with the domain rounding`() =
         runTest {
             val ride = BleRide(this, workout = steadyWorkout(30, 0.8))
             ride.start()
@@ -330,7 +330,7 @@ class BleRideTest {
         }
 
     @Test
-    fun `a whole ride of RR is about the beats of the ride, none lost and none invented`() =
+    fun `a whole ride of RR is about the beats of the ride none lost and none invented`() =
         runTest {
             val ride = BleRide(this, workout = steadyWorkout(60, 0.8))
             ride.rig.fakeStrap.bpm = 120
@@ -343,7 +343,7 @@ class BleRideTest {
         }
 
     @Test
-    fun `a strap that sends no RR gives a ride without HRV, not an error`() =
+    fun `a strap that sends no RR gives a ride without HRV not an error`() =
         runTest {
             val rig = BleRig(this, strapOptions = FakeHeartRateStrapOptions(sendsRr = false))
             val ride = BleRide(this, rig = rig, workout = steadyWorkout(20, 0.8))

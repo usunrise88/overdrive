@@ -39,7 +39,7 @@ class BleRecordReplayTest {
     }
 
     @Test
-    fun `a ride with a 133 drop, a failed reconnect and a strap off the chest replays into the same record`() {
+    fun `a ride with a 133 drop a failed reconnect and a strap off the chest replays into the same record`() {
         val recorded = live(SyntheticRide.DROPOUTS)
         val live = recorded.record
         assertTrue(live.samples.any { it.paused }, "the scenario did interrupt the ride")
@@ -56,7 +56,7 @@ class BleRecordReplayTest {
     }
 
     @Test
-    fun `the recorded files are well formed, short, and mark every connection`() {
+    fun `the recorded files are well formed short and mark every connection`() {
         for (scenario in SyntheticRide.entries) {
             val recorded = live(scenario)
             for (text in listOf(recorded.trainerSession, recorded.strapSession)) {

@@ -37,7 +37,7 @@ class ProgressRepositoriesTest {
     private val answer = ProgressSamples.json(ProgressSamples.heartRateFalling())
 
     @Test
-    fun `each range is asked with its own days, ending today`() =
+    fun `each range is asked with its own days ending today`() =
         runTest {
             val transport = ScriptedTransport(ok(answer))
             val repo = repository(transport)
@@ -69,7 +69,7 @@ class ProgressRepositoriesTest {
     }
 
     @Test
-    fun `the answer is shown and kept in the cache in the services own words, one cache per range`() =
+    fun `the answer is shown and kept in the cache in the services own words one cache per range`() =
         runTest {
             val stores = mutableMapOf<String, MemoryTextStore>()
             val repo = repository(ScriptedTransport(ok(answer)), stores)
@@ -112,7 +112,7 @@ class ProgressRepositoriesTest {
         }
 
     @Test
-    fun `nothing cached and a failed request is an error with its cause, and a service without the route says so`() =
+    fun `nothing cached and a failed request is an error with its cause and a service without the route says so`() =
         runTest {
             val down = repository(ScriptedTransport(error(503)))
             down.load()
@@ -140,7 +140,7 @@ class ProgressRepositoriesTest {
         }
 
     @Test
-    fun `a cache written for another address, or damaged, is no cache`() =
+    fun `a cache written for another address or damaged is no cache`() =
         runTest {
             val stores = mutableMapOf<String, MemoryTextStore>()
             repository(ScriptedTransport(ok(answer)), stores).also {

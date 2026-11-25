@@ -76,7 +76,7 @@ class ResumeAfterPauseTest {
         }
 
     @Test
-    fun `with the hold and the new signs turned off the ride stays paused, which was the deadlock`() =
+    fun `with the hold and the new signs turned off the ride stays paused which was the deadlock`() =
         runTest {
             val settings =
                 RideSettings(
@@ -116,7 +116,7 @@ class ResumeAfterPauseTest {
         }
 
     @Test
-    fun `power alone resumes the ride, because the hold is something to push against`() =
+    fun `power alone resumes the ride because the hold is something to push against`() =
         runTest {
             val ride = FlywheelRide(this)
             ride.stopUntilAutoPaused()
@@ -168,7 +168,7 @@ class ResumeAfterPauseTest {
     // region a flywheel that only coasts must not resume the ride
 
     @Test
-    fun `a flywheel that winds down by itself does not resume the ride, whatever power it reports`() =
+    fun `a flywheel that winds down by itself does not resume the ride whatever power it reports`() =
         runTest {
             val ride = FlywheelRide(this)
             ride.stopUntilAutoPaused()
@@ -204,7 +204,7 @@ class ResumeAfterPauseTest {
         }
 
     @Test
-    fun `without a speed field a coast that reports power looks like a rider, and the rule can be turned off`() =
+    fun `without a speed field a coast that reports power looks like a rider and the rule can be turned off`() =
         runTest {
             val ride = FlywheelRide(this)
             ride.options.reportsSpeed = false
@@ -229,7 +229,7 @@ class ResumeAfterPauseTest {
     // region manual pause
 
     @Test
-    fun `pedalling never lifts a manual pause, resume does, and the ramp-in starts from 0 W`() =
+    fun `pedalling never lifts a manual pause resume does and the ramp-in starts from 0 W`() =
         runTest {
             val ride = FlywheelRide(this)
             ride.rig.engine.pause()

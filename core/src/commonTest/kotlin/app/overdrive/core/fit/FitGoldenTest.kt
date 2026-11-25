@@ -49,7 +49,7 @@ class FitGoldenTest {
     }
 
     @Test
-    fun `the golden is a file our own reader accepts, with the sizes and checksums the document gives`() {
+    fun `the golden is a file our own reader accepts with the sizes and checksums the document gives`() {
         val file = FitReader.parse(expected)
         assertEquals(376, expected.size)
         assertEquals(14, file.headerSize)

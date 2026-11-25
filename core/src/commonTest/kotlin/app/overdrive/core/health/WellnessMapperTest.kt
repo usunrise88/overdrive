@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
 
 class WellnessMapperTest {
     @Test
-    fun `instants are written the way the service reads them, to the millisecond`() {
+    fun `instants are written the way the service reads them to the millisecond`() {
         assertEquals("2026-11-18T07:00:00Z", WellnessTime.formatInstant(NOW))
         assertEquals("2026-11-18T07:00:00.123Z", WellnessTime.formatInstant(NOW + 123))
         assertEquals("1970-01-01T00:00:00Z", WellnessTime.formatInstant(0))
@@ -28,7 +28,7 @@ class WellnessMapperTest {
     }
 
     @Test
-    fun `a Health Connect id the contract would refuse gets a safe id, the same one every time`() {
+    fun `a Health Connect id the contract would refuse gets a safe id the same one every time`() {
         assertEquals("a1b2-C3_d.4", WellnessMapper.wireId("a1b2-C3_d.4"))
         assertEquals("a_b_c", WellnessMapper.wireId("a/b c"))
         assertEquals("h_leading", WellnessMapper.wireId("_leading"))
@@ -38,7 +38,7 @@ class WellnessMapperTest {
     }
 
     @Test
-    fun `a record the contract would refuse is skipped and counted, and the rest still go`() {
+    fun `a record the contract would refuse is skipped and counted and the rest still go`() {
         val mapped =
             WellnessMapper.map(
                 listOf(
@@ -55,7 +55,7 @@ class WellnessMapperTest {
     }
 
     @Test
-    fun `heart rate outside a night and an activity is not sent, inside it is`() {
+    fun `heart rate outside a night and an activity is not sent inside it is`() {
         val night = HealthSamples.night("sleep-1", NOW)
         val workout = HealthSamples.workout("ex-1", NOW + 2 * HOUR)
         val day = HealthSamples.heartRate("hr-day", NOW - 12 * HOUR, NOW + 4 * HOUR, bpm = SENTINEL_BPM)
@@ -109,7 +109,7 @@ class WellnessMapperTest {
     }
 
     @Test
-    fun `samples outside 1 to 300 are dropped, not sent to refuse the batch`() {
+    fun `samples outside 1 to 300 are dropped not sent to refuse the batch`() {
         val night = HealthSamples.night("sleep-1", NOW)
         val at = night.startMillis
         val series =
@@ -130,7 +130,7 @@ class WellnessMapperTest {
     }
 
     @Test
-    fun `an exercise type that is not a token becomes other_workout, a title is trimmed and an empty one dropped`() {
+    fun `an exercise type that is not a token becomes other_workout a title is trimmed and an empty one dropped`() {
         val mapped =
             WellnessMapper
                 .map(
@@ -147,7 +147,7 @@ class WellnessMapperTest {
     }
 
     @Test
-    fun `sleep stages are kept by name and in order, and dropped when there are too many`() {
+    fun `sleep stages are kept by name and in order and dropped when there are too many`() {
         val stages =
             SleepStage.entries.mapIndexed { index, stage ->
                 SleepStageReading(stage, NOW + index * 1000L, NOW + (index + 1) * 1000L)
@@ -165,7 +165,7 @@ class WellnessMapperTest {
     }
 
     @Test
-    fun `the same id twice in one call is one record, the newer edit`() {
+    fun `the same id twice in one call is one record the newer edit`() {
         val mapped =
             WellnessMapper.map(
                 listOf(
@@ -196,7 +196,7 @@ class WellnessMapperTest {
     }
 
     @Test
-    fun `batches stop at the record and the byte limit, keep the order and each is a valid upload`() {
+    fun `batches stop at the record and the byte limit keep the order and each is a valid upload`() {
         val records = WellnessMapper.map(List(12) { HealthSamples.resting("r$it", NOW + it * 1000L) }).records
         val byRecords = WellnessBatcher.batches(records, "Phone", maxRecords = 5)
         assertEquals(listOf(5, 5, 2), byRecords.map { it.records })

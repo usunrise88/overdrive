@@ -51,7 +51,7 @@ class ProfilePatchTest {
     }
 
     @Test
-    fun `two patches in turn are one, the later winning per field`() {
+    fun `two patches in turn are one the later winning per field`() {
         val first = ProfilePatch(ftp = Change.Set(180), physics = PhysicsPatch(systemMassKg = 80.0, crr = 0.004))
         val second =
             ProfilePatch(

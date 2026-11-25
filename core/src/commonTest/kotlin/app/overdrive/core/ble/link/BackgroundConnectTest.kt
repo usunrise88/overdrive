@@ -57,7 +57,7 @@ class BackgroundConnectTest {
     // region the first attempt
 
     @Test
-    fun `a device that is awake connects on the first, active attempt`() =
+    fun `a device that is awake connects on the first active attempt`() =
         runTest {
             val rig = BleRig(this)
             val supervisor = rig.supervisor()
@@ -96,7 +96,7 @@ class BackgroundConnectTest {
     // region waking up
 
     @Test
-    fun `a device that wakes after five minutes is connected at once, by the pending connect`() =
+    fun `a device that wakes after five minutes is connected at once by the pending connect`() =
         runTest {
             val rig = BleRig(this)
             rig.asleep()
@@ -144,7 +144,7 @@ class BackgroundConnectTest {
     // region the pitfalls of autoConnect
 
     @Test
-    fun `a pending background connect is closed and opened again after the watchdog, one at a time`() =
+    fun `a pending background connect is closed and opened again after the watchdog one at a time`() =
         runTest {
             val rig = BleRig(this)
             rig.asleep()
@@ -294,7 +294,7 @@ class BackgroundConnectTest {
     // region the old behaviour
 
     @Test
-    fun `with the strategy off a sleeping device is only ever tried actively, with backoff in between`() =
+    fun `with the strategy off a sleeping device is only ever tried actively with backoff in between`() =
         runTest {
             val rig = BleRig(this)
             rig.asleep()
@@ -308,7 +308,7 @@ class BackgroundConnectTest {
         }
 
     @Test
-    fun `the strategy is read at every attempt, so the setting works while the app runs`() =
+    fun `the strategy is read at every attempt so the setting works while the app runs`() =
         runTest {
             val rig = BleRig(this)
             rig.asleep()

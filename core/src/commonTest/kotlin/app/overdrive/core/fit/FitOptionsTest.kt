@@ -90,7 +90,7 @@ class FitOptionsTest {
     }
 
     @Test
-    fun `8_5 manufacturer, product and serial number are the file id`() {
+    fun `8_5 manufacturer product and serial number are the file id`() {
         val id =
             write(
                 FitOptions(manufacturer = 1, product = 3_000, serialNumber = 4_000_000_000L),
@@ -102,7 +102,7 @@ class FitOptionsTest {
     }
 
     @Test
-    fun `8_6 the timer events can be left out, the activity stays`() {
+    fun `8_6 the timer events can be left out the activity stays`() {
         val file = write(FitOptions(timerEvents = false))
         assertEquals(0, file.messages("event").size)
         assertFalse(file.definitions.any { it.globalNumber == 21 })
@@ -111,7 +111,7 @@ class FitOptionsTest {
     }
 
     @Test
-    fun `the lap trigger of the step laps is a choice, the last lap always ends the session`() {
+    fun `the lap trigger of the step laps is a choice the last lap always ends the session`() {
         val file = write(FitOptions(stepLapTrigger = 1))
         val triggers = file.messages("lap").map { it.raw("lap_trigger") }
         assertEquals(listOf(1L, 1L, 1L, 7L), triggers)

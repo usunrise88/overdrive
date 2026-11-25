@@ -65,7 +65,7 @@ class RideEngineStateTest {
         )
 
     @Test
-    fun `the engine is idle until the trainer connects, then ready with no sensor data`() =
+    fun `the engine is idle until the trainer connects then ready with no sensor data`() =
         runTest {
             val rig = EngineRig(this, connectTrainer = false)
             assertEquals(RideState.IDLE, rig.now.state)
@@ -283,7 +283,7 @@ class RideEngineStateTest {
         }
 
     @Test
-    fun `a manual pause overrides auto-resume, only resume ends it`() =
+    fun `a manual pause overrides auto-resume only resume ends it`() =
         runTest {
             val rig = EngineRig(this)
             rig.start()
@@ -301,7 +301,7 @@ class RideEngineStateTest {
         }
 
     @Test
-    fun `a manual pause while auto-paused changes nothing, pedalling still resumes`() =
+    fun `a manual pause while auto-paused changes nothing pedalling still resumes`() =
         runTest {
             val rig = EngineRig(this)
             rig.start()
@@ -534,7 +534,7 @@ class RideEngineStateTest {
         }
 
     @Test
-    fun `next and previous interval move the workout position, not the ride clock`() =
+    fun `next and previous interval move the workout position not the ride clock`() =
         runTest {
             val rig = EngineRig(this, workout = abcWorkout)
             rig.start()

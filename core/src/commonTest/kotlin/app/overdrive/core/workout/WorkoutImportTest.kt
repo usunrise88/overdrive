@@ -14,7 +14,7 @@ class WorkoutImportTest {
     ) = "<workout_file><name>$name</name><workout>$steps</workout></workout_file>"
 
     @Test
-    fun `steady, ramps, intervals and free ride convert to the native steps`() {
+    fun `steady ramps intervals and free ride convert to the native steps`() {
         val workout =
             WorkoutImport.fromZwo(
                 zwo(
@@ -49,7 +49,7 @@ class WorkoutImportTest {
     }
 
     @Test
-    fun `a ramp runs from PowerLow to PowerHigh in file order, so a cooldown can ramp down`() {
+    fun `a ramp runs from PowerLow to PowerHigh in file order so a cooldown can ramp down`() {
         val steps = WorkoutImport.fromZwo(zwo("""<Cooldown Duration="60" PowerLow="0.75" PowerHigh="0.25"/>""")).steps
         val ramp = assertIs<RampStep>(steps.single())
         assertEquals(0.75, ramp.from)
@@ -71,7 +71,7 @@ class WorkoutImportTest {
     }
 
     @Test
-    fun `cadence becomes the display cadence, resting cadence goes to the off step, and zero is dropped`() {
+    fun `cadence becomes the display cadence resting cadence goes to the off step and zero is dropped`() {
         val steps =
             WorkoutImport
                 .fromZwo(
@@ -110,7 +110,7 @@ class WorkoutImportTest {
     }
 
     @Test
-    fun `name, description and id`() {
+    fun `name description and id`() {
         val workout =
             WorkoutImport.fromZwo(
                 "<workout_file><name>  FTP test: 20 min!  </name><description>Go hard.</description>" +
@@ -125,7 +125,7 @@ class WorkoutImportTest {
     }
 
     @Test
-    fun `a missing or blank name gets a default, and an empty slug a default id`() {
+    fun `a missing or blank name gets a default and an empty slug a default id`() {
         val unnamed =
             WorkoutImport.fromZwo(
                 """<workout_file><workout><FreeRide Duration="60"/></workout></workout_file>""",

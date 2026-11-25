@@ -111,7 +111,7 @@ class CuePlaybackTest {
         )
 
     @Test
-    fun `a cue within its time is played, shown while it is spoken and for six seconds after, and reported`() =
+    fun `a cue within its time is played shown while it is spoken and for six seconds after and reported`() =
         runTest {
             val rig = Rig(this)
             rig.playback.offer(cue(1))
@@ -135,7 +135,7 @@ class CuePlaybackTest {
         }
 
     @Test
-    fun `a cue that waited behind another past its time is dropped, silently, and never played late`() =
+    fun `a cue that waited behind another past its time is dropped silently and never played late`() =
         runTest {
             val rig = Rig(this, mapOf(1 to Plan.Speaks(9_000)))
             rig.playback.offer(cue(1, ttlMs = 20_000))
@@ -171,7 +171,7 @@ class CuePlaybackTest {
         }
 
     @Test
-    fun `one cue at a time, and at most two wait behind it, the oldest dropped`() =
+    fun `one cue at a time and at most two wait behind it the oldest dropped`() =
         runTest {
             val rig = Rig(this, mapOf(1 to Plan.Speaks(30_000)))
             rig.playback.offer(cue(1, ttlMs = 600_000))
@@ -201,7 +201,7 @@ class CuePlaybackTest {
         }
 
     @Test
-    fun `a player that fails or throws drops the cue, raises nothing, and the next cue plays`() =
+    fun `a player that fails or throws drops the cue raises nothing and the next cue plays`() =
         runTest {
             val rig = Rig(this, mapOf(1 to Plan.Fails, 2 to Plan.Throws))
             for (id in 1..3) rig.playback.offer(cue(id, ttlMs = 60_000))
@@ -213,7 +213,7 @@ class CuePlaybackTest {
         }
 
     @Test
-    fun `mute cuts off what is being spoken, drops what waits and the plate, and ignores every cue after`() =
+    fun `mute cuts off what is being spoken drops what waits and the plate and ignores every cue after`() =
         runTest {
             val rig = Rig(this, mapOf(1 to Plan.Hangs))
             rig.playback.offer(cue(1))
@@ -240,7 +240,7 @@ class CuePlaybackTest {
         }
 
     @Test
-    fun `mute before any cue is the same, and sticky`() =
+    fun `mute before any cue is the same and sticky`() =
         runTest {
             val rig = Rig(this)
             rig.playback.mute()
@@ -253,7 +253,7 @@ class CuePlaybackTest {
         }
 
     @Test
-    fun `closing cuts off the sound and ignores what comes after, with no report for a cue it never saw`() =
+    fun `closing cuts off the sound and ignores what comes after with no report for a cue it never saw`() =
         runTest {
             val rig = Rig(this, mapOf(1 to Plan.Hangs))
             rig.playback.offer(cue(1))
@@ -285,7 +285,7 @@ class CuePlaybackTest {
         }
 
     @Test
-    fun `a cue's time is counted from when it arrived, not from when it was made`() =
+    fun `a cue's time is counted from when it arrived not from when it was made`() =
         runTest {
             // ttlMs 8000 from receipt: arrives at 10 s, may start up to 18 s.
             val rig = Rig(this, mapOf(1 to Plan.Speaks(7_000)))

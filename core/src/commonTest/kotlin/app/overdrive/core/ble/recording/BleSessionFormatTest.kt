@@ -63,7 +63,7 @@ class BleSessionFormatTest {
     }
 
     @Test
-    fun `lines that are not events are rejected, never thrown on`() {
+    fun `lines that are not events are rejected never thrown on`() {
         for (bad in listOf(
             "",
             "   ",
@@ -82,7 +82,7 @@ class BleSessionFormatTest {
     }
 
     @Test
-    fun `a file has a version, an optional model, comments and events, and counts what it cannot read`() {
+    fun `a file has a version an optional model comments and events and counts what it cannot read`() {
         val text =
             """
             # overdrive-ble-session 1
@@ -101,7 +101,7 @@ class BleSessionFormatTest {
     }
 
     @Test
-    fun `a file without a header still reads, and its version is null`() {
+    fun `a file without a header still reads and its version is null`() {
         val parsed = BleSessionFormat.parseWithDiagnostics("0 S - - connecting\n")
         assertNull(parsed.version)
         assertNull(parsed.session.model)
@@ -149,7 +149,7 @@ class BleSessionFormatTest {
         val random = Random(3)
         val alphabet = "0123456789ABCDEFNIWRCSD -*#\n\tx"
         repeat(3_000) {
-            val text = String(CharArray(random.nextInt(0, 200)) { alphabet[random.nextInt(alphabet.length)] })
+            val text = CharArray(random.nextInt(0, 200)) { alphabet[random.nextInt(alphabet.length)] }.concatToString()
             val parsed = BleSessionFormat.parseWithDiagnostics(text)
             assertTrue(parsed.skippedLines >= 0)
             parsed.session.events.forEach { assertEquals(it, BleSessionFormat.parseLine(BleSessionFormat.format(it))) }
@@ -157,7 +157,7 @@ class BleSessionFormatTest {
     }
 
     @Test
-    fun `a redacted or missing value has no bytes, an empty one is empty`() {
+    fun `a redacted or missing value has no bytes an empty one is empty`() {
         assertNull(BleSessionFormat.parseLine("1 R 2A25 0 *")!!.bytes())
         assertEquals(0, BleSessionFormat.parseLine("1 R 2A25 0 -")!!.bytes()!!.size)
         assertNull(BleSessionFormat.parseLine("1 R 2A25 0 ZZ")!!.bytes())

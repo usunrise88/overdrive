@@ -16,7 +16,7 @@ class BackgroundConnectDevicesTest {
     private val hybrid = { ConnectStrategy.HYBRID }
 
     @Test
-    fun `a Click that sleeps is waited for, not failed, and a press that wakes it connects it at once`() =
+    fun `a Click that sleeps is waited for not failed and a press that wakes it connects it at once`() =
         runTest {
             val rig = BleRig(this)
             val fake = rig.addClick()

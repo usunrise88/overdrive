@@ -60,7 +60,7 @@ class RouteGradeTest {
     }
 
     @Test
-    fun `the grade is rounded to the trainer's resolution of 0,01 percent`() {
+    fun `the grade is rounded to the trainer's resolution of 0 01 percent`() {
         // 6.25% road at 50% is 3.125, which FTMS cannot say: it is 3.13.
         assertEquals(3.13, grade.routePercentAt(105.0), 1e-12)
         // 7.5% road at 50% is 3.75, which it can.
@@ -79,7 +79,7 @@ class RouteGradeTest {
     }
 
     @Test
-    fun `a road steeper than the trainer can do is held at 15 percent, climbing and descending alike`() {
+    fun `a road steeper than the trainer can do is held at 15 percent climbing and descending alike`() {
         val wall = testRoute(listOf(RoutePoint(0.0, 0.0), RoutePoint(100.0, 0.0), RoutePoint(200.0, 40.0)))
         val drop = testRoute(listOf(RoutePoint(0.0, 100.0), RoutePoint(100.0, 100.0), RoutePoint(200.0, 60.0)))
         // [130, 170] is 12 to 28 m: a 40% road, 40% at the full difficulty, and the trainer takes 15.
@@ -133,7 +133,7 @@ class RouteGradeTest {
     }
 
     @Test
-    fun `the smoothed grade is the mean of the road's grade over the window, found independently`() {
+    fun `the smoothed grade is the mean of the road's grade over the window found independently`() {
         // The road's grade is constant between points; integrate it over the window with a fine step and compare.
         val points = route.points
 

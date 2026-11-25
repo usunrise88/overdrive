@@ -41,7 +41,7 @@ class ClickRideTest {
     // region criterion 3
 
     @Test
-    fun `all ten Click actions work through the whole chain, each with its effect`() =
+    fun `all ten Click actions work through the whole chain each with its effect`() =
         runTest {
             val rig = ClickRide(this)
             val ride = rig.ride
@@ -153,7 +153,7 @@ class ClickRideTest {
     // region the Click goes away
 
     @Test
-    fun `the Click drops mid-ride and returns, the ride is unaffected and the buttons work again`() =
+    fun `the Click drops mid-ride and returns the ride is unaffected and the buttons work again`() =
         runTest {
             val rig = ClickRide(this)
             val ride = rig.ride
@@ -177,7 +177,7 @@ class ClickRideTest {
         }
 
     @Test
-    fun `a volume button held while the Click drops stops repeating, and nothing is left held`() =
+    fun `a volume button held while the Click drops stops repeating and nothing is left held`() =
         runTest {
             val rig = ClickRide(this)
             rig.ride.start()
@@ -254,7 +254,7 @@ class ClickRideTest {
     }
 
     @Test
-    fun `a locked Click shows what to do, and the on-screen controls keep working`() =
+    fun `a locked Click shows what to do and the on-screen controls keep working`() =
         runTest {
             val hidden = ClickRide(this, fake = FakeClick().also { it.lock = FakeClickLock.HIDDEN })
             hidden.ride.start()
@@ -292,7 +292,7 @@ class ClickRideTest {
         }
 
     @Test
-    fun `by default a Click that says nothing is active, and does nothing to the ride either`() =
+    fun `by default a Click that says nothing is active and does nothing to the ride either`() =
         runTest {
             val rig = ClickRide(this)
             rig.ride.rig.advance(600_000)
@@ -309,7 +309,7 @@ class ClickRideTest {
     // region the mapping is a setting
 
     @Test
-    fun `a learned mapping drives the ride, and the default one does not apply any more`() =
+    fun `a learned mapping drives the ride and the default one does not apply any more`() =
         runTest {
             val rig = ClickRide(this)
             val learner = ButtonLearner()

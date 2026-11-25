@@ -16,11 +16,15 @@ import app.overdrive.core.ble.recording.BleSessionRecorder
 import app.overdrive.core.ble.recording.LineSink
 import app.overdrive.core.ble.recording.RecordingGattTransport
 import app.overdrive.core.click.ButtonChange
+import app.overdrive.core.click.ClickBits
 import app.overdrive.core.click.ClickDevice
 import app.overdrive.core.click.ClickOptions
+import app.overdrive.core.click.ClickSide
 import app.overdrive.core.control.ActionRouter
+import app.overdrive.core.control.ButtonLearner
 import app.overdrive.core.control.ButtonMapping
 import app.overdrive.core.control.ClickAction
+import app.overdrive.core.control.CoachButtonLearner
 import app.overdrive.core.control.CoachControl
 import app.overdrive.core.control.GestureTiming
 import app.overdrive.core.control.HandlebarControls
@@ -33,9 +37,16 @@ import app.overdrive.core.device.TrainerDevice
 import app.overdrive.core.fit.FitOptions
 import app.overdrive.core.fit.FitRoutes
 import app.overdrive.core.fit.FitWriter
+import app.overdrive.core.gear.GearSettings
 import app.overdrive.core.live.CuePlayback
 import app.overdrive.core.live.CuePlayer
+import app.overdrive.core.live.CueStream
+import app.overdrive.core.live.CueStreamSource
 import app.overdrive.core.live.LiveCoachClient
+import app.overdrive.core.live.LiveCue
+import app.overdrive.core.live.LivePlan
+import app.overdrive.core.live.LiveSessionController
+import app.overdrive.core.physics.PhysicsSettings
 import app.overdrive.core.plan.PlanCache
 import app.overdrive.core.plan.PlanRepository
 import app.overdrive.core.profile.ProfileCache
@@ -50,10 +61,16 @@ import app.overdrive.core.remote.RemoteResource
 import app.overdrive.core.remote.ServiceClient
 import app.overdrive.core.remote.TextStore
 import app.overdrive.core.remote.recoveryResource
+import app.overdrive.core.ride.FlatStep
 import app.overdrive.core.ride.RideEngine
 import app.overdrive.core.ride.RideSession
 import app.overdrive.core.ride.RideSettings
+import app.overdrive.core.ride.RideSnapshot
+import app.overdrive.core.ride.RideState
+import app.overdrive.core.ride.StallGuardSettings
+import app.overdrive.core.ride.flatSteps
 import app.overdrive.core.route.RideRoutes
+import app.overdrive.core.route.Route
 import app.overdrive.core.route.RouteLibrary
 import app.overdrive.core.sync.HttpGetTransport
 import app.overdrive.core.sync.HttpPatchTransport
@@ -452,4 +469,73 @@ public object AppleCoreFactories {
     public fun decodeRideRecord(json: String): RideRecord = RideRecordJson.decode(json)
 
     public fun recoverRideLog(path: String): RecoveredRide? = RideLog.recover(FileByteSource(path))
+
+    public fun createRideSettings(
+        ftp: Int,
+        physics: PhysicsSettings,
+        gearCount: Int,
+        gradeStepPercent: Double,
+        cadenceGuardEnabled: Boolean,
+        cadenceFloorRpm: Int,
+    ): RideSettings =
+        RideSettings(
+            ftp = ftp,
+            physics = physics,
+            gears =
+                GearSettings(
+                    count = gearCount,
+                    neutralGear = (gearCount + 1) / 2,
+                    gradePercentPerGear = gradeStepPercent,
+                ),
+            stallGuard =
+                StallGuardSettings(
+                    enabled = cadenceGuardEnabled,
+                    cadenceFloorRpm = cadenceFloorRpm,
+                ),
+        )
+
+    public fun createClickOptions(
+        silentMeansLocked: Boolean,
+        acceptEitherPuck: Boolean,
+    ): ClickOptions =
+        ClickOptions(
+            acceptedSides =
+                if (acceptEitherPuck) {
+                    setOf(ClickSide.RIGHT, ClickSide.LEFT)
+                } else {
+                    setOf(ClickSide.RIGHT)
+                },
+            silentMeansLocked = silentMeansLocked,
+        )
+
+    public fun createLiveSessionController(
+        plan: LivePlan,
+        wallClockMillis: () -> Long,
+    ): LiveSessionController = LiveSessionController(plan = plan, wallClockMillis = wallClockMillis)
+
+    public fun createCueStream(
+        source: CueStreamSource,
+        onCue: (LiveCue) -> Unit,
+    ): CueStream = CueStream(source = source, onCue = onCue)
+
+    public fun createButtonLearner(base: ButtonMapping): ButtonLearner = ButtonLearner(base = base)
+
+    public fun createCoachButtonLearner(base: ButtonMapping): CoachButtonLearner = CoachButtonLearner(base = base)
+
+    public fun workoutFlatSteps(workout: Workout): List<FlatStep> = workout.flatSteps()
+
+    public fun workoutDurationSeconds(workout: Workout): Int = workout.flatSteps().sumOf { it.durationSeconds }
+
+    public fun clickBitLabel(mask: Int): String = ClickBits.namesOf(mask).joinToString("+").ifEmpty { "None" }
+
+    public fun defaultRideSnapshot(ftp: Int): RideSnapshot = RideSnapshot(state = RideState.IDLE, ftp = ftp)
+
+    public fun noneFitRoutes(): FitRoutes = FitRoutes.None
+
+    public fun noneRideRoutes(): RideRoutes = RideRoutes.None
+
+    public fun freeRideRoutes(
+        route: Route,
+        difficultyPercent: Int,
+    ): RideRoutes = RideRoutes(difficultyPercent = difficultyPercent, freeRide = route)
 }

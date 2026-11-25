@@ -25,7 +25,7 @@ class FtpSuggestionAnswersTest {
     ) = FtpSuggestionAnswers(ServiceClient({ config }, transport, transport), { config }, store)
 
     @Test
-    fun `sends the id to the dismiss route as the contract's body, with the token in the header`() =
+    fun `sends the id to the dismiss route as the contract's body with the token in the header`() =
         runTest {
             val transport = ScriptedTransport(dismissed)
             val answers = answers(transport)
@@ -39,7 +39,7 @@ class FtpSuggestionAnswersTest {
         }
 
     @Test
-    fun `offline the suggestion is hidden at once, the answer waits on disk, and is sent at the next flush`() =
+    fun `offline the suggestion is hidden at once the answer waits on disk and is sent at the next flush`() =
         runTest {
             val store = MemoryTextStore()
             val transport = ScriptedTransport(TransportException(TransportFailure.NoNetwork))
@@ -58,7 +58,7 @@ class FtpSuggestionAnswersTest {
         }
 
     @Test
-    fun `a server error leaves the answer waiting, a refusal settles it`() =
+    fun `a server error leaves the answer waiting a refusal settles it`() =
         runTest {
             val transport = ScriptedTransport(error(503))
             val answers = answers(transport)
@@ -94,7 +94,7 @@ class FtpSuggestionAnswersTest {
         }
 
     @Test
-    fun `answers written for another service, or damaged, are not read`() =
+    fun `answers written for another service or damaged are not read`() =
         runTest {
             val good = MemoryTextStore().also { answers(ScriptedTransport(dismissed), it).dismiss(7) }.text!!
             val other = SyncConfig("https://other.example.org", TOKEN)

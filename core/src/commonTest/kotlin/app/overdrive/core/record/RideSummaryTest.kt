@@ -57,7 +57,7 @@ class RideSummaryTest {
     }
 
     @Test
-    fun `normalised power weights hard efforts, worked out on 30 s at 100 W then 30 s at 300 W`() {
+    fun `normalised power weights hard efforts worked out on 30 s at 100 W then 30 s at 300 W`() {
         // 31 complete windows; window i holds 30-i seconds of 100 W and i of 300 W, so its mean is 100 + 20 i / 3.
         // The mean of their fourth powers, taken to the fourth root, is 223.0694887793096 W (brute force).
         val summary = summaryOf(List(30) { 100 } + List(30) { 300 }, ftp = 200)
@@ -69,7 +69,7 @@ class RideSummaryTest {
     }
 
     @Test
-    fun `alternating 0 and 400 W averages 200 W in every window, so NP is exactly 200 despite the 4th power`() {
+    fun `alternating 0 and 400 W averages 200 W in every window so NP is exactly 200 despite the 4th power`() {
         // 45 samples exercise the ring buffer wrapping: 16 windows of 15 zeros and 15 values of 400 W each.
         val summary = summaryOf(List(45) { if (it % 2 == 0) 0 else 400 }, ftp = 250)
         assertEquals(200.0, summary.normalizedPower!!, tolerance)
@@ -78,7 +78,7 @@ class RideSummaryTest {
     }
 
     @Test
-    fun `an interval session, 15 min at 150 W then 5 at 250 W then 5 at 50 W`() {
+    fun `an interval session 15 min at 150 W then 5 at 250 W then 5 at 50 W`() {
         val powers = List(300) { 150 } + List(300) { 250 } + List(300) { 50 }
         val summary = summaryOf(powers, ftp = 250)
         assertEquals(150.0, summary.averagePower!!, tolerance)
@@ -87,7 +87,7 @@ class RideSummaryTest {
     }
 
     @Test
-    fun `a window is only complete at 30 values, so a short ride has no normalised power`() {
+    fun `a window is only complete at 30 values so a short ride has no normalised power`() {
         val short = summaryOf(List(29) { 200 }, ftp = 250)
         assertEquals(200.0, short.averagePower!!, tolerance)
         assertNull(short.normalizedPower)

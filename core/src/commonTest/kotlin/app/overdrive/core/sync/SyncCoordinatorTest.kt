@@ -95,7 +95,7 @@ class SyncCoordinatorTest {
     // region the outbox
 
     @Test
-    fun `the in-memory outbox keeps entries oldest first, adds each ride once and forgets what is done`() =
+    fun `the in-memory outbox keeps entries oldest first adds each ride once and forgets what is done`() =
         runTest {
             val outbox = InMemoryOutbox()
             outbox.enqueue(entry("b", queuedAt = 20))
@@ -126,7 +126,7 @@ class SyncCoordinatorTest {
     // region the no-op provider
 
     @Test
-    fun `the no-op provider acknowledges nothing, so every ride stays queued for Phase 2`() =
+    fun `the no-op provider acknowledges nothing so every ride stays queued for Phase 2`() =
         runTest {
             val outbox = InMemoryOutbox()
             val sync = coordinator(outbox, { NoopSyncProvider })
@@ -170,7 +170,7 @@ class SyncCoordinatorTest {
     // region draining
 
     @Test
-    fun `a provider that acknowledges empties the outbox, oldest ride first`() =
+    fun `a provider that acknowledges empties the outbox oldest ride first`() =
         runTest {
             val outbox = InMemoryOutbox()
             val provider = ScriptedProvider()
@@ -220,7 +220,7 @@ class SyncCoordinatorTest {
         }
 
     @Test
-    fun `a failing upload backs off 5 s, 10 s, 20 s, keeps the ride, and the first success starts over`() =
+    fun `a failing upload backs off 5 s 10 s 20 s keeps the ride and the first success starts over`() =
         runTest {
             val outbox = InMemoryOutbox()
             val provider =
@@ -277,7 +277,7 @@ class SyncCoordinatorTest {
     }
 
     @Test
-    fun `a failing ride does not hold up the ones behind it forever, but the order is kept`() =
+    fun `a failing ride does not hold up the ones behind it forever but the order is kept`() =
         runTest {
             val outbox = InMemoryOutbox()
             val provider = ScriptedProvider().then(SyncResult.Acknowledged, SyncResult.RetryLater("x"))
@@ -316,7 +316,7 @@ class SyncCoordinatorTest {
         }
 
     @Test
-    fun `a provider that throws is a retry, not a crash`() =
+    fun `a provider that throws is a retry not a crash`() =
         runTest {
             val outbox = InMemoryOutbox()
             val provider = ScriptedProvider()
@@ -335,7 +335,7 @@ class SyncCoordinatorTest {
     // region never in the ride's way
 
     @Test
-    fun `finishing a ride returns at once, whatever the provider or the outbox is doing`() =
+    fun `finishing a ride returns at once whatever the provider or the outbox is doing`() =
         runTest {
             val slow =
                 object : SyncProvider {
@@ -359,7 +359,7 @@ class SyncCoordinatorTest {
         }
 
     @Test
-    fun `an outbox that fails is a status, the ride is untouched, and a kick tries again when it heals`() =
+    fun `an outbox that fails is a status the ride is untouched and a kick tries again when it heals`() =
         runTest {
             val outbox = FlakyOutbox()
             val provider = ScriptedProvider()
@@ -474,7 +474,7 @@ class SyncCoordinatorTest {
     }
 
     @Test
-    fun `a rejected token stops the round without backing off, keeps every ride and waits to be kicked`() =
+    fun `a rejected token stops the round without backing off keeps every ride and waits to be kicked`() =
         runTest {
             val outbox = InMemoryOutbox()
             val provider = RideProvider()
@@ -499,7 +499,7 @@ class SyncCoordinatorTest {
         }
 
     @Test
-    fun `a refused ride stays in the outbox, is not retried in a loop and does not hold up the rides behind it`() =
+    fun `a refused ride stays in the outbox is not retried in a loop and does not hold up the rides behind it`() =
         runTest {
             val outbox = InMemoryOutbox()
             val provider = RideProvider()
@@ -528,7 +528,7 @@ class SyncCoordinatorTest {
         }
 
     @Test
-    fun `send now tries the refused rides once more, and one that is accepted leaves the report`() =
+    fun `send now tries the refused rides once more and one that is accepted leaves the report`() =
         runTest {
             val outbox = InMemoryOutbox()
             val provider = RideProvider()
@@ -570,7 +570,7 @@ class SyncCoordinatorTest {
         }
 
     @Test
-    fun `a refusal and a failure in one round - the failure backs off, the refusal waits`() =
+    fun `a refusal and a failure in one round - the failure backs off the refusal waits`() =
         runTest {
             val outbox = InMemoryOutbox()
             val provider = RideProvider()
@@ -589,7 +589,7 @@ class SyncCoordinatorTest {
         }
 
     @Test
-    fun `the report knows the last success, from an earlier run or from this one`() =
+    fun `the report knows the last success from an earlier run or from this one`() =
         runTest {
             val outbox = InMemoryOutbox()
             val clock = FixedClock(1_700_000_500_000)

@@ -7,7 +7,7 @@ import kotlin.test.assertNull
 
 class MiniXmlTest {
     @Test
-    fun `reads nested elements, attributes and text`() {
+    fun `reads nested elements attributes and text`() {
         val root = parseXml("<a x=\"1\" y='two'><b>hello</b><c/><b>again</b></a>")
         assertEquals("a", root.name)
         assertEquals("1", root.attribute("x"))
@@ -41,7 +41,7 @@ class MiniXmlTest {
     }
 
     @Test
-    fun `skips the declaration, comments, processing instructions and a doctype with an internal subset`() {
+    fun `skips the declaration comments processing instructions and a doctype with an internal subset`() {
         val root =
             parseXml(
                 """
@@ -63,7 +63,7 @@ class MiniXmlTest {
     }
 
     @Test
-    fun `tolerates a byte order mark, crlf line endings and odd spacing`() {
+    fun `tolerates a byte order mark crlf line endings and odd spacing`() {
         val root = parseXml("﻿<a\r\n  x = \"1\"\r\n>\r\n  <b />\r\n</a >")
         assertEquals("1", root.attribute("x"))
         assertEquals(listOf("b"), root.children.map { it.name })

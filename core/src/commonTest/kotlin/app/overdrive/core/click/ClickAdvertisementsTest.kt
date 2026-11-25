@@ -26,7 +26,7 @@ class ClickAdvertisementsTest {
     }
 
     @Test
-    fun `the left puck is recognised but not wanted by default, and wanted when asked`() {
+    fun `the left puck is recognised but not wanted by default and wanted when asked`() {
         val left = advertisement(manufacturer = listOf(ManufacturerData(0x094A, byteArrayOf(0x0B))))
         assertNull(ClickAdvertisements.recognise(left))
         val both = ClickOptions(acceptedSides = setOf(ClickSide.RIGHT, ClickSide.LEFT))
@@ -34,14 +34,14 @@ class ClickAdvertisementsTest {
     }
 
     @Test
-    fun `the device-type bytes are options, so a bench that finds them swapped is one change`() {
+    fun `the device-type bytes are options so a bench that finds them swapped is one change`() {
         val zeroB = advertisement(manufacturer = listOf(ManufacturerData(0x094A, byteArrayOf(0x0B))))
         val swapped = ClickOptions(rightSideByte = 0x0B, leftSideByte = 0x0A)
         assertEquals(ClickSide.RIGHT, ClickAdvertisements.recognise(zeroB, swapped)?.side)
     }
 
     @Test
-    fun `only the first byte of the payload decides, the rest may be anything`() {
+    fun `only the first byte of the payload decides the rest may be anything`() {
         val long = advertisement(manufacturer = listOf(ManufacturerData(0x094A, byteArrayOf(0x0A, 1, 2, 3, 4, 5, 6))))
         assertEquals(ClickSide.RIGHT, ClickAdvertisements.recognise(long)?.side)
     }
@@ -70,7 +70,7 @@ class ClickAdvertisementsTest {
     }
 
     @Test
-    fun `the service is checked first, and the older one is a fallback`() {
+    fun `the service is checked first and the older one is a fallback`() {
         assertNull(ClickAdvertisements.recognise(advertisement(services = setOf(FtmsUuids.SERVICE))))
         assertNull(ClickAdvertisements.recognise(advertisement(services = emptySet())))
         val legacy = advertisement(services = setOf(ClickUuids.LEGACY_SERVICE))
@@ -93,7 +93,7 @@ class ClickAdvertisementsTest {
     }
 
     @Test
-    fun `the scan filter lists the services of the options, or everything`() {
+    fun `the scan filter lists the services of the options or everything`() {
         assertEquals(
             setOf(ClickUuids.SERVICE, ClickUuids.LEGACY_SERVICE),
             ClickAdvertisements.scanFilter().serviceUuids,

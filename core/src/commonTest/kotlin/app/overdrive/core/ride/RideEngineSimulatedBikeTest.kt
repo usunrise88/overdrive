@@ -56,7 +56,7 @@ class RideEngineSimulatedBikeTest {
     }
 
     @Test
-    fun `an ERG workout is held by the simulated rider, step by step`() =
+    fun `an ERG workout is held by the simulated rider step by step`() =
         runTest {
             val ride = BikeRide(this, workout = abcWorkout)
             advanceSeconds(180)
@@ -227,7 +227,7 @@ class RideEngineSimulatedBikeTest {
     }
 
     @Test
-    fun `the same seed gives the same ride, down to every snapshot`() {
+    fun `the same seed gives the same ride down to every snapshot`() {
         val first = run(seed = 42, workout = abcWorkout)
         val second = run(seed = 42, workout = abcWorkout)
         assertEquals(first.first, second.first)

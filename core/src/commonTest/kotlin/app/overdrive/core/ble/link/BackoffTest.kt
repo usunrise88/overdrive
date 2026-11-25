@@ -53,7 +53,7 @@ class BackoffTest {
     }
 
     @Test
-    fun `failed attempts back off, and a long-lived connection starts the sequence over`() {
+    fun `failed attempts back off and a long-lived connection starts the sequence over`() {
         val clock = TestTimeSource()
         val backoff = ReconnectBackoff(BackoffPolicy.EXACT, clock)
         assertEquals(1.seconds, backoff.onAttemptFailed())

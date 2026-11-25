@@ -60,7 +60,7 @@ class RouteLibraryTest {
     )
 
     @Test
-    fun `the list is asked from the routes route, shown, and kept for the next start and for no network`() =
+    fun `the list is asked from the routes route shown and kept for the next start and for no network`() =
         runTest {
             val disk = Disk()
             val transport = ScriptedTransport(HttpAnswer(200, listBody))
@@ -89,7 +89,7 @@ class RouteLibraryTest {
         }
 
     @Test
-    fun `a route's points are fetched when asked for, kept on disk, and never asked for again`() =
+    fun `a route's points are fetched when asked for kept on disk and never asked for again`() =
         runTest {
             val disk = Disk()
             val transport = ScriptedTransport(ok(hill))
@@ -125,7 +125,7 @@ class RouteLibraryTest {
         }
 
     @Test
-    fun `with no network and nothing on disk the route is not downloaded, says why, and works the next time`() =
+    fun `with no network and nothing on disk the route is not downloaded says why and works the next time`() =
         runTest {
             val transport = ScriptedTransport(TransportException(TransportFailure.NoNetwork), ok(line))
             val library = library(transport)
@@ -280,7 +280,7 @@ class RouteLibraryTest {
     )
 
     @Test
-    fun `the routes to fetch ahead are those the next days' free steps name, the easier version's included`() {
+    fun `the routes to fetch ahead are those the next days' free steps name the easier version's included`() {
         val workouts =
             listOf(
                 planned("icu-0", "2026-11-18", listOf(FreeStep(duration = 60, routeId = "route-yesterday"))),

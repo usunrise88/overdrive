@@ -35,7 +35,7 @@ class FakeBleTest {
     }
 
     @Test
-    fun `a connect takes its latency, then the state is connected`() =
+    fun `a connect takes its latency then the state is connected`() =
         runTest {
             val rig = BleRig(this)
             val transport = rig.ble.open(TRAINER_ID)
@@ -50,7 +50,7 @@ class FakeBleTest {
         }
 
     @Test
-    fun `values reach the central only for a characteristic it enabled, as it enabled it`() =
+    fun `values reach the central only for a characteristic it enabled as it enabled it`() =
         runTest {
             val rig = BleRig(this)
             val (transport, services) = connected(rig)
@@ -187,7 +187,7 @@ class FakeBleTest {
         }
 
     @Test
-    fun `the scanner reports peripherals that match its filter, and a failure when Bluetooth is off`() =
+    fun `the scanner reports peripherals that match its filter and a failure when Bluetooth is off`() =
         runTest {
             val rig = BleRig(this)
             val heard = collectAll(rig.ble.scan(ScanFilter(setOf(HeartRateUuids.SERVICE))))

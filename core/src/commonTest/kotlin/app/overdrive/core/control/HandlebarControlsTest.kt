@@ -89,7 +89,7 @@ class HandlebarControlsTest {
         }
 
     @Test
-    fun `a hold on Plus is next interval, once, at the threshold, with nothing on release`() =
+    fun `a hold on Plus is next interval once at the threshold with nothing on release`() =
         runTest {
             val rig = Rig(this)
             rig.press(ClickBits.PLUS)
@@ -103,7 +103,7 @@ class HandlebarControlsTest {
         }
 
     @Test
-    fun `a held volume button steps at once, then at 500 ms and every 150 ms`() =
+    fun `a held volume button steps at once then at 500 ms and every 150 ms`() =
         runTest {
             val rig = Rig(this)
             rig.press(ClickBits.A)
@@ -123,7 +123,7 @@ class HandlebarControlsTest {
         }
 
     @Test
-    fun `every action is also published as a flow, for feedback`() =
+    fun `every action is also published as a flow for feedback`() =
         runTest {
             val rig = Rig(this)
             val seen = mutableListOf<GestureEvent>()
@@ -140,7 +140,7 @@ class HandlebarControlsTest {
         }
 
     @Test
-    fun `the mapping is read at every change, another physical button now does the job`() =
+    fun `the mapping is read at every change another physical button now does the job`() =
         runTest {
             val rig = Rig(this)
             rig.press(ClickBits.PLUS)
@@ -230,7 +230,7 @@ class HandlebarControlsTest {
         }
 
     @Test
-    fun `after close nothing fires, and start is idempotent`() =
+    fun `after close nothing fires and start is idempotent`() =
         runTest {
             val rig = Rig(this)
             rig.controls.start()

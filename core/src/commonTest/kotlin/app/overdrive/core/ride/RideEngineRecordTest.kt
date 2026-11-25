@@ -98,7 +98,7 @@ class RideEngineRecordTest {
         }
 
     @Test
-    fun `each sample carries the target, gear and step that were in force during its second`() =
+    fun `each sample carries the target gear and step that were in force during its second`() =
         runTest {
             val rig = EngineRig(this, workout = abcWorkout)
             rig.start()
@@ -180,7 +180,7 @@ class RideEngineRecordTest {
         }
 
     @Test
-    fun `the sample shows the workout's target during a pause, flagged as paused`() =
+    fun `the sample shows the workout's target during a pause flagged as paused`() =
         runTest {
             val rig = EngineRig(this, workout = abcWorkout)
             rig.start()
@@ -199,7 +199,7 @@ class RideEngineRecordTest {
         }
 
     @Test
-    fun `speed and distance come from the physics model, not from the trainer`() =
+    fun `speed and distance come from the physics model not from the trainer`() =
         runTest {
             val rig = EngineRig(this)
             rig.start()
@@ -338,7 +338,7 @@ class RideEngineRecordTest {
     }
 
     @Test
-    fun `the recorder is called in order, once a second, and not after the end`() =
+    fun `the recorder is called in order once a second and not after the end`() =
         runTest {
             val trainer = SimulatedTrainerDevice().also { it.connect() }
             val strap = SimulatedHeartRateDevice().also { it.connect() }

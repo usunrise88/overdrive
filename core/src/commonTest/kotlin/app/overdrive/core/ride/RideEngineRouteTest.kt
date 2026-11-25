@@ -152,7 +152,7 @@ class RideEngineRouteTest {
         }
 
     @Test
-    fun `the total is clamped to the trainer's limit, and a road steeper than that is held at it for the speed too`() =
+    fun `the total is clamped to the trainer's limit and a road steeper than that is held at it for the speed too`() =
         runTest {
             val wall = lineRoute(1000.0, elevation = { 100.0 + 0.4 * it }, id = "route-wall") // a 40% road
             val rig = RouteRig(this, RideRoutes(difficultyPercent = 100, freeRide = wall))
@@ -178,7 +178,7 @@ class RideEngineRouteTest {
         }
 
     @Test
-    fun `at the end of the route the grade is 0, the ride goes on flat and the route does not loop`() =
+    fun `at the end of the route the grade is 0 the ride goes on flat and the route does not loop`() =
         runTest {
             val rig = RouteRig(this, RideRoutes(freeRide = climb(100.0)))
             rig.start()
@@ -271,7 +271,7 @@ class RideEngineRouteTest {
     private fun RouteRig.pedalThroughTheWarmUp() = repeat(60) { second(power = trainer.targetPowerWatts ?: POWER) }
 
     @Test
-    fun `a free step with a route rides it from its start, and the steps around it are flat`() =
+    fun `a free step with a route rides it from its start and the steps around it are flat`() =
         runTest {
             val rig =
                 RouteRig(
@@ -293,7 +293,7 @@ class RideEngineRouteTest {
         }
 
     @Test
-    fun `the header names the first route of the workout, and the next step starts its own route at 0`() =
+    fun `the header names the first route of the workout and the next step starts its own route at 0`() =
         runTest {
             val rig =
                 RouteRig(
@@ -319,7 +319,7 @@ class RideEngineRouteTest {
         }
 
     @Test
-    fun `a route the tablet has not downloaded is a flat step, and the header does not claim it`() =
+    fun `a route the tablet has not downloaded is a flat step and the header does not claim it`() =
         runTest {
             val rig = RouteRig(this, RideRoutes(byId = mapOf("route-b" to climb(2000.0, "route-b"))), workout = workout)
             rig.start()

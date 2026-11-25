@@ -27,7 +27,7 @@ class FitCrcAndReaderTest {
     }
 
     @Test
-    fun `the CRC over a whole file including its own is zero, and a damaged file is not`() {
+    fun `the CRC over a whole file including its own is zero and a damaged file is not`() {
         assertEquals(0, FitCrc.of(good))
         val damaged = good.copyOf().also { it[100] = (it[100] + 1).toByte() }
         assertEquals(true, FitCrc.of(damaged) != 0)

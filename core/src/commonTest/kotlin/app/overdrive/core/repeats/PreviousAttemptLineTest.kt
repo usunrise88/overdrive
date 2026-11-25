@@ -116,7 +116,7 @@ class PreviousAttemptLineTest {
     }
 
     @Test
-    fun `says nothing until enough has counted, then gives the difference in plain words`() {
+    fun `says nothing until enough has counted then gives the difference in plain words`() {
         val ride = rideAtTheMainStep()
         // The step is 600 s: the first 60 s do not count, and 270 counted seconds (half of the 540 the last attempt had) are needed.
         ride.seconds(60)
@@ -139,7 +139,7 @@ class PreviousAttemptLineTest {
     }
 
     @Test
-    fun `the minimum is the repeat rule's 120 s or half of what the last attempt counted, whichever is more`() {
+    fun `the minimum is the repeat rule's 120 s or half of what the last attempt counted whichever is more`() {
         assertEquals(120, PreviousAttemptComparison.minimumCountedSeconds(180))
         assertEquals(120, PreviousAttemptComparison.minimumCountedSeconds(300))
         assertEquals(120, PreviousAttemptComparison.minimumCountedSeconds(60))
@@ -150,7 +150,7 @@ class PreviousAttemptLineTest {
     }
 
     @Test
-    fun `above, below and the same, in whole bpm with one bpm counting as the same`() {
+    fun `above below and the same in whole bpm with one bpm counting as the same`() {
         fun lineAt(heartRate: Int): PreviousLine? {
             val ride = rideAtTheMainStep()
             ride.seconds(60 + 270, heartRate = heartRate)
@@ -177,7 +177,7 @@ class PreviousAttemptLineTest {
     }
 
     @Test
-    fun `seconds at another power do not count, and the line waits for the rest`() {
+    fun `seconds at another power do not count and the line waits for the rest`() {
         val ride = rideAtTheMainStep()
         ride.seconds(60)
         ride.seconds(100, power = 160) // 11% under the 180 W target
@@ -189,7 +189,7 @@ class PreviousAttemptLineTest {
     }
 
     @Test
-    fun `the power tolerance is 3 percent of the target, at both ends`() {
+    fun `the power tolerance is 3 percent of the target at both ends`() {
         fun counted(power: Int): Boolean {
             val ride = rideAtTheMainStep()
             ride.seconds(60)
@@ -226,7 +226,7 @@ class PreviousAttemptLineTest {
     }
 
     @Test
-    fun `a pause ends the stretch, and the minute after the resume is left out too`() {
+    fun `a pause ends the stretch and the minute after the resume is left out too`() {
         val ride = rideAtTheMainStep()
         ride.seconds(60 + 200)
         assertNull(ride.comparison.line())
@@ -239,7 +239,7 @@ class PreviousAttemptLineTest {
     }
 
     @Test
-    fun `a new step starts the count over, and only a steady step is judged`() {
+    fun `a new step starts the count over and only a steady step is judged`() {
         val ride = rideAtTheMainStep()
         ride.seconds(60 + 270)
         assertNotNull(ride.comparison.line())
@@ -250,7 +250,7 @@ class PreviousAttemptLineTest {
     }
 
     @Test
-    fun `a step with no figure last time has no line, and the figure of another step is not used`() {
+    fun `a step with no figure last time has no line and the figure of another step is not used`() {
         val onlyTheWarmUp = attempt(step(1, 0, 300, 100.0, 120.0))
         val ride = rideAtTheMainStep(previous = onlyTheWarmUp)
         ride.seconds(60 + 400)
@@ -272,7 +272,7 @@ class PreviousAttemptLineTest {
     }
 
     @Test
-    fun `a ramp, a free step and a heart-rate step have no fixed power and no line`() {
+    fun `a ramp a free step and a heart-rate step have no fixed power and no line`() {
         val mixed =
             Workout(
                 schema = 1,
@@ -319,7 +319,7 @@ class PreviousAttemptLineTest {
     }
 
     @Test
-    fun `reads nothing from a snapshot that is not riding, and forgets a free ride`() {
+    fun `reads nothing from a snapshot that is not riding and forgets a free ride`() {
         val comparison = PreviousAttemptComparison(lastTime)
         val ride = Ride(comparison)
         ride.toStep(1)

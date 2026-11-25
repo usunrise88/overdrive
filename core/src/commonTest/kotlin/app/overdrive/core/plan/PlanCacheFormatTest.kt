@@ -35,7 +35,7 @@ class PlanCacheFormatTest {
     }
 
     @Test
-    fun `the source is the address without its trailing slash, and differs between addresses`() {
+    fun `the source is the address without its trailing slash and differs between addresses`() {
         assertEquals(
             PlanCacheFormat.sourceOf("https://a.example.org"),
             PlanCacheFormat.sourceOf("https://a.example.org/"),

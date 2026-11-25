@@ -177,11 +177,11 @@ public struct DevicesView: View {
     private var clickButtonsCard: some View {
         let mapping = container.settings.toButtonMapping()
         let rows: [(String, String, String, String)] = [
-            ("Plus", ClickBits.shared.labelOf(mask: mapping.maskFor(button: .plus)), "Gear up", "Next interval"),
-            ("Button 2", ClickBits.shared.labelOf(mask: mapping.maskFor(button: .button2)), "Gear down", "Previous interval"),
-            ("Button 3", ClickBits.shared.labelOf(mask: mapping.maskFor(button: .button3)), "Play / pause media", "Pause / resume ride"),
-            ("Button 4", ClickBits.shared.labelOf(mask: mapping.maskFor(button: .button4)), "Volume up", "Volume up (repeat)"),
-            ("Button 5", ClickBits.shared.labelOf(mask: mapping.maskFor(button: .button5)), "Volume down", "Volume down (repeat)"),
+            ("Plus", AppleCoreFactories.shared.clickBitLabel(mask: mapping.maskOf(button: .plus)), "Gear up", "Next interval"),
+            ("Button 2", AppleCoreFactories.shared.clickBitLabel(mask: mapping.maskOf(button: .button2)), "Gear down", "Previous interval"),
+            ("Button 3", AppleCoreFactories.shared.clickBitLabel(mask: mapping.maskOf(button: .button3)), "Play / pause media", "Pause / resume ride"),
+            ("Button 4", AppleCoreFactories.shared.clickBitLabel(mask: mapping.maskOf(button: .button4)), "Volume up", "Volume up (repeat)"),
+            ("Button 5", AppleCoreFactories.shared.clickBitLabel(mask: mapping.maskOf(button: .button5)), "Volume down", "Volume down (repeat)"),
         ]
 
         return VStack(alignment: .leading, spacing: OverdriveDimens.spaceS4) {
@@ -211,7 +211,7 @@ public struct DevicesView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Mute live coach").odStyle(OverdriveTypography.bodyStrong, color: OverdriveColors.textPrimary)
-                            Text(mapping.coachMuteMask != 0 ? ClickBits.shared.labelOf(mask: mapping.coachMuteMask) : "Not assigned")
+                            Text(mapping.coachMuteMask != 0 ? AppleCoreFactories.shared.clickBitLabel(mask: mapping.coachMuteMask) : "Not assigned")
                                 .odStyle(OverdriveTypography.caption, color: OverdriveColors.textTertiary)
                         }
                         Spacer()

@@ -111,7 +111,7 @@ class RideLogFuzzTest {
     }
 
     @Test
-    fun `cut at every byte offset, recovery gives the records before the cut`() {
+    fun `cut at every byte offset recovery gives the records before the cut`() {
         for (length in 0..bytes.size) {
             val recovered = RideLog.recover(bytes.copyOf(length))
             assertRecovered(recovered, intactLinesBefore(length), "cut at $length of ${bytes.size}")
@@ -119,7 +119,7 @@ class RideLogFuzzTest {
     }
 
     @Test
-    fun `cut anywhere, the recovered samples are a prefix of the written ones and never shrink as the file grows`() {
+    fun `cut anywhere the recovered samples are a prefix of the written ones and never shrink as the file grows`() {
         var previous = 0
         for (length in 0..bytes.size) {
             val samples = RideLog.recover(bytes.copyOf(length))?.samples.orEmpty()
@@ -131,7 +131,7 @@ class RideLogFuzzTest {
     }
 
     @Test
-    fun `a file extended with zeros from any offset, as after a power cut, recovers the same`() {
+    fun `a file extended with zeros from any offset as after a power cut recovers the same`() {
         for (cut in 0..bytes.size step 1) {
             val damaged = bytes.copyOf(cut) + ByteArray(minOf(bytes.size - cut, 400))
             assertRecovered(RideLog.recover(damaged), intactLinesBefore(cut), "zeros from $cut")
@@ -150,7 +150,7 @@ class RideLogFuzzTest {
     }
 
     @Test
-    fun `a flipped byte anywhere ends the log at its line, never earlier and never later`() {
+    fun `a flipped byte anywhere ends the log at its line never earlier and never later`() {
         for (index in bytes.indices) {
             val damaged = bytes.copyOf().also { it[index] = (it[index].toInt() xor 0x01).toByte() }
             // The damaged line is the one containing the byte; everything before it is intact.
@@ -159,7 +159,7 @@ class RideLogFuzzTest {
     }
 
     @Test
-    fun `a whole line rewritten into another line breaks the checksum, not the log`() {
+    fun `a whole line rewritten into another line breaks the checksum not the log`() {
         // Swap the lines of samples 11 and 12: every checksum is intact, the order is not.
         val sampleLines = lines.withIndex().filter { it.value.kind == "sample" }
         val a = sampleLines[10].index

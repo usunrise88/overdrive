@@ -104,7 +104,7 @@ class GestureDetectorTest {
     // region tap or hold: Plus, Button 2, Button 3
 
     @Test
-    fun `a short press fires on release, not on press`() {
+    fun `a short press fires on release not on press`() {
         val script = Script()
         script.press(PLUS, 1_000)
         assertEquals(emptyList(), script.log(), "nothing yet: it might be a hold")
@@ -134,7 +134,7 @@ class GestureDetectorTest {
     }
 
     @Test
-    fun `a hold fires once at the threshold while the button is still down, nothing before and nothing after`() {
+    fun `a hold fires once at the threshold while the button is still down nothing before and nothing after`() {
         val script = Script().press(PLUS, 100)
         assertEquals(emptyList(), script.advance(599).log())
         assertEquals(listOf("NEXT_INTERVAL@600"), script.advance(600).log())
@@ -152,7 +152,7 @@ class GestureDetectorTest {
     }
 
     @Test
-    fun `a stalled caller fires a hold once, at the time it was due, however late it wakes`() {
+    fun `a stalled caller fires a hold once at the time it was due however late it wakes`() {
         val script = Script().press(PLUS, 0)
         assertEquals(listOf("NEXT_INTERVAL@500"), script.advance(1_000_000).log())
     }
@@ -169,7 +169,7 @@ class GestureDetectorTest {
     }
 
     @Test
-    fun `taps of different buttons that overlap, as a rolling thumb does, both fire at their own release`() {
+    fun `taps of different buttons that overlap as a rolling thumb does both fire at their own release`() {
         val script = Script()
         script.press(PLUS, 0).press(BUTTON_2, 50).release(PLUS, 100).release(BUTTON_2, 130)
         assertEquals(listOf("GEAR_UP@100", "GEAR_DOWN@130"), script.log())
@@ -189,7 +189,7 @@ class GestureDetectorTest {
     }
 
     @Test
-    fun `a held volume button repeats from the threshold, every 150 ms, and a two second hold gives twelve steps`() {
+    fun `a held volume button repeats from the threshold every 150 ms and a two second hold gives twelve steps`() {
         val script = Script().press(BUTTON_4, 0).tickEvery(1, 0, 2_000).release(BUTTON_4, 2_000)
         val expected = listOf("VOLUME_UP@0") + (0..10).map { "VOLUME_UP_REPEAT@${500 + 150 * it}" }
         assertEquals(expected, script.log())
@@ -227,7 +227,7 @@ class GestureDetectorTest {
     }
 
     @Test
-    fun `a stalled caller gets one repeated step and the cadence resumes from the present, never a burst`() {
+    fun `a stalled caller gets one repeated step and the cadence resumes from the present never a burst`() {
         val script = Script().press(BUTTON_4, 0)
         script.advance(10_000)
         assertEquals(listOf("VOLUME_UP@0", "VOLUME_UP_REPEAT@500"), script.log(), "one step, not sixty")
@@ -241,20 +241,20 @@ class GestureDetectorTest {
     // region two buttons
 
     @Test
-    fun `two tap buttons held together fire no hold, and nothing on release`() {
+    fun `two tap buttons held together fire no hold and nothing on release`() {
         val script = Script().press(PLUS, 0).press(BUTTON_2, 0).tickEvery(50, 0, 2_000)
         script.release(PLUS, 2_000).release(BUTTON_2, 2_000)
         assertEquals(emptyList(), script.log(), "a palm over the puck skips no interval and pauses nothing")
     }
 
     @Test
-    fun `a hold needs the button alone at the threshold, another button that was tapped and gone does not matter`() {
+    fun `a hold needs the button alone at the threshold another button that was tapped and gone does not matter`() {
         val script = Script().press(PLUS, 0).press(BUTTON_2, 100).release(BUTTON_2, 200).tickEvery(50, 200, 700)
         assertEquals(listOf("GEAR_DOWN@200", "NEXT_INTERVAL@500"), script.log())
     }
 
     @Test
-    fun `a hold that came due while another button was down is gone for that press, the other one may still fire`() {
+    fun `a hold that came due while another button was down is gone for that press the other one may still fire`() {
         val script = Script().press(PLUS, 0).press(BUTTON_2, 400).tickEvery(50, 400, 700)
         assertEquals(emptyList(), script.log(), "Plus's hold due at 500 is skipped: Button 2 is down")
         script.release(PLUS, 700)
@@ -265,7 +265,7 @@ class GestureDetectorTest {
     }
 
     @Test
-    fun `a skipped repeated step is only missed, the next one is tried an interval later`() {
+    fun `a skipped repeated step is only missed the next one is tried an interval later`() {
         val script = Script().press(BUTTON_4, 0).press(PLUS, 600).release(PLUS, 700)
         script.tickEvery(10, 0, 1_000)
         // PLUS was down from 600 to 700: the step due at 650 is skipped; the ones at 500, 800 and 950 fire.
@@ -294,7 +294,7 @@ class GestureDetectorTest {
     }
 
     @Test
-    fun `all five buttons at once, the volume steps fire at the press, no hold fires, the release is silent`() {
+    fun `all five buttons at once the volume steps fire at the press no hold fires the release is silent`() {
         val script = Script()
         HandlebarButton.entries.forEach { script.press(it, 0) }
         assertEquals(listOf("VOLUME_UP@0", "VOLUME_DOWN@0"), script.log())
@@ -399,7 +399,7 @@ class GestureDetectorTest {
     }
 
     @Test
-    fun `with bounce handling a real tap fires once the bounce time has passed, stamped with its release`() {
+    fun `with bounce handling a real tap fires once the bounce time has passed stamped with its release`() {
         val script = Script(GestureTiming(bounceMillis = 30))
         script.press(PLUS, 0).release(PLUS, 100)
         assertEquals(130L, script.detector.nextDeadlineMillis)
@@ -424,7 +424,7 @@ class GestureDetectorTest {
     // endregion
 
     @Test
-    fun `random presses, releases and ticks never throw, never fire more than the rules allow and always settle`() {
+    fun `random presses releases and ticks never throw never fire more than the rules allow and always settle`() {
         val random = Random(2026)
         repeat(300) { round ->
             val timing = GestureTiming(bounceMillis = if (round % 3 == 0) 20 else 0)

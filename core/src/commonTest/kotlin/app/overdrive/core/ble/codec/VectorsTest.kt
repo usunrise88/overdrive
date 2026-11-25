@@ -14,7 +14,7 @@ class VectorsTest {
     // region 8.1 Indoor Bike Data
 
     @Test
-    fun `IBD1 More Data set, speed absent, power 200`() {
+    fun `IBD1 More Data set speed absent power 200`() {
         val data = IndoorBikeDataCodec.parse(hex("41 00 C8 00")).ok()
         assertEquals(0x0041, data.flags)
         assertTrue(data.moreData)
@@ -23,7 +23,7 @@ class VectorsTest {
     }
 
     @Test
-    fun `IBD2 the common case, speed cadence and power`() {
+    fun `IBD2 the common case speed cadence and power`() {
         val data = IndoorBikeDataCodec.parse(hex("44 00 C4 09 B4 00 FA 00")).ok()
         assertEquals(0x0044, data.flags)
         assertFalse(data.moreData)
@@ -76,7 +76,7 @@ class VectorsTest {
     }
 
     @Test
-    fun `IBD9 resistance, average power and MET`() {
+    fun `IBD9 resistance average power and MET`() {
         val data = IndoorBikeDataCodec.parse(hex("A0 04 00 00 19 00 B4 00 2D")).ok()
         assertEquals(0x04A0, data.flags)
         assertEquals(25, data.resistanceLevel)
@@ -125,7 +125,7 @@ class VectorsTest {
     // region 8.2 Heart Rate Measurement
 
     @Test
-    fun `HR1 eight-bit heart rate, no contact support`() {
+    fun `HR1 eight-bit heart rate no contact support`() {
         val hr = HeartRateCodec.parse(hex("00 48")).ok()
         assertEquals(72, hr.bpm)
         assertNull(hr.rrIntervalsRaw)
@@ -145,7 +145,7 @@ class VectorsTest {
     }
 
     @Test
-    fun `HR6 two RR intervals, raw and converted by the domain layer`() {
+    fun `HR6 two RR intervals raw and converted by the domain layer`() {
         val hr = HeartRateCodec.parse(hex("16 48 00 04 00 02")).ok()
         assertEquals(72, hr.bpm)
         assertEquals(listOf(1024, 512), hr.rrIntervalsRaw)
@@ -153,7 +153,7 @@ class VectorsTest {
     }
 
     @Test
-    fun `HR7 sixteen-bit heart rate with RR, 900 rounds to 879 ms`() {
+    fun `HR7 sixteen-bit heart rate with RR 900 rounds to 879 ms`() {
         val hr = HeartRateCodec.parse(hex("17 96 00 84 03 00 04")).ok()
         assertEquals(150, hr.bpm)
         assertEquals(listOf(900, 1024), hr.rrIntervalsRaw)
@@ -178,7 +178,7 @@ class VectorsTest {
     }
 
     @Test
-    fun `HR10 the RR flag with no RR bytes is an empty list, not an error and not null`() {
+    fun `HR10 the RR flag with no RR bytes is an empty list not an error and not null`() {
         val hr = HeartRateCodec.parse(hex("10 50")).ok()
         assertEquals(80, hr.bpm)
         assertEquals(emptyList(), hr.rrIntervalsRaw)

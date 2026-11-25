@@ -36,7 +36,7 @@ class RepeatsRepositoriesTest {
         )
 
     @Test
-    fun `the list is asked from the repeats route, shown, and kept in the cache in the services own words`() =
+    fun `the list is asked from the repeats route shown and kept in the cache in the services own words`() =
         runTest {
             val store = MemoryTextStore()
             val transport = ScriptedTransport(ok(listBody))
@@ -80,7 +80,7 @@ class RepeatsRepositoriesTest {
         }
 
     @Test
-    fun `nothing cached and a failed request is an error with its cause, not an empty list`() =
+    fun `nothing cached and a failed request is an error with its cause not an empty list`() =
         runTest {
             val resource = list(ScriptedTransport(error(503)))
             resource.load()
@@ -92,7 +92,7 @@ class RepeatsRepositoriesTest {
         }
 
     @Test
-    fun `a service without the route says so, and an answer that is not the contract's is not the service`() =
+    fun `a service without the route says so and an answer that is not the contract's is not the service`() =
         runTest {
             val missing = list(ScriptedTransport(error(404, "not_found")))
             missing.load()
@@ -107,7 +107,7 @@ class RepeatsRepositoriesTest {
         }
 
     @Test
-    fun `a cache written for another address, or damaged, is no cache`() =
+    fun `a cache written for another address or damaged is no cache`() =
         runTest {
             val store = MemoryTextStore()
             list(ScriptedTransport(ok(listBody)), store).also {
@@ -140,7 +140,7 @@ class RepeatsRepositoriesTest {
     )
 
     @Test
-    fun `a session is asked by its hash, once a resource each, and cached under that hash`() =
+    fun `a session is asked by its hash once a resource each and cached under that hash`() =
         runTest {
             val body = RepeatSamples.json(RepeatSamples.detail(listOf(150.0, 148.0, 146.0)))
             val transport = ScriptedTransport(ok(body))
@@ -156,7 +156,7 @@ class RepeatsRepositoriesTest {
         }
 
     @Test
-    fun `an opened session opens offline after a restart, with the attempts it had`() =
+    fun `an opened session opens offline after a restart with the attempts it had`() =
         runTest {
             val stores = mutableMapOf<String, MemoryTextStore>()
             val body = RepeatSamples.json(RepeatSamples.detail(listOf(150.0, 148.0, 146.0, 144.0)))
@@ -187,7 +187,7 @@ class RepeatsRepositoriesTest {
         }
 
     @Test
-    fun `only a hash is accepted, and only the most recent resources are kept in memory`() {
+    fun `only a hash is accepted and only the most recent resources are kept in memory`() {
         val repeats = details(ScriptedTransport(ok("{}")), keep = 2)
         for (bad in listOf(
             "",

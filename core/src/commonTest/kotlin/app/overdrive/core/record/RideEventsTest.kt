@@ -16,7 +16,7 @@ class RideEventsTest {
     private fun samples(count: Int) = (1..count).map { RideSample(it, power = 150, cadence = 40, stepIndex = 0) }
 
     @Test
-    fun `an event is kept by the builder, in order, after its sample`() {
+    fun `an event is kept by the builder in order after its sample`() {
         val builder = RideRecordBuilder(header)
         samples(3).forEach(builder::addSample)
         builder.addEvent(guard)
@@ -25,7 +25,7 @@ class RideEventsTest {
     }
 
     @Test
-    fun `the builder refuses an event before its sample, or out of order`() {
+    fun `the builder refuses an event before its sample or out of order`() {
         val builder = RideRecordBuilder(header)
         builder.addSample(samples(1).single())
         assertFailsWith<IllegalArgumentException> { builder.addEvent(guard) }

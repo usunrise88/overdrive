@@ -79,7 +79,7 @@ class FtmsTrainerDeviceTest {
     // region set-up (§4.1)
 
     @Test
-    fun `set-up discovers, reads Feature, enables the three CCCDs one at a time, then takes control`() =
+    fun `set-up discovers reads Feature enables the three CCCDs one at a time then takes control`() =
         runTest {
             val rig = BleRig(this)
             val recorded = rig.recording(model = "D500")
@@ -113,7 +113,7 @@ class FtmsTrainerDeviceTest {
         }
 
     @Test
-    fun `the CCCD writes are at least one operation apart, never overlapping`() =
+    fun `the CCCD writes are at least one operation apart never overlapping`() =
         runTest {
             val rig = BleRig(this)
             val recorded = rig.recording()
@@ -126,7 +126,7 @@ class FtmsTrainerDeviceTest {
         }
 
     @Test
-    fun `it is connected only once set-up has finished, and the engine's request control is then free`() =
+    fun `it is connected only once set-up has finished and the engine's request control is then free`() =
         runTest {
             val rig = BleRig(this)
             val trainer = rig.trainer()
@@ -148,7 +148,7 @@ class FtmsTrainerDeviceTest {
         }
 
     @Test
-    fun `Start or Resume can be turned off, the one-line flip for bench question FT 7`() =
+    fun `Start or Resume can be turned off the one-line flip for bench question FT 7`() =
         runTest {
             val rig = BleRig(this)
             rig.runTrainer(FtmsOptions(startAfterRequestControl = false))
@@ -156,7 +156,7 @@ class FtmsTrainerDeviceTest {
         }
 
     @Test
-    fun `the Feature word is read and published, and missing features are reported but do not stop a command`() =
+    fun `the Feature word is read and published and missing features are reported but do not stop a command`() =
         runTest {
             val noPowerTarget = byteArrayOf(0x06, 0x54, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00)
             val rig = BleRig(this, trainerOptions = FakeFtmsTrainerOptions(featureBytes = noPowerTarget))
@@ -257,7 +257,7 @@ class FtmsTrainerDeviceTest {
     // region data
 
     @Test
-    fun `Indoor Bike Data becomes readings with power, cadence rounded to whole rpm, and the trainer's own speed`() =
+    fun `Indoor Bike Data becomes readings with power cadence rounded to whole rpm and the trainer's own speed`() =
         runTest {
             val rig = BleRig(this)
             val trainer = rig.runTrainer()
@@ -268,7 +268,7 @@ class FtmsTrainerDeviceTest {
         }
 
     @Test
-    fun `a half rpm rounds up and a negative power is a zero, never an exception`() =
+    fun `a half rpm rounds up and a negative power is a zero never an exception`() =
         runTest {
             val rig = BleRig(this)
             val trainer = rig.runTrainer()
@@ -286,7 +286,7 @@ class FtmsTrainerDeviceTest {
         }
 
     @Test
-    fun `a malformed notification is dropped and reported, and the stream goes on`() =
+    fun `a malformed notification is dropped and reported and the stream goes on`() =
         runTest {
             val rig = BleRig(this)
             val trainer = rig.runTrainer()
@@ -301,7 +301,7 @@ class FtmsTrainerDeviceTest {
         }
 
     @Test
-    fun `the disputed flag bits flip with one option, as a bench result for FT 1 would`() =
+    fun `the disputed flag bits flip with one option as a bench result for FT 1 would`() =
         runTest {
             // A trainer that follows the SIG XML labels: bit 1 is cadence.
             val rig = BleRig(this, trainerOptions = FakeFtmsTrainerOptions(flagMap = IndoorBikeFlagMap.SIG_XML_LABELS))
@@ -364,7 +364,7 @@ class FtmsTrainerDeviceTest {
         }
 
     @Test
-    fun `a target above the encodable range is refused at the door, not sent`() =
+    fun `a target above the encodable range is refused at the door not sent`() =
         runTest {
             val rig = BleRig(this)
             val trainer = rig.runTrainer()
@@ -415,7 +415,7 @@ class FtmsTrainerDeviceTest {
         }
 
     @Test
-    fun `an op code the trainer does not support fails, and later tries fail at once without traffic`() =
+    fun `an op code the trainer does not support fails and later tries fail at once without traffic`() =
         runTest {
             val rig = BleRig(this)
             val trainer = rig.runTrainer()
@@ -474,7 +474,7 @@ class FtmsTrainerDeviceTest {
         }
 
     @Test
-    fun `the timeout is an option, the bench value for FT 6`() =
+    fun `the timeout is an option the bench value for FT 6`() =
         runTest {
             val rig = BleRig(this)
             val trainer = rig.runTrainer(FtmsOptions(controlPointTimeout = 500.milliseconds))
@@ -510,7 +510,7 @@ class FtmsTrainerDeviceTest {
         }
 
     @Test
-    fun `one Control Point command is in flight at a time, the second waits for the first`() =
+    fun `one Control Point command is in flight at a time the second waits for the first`() =
         runTest {
             val rig = BleRig(this)
             val trainer = rig.runTrainer()
@@ -545,7 +545,7 @@ class FtmsTrainerDeviceTest {
         }
 
     @Test
-    fun `a target the trainer altered is reported, one it kept is not`() =
+    fun `a target the trainer altered is reported one it kept is not`() =
         runTest {
             val rig = BleRig(this)
             val trainer = rig.runTrainer()
@@ -559,7 +559,7 @@ class FtmsTrainerDeviceTest {
         }
 
     @Test
-    fun `without the status echo of the trainer nothing breaks, bench question FT 4`() =
+    fun `without the status echo of the trainer nothing breaks bench question FT 4`() =
         runTest {
             val rig = BleRig(this, trainerOptions = FakeFtmsTrainerOptions(sendsStatus = false))
             val trainer = rig.runTrainer()
@@ -677,7 +677,7 @@ class FtmsTrainerDeviceTest {
         }
 
     @Test
-    fun `with the grace off the fake D500's Reset makes the adapter ask for control again, as on the bench`() =
+    fun `with the grace off the fake D500's Reset makes the adapter ask for control again as on the bench`() =
         runTest {
             val rig = BleRig(this, trainerOptions = d500)
             val trainer = rig.trainer(FtmsOptions(selfResetGrace = Duration.ZERO))
@@ -689,7 +689,7 @@ class FtmsTrainerDeviceTest {
         }
 
     @Test
-    fun `the grace is an option, a Reset inside it is ignored and one past it is lost control`() =
+    fun `the grace is an option a Reset inside it is ignored and one past it is lost control`() =
         runTest {
             val rig = BleRig(this)
             val trainer = rig.trainer(FtmsOptions(selfResetGrace = 3.seconds))
@@ -709,7 +709,7 @@ class FtmsTrainerDeviceTest {
         }
 
     @Test
-    fun `a Reset five seconds after control was granted is still lost control, and is recovered`() =
+    fun `a Reset five seconds after control was granted is still lost control and is recovered`() =
         runTest {
             val rig = BleRig(this, trainerOptions = d500)
             val trainer = rig.trainer()

@@ -136,7 +136,7 @@ public final class AppContainer: ObservableObject {
     @Published public var recoveryState: RecoveryResponse? = nil
 
     // Live ride state
-    @Published public var snapshot: RideSnapshot = RideSnapshot(state: .idle, ftp: 200)
+    @Published public var snapshot: RideSnapshot = AppleCoreFactories.shared.defaultRideSnapshot(ftp: 200)
     @Published public var averagePower: Int? = nil
     @Published public var lapAveragePower: Int? = nil
     @Published public var trace: [ProfileTracePoint] = []
@@ -1182,10 +1182,10 @@ public final class AppContainer: ObservableObject {
         learningStepIndex = 0
         learningMapPreview = [:]
         if coachMuteOnly {
-            coachButtonLearner = CoachButtonLearner(existing: settings.toButtonMapping())
+            coachButtonLearner = AppleCoreFactories.shared.createCoachButtonLearner(base: settings.toButtonMapping())
             buttonLearner = nil
         } else {
-            buttonLearner = ButtonLearner(previous: settings.toButtonMapping())
+            buttonLearner = AppleCoreFactories.shared.createButtonLearner(base: settings.toButtonMapping())
             coachButtonLearner = nil
         }
         screen = .learnButtons
@@ -1204,29 +1204,29 @@ public final class AppContainer: ObservableObject {
     private func handleLearningPress(_ change: ButtonChange) {
         guard screen == .learnButtons, !change.synthetic else { return }
         if let learner = buttonLearner {
-            let outcome = learner.onChange(change: change)
-            if outcome is LearnOutcomeAccepted {
-                learningStepIndex = Int(learner.stepIndex)
+            let state = learner.feed(held: change.held)
+            if let asking = state as? LearnStateAsking {
+                learningStepIndex = Int(asking.step) - 1
                 learningError = nil
-            } else if let done = outcome as? LearnOutcomeFinished {
+            } else if let done = state as? LearnStateComplete {
                 learningDone = true
                 learningError = nil
                 updateSettings { $0.buttonMappingSerialized = done.mapping.serialize() }
-            } else if outcome is LearnOutcomeRejectedCombo {
-                learningError = "Two buttons were pressed together. Press just one button."
-            } else if outcome is LearnOutcomeRejectedDuplicate {
-                learningError = "That button is already assigned to another role. Press a different one."
+            } else if let rejected = state as? LearnStateRejected {
+                learningError = rejected.reason == .combo
+                    ? "Two buttons were pressed together. Press just one button."
+                    : "That button is already assigned to another role. Press a different one."
             }
         } else if let coachLearner = coachButtonLearner {
-            let outcome = coachLearner.onChange(change: change)
-            if let done = outcome as? CoachLearnOutcomeAssigned {
+            let state = coachLearner.feed(held: change.held)
+            if let done = state as? CoachLearnStateComplete {
                 learningDone = true
                 learningError = nil
                 updateSettings { $0.buttonMappingSerialized = done.mapping.serialize() }
-            } else if outcome is CoachLearnOutcomeRejectedCombo {
-                learningError = "Press a single button for Mute Live Coach."
-            } else if outcome is CoachLearnOutcomeRejectedTaken {
-                learningError = "That button is already used by one of the five main roles."
+            } else if let rejected = state as? CoachLearnStateRejected {
+                learningError = rejected.reason == .combo
+                    ? "Press a single button for Mute Live Coach."
+                    : "That button is already used by one of the five main roles."
             }
         }
     }
@@ -1373,11 +1373,10 @@ public final class AppContainer: ObservableObject {
     // MARK: - Mapping Helpers
 
     private func buildRideRoutes(workout: Workout?) -> RideRoutes {
-        let difficulty = Double(settings.routeDifficultyPercent) / 100.0
         if workout == nil, let id = selectedFreeRouteId, let route = downloadedRoutes[id] {
-            return RideRoutes.Companion.shared.freeRide(route: route, difficulty: difficulty)
+            return AppleCoreFactories.shared.freeRideRoutes(route: route, difficultyPercent: Int32(settings.routeDifficultyPercent))
         }
-        return RideRoutes.Companion.shared.None
+        return AppleCoreFactories.shared.noneRideRoutes()
     }
 
     private func mapOverlayState(from snap: RideSnapshot) -> OverlayUiState {
@@ -1393,25 +1392,38 @@ public final class AppContainer: ObservableObject {
         }
 
         let hold: OverlayHeartRateHold? = snap.heartRateHold.map { h in
-            let delta = Int(h.targetBpm - h.plannedTargetBpm)
-            let deltaStr = delta == 0 ? "" : " (\(UiFormat.signedInt(delta)))"
+            let hr = snap.heartRate?.intValue
             let statusStr: String
-            switch h.status {
-            case .inBand: statusStr = "Target \(h.targetBpm) bpm\(deltaStr) \u{00B1}\(h.bandBpm) \u{00B7} In band"
-            case .aboveBand: statusStr = "Target \(h.targetBpm) bpm\(deltaStr) \u{00B1}\(h.bandBpm) \u{00B7} Above band"
-            case .belowBand: statusStr = "Target \(h.targetBpm) bpm\(deltaStr) \u{00B1}\(h.bandBpm) \u{00B7} Below band"
-            case .rampingIn: statusStr = "Easing in \u{00B7} target \(h.targetBpm) bpm \u{00B1}\(h.bandBpm)"
-            case .noHeartRate: statusStr = "No heart rate \u{00B7} target \(h.targetBpm) bpm"
-            case .strapLostHolding: statusStr = "Strap lost \u{00B7} holding \(snap.targetPower?.intValue ?? 0) W"
-            case .strapLostMinimum: statusStr = "Strap lost \u{00B7} power at the minimum, \(snap.targetPower?.intValue ?? 0) W"
-            default: statusStr = "Target \(h.targetBpm) bpm"
+            let showGauge: Bool
+            if h.strapLost {
+                statusStr = "Strap lost \u{00B7} power at the minimum, \(h.powerMin) W"
+                showGauge = false
+            } else if h.signalLost {
+                statusStr = "Strap lost \u{00B7} holding \(snap.targetPower?.intValue ?? Int(h.powerMin)) W"
+                showGauge = false
+            } else if h.startRamp {
+                statusStr = "Easing in \u{00B7} target \(h.targetBpm) bpm \u{00B1}\(h.band)"
+                showGauge = false
+            } else if let hr {
+                let bandState: String
+                if h.inBand?.boolValue == true {
+                    bandState = "In band"
+                } else if hr > Int(h.targetBpm) {
+                    bandState = "Above band"
+                } else {
+                    bandState = "Below band"
+                }
+                statusStr = "Target \(h.targetBpm) bpm \u{00B1}\(h.band) \u{00B7} \(bandState)"
+                showGauge = true
+            } else {
+                statusStr = "No heart rate \u{00B7} target \(h.targetBpm) bpm"
+                showGauge = false
             }
-            let showGauge = h.status == .inBand || h.status == .aboveBand || h.status == .belowBand
             return OverlayHeartRateHold(
                 targetBpm: Int(h.targetBpm),
-                deltaBpm: delta,
-                bandBpm: Int(h.bandBpm),
-                currentBpm: snap.heartRate?.intValue,
+                deltaBpm: 0,
+                bandBpm: Int(h.band),
+                currentBpm: hr,
                 statusText: statusStr,
                 showGauge: showGauge
             )
@@ -1419,23 +1431,23 @@ public final class AppContainer: ObservableObject {
 
         let workoutInfo: OverlayWorkoutInfo? = snap.workout.map { w in
             let profileSteps = w.steps.map { step in
-                let startPct = step.startTargetFraction?.doubleValue ?? 0.5
-                let endPct = step.endTargetFraction?.doubleValue ?? startPct
+                let startPct = step.targetFrom?.doubleValue ?? 0.5
+                let endPct = step.targetTo?.doubleValue ?? startPct
                 let midWatts = Int((startPct + endPct) * 0.5 * Double(snap.ftp))
                 let z = Int(PowerZone.Companion.shared.of(powerWatts: Int32(midWatts), ftp: snap.ftp).number)
                 return ProfileStepData(
                     durationSeconds: Int(step.durationSeconds),
                     startPctFtp: startPct,
                     endPctFtp: endPct,
-                    isFreeRide: step.isFreeRide,
-                    isHeartRate: step.isHeartRate,
+                    isFreeRide: step.mode == .simulation,
+                    isHeartRate: step.heartRate != nil,
                     zone: z
                 )
             }
             let nextText: String
             if let next = w.nextStep {
                 let dur = UiFormat.minutesAndSeconds(Int(next.durationSeconds))
-                if let frac = next.startTargetFraction?.doubleValue {
+                if let frac = next.targetFrom?.doubleValue {
                     let watts = Int((frac * Double(snap.ftp)).rounded())
                     nextText = "\(next.label) \u{00B7} \(dur) \u{00B7} \(watts) W"
                 } else {

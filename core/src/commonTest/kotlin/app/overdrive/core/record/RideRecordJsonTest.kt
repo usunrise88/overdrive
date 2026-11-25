@@ -23,7 +23,7 @@ class RideRecordJsonTest {
         RideRecordBuilder.recover(RideHeader("t", 1_000, ftp = 200), samples.toList())
 
     @Test
-    fun `a record survives a round trip exactly, doubles included`() {
+    fun `a record survives a round trip exactly doubles included`() {
         assertEquals(record, RideRecordJson.decode(RideRecordJson.encode(record)))
         val awkward =
             tiny(
@@ -40,7 +40,7 @@ class RideRecordJsonTest {
     }
 
     @Test
-    fun `a gap is an absent key, and only that`() {
+    fun `a gap is an absent key and only that`() {
         val json =
             RideRecordJson.encode(
                 tiny(RideSample(1, power = null, heartRate = 100, speedKmh = 1.0, distanceMeters = 0.5)),

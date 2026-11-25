@@ -26,7 +26,7 @@ class RideHeaderRouteTest {
     }
 
     @Test
-    fun `the route and the variant are written after the devices, in this order`() {
+    fun `the route and the variant are written after the devices in this order`() {
         val header =
             RideHeader(
                 "t",

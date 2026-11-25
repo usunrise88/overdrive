@@ -33,7 +33,7 @@ class HeartRateStrapDeviceTest {
         }
 
     @Test
-    fun `set-up discovers and enables only the Heart Rate Measurement, then it is connected`() =
+    fun `set-up discovers and enables only the Heart Rate Measurement then it is connected`() =
         runTest {
             val rig = BleRig(this)
             val recorded = rig.recording(model = "HR7")
@@ -86,7 +86,7 @@ class HeartRateStrapDeviceTest {
         }
 
     @Test
-    fun `off the chest the strap reads as no signal, 0 bpm, and the contact state says why`() =
+    fun `off the chest the strap reads as no signal 0 bpm and the contact state says why`() =
         runTest {
             val rig = BleRig(this)
             val strap = rig.runStrap()
@@ -117,7 +117,7 @@ class HeartRateStrapDeviceTest {
         }
 
     @Test
-    fun `the contact rule and the no-signal behaviour are options, the bench flips for FT 11`() =
+    fun `the contact rule and the no-signal behaviour are options the bench flips for FT 11`() =
         runTest {
             // pycycling's reading: contact status 2 counts as detected, so the number is kept.
             val rig = BleRig(this)
@@ -139,7 +139,7 @@ class HeartRateStrapDeviceTest {
         }
 
     @Test
-    fun `an implausible rate is a gap, not a number`() =
+    fun `an implausible rate is a gap not a number`() =
         runTest {
             val rig = BleRig(this)
             val strap = rig.runStrap()
@@ -167,7 +167,7 @@ class HeartRateStrapDeviceTest {
         }
 
     @Test
-    fun `a strap that drops is a link event only, and it reconnects by itself`() =
+    fun `a strap that drops is a link event only and it reconnects by itself`() =
         runTest {
             val rig = BleRig(this)
             val strap = rig.runStrap()
@@ -215,7 +215,7 @@ class HeartRateStrapDeviceTest {
         }
 
     @Test
-    fun `a silent strap is still connected, the engine's own timeout makes the gap`() =
+    fun `a silent strap is still connected the engine's own timeout makes the gap`() =
         runTest {
             val rig = BleRig(this)
             val strap = rig.runStrap()

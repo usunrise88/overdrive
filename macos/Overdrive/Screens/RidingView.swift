@@ -166,10 +166,10 @@ public struct RidingView: View {
 
     private func workoutCard(_ w: WorkoutProgress) -> some View {
         let steps = w.steps.map { step -> ProfileStepData in
-            let s = step.startTargetFraction?.doubleValue ?? 0.5
-            let e = step.endTargetFraction?.doubleValue ?? s
+            let s = step.targetFrom?.doubleValue ?? 0.5
+            let e = step.targetTo?.doubleValue ?? s
             let z = Int(PowerZone.Companion.shared.of(powerWatts: Int32(((s + e) * 0.5 * Double(container.snapshot.ftp)).rounded()), ftp: container.snapshot.ftp).number)
-            return ProfileStepData(durationSeconds: Int(step.durationSeconds), startPctFtp: s, endPctFtp: e, isFreeRide: step.isFreeRide, isHeartRate: step.isHeartRate, zone: z)
+            return ProfileStepData(durationSeconds: Int(step.durationSeconds), startPctFtp: s, endPctFtp: e, isFreeRide: step.mode == .simulation, isHeartRate: step.heartRate != nil, zone: z)
         }
         return OdCard {
             VStack(alignment: .leading, spacing: OverdriveDimens.spaceS3) {

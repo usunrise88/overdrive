@@ -70,7 +70,7 @@ class FitRouteTest {
     private fun degrees(semicircles: Long) = semicircles / SEMICIRCLES_PER_DEGREE
 
     @Test
-    fun `semicircles are two to the 31 for 180 degrees, with golden numbers`() {
+    fun `semicircles are two to the 31 for 180 degrees with golden numbers`() {
         assertEquals(536_870_912L, semicircles(45.0)) // 2^29
         assertEquals(83_513_253L, semicircles(7.0))
         assertEquals(-1_109_533_218L, semicircles(-93.0))
@@ -157,7 +157,7 @@ class FitRouteTest {
     }
 
     @Test
-    fun `a profile writes the altitude and no position, so it draws no map`() {
+    fun `a profile writes the altitude and no position so it draws no map`() {
         val bytes = FitWriter().write(freeRide("route-profile"), routes(profile))
         val file = parseFit(bytes)
         val definition = file.definitions.single { it.globalNumber == 20 }
