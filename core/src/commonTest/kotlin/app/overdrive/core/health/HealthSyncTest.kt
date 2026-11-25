@@ -101,13 +101,14 @@ class HealthSyncTest {
             assertEquals(60 + 60 + 60 + 2, rig.service.ids().size)
             val sent = rig.service.records()
             assertEquals(sent.size, sent.map { it.id }.toSet().size, "no record twice")
-            val nights = sent.filterIsInstance<SleepSessionRecord>()
+            val nightRanges =
+                sent
+                    .filterIsInstance<SleepSessionRecord>()
+                    .map { instantOf(it.start)..instantOf(it.end) }
             val inNights =
                 sent.filterIsInstance<HeartRateSamplesRecord>().flatMap { it.samples }.map { instantOf(it.t) }
             assertTrue(
-                inNights.all { at ->
-                    nights.any { at in WellnessTime.parseInstant(it.start)!!..WellnessTime.parseInstant(it.end)!! }
-                },
+                inNights.all { at -> nightRanges.any { at in it } },
                 "heart rate outside a night is not sent",
             )
             val workouts = sent.filterIsInstance<ExerciseSessionRecord>()
