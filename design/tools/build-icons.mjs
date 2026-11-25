@@ -100,7 +100,9 @@ const members = iconEntries.map(({ name, pascalName, paths }) => {
   return `    val ${pascalName}: ImageVector by lazy {\n      lucide(\n        "${name}",\n${args}\n      )\n    }`;
 });
 
-const swiftCases = iconEntries.map(({ name, camelName }) => `    case ${camelName} = "${name}"`).join("\n");
+const swiftCases = iconEntries
+  .map(({ name, camelName }) => `    case ${camelName} = "${name}"`)
+  .join("\n");
 const swiftSwitch = iconEntries
   .map(({ camelName, paths }) => {
     const items = paths.map((p) => `            "${p}",`).join("\n");

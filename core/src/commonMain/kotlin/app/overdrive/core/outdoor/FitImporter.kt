@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlin.concurrent.Volatile
 
 /** What came of one file the rider shared (design/companion.md §4.11): the screen says it in words. */
 public sealed interface FitOutcome {

@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlin.concurrent.Volatile
 
 /** How far the read of the last 60 days has come: [chunksDone] of [chunksTotal] windows, [records] read, [estimate] for all of them. */
 public data class ReadProgress(

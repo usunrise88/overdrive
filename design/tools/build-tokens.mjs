@@ -420,7 +420,9 @@ const SWIFT_FONT_BY_WEIGHT = {
 
 const swiftColors = [];
 const addSwiftColor = (name, path) => {
-  swiftColors.push(`    public static let ${name} = Color(argb: ${argb(at(`${path}.value`), path)})`);
+  swiftColors.push(
+    `    public static let ${name} = Color(argb: ${argb(at(`${path}.value`), path)})`,
+  );
 };
 for (const key of Object.keys(tokens.color.neutral)) {
   if (isToken(key)) addSwiftColor(ident(key), `color.neutral.${key}`);
@@ -428,7 +430,8 @@ for (const key of Object.keys(tokens.color.neutral)) {
 for (const key of Object.keys(tokens.color.text)) {
   if (isToken(key)) addSwiftColor(ident("text", key), `color.text.${key}`);
 }
-for (const key of ["backing", "border"]) addSwiftColor(ident("overlay", key), `color.overlay.${key}`);
+for (const key of ["backing", "border"])
+  addSwiftColor(ident("overlay", key), `color.overlay.${key}`);
 addSwiftColor(ident("scrim"), "color.scrim");
 for (const key of zoneKeys) addSwiftColor(key, `color.zone.${key}`);
 swiftColors.push(`    public static let zones: [Color] = [${zoneKeys.join(", ")}]`);
@@ -446,7 +449,9 @@ swiftColors.push(
     })
     .join(", ")}]`,
 );
-swiftColors.push(`    public static let zonePastAlpha: Double = ${dbl(at("color.zone.rules.pastAlpha"))}`);
+swiftColors.push(
+  `    public static let zonePastAlpha: Double = ${dbl(at("color.zone.rules.pastAlpha"))}`,
+);
 
 const swiftDimens = [];
 const swiftMotion = [];
@@ -476,7 +481,9 @@ for (const leaf of [...leaves(tokens.overlay, ["overlay"]), ...leaves(tokens.cha
 }
 for (const key of Object.keys(tokens.motion.duration)) {
   if (!isToken(key)) continue;
-  swiftMotion.push(`    public static let ${ident("duration", key)}: Int = ${at(`motion.duration.${key}`)}`);
+  swiftMotion.push(
+    `    public static let ${ident("duration", key)}: Int = ${at(`motion.duration.${key}`)}`,
+  );
 }
 for (const key of Object.keys(tokens.motion.easing)) {
   if (!isToken(key)) continue;
