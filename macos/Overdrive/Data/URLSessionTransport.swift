@@ -179,23 +179,23 @@ public final class URLSessionTransport: NSObject, AppleHttpClient {
         }
         switch ns.code {
         case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed:
-            return AppleHttpResultFailed(failure: .nameNotFound, hint: "NSURLError.DNS")
+            return AppleHttpResultFailed(failure: .namenotfound, hint: "NSURLError.DNS")
         case NSURLErrorNotConnectedToInternet, NSURLErrorDataNotAllowed:
-            return AppleHttpResultFailed(failure: .noNetwork, hint: "NSURLError.Offline")
+            return AppleHttpResultFailed(failure: .nonetwork, hint: "NSURLError.Offline")
         case NSURLErrorCannotConnectToHost:
             return AppleHttpResultFailed(failure: .refused, hint: "NSURLError.CannotConnect")
         case NSURLErrorNetworkConnectionLost:
             return AppleHttpResultFailed(failure: .dropped, hint: "NSURLError.ConnectionLost")
         case NSURLErrorTimedOut:
-            return AppleHttpResultFailed(failure: .timedOut, hint: "NSURLError.TimedOut")
+            return AppleHttpResultFailed(failure: .timedout, hint: "NSURLError.TimedOut")
         case NSURLErrorSecureConnectionFailed,
              NSURLErrorServerCertificateHasBadDate,
              NSURLErrorServerCertificateUntrusted,
              NSURLErrorServerCertificateHasUnknownRoot,
              NSURLErrorServerCertificateNotYetValid:
-            return AppleHttpResultFailed(failure: .secureConnection, hint: "NSURLError.TLS")
+            return AppleHttpResultFailed(failure: .secureconnection, hint: "NSURLError.TLS")
         case NSURLErrorAppTransportSecurityRequiresSecureConnection:
-            return AppleHttpResultFailed(failure: .networkBlocked, hint: "NSURLError.ATS")
+            return AppleHttpResultFailed(failure: .networkblocked, hint: "NSURLError.ATS")
         default:
             return AppleHttpResultFailed(failure: .unreachable, hint: "NSURLError.\(ns.code)")
         }
