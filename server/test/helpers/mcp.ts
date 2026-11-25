@@ -184,10 +184,11 @@ export function authorizeQuery(base: string, p: AuthorizeParams): URLSearchParam
 export async function submitAuthorization(
   base: string,
   query: URLSearchParams,
-  fields: { passphrase?: string; decision?: "approve" | "deny" },
+  fields: { passphrase?: string; handle?: string; decision?: "approve" | "deny" },
 ): Promise<Response> {
   const body = new URLSearchParams(query);
   if (fields.passphrase !== undefined) body.set("passphrase", fields.passphrase);
+  if (fields.handle !== undefined) body.set("handle", fields.handle);
   body.set("decision", fields.decision ?? "approve");
   return fetch(`${base}/oauth/authorize`, {
     method: "POST",

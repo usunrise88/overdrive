@@ -37,6 +37,7 @@ import { createRideStore, type RideStore } from "./ride-store.ts";
 import { createRideWorkoutResolver, type RideWorkoutResolver } from "./ride-workout.ts";
 import { createRoutes, type RoutesService } from "./routes/service.ts";
 import { createStrava, STRAVA_DESTINATION, type StravaUploads } from "./strava/index.ts";
+import type { TelegramClient } from "./telegram/client.ts";
 import { createPlanHistory } from "./telegram/history.ts";
 import { createTelegram, type TelegramBot } from "./telegram/index.ts";
 import { createRideQueries } from "./telegram/rides.ts";
@@ -158,6 +159,8 @@ export interface ServicesOptions {
   sharedDb?: Db;
   /** false: the bot does not poll (a shared poller feeds it, multi-tenancy). Default true. */
   telegramPoll?: boolean;
+  /** The one Telegram client of the shared bot, when several users' bots share it; otherwise each bot makes its own. */
+  telegramClient?: TelegramClient;
 }
 
 export function createServices(options: ServicesOptions): Services {
@@ -424,6 +427,7 @@ export function createServices(options: ServicesOptions): Services {
     history: planHistory,
     stateDb: options.sharedDb,
     poll: options.telegramPoll,
+    client: options.telegramClient,
     sources: [insights.notifications, notebook.notifications, planEvents.notifications],
     outdoor,
     planEvents,
