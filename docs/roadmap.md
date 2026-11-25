@@ -153,3 +153,10 @@ After `0.4.0-rc.1` the owner sent Bluetooth logs and notes. Done: the background
 archive, Power skills and Effort on the companion (ADR 0042), the Progress screen (ADR 0043). The log analysis also settled OVD-24: cadence 0 with
 a spinning flywheel is real (the rider rests), so the auto-pause stays, and the resume after it is fast (owner, 2026-11-22). Out as
 `v0.4.1-rc.1`; the final `v0.4.0` and `v0.4.1` wait for the owner's testing.
+
+## macOS ride app for Apple Silicon MacBooks (ADR 0044)
+
+Started 2026-11-25 on the owner's decision (**no distribution yet, targeting Apple Silicon MacBooks**).
+
+- **Built (`macos/` + `core/` `macosArm64` + Swift token/icon generators + `macos-15` CI job):** `OverdriveCore.xcframework` target with POSIX `FileByteStorage` and `AppleBridge`, generated `OverdriveTokens.swift` and `OverdriveIcons.swift`, native AppKit `OverlayPanel` (non-activating, `fullScreenAuxiliary`, notch-safe, 1:1 drag + 180 ms snap), `MenuBarController`, `SleepAssertion`, CoreBluetooth stack (`MacBleStack`, `MacGattTransport`, Zwift `0x094A` manufacturer data, `BACKGROUND` wake, raw BLE log `.zip` export), CoreAudio + `CGEvent` `MacMediaController`, `AVAudioPlayer` `MacCuePlayer`, ephemeral `URLSessionTransport` (HTTP + SSE), `KeychainStore`, crash-safe `MacRideStore` + `MacFileOutbox`, all seven SwiftUI screens (`Ready`, `Riding`, `Paused`, `Finished`, `Devices`, `Learn buttons`, `Settings`), and `OverdriveTests`.
+- **Next (on a MacBook or `macos-15` CI):** build `OverdriveCore.xcframework`, run `make macos-test`, and verify the hardware bench checklist in ADR 0044.

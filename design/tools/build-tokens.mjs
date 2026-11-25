@@ -115,6 +115,10 @@ const kotlinFile = join(
 const fontDir = join(uikitMain, "res", "font");
 const licenceFile = join(uikitMain, "assets", "licenses", "geist-OFL.txt");
 const licenceSource = join(designDir, "fonts", "OFL.txt");
+const macosRoot = join(repoRoot, "macos", "Overdrive");
+const swiftTokensFile = join(macosRoot, "Design", "Generated", "OverdriveTokens.swift");
+const macosFontDir = join(macosRoot, "Resources", "Fonts");
+const macosLicenceFile = join(macosRoot, "Resources", "Licenses", "geist-OFL.txt");
 
 const HEX = /^#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;
 // Kotlin keywords that could appear as a token name.
@@ -406,17 +410,181 @@ const kotlin = [
   "",
 ].join("\n");
 
+// ---- Swift (macOS SwiftUI) output, copied fonts and licence --------------------------------
+
+const SWIFT_FONT_BY_WEIGHT = {
+  400: { file: "Geist-Regular.ttf", psName: "Geist-Regular", weight: ".regular" },
+  500: { file: "Geist-Medium.ttf", psName: "Geist-Medium", weight: ".medium" },
+  600: { file: "Geist-SemiBold.ttf", psName: "Geist-SemiBold", weight: ".semibold" },
+};
+
+const swiftColors = [];
+const addSwiftColor = (name, path) => {
+  swiftColors.push(`    public static let ${name} = Color(argb: ${argb(at(`${path}.value`), path)})`);
+};
+for (const key of Object.keys(tokens.color.neutral)) {
+  if (isToken(key)) addSwiftColor(ident(key), `color.neutral.${key}`);
+}
+for (const key of Object.keys(tokens.color.text)) {
+  if (isToken(key)) addSwiftColor(ident("text", key), `color.text.${key}`);
+}
+for (const key of ["backing", "border"]) addSwiftColor(ident("overlay", key), `color.overlay.${key}`);
+addSwiftColor(ident("scrim"), "color.scrim");
+for (const key of zoneKeys) addSwiftColor(key, `color.zone.${key}`);
+swiftColors.push(`    public static let zones: [Color] = [${zoneKeys.join(", ")}]`);
+swiftColors.push(
+  `    public static let zoneNames: [String] = [${zoneKeys.map((k) => JSON.stringify(at(`color.zone.${k}.name`))).join(", ")}]`,
+);
+swiftColors.push(
+  `    public static let zoneFromPctFtp: [Int] = [${zoneKeys.map((k) => String(at(`color.zone.${k}.fromPctFtp`))).join(", ")}]`,
+);
+swiftColors.push(
+  `    public static let zoneToPctFtp: [Int?] = [${zoneKeys
+    .map((k) => {
+      const v = at(`color.zone.${k}.toPctFtp`);
+      return v === null ? "nil" : String(v);
+    })
+    .join(", ")}]`,
+);
+swiftColors.push(`    public static let zonePastAlpha: Double = ${dbl(at("color.zone.rules.pastAlpha"))}`);
+
+const swiftDimens = [];
+const swiftMotion = [];
+for (const group of ["space", "radius", "stroke", "size"]) {
+  for (const key of Object.keys(tokens[group])) {
+    if (!isToken(key)) continue;
+    const name = ident(group, key);
+    swiftDimens.push(`    public static let ${name}: CGFloat = ${dbl(at(`${group}.${key}`))}`);
+  }
+}
+for (const leaf of [...leaves(tokens.overlay, ["overlay"]), ...leaves(tokens.chart, ["chart"])]) {
+  const { path, value } = leaf;
+  const last = path.at(-1);
+  const isSlotWidth = path[1] === "compact" && path[2] === "slots" && last === "width";
+  const name = isSlotWidth ? ident("overlay", "slot", path[3]) : ident(...path);
+  if (typeof value === "boolean") {
+    swiftDimens.push(`    public static let ${name}: Bool = ${value}`);
+  } else if (path[1] === "opacity" || last === "pastAlpha") {
+    swiftDimens.push(`    public static let ${name}: Double = ${dbl(value)}`);
+  } else if (last === "yMaxPctFtp" || last === "plateMaxLines") {
+    swiftDimens.push(`    public static let ${name}: Int = ${value}`);
+  } else if (last === "durationMs" || last === "longPressMs" || last.endsWith("Ms")) {
+    swiftMotion.push(`    public static let ${name}: Int = ${value}`);
+  } else if (typeof value === "number") {
+    swiftDimens.push(`    public static let ${name}: CGFloat = ${dbl(value)}`);
+  }
+}
+for (const key of Object.keys(tokens.motion.duration)) {
+  if (!isToken(key)) continue;
+  swiftMotion.push(`    public static let ${ident("duration", key)}: Int = ${at(`motion.duration.${key}`)}`);
+}
+for (const key of Object.keys(tokens.motion.easing)) {
+  if (!isToken(key)) continue;
+  const nums = parseEasing(at(`motion.easing.${key}`), `motion.easing.${key}`);
+  swiftMotion.push(
+    `    public static let ${ident("easing", key)}: (Double, Double, Double, Double) = (${nums.map(dbl).join(", ")})`,
+  );
+}
+
+const swiftType = [];
+for (const key of Object.keys(tokens.typography.scale)) {
+  if (!isToken(key)) continue;
+  const base = `typography.scale.${key}`;
+  const weight = at(`${base}.weight`);
+  const sf = SWIFT_FONT_BY_WEIGHT[weight];
+  const size = at(`${base}.size`);
+  const lineHeight = at(`${base}.lineHeight`);
+  const trackingEm = at(`${base}.tracking`);
+  const trackingPts = Math.round(trackingEm * size * 1000) / 1000;
+  const tabular = key.startsWith("num");
+  swiftType.push(
+    `    public static let ${ident(key)} = OverdriveTextStyle(fontName: "${sf.psName}", size: ${dbl(size)}, lineHeight: ${dbl(lineHeight)}, weight: ${sf.weight}, tracking: ${dbl(trackingPts)}, tabular: ${tabular})`,
+  );
+}
+
+const swift = `// GENERATED by design/tools/build-tokens.mjs from design/tokens.json. Do not edit.
+
+import SwiftUI
+
+public struct OverdriveTextStyle: Sendable {
+    public let fontName: String
+    public let size: CGFloat
+    public let lineHeight: CGFloat
+    public let weight: Font.Weight
+    public let tracking: CGFloat
+    public let tabular: Bool
+
+    public var font: Font {
+        let base = Font.custom(fontName, size: size)
+        return tabular ? base.monospacedDigit() : base
+    }
+}
+
+public enum OverdriveColors {
+${swiftColors.join("\n")}
+
+    /// Power zone colour for 1-based zone number (1..7), falling back to tertiary text.
+    public static func zone(_ number: Int) -> Color {
+        guard number >= 1, number <= zones.count else { return textTertiary }
+        return zones[number - 1]
+    }
+
+    /// Pre-blended opaque past-bar fill (design/system.md section 2: never draw with alpha over video).
+    public static func blendedZone(_ number: Int, over surface: (Double, Double, Double), alpha: Double = zonePastAlpha) -> Color {
+        let hexes: [UInt32] = [0xBBC5D1, 0x5BB1FE, 0x61DF84, 0xF2DE3C, 0xFFA94F, 0xFF7C7C, 0xEA8DE7]
+        let idx = max(0, min(hexes.count - 1, number - 1))
+        let hex = hexes[idx]
+        let zr = Double((hex >> 16) & 0xFF) / 255.0
+        let zg = Double((hex >> 8) & 0xFF) / 255.0
+        let zb = Double(hex & 0xFF) / 255.0
+        return Color(
+            red: surface.0 + (zr - surface.0) * alpha,
+            green: surface.1 + (zg - surface.1) * alpha,
+            blue: surface.2 + (zb - surface.2) * alpha
+        )
+    }
+}
+
+public enum OverdriveDimens {
+${swiftDimens.join("\n")}
+}
+
+public enum OverdriveMotion {
+${swiftMotion.join("\n")}
+}
+
+public enum OverdriveTypography {
+${swiftType.join("\n")}
+}
+
+public extension Color {
+    init(argb: UInt32) {
+        let a = Double((argb >> 24) & 0xFF) / 255.0
+        let r = Double((argb >> 16) & 0xFF) / 255.0
+        let g = Double((argb >> 8) & 0xFF) / 255.0
+        let b = Double(argb & 0xFF) / 255.0
+        self.init(.sRGB, red: r, green: g, blue: b, opacity: a)
+    }
+}
+`;
+
 const copies = [
   ...fontFiles.map(([weight, file]) => ({
     path: join(fontDir, `${FONT_BY_WEIGHT[weight].resource}.ttf`),
     data: readFileSync(join(repoRoot, file)),
   })),
   { path: licenceFile, data: readFileSync(licenceSource) },
+  ...fontFiles.map(([weight, file]) => ({
+    path: join(macosFontDir, SWIFT_FONT_BY_WEIGHT[weight].file),
+    data: readFileSync(join(repoRoot, file)),
+  })),
+  { path: macosLicenceFile, data: readFileSync(licenceSource) },
 ];
 
 const outputs = [
   { path: join(designDir, "mockups", "tokens.css"), data: css },
   { path: kotlinFile, data: kotlin },
+  { path: swiftTokensFile, data: swift },
   ...copies,
 ];
 

@@ -41,3 +41,8 @@ captures/
 # Generated ride artifacts used during manual testing
 *.fit
 !contracts/fixtures/**/*.fit
+
+# macOS Xcode project (generated via XcodeGen from macos/project.yml) & local signing config
+macos/Overdrive.xcodeproj/
+macos/Config/LocalSigning.xcconfig
+macos/DerivedData/

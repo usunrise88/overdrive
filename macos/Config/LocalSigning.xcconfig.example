@@ -1,0 +1,5 @@
+// Copy this file to macos/Config/LocalSigning.xcconfig (gitignored) and set your Apple Personal Team ID
+// so macOS preserves Bluetooth and Accessibility permissions across local rebuilds.
+// Leave empty for unsigned / ad-hoc builds (e.g. CI).
+DEVELOPMENT_TEAM =
+CODE_SIGN_IDENTITY = -

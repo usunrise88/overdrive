@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -12,13 +13,21 @@ version = "0.1.0-SNAPSHOT"
 kotlin {
     explicitApi()
 
-    // JVM only for now: the Android modules consume this as a plain JVM library. Nothing here may
-    // import Android or any other platform API (spec §7.1), which keeps an iOS port a matter of
-    // adding targets later. No iOS target is declared because iOS is a non-goal (spec §1).
+    // Pure Kotlin core shared by Android (JVM library) and macOS Apple Silicon (static XCFramework).
+    // Nothing in commonMain may import Android, JVM, or Apple platform APIs (spec §7.1, ADR 0044).
     jvm {
         compilerOptions {
             // Android modules compile for Java 17; stay compatible with them whatever JDK runs the build.
             jvmTarget = JvmTarget.JVM_17
+        }
+    }
+
+    val xcf = XCFramework("OverdriveCore")
+    macosArm64 {
+        binaries.framework {
+            baseName = "OverdriveCore"
+            isStatic = true
+            xcf.add(this)
         }
     }
 

@@ -13,8 +13,9 @@ and §3 (architecture).
 
 | Path | What it is | Stack |
 |---|---|---|
-| [`core/`](core) | Shared pure-Kotlin core: protocol codecs, ride engine, workout model and player, FIT writer. No Android imports. | Kotlin Multiplatform (JVM) |
+| [`core/`](core) | Shared pure-Kotlin core: protocol codecs, ride engine, workout model and player, FIT writer. No Android imports. | Kotlin Multiplatform (JVM, macOS Arm64) |
 | [`android/`](android) | Ride app (tablet), companion app (phone), BLE, local data, design-system components | Kotlin, Jetpack Compose |
+| [`macos/`](macos) | Ride app for Apple Silicon MacBooks: floating `NSPanel` overlay, CoreBluetooth, Keychain, Live Coach, SwiftUI screens | Swift, SwiftUI, AppKit, XcodeGen |
 | [`server/`](server) | Web service: sync API, MCP server, scheduler, integrations, Telegram bot, insights | TypeScript, Node 24, Fastify |
 | [`contracts/`](contracts) | Wire formats shared by every component: JSON Schemas and golden fixtures | JSON Schema |
 | [`design/`](design) | Design system and mock-up deliverables | |

@@ -130,3 +130,31 @@ jobs:
           expect 200 -X PUT "$api" -H "$auth" -H 'content-type: application/json' --data-binary "@$record"
           expect 201 -X PUT "$api/fit" -H "$auth" -H 'content-type: application/vnd.ant.fit' --data-binary "@$fit"
           expect 200 -X PUT "$api/fit" -H "$auth" -H 'content-type: application/vnd.ant.fit' --data-binary "@$fit"
+
+  macos:
+    name: macOS ride app (Apple Silicon)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Build and test Kotlin core for macosArm64
+        working-directory: core
+        run: ./gradlew macosArm64Test assembleOverdriveCoreDebugXCFramework
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        working-directory: macos
+        run: |
+          cp Config/LocalSigning.xcconfig.example Config/LocalSigning.xcconfig
+          xcodegen generate
+      - name: Build and test macOS app (unsigned)
+        run: >
+          xcodebuild test
+          -project macos/Overdrive.xcodeproj
+          -scheme Overdrive
+          -destination 'platform=macOS,arch=arm64'
+          CODE_SIGNING_ALLOWED=NO
