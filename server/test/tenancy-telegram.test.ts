@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTelegramClient } from "../src/telegram/client.ts";
-import { COMMANDS } from "../src/telegram/index.ts";
+import { COMMANDS, createTelegram } from "../src/telegram/index.ts";
 import { createTelegramPoller, type TelegramPoller } from "../src/telegram/poller.ts";
 import {
   FAKE_BOT_TOKEN,
@@ -63,6 +63,9 @@ beforeEach(async () => {
 afterEach(async () => {
   await poller?.stop();
   poller = null;
+  // `stop()` has aborted its last long poll, but the fake server may still be reading that request's body. A round trip to it
+  // ends only after everything sent before has been handled, so the next test's `reset()` cannot be followed by a stale call.
+  await fetch(`${telegram.url}/bot${FAKE_BOT_TOKEN}/getMe`, { method: "POST" });
 });
 
 function startPoller(): TelegramPoller {
@@ -167,11 +170,35 @@ describe("the shared poller", () => {
 
 describe("a user's own bot", () => {
   it("does not poll: starting it asks Telegram for nothing", async () => {
-    ann.services.telegram?.start();
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    expect(telegram.offsets).toHaveLength(0);
-    expect(telegram.webhookDeleted).toBe(0);
-    await ann.services.telegram?.stop();
+    // A bot of its own over a client that counts what it is asked, so that no timing is involved.
+    const asked: string[] = [];
+    const counting = new Proxy(sharedClient, {
+      get(target, name, receiver) {
+        const value = Reflect.get(target, name, receiver);
+        if (typeof value !== "function") return value;
+        return (...args: unknown[]) => {
+          asked.push(String(name));
+          return value.apply(target, args);
+        };
+      },
+    });
+    const bot = createTelegram({
+      config: { TELEGRAM_OWNER_CHAT_ID: String(ann.chatId) },
+      db: ann.db,
+      stateDb: rig.shared,
+      poll: false,
+      client: counting,
+      plan: ann.services.plan,
+      bus: ann.services.bus,
+      intervals: null,
+      refresher: null,
+      log: logging.log,
+      timezone: "Europe/Paris",
+    });
+    if (bot === null) throw new Error("no bot");
+    bot.start();
+    await bot.stop();
+    expect(asked).toEqual([]);
   });
 
   it("still answers only its own chat when an update is handed to it", async () => {
