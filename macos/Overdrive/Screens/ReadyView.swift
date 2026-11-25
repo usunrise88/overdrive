@@ -166,7 +166,7 @@ public struct ReadyView: View {
 
     @ViewBuilder
     private func plannedWorkoutRows(_ pw: PlannedWorkout, isToday: Bool) -> some View {
-        let coachTag = pw.workout.liveCoach == true ? (container.settings.liveCoachEnabled ? " \u{00B7} Live coach" : " \u{00B7} Live coach off") : ""
+        let coachTag = pw.workout.liveCoach?.boolValue == true ? (container.settings.liveCoachEnabled ? " \u{00B7} Live coach" : " \u{00B7} Live coach off") : ""
         let subtitle = (pw.workout.description_ ?? pw.date) + coachTag
         selectableRow(
             title: pw.name,
@@ -382,7 +382,7 @@ public struct ReadyView: View {
         let profileSteps = flat.map { step -> ProfileStepData in
             let s = step.targetFrom?.doubleValue ?? 0.5
             let e = step.targetTo?.doubleValue ?? s
-            let z = Int(PowerZone.Companion.shared.of(powerWatts: Int32(((s + e) * 0.5 * Double(container.effectiveFtp)).rounded()), ftp: Int32(container.effectiveFtp)).number)
+            let z = Int(PowerZone.Companion.shared.of(powerWatts: Int32(((s + e) * 0.5 * Double(container.effectiveFtp)).rounded()), ftpWatts: Int32(container.effectiveFtp)).number)
             return ProfileStepData(durationSeconds: Int(step.durationSeconds), startPctFtp: s, endPctFtp: e, isFreeRide: step.mode == .simulation, isHeartRate: step.heartRate != nil, zone: z)
         }
 
@@ -410,7 +410,7 @@ public struct ReadyView: View {
                         if idx > 0 { OdDivider() }
                         let targetPct = step.targetFrom?.doubleValue
                         let watts = targetPct.map { Int(($0 * Double(container.effectiveFtp)).rounded()) }
-                        let zone = watts.map { Int(PowerZone.Companion.shared.of(powerWatts: Int32($0), ftp: Int32(container.effectiveFtp)).number) }
+                        let zone = watts.map { Int(PowerZone.Companion.shared.of(powerWatts: Int32($0), ftpWatts: Int32(container.effectiveFtp)).number) }
                         HStack(spacing: OverdriveDimens.spaceS3) {
                             if let zone {
                                 OdZoneChip(zone: zone)

@@ -87,7 +87,7 @@ public struct RidingView: View {
     private var powerCard: some View {
         let s = container.snapshot
         let power = s.power?.intValue
-        let zone = s.zone.map { Int($0.number) }
+        let zone = s.zone().map { Int($0.number) }
         let pctFtp = power.map { Int((Double($0) / Double(max(1, Int(s.ftp))) * 100.0).rounded()) }
 
         return OdCard(padding: OverdriveDimens.spaceS5) {
@@ -168,7 +168,7 @@ public struct RidingView: View {
         let steps = w.steps.map { step -> ProfileStepData in
             let s = step.targetFrom?.doubleValue ?? 0.5
             let e = step.targetTo?.doubleValue ?? s
-            let z = Int(PowerZone.Companion.shared.of(powerWatts: Int32(((s + e) * 0.5 * Double(container.snapshot.ftp)).rounded()), ftp: container.snapshot.ftp).number)
+            let z = Int(PowerZone.Companion.shared.of(powerWatts: Int32(((s + e) * 0.5 * Double(container.snapshot.ftp)).rounded()), ftpWatts: container.snapshot.ftp).number)
             return ProfileStepData(durationSeconds: Int(step.durationSeconds), startPctFtp: s, endPctFtp: e, isFreeRide: step.mode == .simulation, isHeartRate: step.heartRate != nil, zone: z)
         }
         return OdCard {

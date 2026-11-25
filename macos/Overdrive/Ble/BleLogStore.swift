@@ -77,7 +77,7 @@ public final class BleLogStore {
     }
 
     private func enforceCaps(headroom: Int) {
-        var files = listFiles().reversed() // oldest first
+        var files = Array(listFiles().reversed()) // oldest first
         var total = files.reduce(0) { $0 + ((try? $1.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) }
         while files.count >= Self.maxFiles || total + headroom > Self.maxTotalBytes {
             guard let oldest = files.first else { break }

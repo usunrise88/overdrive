@@ -77,7 +77,7 @@ public final class LiveCoachDriver: ObservableObject {
         playback?.close()
         playback = nil
         if let controller {
-            let effects = controller.close()
+            let effects = controller.close(reason: .stopped)
             apply(effects: effects, controller: controller)
         }
         controller = nil

@@ -165,7 +165,7 @@ public final class AppContainer: ObservableObject {
     public let liveCoach: LiveCoachDriver
 
     private let coreScope = AppleScopes.shared.background()
-    private let rideScope = AppleScopes.shared.singleThread()
+    private var rideScope = AppleScopes.shared.singleThread()
     private let logScope = AppleScopes.shared.io()
     private let httpTransport = URLSessionTransport()
     private let outbox: MacFileOutbox
@@ -307,7 +307,7 @@ public final class AppContainer: ObservableObject {
         self.actionRouter = AppleCoreFactories.shared.createActionRouter(
             session: { [weak self] in self?.activeSession },
             media: self.mediaController,
-            coach: CoachControl { [weak self] in
+            coach: MacCoachControlAdapter { [weak self] in
                 Task { @MainActor in self?.liveCoach.mute() }
             }
         )
@@ -332,7 +332,7 @@ public final class AppContainer: ObservableObject {
                 systemMassKg: p.systemMassKg,
                 cdA: p.cdA,
                 crr: p.crr,
-                airDensityKgPerM3: p.airDensity,
+                airDensity: p.airDensity,
                 drivetrainEfficiency: p.drivetrainEfficiency
             )
         }
@@ -340,8 +340,8 @@ public final class AppContainer: ObservableObject {
             systemMassKg: settings.systemMassKg,
             cdA: settings.cdA,
             crr: settings.crr,
-            airDensityKgPerM3: PhysicsSettings.Companion.shared.DEFAULT_AIR_DENSITY,
-            drivetrainEfficiency: PhysicsSettings.Companion.shared.DEFAULT_DRIVETRAIN_EFFICIENCY
+            airDensity: PhysicsSettings.Companion.shared.STANDARD_AIR_DENSITY,
+            drivetrainEfficiency: 1.0
         )
     }
 
@@ -624,7 +624,8 @@ public final class AppContainer: ObservableObject {
             let logRecorder = try AppleCoreFactories.shared.createRideLogRecorder(path: logFile.path)
             let asyncRec = AsyncRideRecorder(delegate: logRecorder, scope: logScope)
             activeDiskRecorder = asyncRec
-            diskSink = CompositeRideRecorder(recorders: [inMem, asyncRec])
+            let recorders: [RideRecorder] = [inMem, asyncRec]
+            diskSink = CompositeRideRecorder(recorders: recorders)
         } catch {
             logFailed = true
             diskSink = inMem
@@ -795,7 +796,7 @@ public final class AppContainer: ObservableObject {
         var zones = Array(repeating: 0, count: 7)
         for sample in record.samples {
             if !sample.paused, let p = sample.power?.intValue {
-                let z = Int(PowerZone.Companion.shared.of(powerWatts: Int32(p), ftp: record.ride.ftp).number) - 1
+                let z = Int(PowerZone.Companion.shared.of(powerWatts: Int32(p), ftpWatts: record.ride.ftp).number) - 1
                 if z >= 0 && z < 7 { zones[z] += 1 }
             }
         }
@@ -856,11 +857,12 @@ public final class AppContainer: ObservableObject {
     private func teardownSession() {
         snapshotSub?.cancel()
         snapshotSub = nil
-        activeSimulatedBike?.close()
         activeSimulatedBike = nil
         activeSession = nil
         activeInMemoryRecorder = nil
         activeDiskRecorder = nil
+        AppleScopes.shared.cancel(scope: rideScope)
+        rideScope = AppleScopes.shared.singleThread()
         liveCoach.stopCurrent()
         sleepAssertion.setActive(false)
     }
@@ -985,7 +987,9 @@ public final class AppContainer: ObservableObject {
         handlebarControls = nil
 
         let strategy: () -> ConnectStrategy = { [weak self] in
-            (self?.settings.connectInBackground ?? true) ? .hybrid : .legacy
+            (self?.settings.connectInBackground ?? true)
+                ? ConnectStrategy.Companion.shared.HYBRID
+                : ConnectStrategy.Companion.shared.LEGACY
         }
 
         if let tr = rememberedDevices.trainer {
@@ -1000,7 +1004,7 @@ public final class AppContainer: ObservableObject {
             )
             trainerDevice = dev
             dev.start()
-            watchLink(role: .trainer, name: tr.name, flow: dev.linkStatus)
+            watchLink(role: .trainer, name: tr.name, flow: dev.status)
         } else {
             trainerConnected = false
             trainerStatusText = "Not paired"
@@ -1018,7 +1022,7 @@ public final class AppContainer: ObservableObject {
             )
             strapDevice = dev
             dev.start()
-            watchLink(role: .strap, name: st.name, flow: dev.linkStatus)
+            watchLink(role: .strap, name: st.name, flow: dev.status)
         } else {
             strapConnected = false
             strapStatusText = "Not paired"
@@ -1426,7 +1430,7 @@ public final class AppContainer: ObservableObject {
                 let startPct = step.targetFrom?.doubleValue ?? 0.5
                 let endPct = step.targetTo?.doubleValue ?? startPct
                 let midWatts = Int((startPct + endPct) * 0.5 * Double(snap.ftp))
-                let z = Int(PowerZone.Companion.shared.of(powerWatts: Int32(midWatts), ftp: snap.ftp).number)
+                let z = Int(PowerZone.Companion.shared.of(powerWatts: Int32(midWatts), ftpWatts: snap.ftp).number)
                 return ProfileStepData(
                     durationSeconds: Int(step.durationSeconds),
                     startPctFtp: startPct,
@@ -1461,7 +1465,7 @@ public final class AppContainer: ObservableObject {
 
         return OverlayUiState(
             power: snap.power?.intValue,
-            zone: snap.zone.map { Int($0.number) },
+            zone: snap.zone().map { Int($0.number) },
             heartRate: snap.heartRate?.intValue,
             cadence: snap.cadence?.intValue,
             elapsedSeconds: Int(snap.elapsedSeconds),
@@ -1556,4 +1560,10 @@ private final class RecordingFactoryAdapter: NSObject, AppleGattTransportFactory
             mode: mode
         )
     }
+}
+
+private final class MacCoachControlAdapter: NSObject, CoachControl {
+    private let onMute: () -> Void
+    init(_ onMute: @escaping () -> Void) { self.onMute = onMute }
+    func mute() { onMute() }
 }
