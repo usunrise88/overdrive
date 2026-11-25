@@ -483,7 +483,7 @@ public object AppleCoreFactories {
             physics = physics,
             gears =
                 GearSettings(
-                    count = gearCount,
+                    gearCount = gearCount,
                     neutralGear = (gearCount + 1) / 2,
                     gradePercentPerGear = gradeStepPercent,
                 ),
