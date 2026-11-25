@@ -223,7 +223,7 @@ public final class AppContainer: ObservableObject {
         self.menuBar = MenuBarController(enabled: startSubsystems)
 
         let loadedSettings = startSubsystems ? settingsStore.loadSettings() : MacAppSettings()
-        let loadedDevices = startSubsystems ? settingsStore.loadDevices() : RememberedDevices()
+        let loadedDevices = startSubsystems ? settingsStore.loadDevices() : RememberedDevicesRecord()
         let loadedToken = startSubsystems ? keychain.readToken() : ""
         self.settings = loadedSettings
         self.rememberedDevices = loadedDevices
