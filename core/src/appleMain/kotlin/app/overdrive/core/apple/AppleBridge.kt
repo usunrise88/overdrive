@@ -70,6 +70,7 @@ import app.overdrive.core.plan.PlannedWorkout
 import app.overdrive.core.profile.ProfileCache
 import app.overdrive.core.profile.ProfileRepository
 import app.overdrive.core.profile.ProfileState
+import app.overdrive.core.record.CompositeRideRecorder
 import app.overdrive.core.record.FileByteSink
 import app.overdrive.core.record.FileByteSource
 import app.overdrive.core.record.RecoveredRide
@@ -745,6 +746,11 @@ public object AppleCoreFactories {
     @Throws(Exception::class)
     public fun createRideLogRecorder(path: String): RideLogRecorder =
         RideLogRecorder(sink = FileByteSink(path = path, append = true))
+
+    public fun combineRecorders(
+        first: RideRecorder,
+        second: RideRecorder,
+    ): RideRecorder = CompositeRideRecorder(listOf(first, second))
 
     public fun recoverRideLog(path: String): RecoveredRide? = RideLog.recover(FileByteSource(path))
 

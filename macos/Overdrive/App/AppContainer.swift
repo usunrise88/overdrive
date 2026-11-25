@@ -229,7 +229,7 @@ public final class AppContainer: ObservableObject {
         self.rememberedDevices = loadedDevices
         self.syncToken = loadedToken
 
-        var volumeRef: Double = loadedSettings.coachVolume
+        let volumeRef: Double = loadedSettings.coachVolume
         self.cuePlayer = MacCuePlayer(volume: { Float(volumeRef) })
 
         self.outbox = MacFileOutbox(fileURL: base.appendingPathComponent("sync/outbox.json"))
@@ -624,8 +624,7 @@ public final class AppContainer: ObservableObject {
             let logRecorder = try AppleCoreFactories.shared.createRideLogRecorder(path: logFile.path)
             let asyncRec = AsyncRideRecorder(delegate: logRecorder, scope: logScope)
             activeDiskRecorder = asyncRec
-            let recorders: [RideRecorder] = [inMem, asyncRec]
-            diskSink = CompositeRideRecorder(recorders: recorders)
+            diskSink = AppleCoreFactories.shared.combineRecorders(first: inMem, second: asyncRec)
         } catch {
             logFailed = true
             diskSink = inMem
