@@ -110,7 +110,7 @@ public final class MacFileOutbox: NSObject, Outbox {
         let enqueuedAtMillis: Int64
         let startedAtMillis: Int64
         let durationSeconds: Int32
-        let title: String
+        let title: String?
     }
 
     private struct OutboxSnapshot: Codable {
@@ -133,11 +133,11 @@ public final class MacFileOutbox: NSObject, Outbox {
         super.init()
     }
 
-    public func enqueue(entry: OutboxEntry) async throws -> KotlinBoolean {
+    public func enqueue(entry: OutboxEntry) async throws {
         lock.lock()
         defer { lock.unlock() }
         if snapshot.uploadedIds.contains(entry.rideId) || snapshot.pending.contains(where: { $0.rideId == entry.rideId }) {
-            return KotlinBoolean(bool: false)
+            return
         }
         snapshot.pending.append(
             PersistedEntry(
@@ -150,7 +150,6 @@ public final class MacFileOutbox: NSObject, Outbox {
         )
         snapshot.pending.sort { $0.enqueuedAtMillis < $1.enqueuedAtMillis }
         persistLocked()
-        return KotlinBoolean(bool: true)
     }
 
     public func pending() async throws -> [OutboxEntry] {
@@ -167,7 +166,7 @@ public final class MacFileOutbox: NSObject, Outbox {
         }
     }
 
-    public func markDone(rideId: String) async throws -> KotlinBoolean {
+    public func markDone(rideId: String) async throws {
         lock.lock()
         defer { lock.unlock() }
         let before = snapshot.pending.count
@@ -175,9 +174,9 @@ public final class MacFileOutbox: NSObject, Outbox {
         if !snapshot.uploadedIds.contains(rideId) {
             snapshot.uploadedIds.append(rideId)
         }
-        let changed = snapshot.pending.count != before
-        if changed { persistLocked() }
-        return KotlinBoolean(bool: changed)
+        if snapshot.pending.count != before {
+            persistLocked()
+        }
     }
 
     private func persistLocked() {
@@ -225,7 +224,7 @@ public struct InterruptedRideCandidate: Equatable, Sendable {
     public let durationSeconds: Int
 }
 
-public final class MacRideStore: NSObject, RidePayloads {
+public final class MacRideStore: NSObject, AppleRidePayloads {
     public let directory: URL
     private let fm = FileManager.default
 
@@ -324,7 +323,7 @@ public final class MacRideStore: NSObject, RidePayloads {
     }
 
     public func recoverAndSave(_ candidate: InterruptedRideCandidate) throws -> StoredRideMeta {
-        guard let recovered = AppleCoreFactories.shared.recoverRideLog(path: candidate.logURL) else {
+        guard let recovered = AppleCoreFactories.shared.recoverRideLog(path: candidate.logURL.path) else {
             throw NSError(domain: "OverdriveRideStore", code: 2, userInfo: [NSLocalizedDescriptionKey: "Interrupted ride log is unreadable."])
         }
         let rec = recovered.toRecord()
@@ -358,13 +357,13 @@ public final class MacRideStore: NSObject, RidePayloads {
         return list.sorted { $0.startEpochMillis > $1.startEpochMillis }
     }
 
-    // MARK: - RidePayloads
+    // MARK: - AppleRidePayloads
 
-    public func payload(entry: OutboxEntry) async throws -> RidePayload {
+    public func payloadOrNull(entry: OutboxEntry) async throws -> RidePayload? {
         let recFile = recordURL(for: entry.rideId)
         let fitFile = fitURL(for: entry.rideId)
         guard let recData = try? Data(contentsOf: recFile), let fitData = try? Data(contentsOf: fitFile) else {
-            throw RideUnavailableException(message: "Ride files are missing on this Mac")
+            return nil
         }
         return RidePayload(
             rideId: entry.rideId,

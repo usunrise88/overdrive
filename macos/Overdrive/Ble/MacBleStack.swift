@@ -204,7 +204,7 @@ extension MacBleStack: CBCentralManagerDelegate {
         }
 
         let adv = Advertisement(
-            id: DeviceId(value: uuid.uuidString),
+            id: uuid.uuidString,
             name: localName,
             serviceUuids: serviceUuids,
             rssi: Int32(rawRssi),
@@ -282,21 +282,21 @@ private final class CoreBluetoothShim: NSObject, CoreBluetoothPlatform, CBPeriph
         return .started
     }
 
-    func read(service: GattUuid, characteristic: GattUuid) -> PlatformStartResult {
+    func read(service: String, characteristic: String) -> PlatformStartResult {
         guard let peripheral else { return .unavailable }
         guard let cbChar = characteristicsByKey[key(service, characteristic)] else { return .notFound }
         peripheral.readValue(for: cbChar)
         return .started
     }
 
-    func write(service: GattUuid, characteristic: GattUuid, value: Data, withResponse: Bool) -> PlatformStartResult {
+    func write(service: String, characteristic: String, value: Data, withResponse: Bool) -> PlatformStartResult {
         guard let peripheral else { return .unavailable }
         guard let cbChar = characteristicsByKey[key(service, characteristic)] else { return .notFound }
         peripheral.writeValue(value, for: cbChar, type: withResponse ? .withResponse : .withoutResponse)
         return .started
     }
 
-    func setNotify(service: GattUuid, characteristic: GattUuid, enabled: Bool) -> PlatformStartResult {
+    func setNotify(service: String, characteristic: String, enabled: Bool) -> PlatformStartResult {
         guard let peripheral else { return .unavailable }
         guard let cbChar = characteristicsByKey[key(service, characteristic)] else { return .notFound }
         peripheral.setNotifyValue(enabled, for: cbChar)
@@ -374,8 +374,8 @@ private final class CoreBluetoothShim: NSObject, CoreBluetoothPlatform, CBPeriph
         onEvent?(.notifyStateChanged(characteristic: charUuid, enabled: characteristic.isNotifying, status: status))
     }
 
-    private func key(_ service: GattUuid, _ characteristic: GattUuid) -> String {
-        "\(service.value)/\(characteristic.value)"
+    private func key(_ service: String, _ characteristic: String) -> String {
+        "\(service)/\(characteristic)"
     }
 }
 
@@ -402,12 +402,12 @@ private final class MacGattTransportFactoryAdapter: NSObject, GattTransportFacto
     weak var stack: MacBleStack?
     init(stack: MacBleStack) { self.stack = stack }
 
-    func open(device: DeviceId) -> GattTransport {
+    func open(device: String) -> GattTransport {
         open(device: device, mode: .active)
     }
 
-    func open(device: DeviceId, mode: ConnectMode) -> GattTransport {
-        stack?.openTransport(deviceId: device.value, mode: mode)
+    func open(device: String, mode: ConnectMode) -> GattTransport {
+        stack?.openTransport(deviceId: device, mode: mode)
             ?? MacGattTransport(platform: NullCoreBluetoothPlatform(), mode: mode)
     }
 }
@@ -418,8 +418,8 @@ private final class NullCoreBluetoothPlatform: CoreBluetoothPlatform {
     var canSendWriteWithoutResponse: Bool { false }
     func connect() -> PlatformStartResult { .unavailable }
     func discoverServices() -> PlatformStartResult { .unavailable }
-    func read(service: GattUuid, characteristic: GattUuid) -> PlatformStartResult { .unavailable }
-    func write(service: GattUuid, characteristic: GattUuid, value: Data, withResponse: Bool) -> PlatformStartResult { .unavailable }
-    func setNotify(service: GattUuid, characteristic: GattUuid, enabled: Bool) -> PlatformStartResult { .unavailable }
+    func read(service: String, characteristic: String) -> PlatformStartResult { .unavailable }
+    func write(service: String, characteristic: String, value: Data, withResponse: Bool) -> PlatformStartResult { .unavailable }
+    func setNotify(service: String, characteristic: String, enabled: Bool) -> PlatformStartResult { .unavailable }
     func disconnect() {}
 }

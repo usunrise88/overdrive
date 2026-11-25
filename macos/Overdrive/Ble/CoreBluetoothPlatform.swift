@@ -2,16 +2,17 @@ import CoreBluetooth
 import Foundation
 import OverdriveCore
 
-/// Canonical 16-bit/128-bit UUID bridge between CoreBluetooth and `OverdriveCore.GattUuid`.
+/// Canonical 16-bit/128-bit UUID bridge between CoreBluetooth and `OverdriveCore`'s `GattUuid`
+/// (which is a Kotlin `@JvmInline value class` erased to `String` in Objective-C/Swift).
 public extension CBUUID {
-    func toCoreGattUuid() -> GattUuid? {
-        GattUuid.Companion.shared.parse(text: uuidString)
+    func toCoreGattUuid() -> String? {
+        AppleCoreFactories.shared.parseGattUuid(text: uuidString)
     }
 }
 
-public extension GattUuid {
+public extension String {
     func toCBUUID() -> CBUUID {
-        CBUUID(string: value)
+        CBUUID(string: self)
     }
 }
 
@@ -51,11 +52,11 @@ public enum PlatformGattEvent {
     case connected
     case disconnected(status: Int32)
     case servicesDiscovered(characteristics: [GattCharacteristicInfo], status: Int32)
-    case readCompleted(characteristic: GattUuid, value: Data?, status: Int32)
-    case writeCompleted(characteristic: GattUuid, status: Int32)
+    case readCompleted(characteristic: String, value: Data?, status: Int32)
+    case writeCompleted(characteristic: String, status: Int32)
     case writeWithoutResponseReady
-    case notifyStateChanged(characteristic: GattUuid, enabled: Bool, status: Int32)
-    case notificationReceived(characteristic: GattUuid, value: Data, timestampNanos: Int64)
+    case notifyStateChanged(characteristic: String, enabled: Bool, status: Int32)
+    case notificationReceived(characteristic: String, value: Data, timestampNanos: Int64)
 }
 
 /// Thin platform boundary over `CBCentralManager` + `CBPeripheral` so `MacGattTransport` is 100% unit-testable without a radio.
@@ -66,8 +67,8 @@ public protocol CoreBluetoothPlatform: AnyObject {
 
     func connect() -> PlatformStartResult
     func discoverServices() -> PlatformStartResult
-    func read(service: GattUuid, characteristic: GattUuid) -> PlatformStartResult
-    func write(service: GattUuid, characteristic: GattUuid, value: Data, withResponse: Bool) -> PlatformStartResult
-    func setNotify(service: GattUuid, characteristic: GattUuid, enabled: Bool) -> PlatformStartResult
+    func read(service: String, characteristic: String) -> PlatformStartResult
+    func write(service: String, characteristic: String, value: Data, withResponse: Bool) -> PlatformStartResult
+    func setNotify(service: String, characteristic: String, enabled: Bool) -> PlatformStartResult
     func disconnect()
 }

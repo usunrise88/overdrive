@@ -29,18 +29,7 @@ public enum SelectedRideChoice: Equatable {
         case .local(_, let w):
             return w
         case .planned(let pw, let useVariant):
-            if useVariant, let variant = pw.variant {
-                return Workout(
-                    schema: pw.workout.schema,
-                    id: pw.workout.id,
-                    name: pw.workout.name,
-                    description: variant.note ?? pw.workout.description_,
-                    steps: variant.steps,
-                    liveCoach: pw.workout.liveCoach,
-                    coachBrief: pw.workout.coachBrief
-                )
-            }
-            return pw.workout
+            return AppleCoreFactories.shared.effectivePlannedWorkout(planned: pw, useVariant: useVariant)
         }
     }
 
@@ -129,8 +118,8 @@ public final class AppContainer: ObservableObject {
     @Published public var workoutImportError: String?
     @Published public var choice: SelectedRideChoice = .free
     @Published public var selectedFreeRouteId: String? = nil
-    @Published public var planState: PlanState = PlanState()
-    @Published public var profileState: ProfileState = ProfileState()
+    @Published public var planState: PlanState = AppleCoreFactories.shared.defaultPlanState()
+    @Published public var profileState: ProfileState = AppleCoreFactories.shared.defaultProfileState()
     @Published public var routesList: [RouteSummary] = []
     @Published public var downloadedRoutes: [String: Route] = [:]
     @Published public var recoveryState: RecoveryResponse? = nil
@@ -248,11 +237,12 @@ public final class AppContainer: ObservableObject {
         self.lastUploadMillis = lastUploadStore.read()
 
         var configHolder: () -> SyncConfig = { SyncConfig(baseUrl: "", token: "") }
-        let transport = self.httpTransport
+        let transport = AppleCoreFactories.shared.wrapHttpClient(client: self.httpTransport)
+        let payloads = AppleCoreFactories.shared.wrapRidePayloads(delegate: self.rideStore)
 
         self.syncProvider = AppleCoreFactories.shared.createSyncProvider(
             config: { configHolder() },
-            rides: self.rideStore,
+            rides: payloads,
             transport: transport
         )
         self.syncCoordinator = AppleCoreFactories.shared.createSyncCoordinator(
@@ -266,15 +256,15 @@ public final class AppContainer: ObservableObject {
             transport: transport,
             cache: MacPlanCache(fileURL: base.appendingPathComponent("plan/workouts")),
             today: { Self.localToday() },
-            wallMillis: { Self.wallMillis() },
-            elapsedMillis: { Self.monotonicMillis() }
+            wallMillis: { KotlinLong(longLong: Self.wallMillis()) },
+            elapsedMillis: { KotlinLong(longLong: Self.monotonicMillis()) }
         )
         self.profileRepo = AppleCoreFactories.shared.createProfileRepository(
             config: { configHolder() },
             reader: transport,
             writer: transport,
             cache: MacProfileCache(fileURL: base.appendingPathComponent("profile/profile")),
-            elapsedMillis: { Self.monotonicMillis() }
+            elapsedMillis: { KotlinLong(longLong: Self.monotonicMillis()) }
         )
         self.serviceClient = AppleCoreFactories.shared.createServiceClient(
             config: { configHolder() },
@@ -288,15 +278,15 @@ public final class AppContainer: ObservableObject {
             config: { configHolder() },
             listStore: MacTextStore(fileURL: base.appendingPathComponent("routes/list")),
             detailStore: { id in routeDir.store(forKey: id) },
-            wallMillis: { Self.wallMillis() },
-            elapsedMillis: { Self.monotonicMillis() }
+            wallMillis: { KotlinLong(longLong: Self.wallMillis()) },
+            elapsedMillis: { KotlinLong(longLong: Self.monotonicMillis()) }
         )
         self.recoveryResource = AppleCoreFactories.shared.createRecoveryResource(
             client: serviceClient,
             config: { configHolder() },
             store: MacTextStore(fileURL: base.appendingPathComponent("cache/recovery")),
-            wallMillis: { Self.wallMillis() },
-            elapsedMillis: { Self.monotonicMillis() }
+            wallMillis: { KotlinLong(longLong: Self.wallMillis()) },
+            elapsedMillis: { KotlinLong(longLong: Self.monotonicMillis()) }
         )
 
         let liveClient = AppleCoreFactories.shared.createLiveCoachClient(client: serviceClient)
@@ -437,7 +427,6 @@ public final class AppContainer: ObservableObject {
                     guard let report = value as? SyncReport else { return }
                     Task { @MainActor in
                         guard let self else { return }
-                        self.syncPendingCount = Int(report.pending)
                         if let last = report.lastSuccessMillis?.int64Value, last != self.lastUploadMillis {
                             self.lastUploadMillis = last
                             self.lastUploadStore.write(last)
@@ -490,9 +479,10 @@ public final class AppContainer: ObservableObject {
                 scope: coreScope,
                 flow: routeLibrary.list.state,
                 onEach: { [weak self] val in
-                    guard let state = val as? ResourceState<RoutesResponse> else { return }
+                    guard let state = val as? ResourceState<AnyObject> else { return }
+                    let routes = (state.value as? RoutesResponse)?.routes ?? []
                     Task { @MainActor in
-                        self?.routesList = (state.value?.routes) ?? []
+                        self?.routesList = routes
                     }
                 },
                 onComplete: {}
@@ -517,8 +507,9 @@ public final class AppContainer: ObservableObject {
                 scope: coreScope,
                 flow: recoveryResource.state,
                 onEach: { [weak self] val in
-                    guard let state = val as? ResourceState<RecoveryResponse> else { return }
-                    Task { @MainActor in self?.recoveryState = state.value }
+                    guard let state = val as? ResourceState<AnyObject> else { return }
+                    let recovery = state.value as? RecoveryResponse
+                    Task { @MainActor in self?.recoveryState = recovery }
                 },
                 onComplete: {}
             )
@@ -597,7 +588,7 @@ public final class AppContainer: ObservableObject {
         guard !isRideLive else { return }
         selectedFreeRouteId = routeId
         if let routeId {
-            Task { try? await routeLibrary.ensure(id: routeId, reason: .requested) }
+            Task { try? await routeLibrary.ensure(id: routeId, why: .requested) }
         }
         prepareSession()
     }
@@ -624,21 +615,14 @@ public final class AppContainer: ObservableObject {
         autoExpandedStep = false
 
         let rawWorkout = choice.effectiveWorkout
-        let engineWorkout = rawWorkout?.withoutLiveCoach()
+        let engineWorkout = rawWorkout.map { AppleCoreFactories.shared.workoutWithoutLiveCoach(workout: $0) }
         let rideSettings = settings.toRideSettings(effectiveFtp: effectiveFtp, effectivePhysics: effectivePhysics)
         let inMem = InMemoryRideRecorder()
         let diskSink: RideRecorder
         do {
             let logFile = rideStore.logURL(for: rideId)
-            let fileSink = FileByteSink(path: logFile.path, append: true)
-            let logRecorder = RideLogRecorder(sink: fileSink)
-            let asyncRec = AsyncRideRecorder(
-                delegate: logRecorder,
-                scope: logScope,
-                onFailure: { [weak self] _ in
-                    Task { @MainActor in self?.logFailed = true }
-                }
-            )
+            let logRecorder = try AppleCoreFactories.shared.createRideLogRecorder(path: logFile.path)
+            let asyncRec = AsyncRideRecorder(delegate: logRecorder, scope: logScope)
             activeDiskRecorder = asyncRec
             diskSink = CompositeRideRecorder(recorders: [inMem, asyncRec])
         } catch {
@@ -672,7 +656,7 @@ public final class AppContainer: ObservableObject {
                 variantRidden: choice.isVariant
             )
         } else {
-            let trainer: TrainerDevice = trainerDevice ?? UnpairedMacTrainer()
+            let trainer: TrainerDevice = trainerDevice ?? AppleCoreFactories.shared.unpairedTrainer()
             session = AppleCoreFactories.shared.createRideEngine(
                 scope: rideScope,
                 trainer: trainer,
@@ -969,7 +953,7 @@ public final class AppContainer: ObservableObject {
         let roundedRssi = (Int(adv.rssi) / 5) * 5
         let name = role == .click ? "Zwift Click (right)" : RememberedDeviceRecord.clean(adv.name ?? role.fallbackName)
         let item = DiscoveredDevice(
-            id: adv.id.value,
+            id: adv.id,
             role: role,
             name: name.isEmpty ? role.fallbackName : name,
             rssi: roundedRssi,
@@ -1062,7 +1046,7 @@ public final class AppContainer: ObservableObject {
                 },
                 holdMillis: Int64(settings.clickHoldThresholdMs),
                 repeatMillis: Int64(settings.clickVolumeRepeatMs),
-                nowMillis: { Self.monotonicMillis() }
+                nowMillis: { KotlinLong(longLong: Self.monotonicMillis()) }
             )
             handlebarControls = controls
             controls.start()
@@ -1281,10 +1265,10 @@ public final class AppContainer: ObservableObject {
         let remoteReason: Refresh = reason == .start ? .start : .requested
         let profileReason: ProfileRefresh = reason == .start ? .start : .requested
         Task {
-            try? await planRepo.refresh(reason: reason)
-            try? await profileRepo.refresh(reason: profileReason)
-            try? await routeLibrary.refreshList(reason: remoteReason)
-            try? await recoveryResource.refresh(reason: remoteReason)
+            try? await planRepo.refresh(why: reason)
+            try? await profileRepo.refresh(why: profileReason)
+            try? await routeLibrary.refreshList(why: remoteReason)
+            try? await recoveryResource.refresh(why: remoteReason)
         }
     }
 
@@ -1483,12 +1467,23 @@ public final class AppContainer: ObservableObject {
     }
 
     private func updateSyncStatusText(_ status: SyncStatus) {
-        if status is SyncStatusTokenRejected {
+        if let idle = status as? SyncStatusIdle {
+            syncPendingCount = Int(idle.pending)
+            syncStatusLine = nil
+        } else if let syncing = status as? SyncStatusSyncing {
+            syncPendingCount = Int(syncing.pending)
+            syncStatusLine = "Uploading\u{2026}"
+        } else if let rejected = status as? SyncStatusTokenRejected {
+            syncPendingCount = Int(rejected.pending)
             syncStatusLine = "The service did not accept the token"
         } else if let waiting = status as? SyncStatusWaitingToRetry {
+            syncPendingCount = Int(waiting.pending)
             syncStatusLine = waiting.reason ?? "Trying again soon"
-        } else if status is SyncStatusNotConfigured {
+        } else if let unconf = status as? SyncStatusNotConfigured {
+            syncPendingCount = Int(unconf.pending)
             syncStatusLine = settings.syncUrl.isEmpty ? "Not configured" : nil
+        } else if let unavail = status as? SyncStatusOutboxUnavailable {
+            syncStatusLine = unavail.reason ?? "Outbox unavailable"
         } else {
             syncStatusLine = nil
         }
@@ -1539,11 +1534,11 @@ private final class RecordingFactoryAdapter: NSObject, GattTransportFactory {
         self.enabled = enabled
     }
 
-    func open(device: DeviceId) -> GattTransport {
+    func open(device: String) -> GattTransport {
         open(device: device, mode: .active)
     }
 
-    func open(device: DeviceId, mode: ConnectMode) -> GattTransport {
+    func open(device: String, mode: ConnectMode) -> GattTransport {
         let raw = base.open(device: device, mode: mode)
         guard enabled() else { return raw }
         let sink = bleLogs.openSessionSink(role: role)
@@ -1557,15 +1552,4 @@ private final class RecordingFactoryAdapter: NSObject, GattTransportFactory {
             mode: mode
         )
     }
-}
-
-private final class UnpairedMacTrainer: NSObject, TrainerDevice {
-    let name: String = "Trainer"
-    private let connBridge = AppleStateBridge<ConnectionState>(initial: .disconnected)
-    private let readBridge = AppleEventBridge<TrainerReading>(bufferCapacity: 4)
-    var connection: Kotlinx_coroutines_coreStateFlow { connBridge.flow }
-    var readings: Kotlinx_coroutines_coreFlow { readBridge.flow }
-    func requestControl() async throws { throw TrainerCommandException(message: "No trainer paired", cause: nil) }
-    func setTargetPower(watts: Int32) async throws { throw TrainerCommandException(message: "No trainer paired", cause: nil) }
-    func setSimulation(parameters: SimulationParameters) async throws { throw TrainerCommandException(message: "No trainer paired", cause: nil) }
 }

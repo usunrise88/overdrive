@@ -33,8 +33,10 @@ final class MacStorageAndZipTests: XCTestCase {
 
         let entry = OutboxEntry(rideId: "ride-1000", enqueuedAtMillis: 1000, startedAtMillis: 1000, durationSeconds: 600, title: "Test")
         let first = MacFileOutbox(fileURL: file)
-        XCTAssertTrue(try await first.enqueue(entry: entry).boolValue)
-        XCTAssertFalse(try await first.enqueue(entry: entry).boolValue)
+        try await first.enqueue(entry: entry)
+        try await first.enqueue(entry: entry)
+        let firstPending = try await first.pending()
+        XCTAssertEqual(firstPending.count, 1)
 
         // Simulate app restart
         let second = MacFileOutbox(fileURL: file)
@@ -42,9 +44,14 @@ final class MacStorageAndZipTests: XCTestCase {
         XCTAssertEqual(pending.count, 1)
         XCTAssertEqual(pending.first?.rideId, "ride-1000")
 
-        XCTAssertTrue(try await second.markDone(rideId: "ride-1000").boolValue)
+        try await second.markDone(rideId: "ride-1000")
+        let afterDone = try await second.pending()
+        XCTAssertTrue(afterDone.isEmpty)
+
         // A ride uploaded once is never queued again
-        XCTAssertFalse(try await second.enqueue(entry: entry).boolValue)
+        try await second.enqueue(entry: entry)
+        let afterReenqueue = try await second.pending()
+        XCTAssertTrue(afterReenqueue.isEmpty)
     }
 
     func testZipArchiveBuilderProducesValidStoreZip() {

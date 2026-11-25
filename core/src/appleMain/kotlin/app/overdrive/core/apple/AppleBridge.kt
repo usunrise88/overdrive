@@ -5,8 +5,10 @@ package app.overdrive.core.apple
 import app.overdrive.core.ble.BleEnvironment
 import app.overdrive.core.ble.ConnectMode
 import app.overdrive.core.ble.DeviceId
+import app.overdrive.core.ble.GattResult
 import app.overdrive.core.ble.GattTransport
 import app.overdrive.core.ble.GattTransportFactory
+import app.overdrive.core.ble.GattUuid
 import app.overdrive.core.ble.adapter.FtmsOptions
 import app.overdrive.core.ble.adapter.FtmsTrainerDevice
 import app.overdrive.core.ble.adapter.HeartRateOptions
@@ -29,11 +31,15 @@ import app.overdrive.core.control.CoachControl
 import app.overdrive.core.control.GestureTiming
 import app.overdrive.core.control.HandlebarControls
 import app.overdrive.core.control.MediaKeys
+import app.overdrive.core.device.ConnectionState
 import app.overdrive.core.device.DeviceDisconnect
 import app.overdrive.core.device.HeartRateDevice
 import app.overdrive.core.device.SimulatedBike
 import app.overdrive.core.device.SimulatedDevice
+import app.overdrive.core.device.SimulationParameters
+import app.overdrive.core.device.TrainerCommandException
 import app.overdrive.core.device.TrainerDevice
+import app.overdrive.core.device.TrainerReading
 import app.overdrive.core.fit.FitOptions
 import app.overdrive.core.fit.FitRoutes
 import app.overdrive.core.fit.FitWriter
@@ -49,11 +55,16 @@ import app.overdrive.core.live.LiveSessionController
 import app.overdrive.core.physics.PhysicsSettings
 import app.overdrive.core.plan.PlanCache
 import app.overdrive.core.plan.PlanRepository
+import app.overdrive.core.plan.PlanState
+import app.overdrive.core.plan.PlannedWorkout
 import app.overdrive.core.profile.ProfileCache
 import app.overdrive.core.profile.ProfileRepository
+import app.overdrive.core.profile.ProfileState
+import app.overdrive.core.record.FileByteSink
 import app.overdrive.core.record.FileByteSource
 import app.overdrive.core.record.RecoveredRide
 import app.overdrive.core.record.RideLog
+import app.overdrive.core.record.RideLogRecorder
 import app.overdrive.core.record.RideRecord
 import app.overdrive.core.record.RideRecordJson
 import app.overdrive.core.record.RideRecorder
@@ -72,30 +83,47 @@ import app.overdrive.core.ride.flatSteps
 import app.overdrive.core.route.RideRoutes
 import app.overdrive.core.route.Route
 import app.overdrive.core.route.RouteLibrary
+import app.overdrive.core.sync.HttpAnswer
+import app.overdrive.core.sync.HttpGetRequest
 import app.overdrive.core.sync.HttpGetTransport
+import app.overdrive.core.sync.HttpPatchRequest
 import app.overdrive.core.sync.HttpPatchTransport
+import app.overdrive.core.sync.HttpPostRequest
 import app.overdrive.core.sync.HttpPostTransport
+import app.overdrive.core.sync.HttpRequest
+import app.overdrive.core.sync.HttpStreamRequest
 import app.overdrive.core.sync.HttpStreamTransport
 import app.overdrive.core.sync.HttpSyncProvider
 import app.overdrive.core.sync.HttpTransport
 import app.overdrive.core.sync.Outbox
+import app.overdrive.core.sync.OutboxEntry
+import app.overdrive.core.sync.RidePayload
 import app.overdrive.core.sync.RidePayloads
+import app.overdrive.core.sync.RideUnavailableException
 import app.overdrive.core.sync.SyncConfig
 import app.overdrive.core.sync.SyncCoordinator
+import app.overdrive.core.sync.TransportException
+import app.overdrive.core.sync.TransportFailure
 import app.overdrive.core.wellness.RecoveryResponse
 import app.overdrive.core.workout.Workout
 import app.overdrive.core.workout.WorkoutImport
+import app.overdrive.core.workout.withoutLiveCoach
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import platform.Foundation.NSData
 import platform.Foundation.create
@@ -189,11 +217,131 @@ public class AppleEventBridge<T>(
     }
 }
 
+/** Result returned by Swift's `URLSessionTransport` so Kotlin throws native [TransportException]s. */
+public sealed interface AppleHttpResult {
+    public data class Ok(
+        val answer: HttpAnswer,
+    ) : AppleHttpResult
+
+    public data class Failed(
+        val failure: TransportFailure,
+        val hint: String?,
+    ) : AppleHttpResult
+
+    public data object Cancelled : AppleHttpResult
+}
+
+/** Swift-friendly HTTP boundary without `suspend` callbacks or Kotlin exception throwing. */
+public interface AppleHttpClient {
+    public suspend fun put(request: HttpRequest): AppleHttpResult
+
+    public suspend fun get(request: HttpGetRequest): AppleHttpResult
+
+    public suspend fun patch(request: HttpPatchRequest): AppleHttpResult
+
+    public suspend fun post(request: HttpPostRequest): AppleHttpResult
+
+    public suspend fun stream(
+        request: HttpStreamRequest,
+        onChunk: (String) -> Unit,
+    ): AppleHttpResult
+}
+
+/** Adapts [AppleHttpClient] to all five `core` HTTP transport interfaces. */
+public class AppleWrappedHttp(
+    private val client: AppleHttpClient,
+) : HttpTransport,
+    HttpGetTransport,
+    HttpPatchTransport,
+    HttpPostTransport,
+    HttpStreamTransport {
+    override suspend fun put(request: HttpRequest): HttpAnswer = unwrap(client.put(request))
+
+    override suspend fun get(request: HttpGetRequest): HttpAnswer = unwrap(client.get(request))
+
+    override suspend fun patch(request: HttpPatchRequest): HttpAnswer = unwrap(client.patch(request))
+
+    override suspend fun post(request: HttpPostRequest): HttpAnswer = unwrap(client.post(request))
+
+    override suspend fun stream(
+        request: HttpStreamRequest,
+        onChunk: suspend (String) -> Unit,
+    ): HttpAnswer =
+        coroutineScope {
+            val chunks = Channel<String>(Channel.UNLIMITED)
+            val consumer =
+                launch {
+                    for (chunk in chunks) {
+                        onChunk(chunk)
+                    }
+                }
+            try {
+                val res = client.stream(request) { chunk -> chunks.trySend(chunk) }
+                chunks.close()
+                consumer.join()
+                unwrap(res)
+            } catch (t: Throwable) {
+                chunks.close(t)
+                consumer.cancel()
+                throw t
+            }
+        }
+
+    private fun unwrap(result: AppleHttpResult): HttpAnswer =
+        when (result) {
+            is AppleHttpResult.Ok -> result.answer
+            is AppleHttpResult.Failed -> throw TransportException(result.failure, null, result.hint)
+            AppleHttpResult.Cancelled -> throw CancellationException("HTTP request cancelled")
+        }
+}
+
+/** Swift-friendly [RidePayloads] bridge returning null instead of throwing [RideUnavailableException]. */
+public interface AppleRidePayloads {
+    public suspend fun payloadOrNull(entry: OutboxEntry): RidePayload?
+}
+
+private class UnpairedTrainerDevice : TrainerDevice {
+    override val name: String = "Trainer"
+    override val connection: StateFlow<ConnectionState> = MutableStateFlow(ConnectionState.DISCONNECTED)
+    override val data: Flow<TrainerReading> = emptyFlow()
+
+    override suspend fun requestControl() {
+        throw TrainerCommandException("No trainer paired")
+    }
+
+    override suspend fun setTargetPower(watts: Int) {
+        throw TrainerCommandException("No trainer paired")
+    }
+
+    override suspend fun setSimulation(parameters: SimulationParameters) {
+        throw TrainerCommandException("No trainer paired")
+    }
+}
+
 /**
  * Convenience factories with explicit signatures for Swift callers (ObjC/Swift interop does not
- * carry Kotlin default parameter values).
+ * carry Kotlin default parameter values or value classes).
  */
 public object AppleCoreFactories {
+    public fun parseGattUuid(text: String): String? = GattUuid.parse(text)?.value
+
+    public fun gattResultOkUnit(): GattResult<Unit> = GattResult.Ok(Unit)
+
+    public fun defaultPlanState(): PlanState = PlanState()
+
+    public fun defaultProfileState(): ProfileState = ProfileState()
+
+    public fun unpairedTrainer(): TrainerDevice = UnpairedTrainerDevice()
+
+    public fun wrapHttpClient(client: AppleHttpClient): AppleWrappedHttp = AppleWrappedHttp(client)
+
+    public fun wrapRidePayloads(delegate: AppleRidePayloads): RidePayloads =
+        object : RidePayloads {
+            override suspend fun payload(entry: OutboxEntry): RidePayload =
+                delegate.payloadOrNull(entry)
+                    ?: throw RideUnavailableException("Ride files are missing on this Mac")
+        }
+
     public fun createFtmsTrainer(
         scope: CoroutineScope,
         deviceId: String,
@@ -445,6 +593,7 @@ public object AppleCoreFactories {
             onPlate = onPlate,
         )
 
+    @Throws(Exception::class)
     public fun parseWorkout(
         fileName: String,
         text: String,
@@ -454,6 +603,23 @@ public object AppleCoreFactories {
         } else {
             WorkoutImport.fromJson(text)
         }
+
+    public fun effectivePlannedWorkout(
+        planned: PlannedWorkout,
+        useVariant: Boolean,
+    ): Workout {
+        val variant = if (useVariant) planned.variant else null
+        return if (variant != null) {
+            planned.workout.copy(
+                description = variant.note ?: planned.workout.description,
+                steps = variant.steps,
+            )
+        } else {
+            planned.workout
+        }
+    }
+
+    public fun workoutWithoutLiveCoach(workout: Workout): Workout = workout.withoutLiveCoach()
 
     public fun exportFit(
         record: RideRecord,
@@ -466,7 +632,12 @@ public object AppleCoreFactories {
 
     public fun encodeRideRecord(record: RideRecord): String = RideRecordJson.encode(record)
 
+    @Throws(Exception::class)
     public fun decodeRideRecord(json: String): RideRecord = RideRecordJson.decode(json)
+
+    @Throws(Exception::class)
+    public fun createRideLogRecorder(path: String): RideLogRecorder =
+        RideLogRecorder(sink = FileByteSink(path = path, append = true))
 
     public fun recoverRideLog(path: String): RecoveredRide? = RideLog.recover(FileByteSource(path))
 

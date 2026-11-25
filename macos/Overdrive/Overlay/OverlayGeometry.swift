@@ -135,7 +135,7 @@ public enum OverlayPolicy {
     public static let minUpdateIntervalMs: Int64 = 1_000
     public static let dragSlop: CGFloat = 8.0
     public static let longPressMs: Int64 = 500
-    public static let snapDurationSeconds: TimeInterval = Double(OverdriveMotion.overlaySnapDurationMs) / 1000.0
+    public static let snapDurationSeconds: TimeInterval = Double(OverdriveMotion.overlayEdgeSnapDurationMs) / 1000.0
 
     public static func windowWanted(isLive: Bool, mainWindowVisible: Bool, alwaysShow: Bool) -> Bool {
         guard isLive else { return false }

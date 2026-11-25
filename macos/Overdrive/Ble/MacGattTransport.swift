@@ -13,10 +13,10 @@ public final class MacGattTransport: NSObject, GattTransport {
     private enum PendingOp {
         case connect(CheckedContinuation<GattResult, Never>)
         case discover(CheckedContinuation<GattResult, Never>)
-        case read(GattUuid, CheckedContinuation<GattResult, Never>)
-        case write(GattUuid, CheckedContinuation<GattResult, Never>)
+        case read(String, CheckedContinuation<GattResult, Never>)
+        case write(String, CheckedContinuation<GattResult, Never>)
         case writeNoResponseReady(CheckedContinuation<Bool, Never>)
-        case enable(GattUuid, CheckedContinuation<GattResult, Never>)
+        case enable(String, CheckedContinuation<GattResult, Never>)
     }
 
     private let platform: CoreBluetoothPlatform
@@ -162,12 +162,12 @@ public final class MacGattTransport: NSObject, GattTransport {
             value: data,
             withResponse: false
         )
-        return started == .started ? GattResultOk(value: KotlinUnit()) : failed(mapStartFailure(started))
+        return started == .started ? AppleCoreFactories.shared.gattResultOkUnit() : failed(mapStartFailure(started))
     }
 
     public func enable(characteristic: GattCharacteristicInfo, mode: ValueUpdate) async throws -> GattResult {
         lock.lock()
-        enabledModes[characteristic.characteristic.value] = mode
+        enabledModes[characteristic.characteristic] = mode
         lock.unlock()
         return await runSerialized(
             start: {
@@ -277,7 +277,7 @@ public final class MacGattTransport: NSObject, GattTransport {
             if case .connect = op { pending = nil }
             lock.unlock()
             if case .connect(let cont) = op {
-                cont.resume(returning: GattResultOk(value: KotlinUnit()))
+                cont.resume(returning: AppleCoreFactories.shared.gattResultOkUnit())
             }
 
         case .disconnected(let status):
@@ -306,11 +306,11 @@ public final class MacGattTransport: NSObject, GattTransport {
         case .readCompleted(let uuid, let value, let status):
             lock.lock()
             let op = pending
-            if case .read(let expected, _) = op, expected.value == uuid.value {
+            if case .read(let expected, _) = op, expected == uuid {
                 pending = nil
             }
             lock.unlock()
-            if case .read(let expected, let cont) = op, expected.value == uuid.value {
+            if case .read(let expected, let cont) = op, expected == uuid {
                 if status == GattStatus.shared.SUCCESS, let value {
                     cont.resume(returning: GattResultOk(value: AppleBytes.shared.toByteArray(data: value)))
                 } else {
@@ -321,13 +321,13 @@ public final class MacGattTransport: NSObject, GattTransport {
         case .writeCompleted(let uuid, let status):
             lock.lock()
             let op = pending
-            if case .write(let expected, _) = op, expected.value == uuid.value {
+            if case .write(let expected, _) = op, expected == uuid {
                 pending = nil
             }
             lock.unlock()
-            if case .write(let expected, let cont) = op, expected.value == uuid.value {
+            if case .write(let expected, let cont) = op, expected == uuid {
                 if status == GattStatus.shared.SUCCESS {
-                    cont.resume(returning: GattResultOk(value: KotlinUnit()))
+                    cont.resume(returning: AppleCoreFactories.shared.gattResultOkUnit())
                 } else {
                     cont.resume(returning: failed(.status, status: status))
                 }
@@ -345,13 +345,13 @@ public final class MacGattTransport: NSObject, GattTransport {
         case .notifyStateChanged(let uuid, _, let status):
             lock.lock()
             let op = pending
-            if case .enable(let expected, _) = op, expected.value == uuid.value {
+            if case .enable(let expected, _) = op, expected == uuid {
                 pending = nil
             }
             lock.unlock()
-            if case .enable(let expected, let cont) = op, expected.value == uuid.value {
+            if case .enable(let expected, let cont) = op, expected == uuid {
                 if status == GattStatus.shared.SUCCESS {
-                    cont.resume(returning: GattResultOk(value: KotlinUnit()))
+                    cont.resume(returning: AppleCoreFactories.shared.gattResultOkUnit())
                 } else {
                     cont.resume(returning: failed(.status, status: status))
                 }
@@ -359,7 +359,7 @@ public final class MacGattTransport: NSObject, GattTransport {
 
         case .notificationReceived(let uuid, let value, let timestampNanos):
             lock.lock()
-            let updateKind = enabledModes[uuid.value] ?? .notification
+            let updateKind = enabledModes[uuid] ?? .notification
             lock.unlock()
             let notification = GattNotification(
                 characteristic: uuid,

@@ -72,14 +72,14 @@ private final class ScriptedPlatform: CoreBluetoothPlatform {
         return .started
     }
 
-    func read(service: GattUuid, characteristic: GattUuid) -> PlatformStartResult {
+    func read(service: String, characteristic: String) -> PlatformStartResult {
         DispatchQueue.global().async { [weak self] in
             self?.onEvent?(.readCompleted(characteristic: characteristic, value: Data([0x01, 0x02]), status: GattStatus.shared.SUCCESS))
         }
         return .started
     }
 
-    func write(service: GattUuid, characteristic: GattUuid, value: Data, withResponse: Bool) -> PlatformStartResult {
+    func write(service: String, characteristic: String, value: Data, withResponse: Bool) -> PlatformStartResult {
         if withResponse {
             DispatchQueue.global().async { [weak self] in
                 self?.onEvent?(.writeCompleted(characteristic: characteristic, status: GattStatus.shared.SUCCESS))
@@ -88,7 +88,7 @@ private final class ScriptedPlatform: CoreBluetoothPlatform {
         return .started
     }
 
-    func setNotify(service: GattUuid, characteristic: GattUuid, enabled: Bool) -> PlatformStartResult {
+    func setNotify(service: String, characteristic: String, enabled: Bool) -> PlatformStartResult {
         DispatchQueue.global().async { [weak self] in
             self?.onEvent?(.notifyStateChanged(characteristic: characteristic, enabled: enabled, status: GattStatus.shared.SUCCESS))
         }

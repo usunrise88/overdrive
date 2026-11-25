@@ -1,15 +1,10 @@
 import Foundation
 import OverdriveCore
 
-/// Ephemeral `URLSession`-backed implementation of every `OverdriveCore` HTTP verb (`PUT`, `GET`, `PATCH`, `POST`,
-/// and `text/event-stream` SSE) with strict redirect blocking, no disk cache, no cookies, and secret redaction (ADR 0044).
-public final class URLSessionTransport: NSObject,
-    HttpTransport,
-    HttpGetTransport,
-    HttpPatchTransport,
-    HttpPostTransport,
-    HttpStreamTransport
-{
+/// Ephemeral `URLSession`-backed implementation of `AppleHttpClient` (adapted to all five `OverdriveCore`
+/// HTTP verbs: `PUT`, `GET`, `PATCH`, `POST`, and `text/event-stream` SSE) with strict redirect blocking,
+/// no disk cache, no cookies, and secret redaction (ADR 0044).
+public final class URLSessionTransport: NSObject, AppleHttpClient {
     private let session: URLSession
     private let streamSession: URLSession
     private let redirectBlocker = RedirectBlocker()
@@ -41,11 +36,11 @@ public final class URLSessionTransport: NSObject,
         streamSession.invalidateAndCancel()
     }
 
-    // MARK: - HttpTransport (PUT)
+    // MARK: - PUT
 
-    public func put(request: HttpRequest) async throws -> HttpAnswer {
+    public func put(request: HttpRequest) async throws -> AppleHttpResult {
         guard let url = URL(string: request.url) else {
-            throw TransportException(failure: .other, cause: nil, hint: "InvalidURL")
+            return AppleHttpResultFailed(failure: .other, hint: "InvalidURL")
         }
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "PUT"
@@ -55,57 +50,57 @@ public final class URLSessionTransport: NSObject,
         let sink = DataChunkSink()
         request.body.writeTo(sink: sink)
         urlRequest.httpBody = sink.data
-        return try await execute(urlRequest, maxBytes: 16_384)
+        return await execute(urlRequest, maxBytes: 16_384)
     }
 
-    // MARK: - HttpGetTransport (GET)
+    // MARK: - GET
 
-    public func get(request: HttpGetRequest) async throws -> HttpAnswer {
+    public func get(request: HttpGetRequest) async throws -> AppleHttpResult {
         guard let url = URL(string: request.url) else {
-            throw TransportException(failure: .other, cause: nil, hint: "InvalidURL")
+            return AppleHttpResultFailed(failure: .other, hint: "InvalidURL")
         }
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "GET"
         urlRequest.setValue("Bearer \(request.bearerToken)", forHTTPHeaderField: "Authorization")
-        return try await execute(urlRequest, maxBytes: Int(request.maxBytes))
+        return await execute(urlRequest, maxBytes: Int(request.maxBytes))
     }
 
-    // MARK: - HttpPatchTransport (PATCH)
+    // MARK: - PATCH
 
-    public func patch(request: HttpPatchRequest) async throws -> HttpAnswer {
+    public func patch(request: HttpPatchRequest) async throws -> AppleHttpResult {
         guard let url = URL(string: request.url) else {
-            throw TransportException(failure: .other, cause: nil, hint: "InvalidURL")
+            return AppleHttpResultFailed(failure: .other, hint: "InvalidURL")
         }
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "PATCH"
         urlRequest.setValue("Bearer \(request.bearerToken)", forHTTPHeaderField: "Authorization")
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.httpBody = Data(request.body.utf8)
-        return try await execute(urlRequest, maxBytes: Int(request.maxBytes))
+        return await execute(urlRequest, maxBytes: Int(request.maxBytes))
     }
 
-    // MARK: - HttpPostTransport (POST)
+    // MARK: - POST
 
-    public func post(request: HttpPostRequest) async throws -> HttpAnswer {
+    public func post(request: HttpPostRequest) async throws -> AppleHttpResult {
         guard let url = URL(string: request.url) else {
-            throw TransportException(failure: .other, cause: nil, hint: "InvalidURL")
+            return AppleHttpResultFailed(failure: .other, hint: "InvalidURL")
         }
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("Bearer \(request.bearerToken)", forHTTPHeaderField: "Authorization")
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.httpBody = Data(request.body.utf8)
-        return try await execute(urlRequest, maxBytes: Int(request.maxBytes))
+        return await execute(urlRequest, maxBytes: Int(request.maxBytes))
     }
 
-    // MARK: - HttpStreamTransport (SSE GET)
+    // MARK: - SSE GET
 
     public func stream(
         request: HttpStreamRequest,
-        onChunk: @escaping (String) async throws -> KotlinUnit
-    ) async throws -> HttpAnswer {
+        onChunk: @escaping (String) -> Void
+    ) async throws -> AppleHttpResult {
         guard let url = URL(string: request.url) else {
-            throw TransportException(failure: .other, cause: nil, hint: "InvalidURL")
+            return AppleHttpResultFailed(failure: .other, hint: "InvalidURL")
         }
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "GET"
@@ -118,7 +113,7 @@ public final class URLSessionTransport: NSObject,
         do {
             let (bytes, response) = try await streamSession.bytes(for: urlRequest)
             guard let http = response as? HTTPURLResponse else {
-                throw TransportException(failure: .other, cause: nil, hint: "NonHTTPResponse")
+                return AppleHttpResultFailed(failure: .other, hint: "NonHTTPResponse")
             }
             if http.statusCode != 200 {
                 var errData = Data()
@@ -126,81 +121,83 @@ public final class URLSessionTransport: NSObject,
                     errData.append(b)
                     if errData.count >= 4_096 { break }
                 }
-                return HttpAnswer(status: Int32(http.statusCode), body: String(data: errData, encoding: .utf8) ?? "")
+                let answer = HttpAnswer(
+                    status: Int32(http.statusCode),
+                    body: String(data: errData, encoding: .utf8) ?? ""
+                )
+                return AppleHttpResultOk(answer: answer)
             }
 
             var lineBuffer = Data()
             for try await b in bytes {
-                try Task.checkCancellation()
+                if Task.isCancelled {
+                    return AppleHttpResultCancelled.shared
+                }
                 lineBuffer.append(b)
                 if b == 0x0A { // '\n'
                     if let chunk = String(data: lineBuffer, encoding: .utf8) {
-                        _ = try await onChunk(chunk)
+                        onChunk(chunk)
                     }
                     lineBuffer.removeAll(keepingCapacity: true)
                 }
             }
             if !lineBuffer.isEmpty, let tail = String(data: lineBuffer, encoding: .utf8) {
-                _ = try await onChunk(tail)
+                onChunk(tail)
             }
-            return HttpAnswer(status: 200, body: "")
+            return AppleHttpResultOk(answer: HttpAnswer(status: 200, body: ""))
         } catch is CancellationError {
-            throw CancellationError()
-        } catch let tx as TransportException {
-            throw tx
+            return AppleHttpResultCancelled.shared
         } catch {
-            throw mapError(error)
+            return mapError(error)
         }
     }
 
     // MARK: - Helpers
 
-    private func execute(_ request: URLRequest, maxBytes: Int) async throws -> HttpAnswer {
+    private func execute(_ request: URLRequest, maxBytes: Int) async -> AppleHttpResult {
         do {
             let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else {
-                throw TransportException(failure: .other, cause: nil, hint: "NonHTTPResponse")
+                return AppleHttpResultFailed(failure: .other, hint: "NonHTTPResponse")
             }
             if maxBytes > 0 && data.count > maxBytes {
-                throw TransportException(failure: .other, cause: nil, hint: "BodyTooLarge")
+                return AppleHttpResultFailed(failure: .other, hint: "BodyTooLarge")
             }
             let body = String(data: data, encoding: .utf8) ?? ""
-            return HttpAnswer(status: Int32(http.statusCode), body: body)
+            return AppleHttpResultOk(answer: HttpAnswer(status: Int32(http.statusCode), body: body))
         } catch is CancellationError {
-            throw CancellationError()
-        } catch let tx as TransportException {
-            throw tx
+            return AppleHttpResultCancelled.shared
         } catch {
-            throw mapError(error)
+            return mapError(error)
         }
     }
 
-    private func mapError(_ error: Error) -> TransportException {
+    private func mapError(_ error: Error) -> AppleHttpResultFailed {
         let ns = error as NSError
         guard ns.domain == NSURLErrorDomain else {
-            return TransportException(failure: .other, cause: nil, hint: ns.domain)
+            return AppleHttpResultFailed(failure: .other, hint: ns.domain)
         }
         switch ns.code {
         case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed:
-            return TransportException(failure: .nameNotFound, cause: nil, hint: "NSURLError.DNS")
+            return AppleHttpResultFailed(failure: .nameNotFound, hint: "NSURLError.DNS")
         case NSURLErrorNotConnectedToInternet, NSURLErrorDataNotAllowed:
-            return TransportException(failure: .noNetwork, cause: nil, hint: "NSURLError.Offline")
+            return AppleHttpResultFailed(failure: .noNetwork, hint: "NSURLError.Offline")
         case NSURLErrorCannotConnectToHost:
-            return TransportException(failure: .refused, cause: nil, hint: "NSURLError.CannotConnect")
+            return AppleHttpResultFailed(failure: .refused, hint: "NSURLError.CannotConnect")
         case NSURLErrorNetworkConnectionLost:
-            return TransportException(failure: .dropped, cause: nil, hint: "NSURLError.ConnectionLost")
+            return AppleHttpResultFailed(failure: .dropped, hint: "NSURLError.ConnectionLost")
         case NSURLErrorTimedOut:
-            return TransportException(failure: .timedOut, cause: nil, hint: "NSURLError.TimedOut")
+            return AppleHttpResultFailed(failure: .timedOut, hint: "NSURLError.TimedOut")
         case NSURLErrorSecureConnectionFailed,
              NSURLErrorServerCertificateHasBadDate,
              NSURLErrorServerCertificateUntrusted,
              NSURLErrorServerCertificateHasUnknownRoot,
              NSURLErrorServerCertificateNotYetValid:
-            return TransportException(failure: .secureConnection, cause: nil, hint: "NSURLError.TLS")
+            return AppleHttpResultFailed(failure: .secureConnection, hint: "NSURLError.TLS")
         case NSURLErrorAppTransportSecurityRequiresSecureConnection:
-            return TransportException(failure: .networkBlocked, cause: nil, hint: "NSURLError.ATS")
+            return AppleHttpResultFailed(failure: .networkBlocked, hint: "NSURLError.ATS")
         default:
-            return TransportException(failure: .unreachable, cause: nil, hint: "NSURLError.\(ns.code)")
+            return AppleHttpResultFailed(failure: .unreachable, hint: "NSURLError.\(ns.code)")
         }
     }
 }
