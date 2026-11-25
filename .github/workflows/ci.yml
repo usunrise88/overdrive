@@ -102,9 +102,13 @@ jobs:
         run: |
           TOKEN="$(openssl rand -base64 36)"
           echo "::add-mask::$TOKEN"
+          ADMIN="$(openssl rand -base64 36 | tr -d '\n')"
+          echo "::add-mask::$ADMIN"
+          # A fresh database with DEVICE_TOKENS: the start-up creates the owner (user 1) and keeps the token working.
           docker run -d --name server --network host \
             -e DATABASE_URL=postgres://postgres:ci@127.0.0.1:5432/postgres \
             -e "DEVICE_TOKENS=ci:$TOKEN" \
+            -e "ADMIN_TOKEN=$ADMIN" \
             overdrive-server
           up=0
           for i in $(seq 1 20); do
@@ -130,3 +134,9 @@ jobs:
           expect 200 -X PUT "$api" -H "$auth" -H 'content-type: application/json' --data-binary "@$record"
           expect 201 -X PUT "$api/fit" -H "$auth" -H 'content-type: application/vnd.ant.fit' --data-binary "@$fit"
           expect 200 -X PUT "$api/fit" -H "$auth" -H 'content-type: application/vnd.ant.fit' --data-binary "@$fit"
+
+          # The owner is user 1 and the token is theirs; the admin API answers inside the container on loopback and nowhere else.
+          expect 200 "http://127.0.0.1:8080/v1/me" -H "$auth"
+          grep -q '"userId":1' /tmp/body || { echo "not the owner: $(cat /tmp/body)"; exit 1; }
+          expect 404 "http://127.0.0.1:8080/admin/users" -H "$auth"
+          docker exec server node -e "fetch('http://127.0.0.1:8081/admin/users', { headers: { authorization: 'Bearer ' + process.env.ADMIN_TOKEN } }).then((r) => process.exit(r.status === 200 ? 0 : 1), () => process.exit(1))"
