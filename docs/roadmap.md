@@ -51,10 +51,10 @@ the owner's account (ADR 0044; spec §3.1; deploy section 22). Built in these st
 - **B1** the multi-user runtime: per-user configuration, the tenant registry, `request.tenant`, `GET /v1/me` (merged).
 - **B2** OAuth, MCP and Telegram on `shared`: login by handle, per-handle lockout, the shared bot poller, migration `0014`.
 - **B3** the admin API, with `ADMIN_TOKEN`, `ADMIN_PORT` and `OWNER_HANDLE` in the configuration.
-- **C** the wiring and the documentation. Documentation (ADR 0044, spec §3.1, deploy section 22, this section) is done. Still
-  open: `server/src/main.ts` (the bootstrap on start, `MIGRATE_ONLY`, the registry, the shared poller, the admin listener on
-  `127.0.0.1`), `compose.yaml` (`ADMIN_TOKEN`, the port bound to `127.0.0.1` only), `curl` in the image, the CI smoke test, and
-  the end-to-end test.
+- **C** the wiring and the documentation (merged): the start-up in `server/src/start.ts` behind `main.ts` (the bootstrap on
+  start, `MIGRATE_ONLY`, the registry, the shared poller, the admin listener on `127.0.0.1`, not published), `curl` in the
+  image, the CI smoke test and the end-to-end test of two users. Documentation: ADR 0044, spec §3.1, deploy section 22, this
+  section.
 - **Rehearsal and production cutover: not done.** A rehearsal on a copy of the dump (two scratch PostgreSQL 18 containers, no
   external network) comes first; the production move waits for the owner's approval.
 
