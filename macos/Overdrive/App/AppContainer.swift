@@ -873,7 +873,13 @@ public final class AppContainer: ObservableObject {
         scanError = nil
         discoveredDevices = []
         isScanning = true
-        let filter = ScanFilter(serviceUuids: [FtmsUuids.shared.SERVICE, HeartRateUuids.shared.SERVICE, ClickUuids.shared.SERVICE])
+        let filter = AppleCoreFactories.shared.createScanFilter(
+            serviceUuids: [
+                AppleCoreFactories.shared.ftmsServiceUuid,
+                AppleCoreFactories.shared.heartRateServiceUuid,
+                AppleCoreFactories.shared.clickServiceUuid,
+            ]
+        )
         let flow = bleStack.scanner.scan(filter: filter)
         scanSub = AppleFlowWatcher.shared.watch(
             scope: coreScope,
@@ -939,9 +945,9 @@ public final class AppContainer: ObservableObject {
 
     private func ingestAdvertisement(_ adv: Advertisement) {
         let role: MacDeviceRole?
-        if adv.serviceUuids.contains(FtmsUuids.shared.SERVICE) {
+        if AppleCoreFactories.shared.advertisementHasService(adv: adv, uuid: AppleCoreFactories.shared.ftmsServiceUuid) {
             role = .trainer
-        } else if adv.serviceUuids.contains(HeartRateUuids.shared.SERVICE) {
+        } else if AppleCoreFactories.shared.advertisementHasService(adv: adv, uuid: AppleCoreFactories.shared.heartRateServiceUuid) {
             role = .strap
         } else if ClickAdvertisements.shared.recognise(advertisement: adv, options: settings.toClickOptions()) != nil {
             role = .click
@@ -953,7 +959,7 @@ public final class AppContainer: ObservableObject {
         let roundedRssi = (Int(adv.rssi) / 5) * 5
         let name = role == .click ? "Zwift Click (right)" : RememberedDeviceRecord.clean(adv.name ?? role.fallbackName)
         let item = DiscoveredDevice(
-            id: adv.id,
+            id: AppleCoreFactories.shared.advertisementIdString(adv: adv),
             role: role,
             name: name.isEmpty ? role.fallbackName : name,
             rssi: roundedRssi,
@@ -1068,15 +1074,17 @@ public final class AppContainer: ObservableObject {
     }
 
     private func wrappedTransportFactory(role: String, model: @escaping () -> String) -> GattTransportFactory {
-        RecordingFactoryAdapter(
-            base: bleStack.transports,
-            bleLogs: bleLogs,
-            role: role,
-            scope: coreScope,
-            logScope: logScope,
-            nanoClock: { [weak self] in self?.bleStack.nanoClock() ?? 0 },
-            model: model,
-            enabled: { [weak self] in self?.settings.recordBleSessions ?? true }
+        AppleCoreFactories.shared.wrapTransportFactory(
+            delegate: RecordingFactoryAdapter(
+                base: bleStack.transports,
+                bleLogs: bleLogs,
+                role: role,
+                scope: coreScope,
+                logScope: logScope,
+                nanoClock: { [weak self] in self?.bleStack.nanoClock() ?? 0 },
+                model: model,
+                enabled: { [weak self] in self?.settings.recordBleSessions ?? true }
+            )
         )
     }
 
@@ -1504,7 +1512,7 @@ public final class AppContainer: ObservableObject {
     }
 }
 
-private final class RecordingFactoryAdapter: NSObject, GattTransportFactory {
+private final class RecordingFactoryAdapter: NSObject, AppleGattTransportFactory {
     private let base: GattTransportFactory
     private let bleLogs: BleLogStore
     private let role: String
@@ -1534,12 +1542,8 @@ private final class RecordingFactoryAdapter: NSObject, GattTransportFactory {
         self.enabled = enabled
     }
 
-    func open(device: String) -> GattTransport {
-        open(device: device, mode: .active)
-    }
-
-    func open(device: String, mode: ConnectMode) -> GattTransport {
-        let raw = base.open(device: device, mode: mode)
+    func open(deviceId: String, mode: ConnectMode) -> GattTransport {
+        let raw = AppleCoreFactories.shared.openWrappedTransport(factory: base, deviceId: deviceId, mode: mode)
         guard enabled() else { return raw }
         let sink = bleLogs.openSessionSink(role: role)
         return AppleCoreFactories.shared.createRecordingTransport(

@@ -110,28 +110,34 @@ public final class MacGattTransport: NSObject, GattTransport {
     }
 
     public func read(characteristic: GattCharacteristicInfo) async throws -> GattResult {
-        await runSerialized(
-            start: { self.platform.read(service: characteristic.service, characteristic: characteristic.characteristic) },
-            makePending: { .read(characteristic.characteristic, $0) }
+        let svc = AppleCoreFactories.shared.characteristicServiceString(info: characteristic)
+        let chr = AppleCoreFactories.shared.characteristicUuidString(info: characteristic)
+        return await runSerialized(
+            start: { self.platform.read(service: svc, characteristic: chr) },
+            makePending: { .read(chr, $0) }
         )
     }
 
     public func write(characteristic: GattCharacteristicInfo, value: KotlinByteArray) async throws -> GattResult {
+        let svc = AppleCoreFactories.shared.characteristicServiceString(info: characteristic)
+        let chr = AppleCoreFactories.shared.characteristicUuidString(info: characteristic)
         let data = AppleBytes.shared.toNSData(bytes: value)
         return await runSerialized(
             start: {
                 self.platform.write(
-                    service: characteristic.service,
-                    characteristic: characteristic.characteristic,
+                    service: svc,
+                    characteristic: chr,
                     value: data,
                     withResponse: true
                 )
             },
-            makePending: { .write(characteristic.characteristic, $0) }
+            makePending: { .write(chr, $0) }
         )
     }
 
     public func writeWithoutResponse(characteristic: GattCharacteristicInfo, value: KotlinByteArray) async throws -> GattResult {
+        let svc = AppleCoreFactories.shared.characteristicServiceString(info: characteristic)
+        let chr = AppleCoreFactories.shared.characteristicUuidString(info: characteristic)
         lock.lock()
         if closed {
             lock.unlock()
@@ -157,8 +163,8 @@ public final class MacGattTransport: NSObject, GattTransport {
 
         let data = AppleBytes.shared.toNSData(bytes: value)
         let started = platform.write(
-            service: characteristic.service,
-            characteristic: characteristic.characteristic,
+            service: svc,
+            characteristic: chr,
             value: data,
             withResponse: false
         )
@@ -166,18 +172,20 @@ public final class MacGattTransport: NSObject, GattTransport {
     }
 
     public func enable(characteristic: GattCharacteristicInfo, mode: ValueUpdate) async throws -> GattResult {
+        let svc = AppleCoreFactories.shared.characteristicServiceString(info: characteristic)
+        let chr = AppleCoreFactories.shared.characteristicUuidString(info: characteristic)
         lock.lock()
-        enabledModes[characteristic.characteristic] = mode
+        enabledModes[chr] = mode
         lock.unlock()
         return await runSerialized(
             start: {
                 self.platform.setNotify(
-                    service: characteristic.service,
-                    characteristic: characteristic.characteristic,
+                    service: svc,
+                    characteristic: chr,
                     enabled: true
                 )
             },
-            makePending: { .enable(characteristic.characteristic, $0) }
+            makePending: { .enable(chr, $0) }
         )
     }
 
@@ -361,13 +369,14 @@ public final class MacGattTransport: NSObject, GattTransport {
             lock.lock()
             let updateKind = enabledModes[uuid] ?? .notification
             lock.unlock()
-            let notification = GattNotification(
+            if let notification = AppleCoreFactories.shared.createGattNotification(
                 characteristic: uuid,
                 value: AppleBytes.shared.toByteArray(data: value),
                 timestampNanos: timestampNanos,
                 kind: updateKind
-            )
-            _ = notificationBridge.emit(value: notification)
+            ) {
+                _ = notificationBridge.emit(value: notification)
+            }
         }
     }
 

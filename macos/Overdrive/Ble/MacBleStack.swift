@@ -18,7 +18,9 @@ public final class MacBleStack: NSObject {
 
     public lazy var environment: BleEnvironment = MacBleEnvironmentAdapter(bridge: availabilityBridge)
     public lazy var scanner: GattScanner = MacGattScannerAdapter(stack: self)
-    public lazy var transports: GattTransportFactory = MacGattTransportFactoryAdapter(stack: self)
+    public lazy var transports: GattTransportFactory = AppleCoreFactories.shared.wrapTransportFactory(
+        delegate: MacGattTransportFactoryAdapter(stack: self)
+    )
 
     public override init() {
         super.init()
@@ -62,9 +64,10 @@ public final class MacBleStack: NSObject {
             }
             self.activeScanBridge = bridge
             self.activeScanFilter = filter
-            let services: [CBUUID]? = filter.serviceUuids.isEmpty
+            let filterUuids = AppleCoreFactories.shared.scanFilterServiceUuidStrings(filter: filter)
+            let services: [CBUUID]? = filterUuids.isEmpty
                 ? nil
-                : filter.serviceUuids.map { $0.toCBUUID() }
+                : filterUuids.map { $0.toCBUUID() }
             self.centralManager.scanForPeripherals(
                 withServices: services,
                 options: [CBCentralManagerScanOptionAllowDuplicatesKey: true]
@@ -203,8 +206,8 @@ extension MacBleStack: CBCentralManagerDelegate {
             manufacturerList.append(parsed)
         }
 
-        let adv = Advertisement(
-            id: uuid.uuidString,
+        let adv = AppleCoreFactories.shared.createAdvertisement(
+            deviceId: uuid.uuidString,
             name: localName,
             serviceUuids: serviceUuids,
             rssi: Int32(rawRssi),
@@ -330,13 +333,13 @@ private final class CoreBluetoothShim: NSObject, CoreBluetoothPlatform, CBPeriph
             for cbChar in service.characteristics ?? [] {
                 if let charUuid = cbChar.uuid.toCoreGattUuid() {
                     characteristicsByKey[key(svcUuid, charUuid)] = cbChar
-                    discoveredInfos.append(
-                        GattCharacteristicInfo(
-                            service: svcUuid,
-                            characteristic: charUuid,
-                            properties: mapCharacteristicProperties(cbChar.properties)
-                        )
-                    )
+                    if let info = AppleCoreFactories.shared.createCharacteristicInfo(
+                        service: svcUuid,
+                        characteristic: charUuid,
+                        properties: mapCharacteristicProperties(cbChar.properties)
+                    ) {
+                        discoveredInfos.append(info)
+                    }
                 }
             }
         }
@@ -398,16 +401,12 @@ private final class MacGattScannerAdapter: NSObject, GattScanner {
     }
 }
 
-private final class MacGattTransportFactoryAdapter: NSObject, GattTransportFactory {
+private final class MacGattTransportFactoryAdapter: NSObject, AppleGattTransportFactory {
     weak var stack: MacBleStack?
     init(stack: MacBleStack) { self.stack = stack }
 
-    func open(device: String) -> GattTransport {
-        open(device: device, mode: .active)
-    }
-
-    func open(device: String, mode: ConnectMode) -> GattTransport {
-        stack?.openTransport(deviceId: device, mode: mode)
+    func open(deviceId: String, mode: ConnectMode) -> GattTransport {
+        stack?.openTransport(deviceId: deviceId, mode: mode)
             ?? MacGattTransport(platform: NullCoreBluetoothPlatform(), mode: mode)
     }
 }

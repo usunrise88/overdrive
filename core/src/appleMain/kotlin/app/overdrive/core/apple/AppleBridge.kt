@@ -2,13 +2,24 @@
 
 package app.overdrive.core.apple
 
+import app.overdrive.core.ble.Advertisement
 import app.overdrive.core.ble.BleEnvironment
+import app.overdrive.core.ble.ClickUuids
 import app.overdrive.core.ble.ConnectMode
 import app.overdrive.core.ble.DeviceId
+import app.overdrive.core.ble.FtmsUuids
+import app.overdrive.core.ble.GattCharacteristicInfo
+import app.overdrive.core.ble.GattNotification
+import app.overdrive.core.ble.GattProperty
 import app.overdrive.core.ble.GattResult
+import app.overdrive.core.ble.GattServices
 import app.overdrive.core.ble.GattTransport
 import app.overdrive.core.ble.GattTransportFactory
 import app.overdrive.core.ble.GattUuid
+import app.overdrive.core.ble.HeartRateUuids
+import app.overdrive.core.ble.ManufacturerData
+import app.overdrive.core.ble.ScanFilter
+import app.overdrive.core.ble.ValueUpdate
 import app.overdrive.core.ble.adapter.FtmsOptions
 import app.overdrive.core.ble.adapter.FtmsTrainerDevice
 import app.overdrive.core.ble.adapter.HeartRateOptions
@@ -299,6 +310,14 @@ public interface AppleRidePayloads {
     public suspend fun payloadOrNull(entry: OutboxEntry): RidePayload?
 }
 
+/** Swift-friendly [GattTransportFactory] avoiding Kotlin `value class` (`DeviceId`) boxing in ObjC. */
+public interface AppleGattTransportFactory {
+    public fun open(
+        deviceId: String,
+        mode: ConnectMode,
+    ): GattTransport
+}
+
 private class UnpairedTrainerDevice : TrainerDevice {
     override val name: String = "Trainer"
     override val connection: StateFlow<ConnectionState> = MutableStateFlow(ConnectionState.DISCONNECTED)
@@ -322,9 +341,98 @@ private class UnpairedTrainerDevice : TrainerDevice {
  * carry Kotlin default parameter values or value classes).
  */
 public object AppleCoreFactories {
+    public val ftmsServiceUuid: String = FtmsUuids.SERVICE.value
+    public val ftmsControlPointUuid: String = FtmsUuids.CONTROL_POINT.value
+    public val ftmsIndoorBikeDataUuid: String = FtmsUuids.INDOOR_BIKE_DATA.value
+    public val heartRateServiceUuid: String = HeartRateUuids.SERVICE.value
+    public val clickServiceUuid: String = ClickUuids.SERVICE.value
+
     public fun parseGattUuid(text: String): String? = GattUuid.parse(text)?.value
 
     public fun gattResultOkUnit(): GattResult<Unit> = GattResult.Ok(Unit)
+
+    public fun createCharacteristicInfo(
+        service: String,
+        characteristic: String,
+        properties: Set<GattProperty>,
+    ): GattCharacteristicInfo? {
+        val svc = GattUuid.parse(service) ?: return null
+        val chr = GattUuid.parse(characteristic) ?: return null
+        return GattCharacteristicInfo(service = svc, characteristic = chr, properties = properties)
+    }
+
+    public fun characteristicServiceString(info: GattCharacteristicInfo): String = info.service.value
+
+    public fun characteristicUuidString(info: GattCharacteristicInfo): String = info.characteristic.value
+
+    public fun createGattNotification(
+        characteristic: String,
+        value: ByteArray,
+        timestampNanos: Long,
+        kind: ValueUpdate,
+    ): GattNotification? {
+        val chr = GattUuid.parse(characteristic) ?: return null
+        return GattNotification(
+            characteristic = chr,
+            value = value,
+            timestampNanos = timestampNanos,
+            kind = kind,
+        )
+    }
+
+    public fun createAdvertisement(
+        deviceId: String,
+        name: String?,
+        serviceUuids: Set<String>,
+        rssi: Int,
+        manufacturerData: List<ManufacturerData>,
+    ): Advertisement =
+        Advertisement(
+            id = DeviceId(deviceId),
+            name = name,
+            serviceUuids = serviceUuids.mapNotNull { GattUuid.parse(it) }.toSet(),
+            rssi = rssi,
+            manufacturerData = manufacturerData,
+        )
+
+    public fun advertisementIdString(adv: Advertisement): String = adv.id.value
+
+    public fun advertisementHasService(
+        adv: Advertisement,
+        uuid: String,
+    ): Boolean = GattUuid.parse(uuid)?.let { it in adv.serviceUuids } == true
+
+    public fun createScanFilter(serviceUuids: Set<String>): ScanFilter =
+        ScanFilter(serviceUuids = serviceUuids.mapNotNull { GattUuid.parse(it) }.toSet())
+
+    public fun scanFilterServiceUuidStrings(filter: ScanFilter): Set<String> =
+        filter.serviceUuids.mapTo(LinkedHashSet()) { it.value }
+
+    public fun findCharacteristic(
+        services: GattServices,
+        service: String,
+        characteristic: String,
+    ): GattCharacteristicInfo? {
+        val svc = GattUuid.parse(service) ?: return null
+        val chr = GattUuid.parse(characteristic) ?: return null
+        return services.find(svc, chr)
+    }
+
+    public fun wrapTransportFactory(delegate: AppleGattTransportFactory): GattTransportFactory =
+        object : GattTransportFactory {
+            override fun open(device: DeviceId): GattTransport = delegate.open(device.value, ConnectMode.ACTIVE)
+
+            override fun open(
+                device: DeviceId,
+                mode: ConnectMode,
+            ): GattTransport = delegate.open(device.value, mode)
+        }
+
+    public fun openWrappedTransport(
+        factory: GattTransportFactory,
+        deviceId: String,
+        mode: ConnectMode,
+    ): GattTransport = factory.open(DeviceId(deviceId), mode)
 
     public fun defaultPlanState(): PlanState = PlanState()
 

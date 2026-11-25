@@ -36,7 +36,11 @@ final class MacGattTransportTests: XCTestCase {
             XCTFail("Expected discovered services")
             return
         }
-        let cp = services.find(service: FtmsUuids.shared.SERVICE, characteristic: FtmsUuids.shared.CONTROL_POINT)
+        let cp = AppleCoreFactories.shared.findCharacteristic(
+            services: services,
+            service: AppleCoreFactories.shared.ftmsServiceUuid,
+            characteristic: AppleCoreFactories.shared.ftmsControlPointUuid
+        )
         XCTAssertNotNil(cp)
 
         let enableResult = try await transport.enable(characteristic: cp!, mode: .indication)
@@ -63,9 +67,17 @@ private final class ScriptedPlatform: CoreBluetoothPlatform {
 
     func discoverServices() -> PlatformStartResult {
         let chars = [
-            GattCharacteristicInfo(service: FtmsUuids.shared.SERVICE, characteristic: FtmsUuids.shared.CONTROL_POINT, properties: [.write, .indicate]),
-            GattCharacteristicInfo(service: FtmsUuids.shared.SERVICE, characteristic: FtmsUuids.shared.INDOOR_BIKE_DATA, properties: [.notify]),
-        ]
+            AppleCoreFactories.shared.createCharacteristicInfo(
+                service: AppleCoreFactories.shared.ftmsServiceUuid,
+                characteristic: AppleCoreFactories.shared.ftmsControlPointUuid,
+                properties: [.write, .indicate]
+            ),
+            AppleCoreFactories.shared.createCharacteristicInfo(
+                service: AppleCoreFactories.shared.ftmsServiceUuid,
+                characteristic: AppleCoreFactories.shared.ftmsIndoorBikeDataUuid,
+                properties: [.notify]
+            ),
+        ].compactMap { $0 }
         DispatchQueue.global().async { [weak self] in
             self?.onEvent?(.servicesDiscovered(characteristics: chars, status: GattStatus.shared.SUCCESS))
         }
