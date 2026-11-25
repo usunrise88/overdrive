@@ -55,8 +55,9 @@ the owner's account (ADR 0044; spec §3.1; deploy section 22). Built in these st
   start, `MIGRATE_ONLY`, the registry, the shared poller, the admin listener on `127.0.0.1`, not published), `curl` in the
   image, the CI smoke test and the end-to-end test of two users. Documentation: ADR 0044, spec §3.1, deploy section 22, this
   section.
-- **Rehearsal and production cutover: not done.** A rehearsal on a copy of the dump (two scratch PostgreSQL 18 containers, no
-  external network) comes first; the production move waits for the owner's approval.
+- **Rehearsal: done** (`deploy/rehearsal/`, on a copy of the dump in two scratch PostgreSQL 18 containers with no external
+  network: the checksums of old and new restores are equal, the move report is clean, the previous image refuses to start on the
+  moved data, and all 14 endpoints answer identically). **Production cutover: not done**; it waits for the owner's approval.
 
 Not part of it (ADR 0044): more than one owner for one user, a review of the Strava terms for several people, and encryption
 of the secrets in the database.
