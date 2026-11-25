@@ -85,8 +85,9 @@ describe("the environment keys (T5)", () => {
   });
 
   it("covers every environment key that code outside the configuration reads", () => {
-    // The two command-line tools read a few keys of their own; those are not the service's.
-    const tools = new Set(["GOOGLE_AUTH_PORT", "OWNER_PASSPHRASE"]);
+    // The two command-line tools read a few keys of their own; those are not the service's. MIGRATE_ONLY is the start-up
+    // switch of `start.ts` (a one-off run), not a setting of any tenant.
+    const tools = new Set(["GOOGLE_AUTH_PORT", "OWNER_PASSPHRASE", "MIGRATE_ONLY"]);
     const found = new Set<string>();
     const walk = (dir: string) => {
       for (const name of readdirSync(dir)) {

@@ -20,6 +20,10 @@ RUN pnpm --filter "@overdrive/server..." build \
 
 FROM node:24-slim
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=8080
+# curl: the admin API is reached with `docker compose exec server sh -c 'curl ...'` (docs/deploy.md).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /out/package.json ./
 COPY --from=build /out/node_modules ./node_modules

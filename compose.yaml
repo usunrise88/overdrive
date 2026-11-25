@@ -94,6 +94,13 @@ services:
       LIVE_COACH_MAX_CUES_PER_HOUR: ${LIVE_COACH_MAX_CUES_PER_HOUR:-}
       LIVE_COACH_LEAD_SECONDS: ${LIVE_COACH_LEAD_SECONDS:-}
       LIVE_COACH_DEADLINE_SECONDS: ${LIVE_COACH_DEADLINE_SECONDS:-}
+      # Users (multi-tenancy): the admin API listens on 127.0.0.1 inside the container, on ADMIN_PORT, and is NOT published; reach it with
+      # `docker compose exec server ...` from the host. Without ADMIN_TOKEN it is off. OWNER_HANDLE names the first user (default owner).
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      ADMIN_PORT: ${ADMIN_PORT:-8081}
+      OWNER_HANDLE: ${OWNER_HANDLE:-}
+      # MIGRATE_ONLY is deliberately not here: it is for a one-off run that migrates, prints the report and exits without serving:
+      #   docker compose run --rm -e MIGRATE_ONLY=1 server
     ports:
       - "127.0.0.1:${SERVER_PORT:-8080}:8080"
 

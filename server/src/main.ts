@@ -1,45 +1,27 @@
-import { buildApp } from "./app.ts";
-import { type Config, describeConfigError, loadConfig } from "./config.ts";
-import { createPgDb } from "./db.ts";
-import { migrate } from "./migrate.ts";
+import { describeConfigError } from "./config.ts";
+import { consoleLogger } from "./log.ts";
+import { messageOf, startServer } from "./start.ts";
 
-let config: Config;
-try {
-  config = loadConfig();
-} catch (err) {
-  console.error(`Invalid configuration:\n${describeConfigError(err)}`);
-  process.exit(1);
-}
-const db = createPgDb(config.DATABASE_URL, (err) =>
-  console.error("database connection error", err),
-);
-const app = buildApp({ config, db });
-
-// The owner's passphrase is never configured, only its hash (ADR 0018). A plain one in the
-// environment is a mistake worth saying so about, though its value is never read or printed.
-if ((process.env.OWNER_PASSPHRASE ?? "") !== "") {
-  app.log.warn(
-    "OWNER_PASSPHRASE is set but is not read: the server takes only OWNER_PASSPHRASE_HASH. Remove the plain passphrase from the environment",
-  );
-}
-
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.once(signal, () => {
-    app.log.info({ signal }, "shutting down");
-    void app
-      .close()
-      .then(() => db.close())
-      .then(() => process.exit(0));
-  });
-}
+/** The process wrapper: environment in, signals out. Everything that can be tested is in `start.ts`. */
+const log = consoleLogger(process.env.LOG_LEVEL);
 
 try {
-  const applied = await migrate(db);
-  if (applied.length > 0) app.log.info({ migrations: applied }, "database migrated");
-  await app.listen({ host: config.HOST, port: config.PORT });
-  // The upload worker and the plan refresher run only once the schema is there and the port is open.
-  app.services.start();
+  const server = await startServer({ env: process.env, log });
+  if (server.mode === "migrate-only") {
+    // The report holds counts, hashes and key names, never a value.
+    process.stdout.write(`${JSON.stringify(server.report, null, 2)}\n`);
+    await server.close();
+    process.exit(0);
+  }
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.once(signal, () => {
+      log.info({ signal }, "shutting down");
+      void server.close().then(() => process.exit(0));
+    });
+  }
 } catch (err) {
-  app.log.error(err);
+  const message =
+    err instanceof Error && err.name === "ZodError" ? describeConfigError(err) : messageOf(err);
+  log.error({}, `the server did not start: ${message}`);
   process.exit(1);
 }
