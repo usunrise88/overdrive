@@ -21,6 +21,8 @@ const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/;
 // Base64 and base64url, which is what `openssl rand -base64 36` makes: nothing that could be taken
 // for the separators of the list.
 const TOKEN = /^[A-Za-z0-9+/=._~-]+$/;
+/** The login handle of a user: what `shared.users.handle` accepts. */
+export const HANDLE = /^[a-z][a-z0-9_-]{1,31}$/;
 
 /**
  * Parses `DEVICE_TOKENS` (or `MCP_STATIC_TOKENS`, which has the same form): comma-separated
@@ -107,6 +109,33 @@ const schema = z.object({
       error: "DATABASE_URL is required, for example postgres://user:password@host:5432/db",
     })
     .min(1, "DATABASE_URL must not be empty"),
+  // The admin API (stage B3): a separate listener on 127.0.0.1 for the owner's server-side tooling. Off without a token.
+  ADMIN_TOKEN: z.preprocess(
+    blankIsUnset,
+    z
+      .string()
+      .trim()
+      .min(
+        MIN_TOKEN_LENGTH,
+        `ADMIN_TOKEN must be at least ${MIN_TOKEN_LENGTH} characters, make one with: openssl rand -base64 36`,
+      )
+      .max(MAX_TOKEN_LENGTH, `ADMIN_TOKEN must be at most ${MAX_TOKEN_LENGTH} characters`)
+      .regex(TOKEN, "ADMIN_TOKEN must use only A-Z a-z 0-9 + / = . _ ~ -")
+      .optional(),
+  ),
+  ADMIN_PORT: z.coerce.number().int().min(1).max(65535).default(8081),
+  // The login handle of the owner (user 1), used when an old installation is migrated.
+  OWNER_HANDLE: z.preprocess(
+    blankIsUnset,
+    z
+      .string()
+      .trim()
+      .regex(
+        HANDLE,
+        "OWNER_HANDLE must be 2 to 32 characters: a lowercase letter, then lowercase letters, digits, _ or -",
+      )
+      .default("owner"),
+  ),
   DEVICE_TOKENS: z
     .string()
     .default("")

@@ -12,6 +12,7 @@ export const INSTALLATION_KEYS: readonly string[] = [
   "DATABASE_URL",
   "PUBLIC_BASE_URL",
   "ADMIN_TOKEN",
+  "ADMIN_PORT",
   "LLM_BASE_URL",
   "LLM_API_KEY",
   "LLM_MODEL",
@@ -89,12 +90,9 @@ export const IMPORT_ONLY_KEYS: readonly string[] = [
   "MCP_STATIC_TOKENS",
   "OWNER_PASSPHRASE_HASH",
   "TELEGRAM_OWNER_CHAT_ID",
-  // The owner's login handle (default "owner"). Not read by the configuration code yet.
+  // The owner's login handle (default "owner").
   "OWNER_HANDLE",
 ];
-
-/** The keys of {@link IMPORT_ONLY_KEYS} and {@link INSTALLATION_KEYS} that the configuration code does not read (yet). */
-export const NOT_IN_CONFIG_YET: readonly string[] = ["ADMIN_TOKEN", "OWNER_HANDLE"];
 
 export type KeyKind = "installation" | "per-user" | "import-only";
 

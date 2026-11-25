@@ -13,7 +13,6 @@ import {
   IMPORT_ONLY_KEYS,
   INSTALLATION_KEYS,
   keyKind,
-  NOT_IN_CONFIG_YET,
   PER_USER_KEYS,
 } from "../src/tenancy/keys.ts";
 
@@ -59,11 +58,11 @@ describe("the environment keys (T5)", () => {
     expect(loose).toEqual([]);
   });
 
-  it("lists no key twice and no key that the code does not know, except the two that are not read yet", () => {
+  it("lists no key twice and no key that the code does not know", () => {
     const all = [...INSTALLATION_KEYS, ...PER_USER_KEYS, ...IMPORT_ONLY_KEYS];
     expect(new Set(all).size).toBe(all.length);
     const known = new Set(configKeys());
-    expect(all.filter((k) => !known.has(k)).sort()).toEqual([...NOT_IN_CONFIG_YET].sort());
+    expect(all.filter((k) => !known.has(k))).toEqual([]);
   });
 
   it("agrees with the brief on the owner's secrets", () => {
