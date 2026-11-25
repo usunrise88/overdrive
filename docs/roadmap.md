@@ -7,7 +7,7 @@ rest is solid.
 
 **Where we are: M1 to M4 are done, and Phase 2 is complete.** `v0.1.0` is the MVP: everything automatic is green and
 nothing has touched real hardware. Phase 2 (P2-1 to P2-5) is built and merged, and `v0.2.0` is ready to be cut by the
-owner once CI is green. Phase 3 is released (`v0.3.1`, `v0.3.2`). Phase 4 (`v0.4.0`) is built and out as `v0.4.0-rc.1` (see "Phase 4 stages"). Multiple users (ADR 0015) comes last. The bench (below) is still open.
+owner once CI is green. Phase 3 is released (`v0.3.1`, `v0.3.2`). Phase 4 (`v0.4.0`) is built and out as `v0.4.0-rc.1` (see "Phase 4 stages"). Multiple users (ADR 0044) is built; its move of the owner's data waits for the owner's go-ahead (section "Multiple users"). The bench (below) is still open.
 
 | Stage | Release | Goal | What the owner tests | State |
 |---|---|---|---|---|
@@ -40,12 +40,26 @@ on 2026-11-18 that Phase 2 has one release, `v0.2.0`, after the last stage.
 | **P2-5 Strava upload and description** (ADR 0020) | Rides uploaded to Strava, with their description written (§5.5, §5.6). Strava is write-only | done (merged) |
 | **Release `v0.2.0`** | Notes from `docs/releases/TEMPLATE.md`. One release for all of Phase 2, no alphas (owner, 2026-11-18). The owner publishes it in the GitHub web UI once CI on the commit is green (`docs/releasing.md`, section 11) | ready to be cut by the owner |
 
-## Last: multiple users
+## Multiple users
 
-Decision (owner, 2026-11-18, ADR 0015): multi-user support is the **final stage of the project**, after Phase 3. Until then the
-system is single-user (spec §1): one profile, one plan, one set of integration keys, device tokens that name devices, not people.
-It will need accounts and sign-in, a user id on every table, per-user integration keys and profile, and a review of the Strava
-terms for more than one person. Nothing of it is built earlier, and no earlier stage adds a user column "just in case".
+Decided first as the last stage (owner, 2026-11-18, ADR 0015), then designed by the owner on 2026-11-24 and 2026-11-25: one
+installation, one schema per user and a `shared` schema, accounts created through the admin API, the owner's data moved into
+the owner's account (ADR 0044; spec §3.1; deploy section 22). Built in these stages:
+
+- **A1** schema-per-user database layer, migrations by directory, the `shared` migration (merged).
+- **A2** the verified move of the owner's data and the fresh install, with the checks and the guard (merged).
+- **B1** the multi-user runtime: per-user configuration, the tenant registry, `request.tenant`, `GET /v1/me` (merged).
+- **B2** OAuth, MCP and Telegram on `shared`: login by handle, per-handle lockout, the shared bot poller, migration `0014`.
+- **B3** the admin API, with `ADMIN_TOKEN`, `ADMIN_PORT` and `OWNER_HANDLE` in the configuration.
+- **C** the wiring and the documentation. Documentation (ADR 0044, spec §3.1, deploy section 22, this section) is done. Still
+  open: `server/src/main.ts` (the bootstrap on start, `MIGRATE_ONLY`, the registry, the shared poller, the admin listener on
+  `127.0.0.1`), `compose.yaml` (`ADMIN_TOKEN`, the port bound to `127.0.0.1` only), `curl` in the image, the CI smoke test, and
+  the end-to-end test.
+- **Rehearsal and production cutover: not done.** A rehearsal on a copy of the dump (two scratch PostgreSQL 18 containers, no
+  external network) comes first; the production move waits for the owner's approval.
+
+Not part of it (ADR 0044): more than one owner for one user, a review of the Strava terms for several people, and encryption
+of the secrets in the database.
 
 ## Hardware verification is deferred
 

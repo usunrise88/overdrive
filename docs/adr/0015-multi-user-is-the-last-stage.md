@@ -1,6 +1,6 @@
 # ADR 0015: Multiple users come last
 
-Status: accepted (owner's decision, 2026-11-18).
+Status: accepted (owner's decision, 2026-11-18). Superseded in part by ADR 0044 (the multi-user stage is built as 0044 describes).
 
 ## Context
 

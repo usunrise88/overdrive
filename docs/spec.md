@@ -11,7 +11,7 @@
 
 ## 1. Overview
 
-Overdrive is a single-user indoor cycling system: an Android tablet app that controls a Van Rysel D500 and shows ride data in a small overlay on top of other apps, a thin self-hosted web service with an MCP server so an AI agent can plan workouts, and a phone companion for statistics and wellness data.
+Overdrive is an indoor cycling system: one installation of the web service serves one or more users, each with their own data (§3.1, ADR 0044). Its parts are an Android tablet app that controls a Van Rysel D500 and shows ride data in a small overlay on top of other apps, a thin self-hosted web service with an MCP server so an AI agent can plan workouts, and a phone companion for statistics and wellness data.
 
 The core idea is that everything runs on the tablet in front of the bike. Video plays full screen, the overlay shows the numbers, and one Zwift Click controller on the handlebar drives the ride, the workout and the media.
 
@@ -28,7 +28,7 @@ The core idea is that everything runs on the tablet in front of the bike. Video 
 
 - iOS. iOS has no system overlay; the shared core keeps the door open but nothing is built for it.
 - Virtual worlds, multiplayer, racing, video routes.
-- Store distribution. Multiple users and accounts are not built now; they are the **last stage of the project**, after Phase 3 (ADR 0015).
+- Store distribution. Users are created by the owner through the admin API; there is no sign-up (§3.1). Multiple users were the last stage of the project (ADR 0015, superseded in part by ADR 0044).
 - A custom training-plan database. intervals.icu is the plan backend.
 - Medical conclusions.
 
@@ -95,6 +95,25 @@ Devices talk only to the apps, the apps talk only to the web service, and the se
 3. **Upload.** The ride app sends the FIT file to the service. The service uploads it to intervals.icu and Strava.
 4. **Wellness.** The companion reads Health Connect once a day and on open, and sends new records to the service.
 5. **Insight.** The service computes load and recovery metrics, asks the LLM for the text, and sends it through Telegram and to the companion.
+
+### 3.1 Users and tenancy
+
+One installation of the web service serves several users (ADR 0044). The rules, in brief:
+
+- **Storage.** One PostgreSQL database with a `shared` schema (users, device and MCP tokens as digests, per-user settings,
+  OAuth, the Telegram bot's state) and one schema per user, `t_<id>`, with every other table of §8 unchanged. A user's data
+  never shares a table with another user's.
+- **Configuration.** Three lists, never mixed. Installation keys (model providers, bot token, admin token) come from the
+  environment only. Per-user keys (intervals.icu, Strava, Google, timezone, reminders, insights) come from the user's settings
+  only, and a per-user key in the environment is ignored. Import-only keys are read by the one-time move and by user creation.
+- **Sign-in.** The authorisation page takes a handle and a passphrase (a stored hash only). Tokens are per user.
+- **Telegram.** One bot for the installation, routing each update by chat id to the user who owns the chat.
+- **Admin.** Users are created, changed and removed through an admin API that is reachable from the server only, never
+  published.
+- **The owner's data** is moved into the owner's schema by one verified transaction (a check before, a comparison after, a
+  guard against the old image). The apps need no change: their addresses and tokens keep working.
+
+Stated in full, with the decisions and their limits: ADR 0044.
 
 ## 4. Phase 1: Android ride app MVP
 

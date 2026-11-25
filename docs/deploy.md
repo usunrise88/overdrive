@@ -52,14 +52,17 @@ Edit `.env` in an editor. Set:
 
 - `POSTGRES_PASSWORD`: URL-safe, because it goes into the database URL. Make one with `openssl rand -hex 24`.
 - `SERVER_PORT=27180` and `POSTGRES_PORT=27181` (the host's ports; the defaults are taken there).
-- `DEVICE_TOKENS`: see the next step.
+- `DEVICE_TOKENS`: see the next step. After the move (section 22) it is read only by the move.
+- `ADMIN_TOKEN`: from the move on, the bearer token of the admin API (section 22). Make one with `openssl rand -base64 36`.
+  It stays in `.env` like the other installation settings, and nothing prints it.
 
 `.env` is git-ignored. Never commit it, and never paste its contents into a chat, an issue or a commit.
 
 ## 3. Device token
 
 Each device that uploads rides needs a token. This one is for the tablet, named `tablet`. Make it and write it into
-`.env` without printing it:
+`.env` without printing it. (After the move, section 22, the tablet's token lives in the database, and new device tokens
+are issued through the admin API; the `DEVICE_TOKENS` line is then read only by the move.)
 
 ```bash
 printf 'DEVICE_TOKENS=tablet:%s\n' "$(openssl rand -base64 36)" >> .env
@@ -142,6 +145,10 @@ chmod 600 ~/backups/overdrive-*.sql.gz
 
 Make the backup directory first (`mkdir -p ~/backups`). Keep a copy off the host as well.
 
+From the move on (section 22) the database holds one schema for every user: `shared` (users, tokens, settings, OAuth, the
+bot's state) and `t_<id>` for each user. `pg_dump` takes the whole database by default, so the command above includes all of
+them; there is no per-user dump. Every user's secrets are in the dump in clear, as they are today: keep it private.
+
 ## 9. Restoring
 
 A restore goes into an empty database, because the dump creates the tables without checking for them. Stop the server,
@@ -161,6 +168,9 @@ docker compose up -d server
 The server finds every migration already recorded in `schema_migrations` and starts. To check a backup without touching
 the live database, restore it into a scratch copy of this project first.
 
+A dump taken after the move restores every schema (`shared` and each `t_<id>`) with the same command. A dump taken before
+the move is the single-user layout: restore it and run the previous image, as the rollback in section 22 says.
+
 ## 10. Rotating a token
 
 To change a device's token, or to revoke a device:
@@ -170,6 +180,16 @@ To change a device's token, or to revoke a device:
 3. For a new token, type it into the tablet's Settings, Sync.
 
 The old token stops working at once. Tokens are at least 32 characters; startup fails otherwise.
+
+**After the move** (section 22) the tokens are in the database and `.env` no longer holds them. Issue the new one through the
+admin API under a new name, type it into the tablet, then revoke the old name. Names are not reused after a revoke, so the
+new one needs its own name (for example `tablet-2`):
+
+```bash
+# body in ~/admin-body.json: {"kind":"device","name":"tablet-2"}; the answer carries the token once
+docker compose exec -T server sh -c 'curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" --data-binary @- http://127.0.0.1:${ADMIN_PORT:-8081}/admin/users/1/tokens' < ~/admin-body.json
+docker compose exec server sh -c 'curl -s -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" http://127.0.0.1:${ADMIN_PORT:-8081}/admin/users/1/tokens/tablet'
+```
 
 ## 11. Environment variables
 
@@ -305,6 +325,9 @@ change: the site file proxies everything, including `/mcp`, `/.well-known/…` a
    ```
 
    The hash has colons and no dollar sign on purpose: compose would read a `$` in `.env` as a variable.
+
+   After the move (section 22) the hash is in the owner's row in the database, copied from this line by the move. The admin
+   API cannot change it yet, so leave it as it is.
 3. Check that the front door answers (both documents are public):
 
    ```bash
@@ -314,12 +337,15 @@ change: the site file proxies everything, including `/mcp`, `/.well-known/…` a
    ```
 4. In the AI client, add a custom connector (a remote MCP server) with the address `https://overdrive.llmto.day/mcp`. The client opens a
    page of the service in the browser, **Connect to Overdrive**: type the passphrase and press Approve. Five wrong passphrases lock
-   that page for 15 minutes, then 30, and so on up to a day (tokens already issued keep working).
+   that page for 15 minutes, then 30, and so on up to a day (tokens already issued keep working). From the move on the page also
+   asks for a handle: type `owner`, or the `OWNER_HANDLE` you chose for the move. A handle is required; the page does not fill it in.
 5. For a client that cannot do OAuth but can send a fixed header, add `MCP_STATIC_TOKENS=name:<openssl rand -base64 36>` to `.env`
-   and `docker compose up -d server`; give the client `Authorization: Bearer <that>`.
+   and `docker compose up -d server`; give the client `Authorization: Bearer <that>`. After the move, issue the token through the
+   admin API instead (section 22, `kind` `mcp`); `MCP_STATIC_TOKENS` is then read only by the move.
 
 To end every client's access at once (they must ask for approval again), run in the database:
-`DELETE FROM oauth_tokens;` (`docker compose exec db psql -U overdrive -d overdrive`). To change the passphrase, make a new hash and
+`DELETE FROM oauth_tokens;` (`docker compose exec db psql -U overdrive -d overdrive`). After the move the table is in the
+`shared` schema: `DELETE FROM shared.oauth_tokens;`. To change the passphrase, make a new hash and
 put it in `.env` (grants already issued stay; delete them as above if you want them gone). To turn the MCP server off, empty
 `PUBLIC_BASE_URL` or `OWNER_PASSPHRASE_HASH` and `docker compose up -d server`: its routes disappear.
 
@@ -368,8 +394,10 @@ stay in `.env`: you type them into the file on the host and never into a chat.
    ```
 
    Use the id of your own private chat (a positive number). Other people who find the bot get the same log line, and nothing else.
+   After the move (section 22) the shared bot logs an update from a chat that no user has, and the line reads
+   `Telegram message from a chat no user has`; the chat id is in the same line. Set it with `PUT /admin/users/1/telegram`.
 4. **Make that chat the owner.** Put `TELEGRAM_OWNER_CHAT_ID=123456789` in `.env`, then `docker compose up -d server`. Send `/help`:
-   the bot now answers.
+   the bot now answers. (After the move, the chat is set with the admin API, section 22, and `.env` does not need it.)
 5. **Optional.** Set `REMINDER_EVENING_TIME`, `REMINDER_LEAD_MINUTES`, `WEEKLY_SUMMARY_DAY`, `WEEKLY_SUMMARY_TIME` and
    `GCAL_WORKOUT_START` (the time a workout is assumed to start, shared with the calendar). Reminders and summaries are in
    `TIMEZONE`, so set that too.
@@ -380,7 +408,8 @@ Check: with a workout planned for tomorrow, the evening reminder arrives at `REM
 buttons. `/today` and `/week` need the plan source (`INTERVALS_API_KEY`); without it the bot says so.
 
 To change the token, send `/revoke` to BotFather, update `.env` and `docker compose up -d server`. If the bot stays silent, look in
-the log for `another chat ignored` (the chat id there is not the one in `.env`) and for `polling failed` (network or token).
+the log for `another chat ignored` (the chat id there is not the one in `.env`) and for `polling failed` (network or token). After
+the move, look for `a chat no user has` instead.
 
 ## 14. Google Calendar
 
@@ -802,6 +831,134 @@ and a session with no snapshot for 10 minutes ends by itself.
 
 **Rollout.** The tablet and the companion must learn `live_coach`, `coach_brief` and `must_say` (their decoders reject unknown keys) **before**
 the planning agent writes any of them: until then the agent must not set them.
+
+## 22. Users and the move
+
+Several users can share one installation. Each has their own rides, plan events, notebook, integrations and Telegram chat; the
+model providers (LLM, TTS, BRouter) are shared (ADR 0044). The owner's data moves into the owner's account once, by a checked
+transaction. **Status:** the code is in the repository. The start-up wiring (`server/src/main.ts`), the admin port and token in
+`compose.yaml`, and the image's `curl` are not on the branch yet (the image is `node:24-slim`, which has no `curl`). Until they
+are, the commands below do not work, and production still runs the single-user layout. Nothing here has been run against the
+production database.
+
+### What happens on start
+
+Before it serves anything, the server brings the database to the multi-tenant layout:
+
+- **An empty database** (a fresh install): creates the `shared` schema, user 1 (the owner, handle `owner` or `OWNER_HANDLE`)
+  with the passphrase hash, the Telegram chat, and the device and MCP tokens from `DEVICE_TOKENS` and `MCP_STATIC_TOKENS` if
+  they are set; creates `t_1`; runs the migrations.
+- **The live single-user database** (the tables are in `public`): the owner's data moves into `t_1`, the OAuth tables and the
+  bot's state into `shared`, in one transaction. Nothing is moved unless everything checks out first: `public` holds exactly the
+  expected tables, the 13 old migrations match their recorded checksums, `DEVICE_TOKENS` is not empty, and the owner's settings
+  are valid. A refusal says what is wrong and changes nothing. A content comparison before and after the move rolls the whole
+  move back if anything differs. Afterwards `public` holds one guard row, which makes the old image refuse to start on this
+  database.
+- **A database that is already moved**: nothing to move; the pending migrations run in `shared` and in each user's schema.
+
+The log says which of these happened, the migrations run, and the **names** (never the values) of the keys that were imported,
+and of the per-user keys still in `.env`, which are ignored from now on.
+
+### Checking a move before the server starts
+
+`MIGRATE_ONLY=1` runs the bootstrap and the migrations, prints the report to the log and exits without listening:
+
+```bash
+docker compose run --rm -e MIGRATE_ONLY=1 server
+```
+
+### The admin API
+
+The admin API is a separate port inside the server, `ADMIN_PORT` (default 8081), bound to `127.0.0.1` and never published:
+no compose port, no Caddy route. It needs `Authorization: Bearer <ADMIN_TOKEN>`. Call it from the server, from inside the
+container; the token is read from the container's environment, so it is never typed or printed:
+
+```bash
+docker compose exec server sh -c 'curl -s -H "Authorization: Bearer $ADMIN_TOKEN" http://127.0.0.1:${ADMIN_PORT:-8081}/admin/users'
+```
+
+For a request with a body, write the JSON into a file only you can read, and pass it on stdin. Delete the file afterwards.
+Passphrase hashes and API keys are secrets, so do not leave these files behind:
+
+```bash
+umask 077
+cat > ~/admin-body.json <<'JSON'
+{"handle":"anna","passphraseHash":"<the hash, from the step below>","telegramChatId":123456789,"tokenName":"tablet"}
+JSON
+docker compose exec -T server sh -c 'curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" --data-binary @- http://127.0.0.1:${ADMIN_PORT:-8081}/admin/users' < ~/admin-body.json
+rm -f ~/admin-body.json
+```
+
+Replies are JSON. Errors have the form `{"error":{"code","message"}}`: `invalid_request` (400) names the field, `conflict` (409)
+means the handle, the chat or the change clashes with another user or a rebuild failed.
+
+### Creating a user
+
+1. Make the passphrase hash, as in section 12 (`docker compose run --rm --no-deps server node dist/hash-passphrase.js`). Use
+   the part of the line the command prints after `OWNER_PASSPHRASE_HASH=` (it starts with `scrypt:`).
+2. Write the body (the file above) and `POST` it to `/admin/users`. Fields: `handle` (2 to 32 characters: a lowercase letter, then
+   lowercase letters, digits, `_` or `-`); `passphraseHash` (optional; without it the user cannot approve a connector); `telegramChatId`
+   (optional, a whole number); `tokenName` (default `device-1`); `settings` (optional, per-user keys only, see below).
+3. The answer is `201` with `id`, `handle`, `deviceToken` and `state`. **The device token is shown once.** Type it into the new
+   user's tablet (Settings, Sync) and do not keep it in a file. `state` is `ready`, or `failed` when the user's settings are
+   invalid; the log then names the keys.
+
+Each new user also needs their own intervals.icu key, their own Strava app, a Google client (in the Testing mode its tokens last
+seven days) and a chat with the shared Telegram bot. ADR 0044 has the details.
+
+### Tokens
+
+- **Issue:** `POST /admin/users/:id/tokens` with `{"kind":"device"}` or `{"kind":"mcp"}` and a `name` (letters, digits, `.`, `_`, `-`;
+  up to 32 characters). `201`, with the token once.
+- **Revoke:** `DELETE /admin/users/:id/tokens/:name`. `204`. A revoked name is not reused.
+- **List:** `GET /admin/users` shows each user's tokens by name, kind and whether they are revoked. Never the values.
+
+### Settings
+
+- **Read:** `GET /admin/users/:id/settings`. Names that look secret (containing `TOKEN`, `SECRET`, `KEY` or `PASSWORD`) show as `***`.
+- **Write:** `PUT /admin/users/:id/settings` with an object of names to values; `null` removes one. Only per-user keys are accepted:
+  the list is `PER_USER_KEYS` in `server/src/tenancy/keys.ts`. Values are checked by the same rules as the environment. The user's
+  services are rebuilt with the new values; a rebuild that fails answers `409`.
+
+```bash
+# body in ~/admin-body.json: {"TIMEZONE":"<your timezone>","INTERVALS_API_KEY":"<the key>"}
+docker compose exec -T server sh -c 'curl -s -X PUT -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" --data-binary @- http://127.0.0.1:${ADMIN_PORT:-8081}/admin/users/2/settings' < ~/admin-body.json
+```
+
+### Telegram chat
+
+The shared bot answers each chat only for the user whose chat it is. To find a new user's chat id, have them send any message
+to the bot, then read the id from the log (the line says `Telegram message from a chat no user has`):
+
+```bash
+docker compose logs --tail 50 server | grep 'a chat no user has' | grep -o '"chatId":-\?[0-9]*'
+```
+
+Set it with `PUT /admin/users/:id/telegram` and `{"chatId":123456789}`; `null` unsets it. A chat belongs to one user only (`409`).
+
+### Disable, enable, reload, delete
+
+- `POST /admin/users/:id/disable`: the user's services stop and their tokens stop working. `POST .../enable` brings them back.
+- `POST /admin/users/:id/reload`: rebuilds the user's services from their settings.
+- `DELETE /admin/users/:id` with `{"confirm":"<handle>"}` removes the user's schema, rows, tokens and OAuth grants in one
+  transaction. `204`. It cannot be undone except from a dump, so take one first (section 8). The owner is user 1: deleting them
+  needs `{"confirm":"<handle> allow-owner"}`.
+
+### The move, in order
+
+1. Take a dump (section 8) and keep a copy off the host.
+2. Do it only after the owner's go-ahead, which follows a rehearsal on a copy of the dump (ADR 0044).
+3. `docker compose stop server`.
+4. `docker compose run --rm -e MIGRATE_ONLY=1 server`. Read the report. A refusal changes nothing: fix what it names, and run it again.
+5. `docker compose up -d server`. Check section 5, `GET /v1/me` with the tablet's token (it names user 1), a ride upload from the
+   tablet, a command in Telegram, and the connector in the AI client.
+6. Remove from `.env` the import-only lines (`DEVICE_TOKENS`, `MCP_STATIC_TOKENS`, `OWNER_PASSPHRASE_HASH`, `TELEGRAM_OWNER_CHAT_ID`,
+   `OWNER_HANDLE`) and the per-user keys the log names. Keep the installation settings, `ADMIN_TOKEN` among them. Then
+   `docker compose up -d server`.
+
+**Rollback.** Stop the server, restore the dump taken before step 3 (section 9), and run the previous image. The guard row makes
+the old image refuse to start on the moved database, so it cannot start empty. Rides and other data uploaded after the move
+are lost, except what the tablet sends again (ADR 0044, consequences).
 
 ## Troubleshooting
 

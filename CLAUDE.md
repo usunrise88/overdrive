@@ -1,6 +1,6 @@
 # Overdrive: guide for coding agents
 
-Single-user indoor cycling system. The authoritative spec is `docs/spec.md`; cite sections as
+Indoor cycling system: one installation serves one or more users, each with their own data (ADR 0044). The authoritative spec is `docs/spec.md`; cite sections as
 "spec §4.7". Read §1, §3 and the section for the phase you are working in before changing code.
 
 ## Layout
