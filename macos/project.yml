@@ -33,16 +33,16 @@ targets:
       - path: Overdrive
         excludes:
           - "**/*.md"
-    resources:
+          - "Resources/**"
       - path: Overdrive/Resources/Fonts
-        buildPhase: resources
         type: folder
+        buildPhase: resources
       - path: Overdrive/Resources/Licenses
-        buildPhase: resources
         type: folder
+        buildPhase: resources
       - path: Overdrive/Resources/Workouts
-        buildPhase: resources
         type: folder
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.overdrive.ride.macos
@@ -68,7 +68,7 @@ targets:
     dependencies:
       - framework: ../core/build/XCFrameworks/debug/OverdriveCore.xcframework
         embed: false
-        implicit: true
+        implicit: false
       - sdk: CoreBluetooth.framework
       - sdk: CoreAudio.framework
       - sdk: AVFoundation.framework
@@ -87,3 +87,6 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: app.overdrive.ride.macos.tests
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Overdrive.app/Contents/MacOS/Overdrive"
         BUNDLE_LOADER: "$(TEST_HOST)"
+        FRAMEWORK_SEARCH_PATHS:
+          - "$(inherited)"
+          - "$(SRCROOT)/../core/build/XCFrameworks/debug/OverdriveCore.xcframework/macos-arm64"
