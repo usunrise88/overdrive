@@ -30,7 +30,7 @@ public final class SleepAssertion {
 /// Compact macOS menu bar extra (`NSStatusItem`) showing live power while riding and quick controls (ADR 0044).
 @MainActor
 public final class MenuBarController: NSObject {
-    private let statusItem: NSStatusItem
+    private let statusItem: NSStatusItem?
     private let menu = NSMenu()
     private let toggleOverlayItem: NSMenuItem
     private let pauseResumeItem: NSMenuItem
@@ -42,14 +42,14 @@ public final class MenuBarController: NSObject {
     public var onMuteCoach: (() -> Void)?
     public var onQuit: (() -> Void)?
 
-    public override init() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    public init(enabled: Bool = true) {
+        statusItem = enabled ? NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength) : nil
         toggleOverlayItem = NSMenuItem(title: "Always Show Overlay", action: nil, keyEquivalent: "")
         pauseResumeItem = NSMenuItem(title: "Pause Ride", action: nil, keyEquivalent: "")
         muteCoachItem = NSMenuItem(title: "Mute Live Coach", action: nil, keyEquivalent: "")
         super.init()
 
-        if let button = statusItem.button {
+        if let button = statusItem?.button {
             button.image = NSImage(systemSymbolName: "bicycle", accessibilityDescription: "Overdrive")
             button.imagePosition = .imageLeading
         }
@@ -80,7 +80,7 @@ public final class MenuBarController: NSObject {
         quitItem.target = self
         menu.addItem(quitItem)
 
-        statusItem.menu = menu
+        statusItem?.menu = menu
     }
 
     public func update(
@@ -91,7 +91,7 @@ public final class MenuBarController: NSObject {
         coachActive: Bool,
         coachMuted: Bool
     ) {
-        if let button = statusItem.button {
+        if let button = statusItem?.button {
             if isLive {
                 let text = isPaused ? " Paused" : (powerWatts.map { " \($0) W" } ?? " —")
                 button.title = text

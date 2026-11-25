@@ -5,7 +5,9 @@ import UniformTypeIdentifiers
 @main
 public struct OverdriveMacApp: App {
     @NSApplicationDelegateAdaptor(OverdriveAppDelegate.self) private var delegate
-    @StateObject private var container = AppContainer()
+    @StateObject private var container = AppContainer(
+        startSubsystems: ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
+    )
 
     public init() {}
 

@@ -7,7 +7,7 @@ import OverdriveCore
 /// `GattTransportFactory`, `GattTransport`) on a dedicated background `DispatchQueue` (spec §7.3, ADR 0044).
 public final class MacBleStack: NSObject {
     public let bleQueue = DispatchQueue(label: "app.overdrive.ble", qos: .userInitiated)
-    private var centralManager: CBCentralManager!
+    private var centralManager: CBCentralManager?
     private let availabilityBridge = AppleStateBridge<BleAvailability>(initial: .bluetoothOff)
 
     private var activeScanBridge: AppleEventBridge<ScanEvent>?
@@ -22,10 +22,12 @@ public final class MacBleStack: NSObject {
         delegate: MacGattTransportFactoryAdapter(stack: self)
     )
 
-    public override init() {
+    public init(autoStart: Bool = true) {
         super.init()
-        centralManager = CBCentralManager(delegate: self, queue: bleQueue)
-        updateAvailability()
+        if autoStart {
+            centralManager = CBCentralManager(delegate: self, queue: bleQueue)
+            updateAvailability()
+        }
     }
 
     public func refreshAvailability() {
@@ -68,7 +70,7 @@ public final class MacBleStack: NSObject {
             let services: [CBUUID]? = filterUuids.isEmpty
                 ? nil
                 : filterUuids.map { $0.toCBUUID() }
-            self.centralManager.scanForPeripherals(
+            self.centralManager?.scanForPeripherals(
                 withServices: services,
                 options: [CBCentralManagerScanOptionAllowDuplicatesKey: true]
             )
@@ -81,7 +83,7 @@ public final class MacBleStack: NSObject {
             self.activeScanBridge = nil
             self.activeScanFilter = nil
             if self.pendingResolveCallbacks.isEmpty {
-                self.centralManager.stopScan()
+                self.centralManager?.stopScan()
             }
         }
     }
@@ -96,23 +98,23 @@ public final class MacBleStack: NSObject {
         var result: PlatformStartResult = .started
         bleQueue.sync {
             self.updateAvailability()
-            guard self.availabilityBridge.get() == .ready else {
+            guard self.availabilityBridge.get() == .ready, let centralManager = self.centralManager else {
                 result = .unavailable
                 return
             }
             self.activeShims[uuid] = shim
             if let peripheral = self.resolvePeripheralSync(uuid: uuid) {
                 shim.attach(peripheral: peripheral)
-                self.centralManager.connect(peripheral, options: nil)
+                centralManager.connect(peripheral, options: nil)
             } else {
                 // Fallback when bluetoothd cache lacks the remembered UUID: brief targeted scan to resolve it.
                 self.pendingResolveCallbacks[uuid, default: []].append { [weak self, weak shim] found in
                     guard let self, let shim, self.activeShims[uuid] === shim else { return }
                     shim.attach(peripheral: found)
-                    self.centralManager.connect(found, options: nil)
+                    self.centralManager?.connect(found, options: nil)
                 }
                 if self.activeScanBridge == nil {
-                    self.centralManager.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+                    centralManager.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
                 }
             }
         }
@@ -127,18 +129,18 @@ public final class MacBleStack: NSObject {
             }
             self.pendingResolveCallbacks.removeValue(forKey: uuid)
             if self.activeScanBridge == nil && self.pendingResolveCallbacks.isEmpty {
-                self.centralManager.stopScan()
+                self.centralManager?.stopScan()
             }
             if let peripheral = shim.peripheral {
                 peripheral.delegate = nil
-                self.centralManager.cancelPeripheralConnection(peripheral)
+                self.centralManager?.cancelPeripheralConnection(peripheral)
             }
         }
     }
 
     private func resolvePeripheralSync(uuid: UUID) -> CBPeripheral? {
         if let cached = knownPeripherals[uuid] { return cached }
-        let retrieved = centralManager.retrievePeripherals(withIdentifiers: [uuid])
+        let retrieved = centralManager?.retrievePeripherals(withIdentifiers: [uuid]) ?? []
         if let first = retrieved.first {
             knownPeripherals[uuid] = first
             return first
@@ -147,6 +149,10 @@ public final class MacBleStack: NSObject {
     }
 
     private func updateAvailability() {
+        guard let centralManager else {
+            availabilityBridge.set(value: .bluetoothOff)
+            return
+        }
         let auth = CBManager.authorization
         let availability: BleAvailability
         if centralManager.state == .unsupported {

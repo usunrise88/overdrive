@@ -208,23 +208,23 @@ public final class AppContainer: ObservableObject {
     private var lapPowerCount: Int = 0
     private var autoExpandedStep: Bool = false
 
-    public init(directory: URL? = nil) {
+    public init(directory: URL? = nil, startSubsystems: Bool = true) {
         let base = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Overdrive", isDirectory: true)
         self.dataDirectory = base
         self.settingsStore = SettingsStore(directory: base)
         self.keychain = KeychainStore()
         self.rideStore = MacRideStore(directory: base.appendingPathComponent("rides", isDirectory: true))
-        self.bleStack = MacBleStack()
+        self.bleStack = MacBleStack(autoStart: startSubsystems)
         self.bleLogs = BleLogStore(directory: base.appendingPathComponent("ble-logs", isDirectory: true))
         self.mediaController = MacMediaController()
         self.overlayController = OverlayWindowController()
         self.sleepAssertion = SleepAssertion()
-        self.menuBar = MenuBarController()
+        self.menuBar = MenuBarController(enabled: startSubsystems)
 
-        let loadedSettings = settingsStore.loadSettings()
-        let loadedDevices = settingsStore.loadDevices()
-        let loadedToken = keychain.readToken()
+        let loadedSettings = startSubsystems ? settingsStore.loadSettings() : MacAppSettings()
+        let loadedDevices = startSubsystems ? settingsStore.loadDevices() : RememberedDevices()
+        let loadedToken = startSubsystems ? keychain.readToken() : ""
         self.settings = loadedSettings
         self.rememberedDevices = loadedDevices
         self.syncToken = loadedToken
@@ -234,7 +234,8 @@ public final class AppContainer: ObservableObject {
 
         self.outbox = MacFileOutbox(fileURL: base.appendingPathComponent("sync/outbox.json"))
         self.lastUploadStore = LastUploadStore(fileURL: base.appendingPathComponent("sync/last-upload"))
-        self.lastUploadMillis = lastUploadStore.read()
+        let initialLastUploadMillis = startSubsystems ? lastUploadStore.read() : nil
+        self.lastUploadMillis = initialLastUploadMillis
 
         var configHolder: () -> SyncConfig = { SyncConfig(baseUrl: "", token: "") }
         let transport = AppleCoreFactories.shared.wrapHttpClient(client: self.httpTransport)
@@ -249,7 +250,7 @@ public final class AppContainer: ObservableObject {
             scope: coreScope,
             outbox: self.outbox,
             provider: self.syncProvider,
-            lastSuccessMillis: self.lastUploadMillis.map { KotlinLong(longLong: $0) }
+            lastSuccessMillis: initialLastUploadMillis.map { KotlinLong(longLong: $0) }
         )
         self.planRepo = AppleCoreFactories.shared.createPlanRepository(
             config: { configHolder() },
@@ -312,9 +313,11 @@ public final class AppContainer: ObservableObject {
             }
         )
 
-        configureCallbacks()
-        loadBundledWorkouts()
-        bootstrap()
+        if startSubsystems {
+            configureCallbacks()
+            loadBundledWorkouts()
+            bootstrap()
+        }
     }
 
     // MARK: - Effective Rider Values (Profile overrides local settings, ADR 0021)
