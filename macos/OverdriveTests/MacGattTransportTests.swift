@@ -21,17 +21,17 @@ final class MacGattTransportTests: XCTestCase {
         let transport = MacGattTransport(platform: platform, mode: .active)
 
         let connectResult = try await transport.connect()
-        XCTAssertTrue(connectResult is GattResultOk)
+        XCTAssertTrue(connectResult is GattResultOk<AnyObject>)
 
         let mtuResult = try await transport.requestMtu(mtu: 64)
-        if let ok = mtuResult as? GattResultOk, let negotiated = ok.value as? KotlinInt {
+        if let ok = mtuResult as? GattResultOk<AnyObject>, let negotiated = ok.value as? KotlinInt {
             XCTAssertEqual(negotiated.intValue, 185 + 3)
         } else {
             XCTFail("Expected negotiated MTU")
         }
 
         let servicesResult = try await transport.discoverServices()
-        guard let servicesOk = servicesResult as? GattResultOk,
+        guard let servicesOk = servicesResult as? GattResultOk<AnyObject>,
               let services = servicesOk.value as? GattServices else {
             XCTFail("Expected discovered services")
             return
@@ -44,7 +44,7 @@ final class MacGattTransportTests: XCTestCase {
         XCTAssertNotNil(cp)
 
         let enableResult = try await transport.enable(characteristic: cp!, mode: .indication)
-        XCTAssertTrue(enableResult is GattResultOk)
+        XCTAssertTrue(enableResult is GattResultOk<AnyObject>)
 
         transport.close()
         let afterClose = try await transport.discoverServices()
