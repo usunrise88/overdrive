@@ -151,10 +151,12 @@ jobs:
         run: |
           cp Config/LocalSigning.xcconfig.example Config/LocalSigning.xcconfig
           xcodegen generate
-      - name: Build and test macOS app (unsigned)
+      - name: Build and test macOS app (ad-hoc signed)
         run: >
           xcodebuild test
           -project macos/Overdrive.xcodeproj
           -scheme Overdrive
           -destination 'platform=macOS,arch=arm64'
-          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGN_IDENTITY="-"
+          DEVELOPMENT_TEAM=""
+          ENABLE_HARDENED_RUNTIME=NO

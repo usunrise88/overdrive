@@ -34,7 +34,7 @@ macos-gen: ## Generate macos/Overdrive.xcodeproj with XcodeGen (needs macOS)
 
 macos-test: macos-core macos-gen ## Run Kotlin/Native core tests and Swift unit tests (needs macOS)
 	cd core && ./gradlew macosArm64Test
-	xcodebuild test -project macos/Overdrive.xcodeproj -scheme Overdrive -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO
+	xcodebuild test -project macos/Overdrive.xcodeproj -scheme Overdrive -destination 'platform=macOS,arch=arm64' CODE_SIGN_IDENTITY="-" DEVELOPMENT_TEAM="" ENABLE_HARDENED_RUNTIME=NO
 
 format: ## Auto-format TypeScript and Kotlin
 	pnpm format

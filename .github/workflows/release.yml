@@ -1,8 +1,9 @@
 name: Release
 
-# Push a tag like v0.1.0 (or v0.2.0-alpha.1 for a pre-release) to build signed APKs and publish a
-# GitHub Release. Making the release in the GitHub web UI works too: it creates the tag, and this run
-# then attaches the APKs and the notes to that release. Anything else is a dry run: everything except publishing, which also verifies the
+# Push a tag like v0.1.0 (or v0.6.0-rc.1 for a pre-release) to build signed Android APKs, the
+# Apple Silicon macOS app bundle, and publish a GitHub Release. Making the release in the GitHub
+# web UI works too: it creates the tag, and this run then attaches the assets and the notes to that
+# release. Anything else is a dry run: everything except publishing, which also verifies the
 # signing secrets. Dry runs happen when this file changes on any branch, or manually.
 on:
   push:
@@ -12,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: Build and verify signed APKs, but do not publish a release
+        description: Build and verify release assets, but do not publish a release
         type: boolean
         default: true
 
@@ -24,8 +25,8 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    name: Build, sign and publish
+  android:
+    name: Build and sign Android APKs
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v0.0.0-dry.{0}', github.run_number) }}
@@ -75,7 +76,7 @@ jobs:
           -PoverdriveVersionName="${VERSION#v}"
           -PoverdriveVersionCode="${{ github.run_number }}"
 
-      - name: Verify signatures and collect assets
+      - name: Verify signatures and collect Android assets
         env:
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -84,7 +85,7 @@ jobs:
           expected="$(keytool -list -keystore "$ANDROID_KEYSTORE_FILE" -storepass:env KEYSTORE_PASSWORD -alias "$KEY_ALIAS" \
             | sed -n 's/^Certificate fingerprint (SHA-256): //p' | tr -d ':' | tr 'A-F' 'a-f')"
 
-          mkdir -p dist
+          mkdir -p dist-android
           for app in ride companion; do
             apk="android/app-$app/build/outputs/apk/release/app-$app-release.apk"
             "$apksigner" verify --print-certs "$apk" | tee "$RUNNER_TEMP/certs-$app.txt"
@@ -92,9 +93,111 @@ jobs:
             actual="$(grep -m1 'certificate SHA-256 digest' "$RUNNER_TEMP/certs-$app.txt" | sed 's/.*: //')"
             [ -n "$actual" ] || { echo "::error::Could not read the signer digest of the $app APK"; exit 1; }
             [ "$actual" = "$expected" ] || { echo "::error::$app APK is not signed with the release key"; exit 1; }
-            cp "$apk" "dist/overdrive-$app-${VERSION#v}.apk"
+            cp "$apk" "dist-android/overdrive-$app-${VERSION#v}.apk"
           done
-          (cd dist && sha256sum *.apk > SHA256SUMS && cat SHA256SUMS)
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-android-${{ env.VERSION }}
+          path: dist-android/*
+          if-no-files-found: error
+          retention-days: 1
+
+  macos:
+    name: Build macOS ride app (Apple Silicon)
+    runs-on: macos-15
+    env:
+      VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v0.0.0-dry.{0}', github.run_number) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Build and test Kotlin core Release XCFramework for macosArm64
+        working-directory: core
+        run: |
+          ./gradlew macosArm64Test assembleOverdriveCoreReleaseXCFramework
+          rm -rf build/XCFrameworks/debug
+          mkdir -p build/XCFrameworks/debug
+          cp -R build/XCFrameworks/release/OverdriveCore.xcframework build/XCFrameworks/debug/OverdriveCore.xcframework
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: macos
+        run: |
+          cp Config/LocalSigning.xcconfig.example Config/LocalSigning.xcconfig
+          xcodegen generate
+
+      - name: Run macOS unit tests
+        run: >
+          xcodebuild test
+          -project macos/Overdrive.xcodeproj
+          -scheme Overdrive
+          -destination 'platform=macOS,arch=arm64'
+          CODE_SIGN_IDENTITY="-"
+          DEVELOPMENT_TEAM=""
+          ENABLE_HARDENED_RUNTIME=NO
+
+      - name: Build Release Overdrive.app (Apple Silicon, ad-hoc signed)
+        run: >
+          xcodebuild build
+          -project macos/Overdrive.xcodeproj
+          -scheme Overdrive
+          -configuration Release
+          -destination 'platform=macOS,arch=arm64'
+          -derivedDataPath macos/build
+          MARKETING_VERSION="${VERSION#v}"
+          CURRENT_PROJECT_VERSION="${{ github.run_number }}"
+          CODE_SIGN_IDENTITY="-"
+          DEVELOPMENT_TEAM=""
+          ENABLE_HARDENED_RUNTIME=NO
+
+      - name: Verify and archive Overdrive.app
+        run: |
+          app="macos/build/Build/Products/Release/Overdrive.app"
+          test -d "$app"
+          lipo -archs "$app/Contents/MacOS/Overdrive" | grep -qx 'arm64'
+          codesign --verify --deep --strict "$app"
+          mkdir -p dist-macos
+          ditto -c -k --sequesterRsrc --keepParent "$app" "dist-macos/overdrive-macos-arm64-${VERSION#v}.zip"
+          ls -lh dist-macos/
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-macos-${{ env.VERSION }}
+          path: dist-macos/*
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    name: Collect checksums and publish
+    needs: [android, macos]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v0.0.0-dry.{0}', github.run_number) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: dist-android-${{ env.VERSION }}
+          path: dist
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: dist-macos-${{ env.VERSION }}
+          path: dist
+
+      - name: Generate SHA256SUMS
+        run: |
+          (cd dist && sha256sum overdrive-*.apk overdrive-*.zip > SHA256SUMS && cat SHA256SUMS)
 
       - uses: actions/upload-artifact@v7
         with:
