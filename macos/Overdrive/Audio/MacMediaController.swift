@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import AudioToolbox
 import CoreAudio
 import Foundation
 import OverdriveCore

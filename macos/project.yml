@@ -52,13 +52,14 @@ targets:
         FRAMEWORK_SEARCH_PATHS:
           - "$(inherited)"
           - "$(SRCROOT)/../core/build/XCFrameworks/debug"
-          - "$(SRCROOT)/../core/build/XCFrameworks/release"
         OTHER_LDFLAGS:
           - "$(inherited)"
           - "-framework"
           - "CoreBluetooth"
           - "-framework"
           - "CoreAudio"
+          - "-framework"
+          - "AudioToolbox"
           - "-framework"
           - "AVFoundation"
           - "-framework"
@@ -71,6 +72,7 @@ targets:
         implicit: false
       - sdk: CoreBluetooth.framework
       - sdk: CoreAudio.framework
+      - sdk: AudioToolbox.framework
       - sdk: AVFoundation.framework
       - sdk: Security.framework
       - sdk: ApplicationServices.framework
